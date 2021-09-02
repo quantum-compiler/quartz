@@ -6,7 +6,7 @@
 
 int main() {
   std::cout << "Hello, World!" << std::endl;
-  std::unique_ptr<Gate> x = std::make_unique<XGate>();
-  x->to_matrix()->print();
+  std::unique_ptr<Gate> y = std::make_unique<YGate>();
+  y->to_matrix()->print();
   return 0;
 }

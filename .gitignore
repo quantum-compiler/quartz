@@ -23,7 +23,7 @@
 # Compiled Static libraries
 *.lai
 *.la
-*.data_
+*.a
 *.lib
 
 # Executables
@@ -31,5 +31,8 @@
 *.out
 *.app
 
+# CMake
 cmake-build-*
+
+# IDE
 .idea/

@@ -2,11 +2,11 @@
 #include "../dagcircuit/dagcircuit.h"
 #include "../math/matrix.h"
 
-#include "iostream"
+#include <iostream>
 
 int main() {
   std::cout << "Hello, World!" << std::endl;
-  XGate x;
-  x.to_matrix()->print();
+  std::unique_ptr<Gate> x = std::make_unique<XGate>();
+  x->to_matrix()->print();
   return 0;
 }

@@ -15,6 +15,6 @@ class DAGNode {
     internal_param
   };
   Type type;
-  std::vector<DAGHyperEdge *> input_edge;
-  std::vector<DAGHyperEdge *> output_edge;
+  std::vector<DAGHyperEdge *> input_edges;
+  std::vector<DAGHyperEdge *> output_edges;
 };

@@ -9,8 +9,8 @@ class DAGNode;
 // A hyperedge in DAG corresponds to a gate in the circuit.
 class DAGHyperEdge {
  public:
-  std::vector<DAGNode *> input_node;  // Nodes including parameters!
-  std::vector<DAGNode *> output_node;
+  std::vector<DAGNode *> input_nodes;  // Nodes including parameters!
+  std::vector<DAGNode *> output_nodes;
 
-  std::unique_ptr<Gate> gate;
+  const Gate* gate;
 };

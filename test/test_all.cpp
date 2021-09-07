@@ -1,5 +1,5 @@
 #include "../gate/all_gates.h"
-#include "../dagcircuit/dag.h"
+#include "../dag/dag.h"
 #include "../math/matrix.h"
 
 #include <iostream>

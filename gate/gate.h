@@ -7,6 +7,7 @@
 
 class Gate {
 public:
+  // TODO: Return a raw pointer in this function
   virtual std::unique_ptr<MatrixBase> to_matrix() const {
     std::cerr << "Gate::to_matrix() called." << std::endl;
     return std::make_unique<MatrixBase>();

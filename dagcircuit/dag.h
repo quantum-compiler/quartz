@@ -2,6 +2,8 @@
 
 #include "dagnode.h"
 #include "daghyperedge.h"
+#include "utils.h"
+#include "../gate/gate.h"
 
 class DAG {
 public:

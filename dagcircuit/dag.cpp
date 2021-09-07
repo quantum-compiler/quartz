@@ -1,5 +1,5 @@
-#include "dagcircuit.h"
-#include <assert.h>
+#include "dag.h"
+#include <cassert>
 
 DAG::DAG(int _num_qubits, int _num_parameters)
 : num_qubits(_num_qubits), num_parameters(_num_parameters)
@@ -29,7 +29,7 @@ bool DAG::add_gate(const std::vector<int>& qubit_indices,
     return false;
   if (gate->get_num_parameters() != parameter_indices.size())
     return false;
-  if (gate->is_parameter_gate() && output_para_index == NULL)
+  if (gate->is_parameter_gate() && output_para_index == nullptr)
     return false;
   // qubit indices must stay in range
   for (auto qubit_idx : qubit_indices)

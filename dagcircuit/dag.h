@@ -6,6 +6,7 @@
 class DAG {
 public:
   DAG(int _num_qubits, int _num_parameters);
+  ~DAG();
   std::vector<DAGNode*> nodes;
   std::vector<DAGHyperEdge*> edges;
   // The gates' information is owned by edges.

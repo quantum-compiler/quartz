@@ -75,3 +75,11 @@ int DAG::get_num_qubits() const
 {
   return num_qubits;
 }
+
+DAG::~DAG()
+{
+  for (auto node : nodes)
+    delete node;
+  for (auto edge : edges)
+    delete edge;
+}

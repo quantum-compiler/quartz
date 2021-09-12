@@ -1,7 +1,7 @@
 #include "gate.h"
 
-Gate::Gate(int _num_qubits, int _num_parameters)
-    : num_qubits(_num_qubits), num_parameters(_num_parameters) {}
+Gate::Gate(GateType tp, int num_qubits, int num_parameters)
+    : tp(tp), num_qubits(num_qubits), num_parameters(num_parameters) {}
 
 int Gate::get_num_qubits() const {
   return num_qubits;

@@ -4,7 +4,7 @@
 
 class YGate : public Gate {
 public:
-  YGate() : Gate(1/*num_qubits*/, 0/*num_parameters*/) {}
+  YGate() : Gate(GateType::y, 1/*num_qubits*/, 0/*num_parameters*/) {}
   std::unique_ptr<MatrixBase> to_matrix() const {
     using namespace std::complex_literals;
     return std::make_unique<Matrix<2>>(Matrix<2>({{0, -1.0i}, {1.0i, 0}}));

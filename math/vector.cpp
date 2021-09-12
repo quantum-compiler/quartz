@@ -1,4 +1,5 @@
 #include "vector.h"
+#include "../utils/utils.h"
 #include <cassert>
 
 bool Vector::apply_matrix(MatrixBase *mat,
@@ -34,7 +35,7 @@ bool Vector::apply_matrix(MatrixBase *mat,
             index ^= (1 << qubit_indices[l]);
           }
         }
-        buffer[j] += mat[j][k] * data_[index];
+        buffer[j] += (*mat)[j][k] * data_[index];
       }
     }
 

@@ -4,7 +4,7 @@
 
 class XGate : public Gate {
  public:
-  XGate(): Gate(1/*num_qubits*/, 0/*num_parameters*/) {}
+  XGate(): Gate(GateType::x, 1/*num_qubits*/, 0/*num_parameters*/) {}
   std::unique_ptr<MatrixBase> to_matrix() const {
     return std::make_unique<Matrix<2>>(Matrix<2>({{0, 1}, {1, 0}}));
   }

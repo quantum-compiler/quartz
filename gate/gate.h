@@ -22,3 +22,10 @@ class Gate {
   GateType tp;
   int num_qubits, num_parameters;
 };
+
+// Include all gate names here.
+#define PER_GATE(x, XGate) class XGate;
+
+#include "gates.inc.h"
+
+#undef PER_GATE

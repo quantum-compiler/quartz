@@ -18,17 +18,16 @@ bool Context::insert_gate(GateType tp) {
   }
   std::unique_ptr<Gate> new_gate;
 
-#define CASE(x, XGate)                      \
+#define PER_GATE(x, XGate)                  \
     case GateType::x:                       \
       new_gate = std::make_unique<XGate>(); \
-      break
+      break;
 
   switch (tp) {
-    CASE(x, XGate);
-    CASE(y, YGate);
+#include "../gate/gates.inc.h"
   }
 
-#undef CASE
+#undef PER_GATE
 
   gates_[tp] = std::move(new_gate);
   return true;

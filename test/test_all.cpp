@@ -1,4 +1,4 @@
-#include "../gate/all_gates.h"
+#include "../gate/gate.h"
 #include "../dag/dag.h"
 #include "../math/vector.h"
 #include "../context/context.h"

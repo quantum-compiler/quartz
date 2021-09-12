@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils.h"
+#include "../utils/utils.h"
 #include "../gate/gate.h"
 
 #include <vector>

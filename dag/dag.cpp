@@ -67,6 +67,7 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
     }
   }
   edges.push_back(std::move(edge));
+  return true;
 }
 
 int DAG::get_num_qubits() const {

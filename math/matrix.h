@@ -3,12 +3,13 @@
 #include <cstring>
 #include <complex>
 #include <iostream>
+#include "../utils/utils.h"
 
 class MatrixBase {
  public:
   virtual void clear() {}
-  virtual std::complex<double> *operator[](int x) { return nullptr; }
-  virtual const std::complex<double> *operator[](int x) const { return nullptr; }
+  virtual ComplexType *operator[](int x) { return nullptr; }
+  virtual const ComplexType *operator[](int x) const { return nullptr; }
   virtual MatrixBase operator*(const MatrixBase &other) const { return MatrixBase(); }
   virtual MatrixBase &operator*=(const MatrixBase &b) { return *this; }
   virtual void print() const {}
@@ -20,8 +21,8 @@ class Matrix : public MatrixBase {
  public:
   void clear() { memset(data_, 0, sizeof(data_)); }
   Matrix() : data_(0) {}
-  Matrix(std::complex<double> data[kSize][kSize]) : data_(data) {}
-  Matrix(std::initializer_list<std::initializer_list<std::complex<double>>> data) {
+  Matrix(ComplexType data[kSize][kSize]) : data_(data) {}
+  Matrix(std::initializer_list<std::initializer_list<ComplexType>> data) {
     int counter = 0;
     for (auto &row : data) {
       std::copy(row.begin(), row.end(), data_[counter++]);
@@ -33,8 +34,8 @@ class Matrix : public MatrixBase {
       I[i][i] = 1;
     return I;
   }
-  std::complex<double> *operator[](int x) { return data_[x]; }
-  const std::complex<double> *operator[](int x) const { return data_[x]; }
+  ComplexType *operator[](int x) { return data_[x]; }
+  const ComplexType *operator[](int x) const { return data_[x]; }
   Matrix operator*(const Matrix &other) const {
     Matrix result;
     for (int i = 0; i < kSize; i++) {
@@ -60,5 +61,5 @@ class Matrix : public MatrixBase {
     }
   }
  private:
-  std::complex<double> data_[kSize][kSize];
+  ComplexType data_[kSize][kSize];
 };

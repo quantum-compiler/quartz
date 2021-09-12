@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstring>
-#include <complex>
 #include <iostream>
 #include "../utils/utils.h"
 
@@ -13,6 +12,7 @@ class MatrixBase {
   virtual MatrixBase operator*(const MatrixBase &other) const { return MatrixBase(); }
   virtual MatrixBase &operator*=(const MatrixBase &b) { return *this; }
   virtual void print() const {}
+  virtual int size() const { return -1; }
   virtual ~MatrixBase() = default;
 };
 
@@ -59,6 +59,9 @@ class Matrix : public MatrixBase {
         std::cout << data_[i][j] << " ";
       std::cout << std::endl;
     }
+  }
+  int size() const {
+    return kSize;
   }
  private:
   ComplexType data_[kSize][kSize];

@@ -4,6 +4,7 @@
 #include "daghyperedge.h"
 #include "../utils/utils.h"
 #include "../gate/gate.h"
+#include "../math/vector.h"
 
 class DAG {
  public:
@@ -17,9 +18,9 @@ class DAG {
                 const std::vector<int> &parameter_indices,
                 const Gate *gate,
                 int *output_para_index);
-  bool evaluate(const std::vector<ComplexType> &input_dis,
+  bool evaluate(const Vector &input_dis,
                 const std::vector<ParamType> &parameters,
-                std::vector<ComplexType> &output_dis) const;
+                Vector &output_dis) const;
   int get_num_qubits() const;
   int num_qubits, num_parameters;
 };

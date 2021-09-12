@@ -1,6 +1,6 @@
 #include "../gate/all_gates.h"
 #include "../dag/dag.h"
-#include "../math/matrix.h"
+#include "../math/vector.h"
 
 #include <iostream>
 

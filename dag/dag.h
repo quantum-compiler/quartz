@@ -19,8 +19,11 @@ class DAG {
                 const Gate *gate,
                 int *output_para_index);
   bool evaluate(const Vector &input_dis,
-                const std::vector<ParamType> &parameters,
+                const std::vector<ParamType> &input_parameters,
                 Vector &output_dis) const;
-  int get_num_qubits() const;
-  int num_qubits, num_parameters;
+  [[nodiscard]] int get_num_qubits() const;
+  [[nodiscard]] int get_num_input_parameters() const;
+  [[nodiscard]] int get_num_total_parameters() const;
+ private:
+  int num_qubits, num_input_parameters;
 };

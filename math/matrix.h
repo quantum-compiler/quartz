@@ -20,7 +20,7 @@ template<int kSize>
 class Matrix : public MatrixBase {
  public:
   void clear() { memset(data_, 0, sizeof(data_)); }
-  Matrix() : data_(0) {}
+  Matrix() = default;
   Matrix(ComplexType data[kSize][kSize]) : data_(data) {}
   Matrix(std::initializer_list<std::initializer_list<ComplexType>> data) {
     int counter = 0;

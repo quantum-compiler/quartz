@@ -10,6 +10,6 @@ int main() {
   Context ctx({GateType::x, GateType::y});
 
   auto y = ctx.get_gate(GateType::y);
-  y->to_matrix()->print();
+  y->get_matrix()->print();
   return 0;
 }

@@ -4,15 +4,17 @@
 
 class XGate : public Gate {
  public:
-  XGate(): Gate(GateType::x, 1/*num_qubits*/, 0/*num_parameters*/) {}
-  std::unique_ptr<MatrixBase> to_matrix() const {
-    return std::make_unique<Matrix<2>>(Matrix<2>({{0, 1}, {1, 0}}));
+  XGate() : Gate(GateType::x, 1/*num_qubits*/, 0/*num_parameters*/),
+            mat({{0, 1}, {1, 0}}) {}
+
+  MatrixBase *get_matrix() override {
+    return &mat;
   }
-  bool is_parameter_gate() const {
+  bool is_parameter_gate() const override {
     return false;
   }
-  bool is_quantum_gate() const {
+  bool is_quantum_gate() const override {
     return true;
   }
-
+  Matrix<2> mat;
 };

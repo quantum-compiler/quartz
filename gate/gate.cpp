@@ -25,3 +25,15 @@ int Gate::get_num_qubits() const {
 int Gate::get_num_parameters() const {
   return num_parameters;
 }
+
+bool Gate::is_parameter_gate() const {
+  return num_qubits == 0;
+}
+
+bool Gate::is_quantum_gate() const {
+  return num_qubits > 0;
+}
+
+bool Gate::is_parametrized_gate() const {
+  return num_qubits > 0 && num_parameters > 0;
+}

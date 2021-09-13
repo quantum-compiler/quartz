@@ -10,11 +10,5 @@ class XGate : public Gate {
   MatrixBase *get_matrix() override {
     return &mat;
   }
-  bool is_parameter_gate() const override {
-    return false;
-  }
-  bool is_quantum_gate() const override {
-    return true;
-  }
   Matrix<2> mat;
 };

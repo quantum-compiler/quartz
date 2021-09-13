@@ -1,5 +1,4 @@
 #include "vector.h"
-#include "../utils/utils.h"
 
 #include <cassert>
 #include <iomanip>
@@ -8,10 +7,10 @@
 
 bool Vector::apply_matrix(MatrixBase *mat,
                           const std::vector<int> &qubit_indices) {
-  const int n0 = qubit_indices.size();
+  const int n0 = (int) qubit_indices.size();
   assert(n0 <= 30);  // 1 << n0 does not overflow
   assert(mat->size() == (1 << n0));
-  const int S = data_.size();
+  const int S = (int) data_.size();
   assert(S >= (1 << n0));
 
   std::vector<ComplexType> buffer(1 << n0);

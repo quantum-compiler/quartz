@@ -16,7 +16,7 @@ class DAG {
   std::vector<DAGNode *> parameters;
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices,
-                const Gate *gate,
+                Gate *gate,
                 int *output_para_index);
   bool evaluate(const Vector &input_dis,
                 const std::vector<ParamType> &input_parameters,

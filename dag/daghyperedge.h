@@ -13,5 +13,5 @@ class DAGHyperEdge {
   std::vector<DAGNode *> input_nodes;  // Nodes including parameters!
   std::vector<DAGNode *> output_nodes;
 
-  const Gate* gate;
+  Gate* gate;
 };

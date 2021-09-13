@@ -1,6 +1,10 @@
 #include "vector.h"
 #include "../utils/utils.h"
+
 #include <cassert>
+#include <iomanip>
+#include <iostream>
+#include <random>
 
 bool Vector::apply_matrix(MatrixBase *mat,
                           const std::vector<int> &qubit_indices) {
@@ -50,4 +54,41 @@ bool Vector::apply_matrix(MatrixBase *mat,
     }
   }
   return true;
+}
+
+void Vector::print() const {
+  std::cout << "[" << std::setprecision(4);
+  for (int i = 0; i < size(); i++) {
+    std::cout << data_[i];
+    if (i != size() - 1)
+      std::cout << " ";
+  }
+  std::cout << "]" << std::endl;
+}
+
+Vector Vector::random_generate(int num_qubits) {
+  // Standard mersenne_twister_engine seeded with 0
+  static std::mt19937 gen(0);
+  static std::uniform_real_distribution<ComplexType::value_type> dis(0, 1);
+
+  Vector result(1 << num_qubits);
+  ComplexType::value_type remaining_norm = 1;
+  int remaining_numbers = (2 << num_qubits);
+
+  auto generate = [&] () {
+    auto number = remaining_norm;
+    if (remaining_numbers > 1) {
+      // Same algorithm as WeChat red packet
+      number = dis(gen) * (remaining_norm / remaining_numbers * 2);
+    }
+    remaining_numbers--;
+    remaining_norm -= number;
+    return std::sqrt(number);
+  };
+
+  for (int i = 0; i < (1 << num_qubits); i++) {
+    result[i].real(generate());
+    result[i].imag(generate());
+  }
+  return result;
 }

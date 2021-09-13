@@ -14,7 +14,16 @@ class DAGNode {
     input_param,
     internal_param
   };
+
+  [[nodiscard]] bool is_qubit() const;
+  [[nodiscard]] bool is_parameter() const;
+
   Type type;
+  // If this node is a qubit, |index| is the qubit id it correspond to,
+  // ranging [0, get_num_qubits()).
+  // If this node is a parameter, |index| is the parameter id,
+  // ranging [0, get_num_total_parameters()).
+  int index;
   std::vector<DAGHyperEdge *> input_edges;
   std::vector<DAGHyperEdge *> output_edges;
 };

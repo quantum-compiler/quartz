@@ -1,4 +1,6 @@
 #include "dag.h"
+#include "../gate/gate.h"
+
 #include <cassert>
 
 DAG::DAG(int _num_qubits, int _num_parameters)
@@ -7,6 +9,7 @@ DAG::DAG(int _num_qubits, int _num_parameters)
   for (int i = 0; i < num_qubits; i++) {
     auto node = std::make_unique<DAGNode>();
     node->type = DAGNode::input_qubit;
+    node->index = i;
     outputs.push_back(node.get());
     nodes.push_back(std::move(node));
   }
@@ -14,6 +17,7 @@ DAG::DAG(int _num_qubits, int _num_parameters)
   for (int i = 0; i < num_input_parameters; i++) {
     auto node = std::make_unique<DAGNode>();
     node->type = DAGNode::input_param;
+    node->index = i;
     parameters.push_back(node.get());
     nodes.push_back(std::move(node));
   }
@@ -21,7 +25,7 @@ DAG::DAG(int _num_qubits, int _num_parameters)
 
 bool DAG::add_gate(const std::vector<int> &qubit_indices,
                    const std::vector<int> &parameter_indices,
-                   const Gate *gate,
+                   Gate *gate,
                    int *output_para_index) {
   if (gate->get_num_qubits() != qubit_indices.size())
     return false;
@@ -50,16 +54,17 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
   if (gate->is_parameter_gate()) {
     auto node = std::make_unique<DAGNode>();
     node->type = DAGNode::internal_param;
+    node->index = *output_para_index = (int) parameters.size();
     node->input_edges.push_back(edge.get());
     edge->output_nodes.push_back(node.get());
     parameters.push_back(node.get());
-    *output_para_index = (int) parameters.size();
     nodes.push_back(std::move(node));
   } else {
     assert(gate->is_quantum_gate());
     for (auto qubit_idx : qubit_indices) {
       auto node = std::make_unique<DAGNode>();
-      node->type = DAGNode::internal_param;
+      node->type = DAGNode::internal_qubit;
+      node->index = qubit_idx;
       node->input_edges.push_back(edge.get());
       edge->output_nodes.push_back(node.get());
       outputs[qubit_idx] = node.get(); // Update outputs
@@ -87,7 +92,26 @@ bool DAG::evaluate(const Vector &input_dis,
   // Assume the edges are already sorted in the topological order.
   const int num_edges = (int) edges.size();
   for (int i = 0; i < num_edges; i++) {
-    // TODO
+    std::vector<int> qubit_indices;
+    std::vector<ParamType> params;
+    for (const auto &input_node : edges[i]->input_nodes) {
+      if (input_node->is_qubit()) {
+        qubit_indices.push_back(input_node->index);
+      } else {
+        params.push_back(parameter_values[input_node->index]);
+      }
+    }
+    if (edges[i]->gate->is_parameter_gate()) {
+      // A parameter gate. Compute the new parameter.
+      assert(edges[i]->output_nodes.size() == 1);
+      const auto &output_node = edges[i]->output_nodes[0];
+      parameter_values[output_node->index] = edges[i]->gate->compute(params);
+    } else {
+      // A quantum gate. Update the distribution.
+      assert(edges[i]->gate->is_quantum_gate());
+      auto *mat = edges[i]->gate->get_matrix(params);
+      output_dis.apply_matrix(mat, qubit_indices);
+    }
   }
   return true;
 }

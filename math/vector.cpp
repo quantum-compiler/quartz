@@ -69,7 +69,8 @@ void Vector::print() const {
 Vector Vector::random_generate(int num_qubits) {
   // Standard mersenne_twister_engine seeded with 0
   static std::mt19937 gen(0);
-  static std::uniform_real_distribution<ComplexType::value_type> dis(0, 1);
+  static std::uniform_real_distribution<ComplexType::value_type> dis_real(0, 1);
+  static std::uniform_int_distribution<int> dis_int(0, 1);
 
   Vector result(1 << num_qubits);
   ComplexType::value_type remaining_norm = 1;
@@ -79,11 +80,15 @@ Vector Vector::random_generate(int num_qubits) {
     auto number = remaining_norm;
     if (remaining_numbers > 1) {
       // Same algorithm as WeChat red packet
-      number = dis(gen) * (remaining_norm / remaining_numbers * 2);
+      number = dis_real(gen) * (remaining_norm / remaining_numbers * 2);
     }
     remaining_numbers--;
     remaining_norm -= number;
-    return std::sqrt(number);
+    number = std::sqrt(number);
+    if (dis_int(gen)) {
+      number = -number;
+    }
+    return number;
   };
 
   for (int i = 0; i < (1 << num_qubits); i++) {

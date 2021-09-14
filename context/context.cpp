@@ -1,7 +1,8 @@
 #include "context.h"
 #include "../gate/all_gates.h"
 
-Context::Context(const std::vector<GateType> &supported_gates) {
+Context::Context(const std::vector<GateType> &supported_gates)
+    : supported_gates_(supported_gates) {
   gates_.reserve(supported_gates.size());
   for (const auto &gate : supported_gates) {
     insert_gate(gate);
@@ -31,4 +32,8 @@ bool Context::insert_gate(GateType tp) {
 
   gates_[tp] = std::move(new_gate);
   return true;
+}
+
+const std::vector<GateType> &Context::get_supported_gates() const {
+  return supported_gates_;
 }

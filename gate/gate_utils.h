@@ -2,7 +2,10 @@
 
 enum class GateType {
   x,
-  y
+  y,
+  rx,
+  ry,
+  rz
 };
 
 class Gate;

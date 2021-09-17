@@ -21,6 +21,7 @@ class DAG {
                 const std::vector<int> &parameter_indices,
                 Gate *gate,
                 int *output_para_index);
+  bool remove_last_gate();
   bool evaluate(const Vector &input_dis,
                 const std::vector<ParamType> &input_parameters,
                 Vector &output_dis) const;

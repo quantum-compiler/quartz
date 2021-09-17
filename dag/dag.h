@@ -24,6 +24,7 @@ class DAG {
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
+  size_t hash(Context* ctx) const;
  private:
   int num_qubits, num_input_parameters;
 };

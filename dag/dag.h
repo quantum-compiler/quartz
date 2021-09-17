@@ -6,9 +6,12 @@
 #include "../gate/gate.h"
 #include "../math/vector.h"
 
+class Context;
+
 class DAG {
  public:
   DAG(int _num_qubits, int _num_parameters);
+  DAG(const DAG &other);  // clone a DAG
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;
   // The gates' information is owned by edges.
@@ -24,7 +27,9 @@ class DAG {
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
-  size_t hash(Context* ctx) const;
+  size_t hash(Context* ctx);
  private:
   int num_qubits, num_input_parameters;
+  size_t hash_value_;
+  bool hash_value_valid_;
 };

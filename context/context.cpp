@@ -1,6 +1,9 @@
 #include "context.h"
 #include "../gate/all_gates.h"
 
+#include <cassert>
+#include <random>
+
 Context::Context(const std::vector<GateType> &supported_gates)
     : supported_gates_(supported_gates) {
   gates_.reserve(supported_gates.size());
@@ -36,4 +39,43 @@ bool Context::insert_gate(GateType tp) {
 
 const std::vector<GateType> &Context::get_supported_gates() const {
   return supported_gates_;
+}
+
+const Vector &Context::get_generated_input_dis(int num_qubits) {
+  assert(num_qubits >= 0);
+  if (random_input_distribution_.size() <= num_qubits) {
+    random_input_distribution_.resize(num_qubits + 1);
+  }
+  if (random_input_distribution_[num_qubits].size() == 0) {
+    random_input_distribution_[num_qubits] =
+        Vector::random_generate(num_qubits);
+  }
+  return random_input_distribution_[num_qubits];
+}
+
+const Vector &Context::get_generated_hashing_dis(int num_qubits) {
+  assert(num_qubits >= 0);
+  if (random_hashing_distribution_.size() <= num_qubits) {
+    random_hashing_distribution_.resize(num_qubits + 1);
+  }
+  if (random_hashing_distribution_[num_qubits].size() == 0) {
+    random_hashing_distribution_[num_qubits] =
+        Vector::random_generate(num_qubits);
+  }
+  return random_hashing_distribution_[num_qubits];
+}
+
+std::vector<ParamType> Context::get_generated_parameters(int num_params) {
+  assert(num_params >= 0);
+  if (random_parameters_.size() < num_params) {
+    // Standard mersenne_twister_engine seeded with 0
+    static std::mt19937 gen(0);
+    static ParamType pi = ((ParamType) -1.0);
+    static std::uniform_real_distribution<ParamType> dis_real(-pi, pi);
+    while (random_parameters_.size() < num_params) {
+      random_parameters_.emplace_back(dis_real(gen));
+    }
+  }
+  return std::vector<ParamType>(random_parameters_.begin(),
+                                random_parameters_.begin() + num_params);
 }

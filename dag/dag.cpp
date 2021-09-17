@@ -1,10 +1,13 @@
 #include "dag.h"
 #include "../gate/gate.h"
+#include "../context/context.h"
 
 #include <cassert>
 
 DAG::DAG(int _num_qubits, int _num_parameters)
-    : num_qubits(_num_qubits), num_input_parameters(_num_parameters) {
+    : num_qubits(_num_qubits),
+      num_input_parameters(_num_parameters),
+      hash_value_valid_(false) {
   // Initialize num_qubits qubits
   for (int i = 0; i < num_qubits; i++) {
     auto node = std::make_unique<DAGNode>();
@@ -21,6 +24,10 @@ DAG::DAG(int _num_qubits, int _num_parameters)
     parameters.push_back(node.get());
     nodes.push_back(std::move(node));
   }
+}
+
+DAG::DAG(const DAG &other) {
+  // TODO: implement
 }
 
 bool DAG::add_gate(const std::vector<int> &qubit_indices,
@@ -72,6 +79,7 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
     }
   }
   edges.push_back(std::move(edge));
+  hash_value_valid_ = false;
   return true;
 }
 
@@ -126,4 +134,26 @@ int DAG::get_num_input_parameters() const {
 
 int DAG::get_num_total_parameters() const {
   return (int) parameters.size();
+}
+
+size_t DAG::hash(Context *ctx) {
+  if (hash_value_valid_) {
+    return hash_value_;
+  }
+  const Vector &input_dis = ctx->get_generated_input_dis(get_num_qubits());
+  Vector output_dis;
+  evaluate(input_dis,
+           ctx->get_generated_parameters(get_num_input_parameters()),
+           output_dis);
+  ComplexType dot_product =
+      output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
+  const int discard_bits = 10;
+  assert(typeid(ComplexType::value_type) == typeid(double));
+  assert(sizeof(size_t) == sizeof(double));
+  auto val1 = dot_product.real(), val2 = dot_product.imag();
+  size_t result = *((size_t *) (&val1)) >> discard_bits << discard_bits;
+  result ^= *((size_t *) (&val2)) >> discard_bits;
+  hash_value_ = result;
+  hash_value_valid_ = true;
+  return result;
 }

@@ -15,6 +15,7 @@ class Vector {
   const ComplexType &operator[](int x) const { return data_[x]; }
   [[nodiscard]] int size() const { return (int) data_.size(); }
   bool apply_matrix(MatrixBase *mat, const std::vector<int> &qubit_indices);
+  [[nodiscard]] ComplexType dot(const Vector &other) const;  // dot product
   void print() const;
 
   static Vector random_generate(int num_qubits);

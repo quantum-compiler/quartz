@@ -96,3 +96,12 @@ Vector Vector::random_generate(int num_qubits) {
   }
   return result;
 }
+
+ComplexType Vector::dot(const Vector &other) const {
+  assert(size() == other.size());
+  ComplexType result = 0;
+  for (int i = 0; i < size(); i++) {
+    result += data_[i] * other[i];
+  }
+  return result;
+}

@@ -83,6 +83,43 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
   return true;
 }
 
+bool DAG::remove_last_gate() {
+  if (edges.empty()) {
+    return false;
+  }
+
+  auto *edge = edges.back().get();
+  auto *gate = edge->gate;
+  // Remove edges from input nodes.
+  for (auto *input_node : edge->input_nodes) {
+    assert(input_node->output_edges.back() == edge);
+    input_node->output_edges.pop_back();
+  }
+
+  if (gate->is_parameter_gate()) {
+    // Remove the parameter.
+    assert(nodes.back()->type == DAGNode::internal_param);
+    assert(nodes.back()->index == (int) parameters.size() - 1);
+    parameters.pop_back();
+  } else {
+    assert(gate->is_quantum_gate());
+    // Restore the outputs.
+    for (auto *input_node : edge->input_nodes) {
+      if (input_node->is_qubit()) {
+        outputs[input_node->index] = input_node;
+      }
+    }
+    // Remove the qubit wires.
+    while (!nodes.empty() && nodes.back()->input_edges.back() == edge) {
+      nodes.pop_back();
+    }
+  }
+
+  // Remove the edge.
+  edges.pop_back();
+  return true;
+}
+
 bool DAG::evaluate(const Vector &input_dis,
                    const std::vector<ParamType> &input_parameters,
                    Vector &output_dis) const {

@@ -241,7 +241,7 @@ DAGHashType DAG::hash(Context *ctx) {
   return result;
 }
 
-bool DAG::print(Context *ctx) const {
+void DAG::print(Context *ctx) const {
   for (size_t i = 0; i < edges.size(); i++) {
     DAGHyperEdge* edge = edges[i].get();
     printf("gate[%zu] type(%d)\n", i, edge->gate->tp);

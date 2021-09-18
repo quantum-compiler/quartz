@@ -32,7 +32,7 @@ class DAG {
   [[nodiscard]] int get_num_total_parameters() const;
   DAGHashType hash(Context* ctx);
   [[nodiscard]] std::string to_string() const;
-  bool print(Context* ctx) const;
+  void print(Context* ctx) const;
  private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;

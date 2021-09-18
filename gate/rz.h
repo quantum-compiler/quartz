@@ -5,7 +5,7 @@
 
 class RZGate : public Gate {
 public:
-  RZGate() : Gate(GateType::rx, 1/*num_qubits*/, 1/*num_parameters*/) {}
+  RZGate() : Gate(GateType::rz, 1/*num_qubits*/, 1/*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);
     ParamType theta = params[0];

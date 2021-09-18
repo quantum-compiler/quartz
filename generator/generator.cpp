@@ -8,7 +8,7 @@ void Generator::generate(int num_qubits,
                          std::unordered_map<DAGHashType,
                                             std::unordered_set<DAG *> > &dataset) {
   DAG *dag = new DAG(num_qubits, max_num_parameters);
-  std::vector<bool> used_parameters(max_num_parameters, false);
+  std::vector<int> used_parameters(max_num_parameters, 0);
   dfs(0, max_num_gates, dag, used_parameters, dataset);
   for (const auto& it : dataset) {
     for (const auto& dag : it.second) {
@@ -21,7 +21,7 @@ void Generator::generate(int num_qubits,
 void Generator::dfs(int gate_idx,
                     int max_num_gates,
                     DAG *dag,
-                    std::vector<bool> &used_parameters,
+                    std::vector<int> &used_parameters,
                     std::unordered_map<DAGHashType,
                                        std::unordered_set<DAG *> > &dataset) {
   bool pass_checks = true;
@@ -32,7 +32,7 @@ void Generator::dfs(int gate_idx,
       pass_checks = false;
   // check that parameters are used in an increasing order
   for (int i = 1; i < dag->get_num_input_parameters(); i++)
-    if (used_parameters[i] && !used_parameters[i - 1])
+    if (used_parameters[i] > 0 && used_parameters[i - 1] == 0)
       pass_checks = false;
   // Return if we fail any checks
   if (!pass_checks)
@@ -47,7 +47,33 @@ void Generator::dfs(int gate_idx,
   std::vector<int> parameter_indices;
   for (const auto& idx : context->get_supported_gates()) {
     Gate* gate = context->get_gate(idx);
-    if (gate->get_num_qubits() == 1) {
+    if (gate->get_num_qubits() == 0) {
+      if (gate->get_num_parameters() == 1) {
+        assert(false && "Unsupported gate type");
+      } else if (gate->get_num_parameters() == 2) {
+        // Case: 0-qubit operators with 2 parameters
+        for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+          parameter_indices.push_back(p1);
+          used_parameters[p1] += 1;
+          for (int p2 = 0; p2 < dag->get_num_total_parameters(); p2++) {
+            parameter_indices.push_back(p2);
+            used_parameters[p2] += 1;
+	    int output_param_index;
+            bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, &output_param_index);
+            assert(ret);
+            dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
+            ret = dag->remove_last_gate();
+            assert(ret);
+            used_parameters[p2] -= 1;
+            parameter_indices.pop_back();
+          }
+          used_parameters[p1] -= 1;
+          parameter_indices.pop_back();
+        }
+      } else {
+        assert(false && "Unsupported gate type");
+      }
+    } else if (gate->get_num_qubits() == 1) {
       if (gate->get_num_parameters() == 0) {
         // Case: 1-qubit operators without parameters
         for (int i = 0; i < dag->get_num_qubits(); i++) {
@@ -67,15 +93,9 @@ void Generator::dfs(int gate_idx,
             parameter_indices.push_back(p1);
             bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
 	    assert(ret);
-            bool old_used_p1 = false;
-            if (p1 < dag->get_num_input_parameters()) {
-              old_used_p1 = used_parameters[p1];
-              used_parameters[p1] = true;
-            }
+            used_parameters[p1] += 1;
             dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
-            if (p1 < dag->get_num_input_parameters()) {
-              used_parameters[p1] = old_used_p1;
-            }
+            used_parameters[p1] -= 1;
             ret = dag->remove_last_gate();
 	    assert(ret);
             parameter_indices.pop_back();

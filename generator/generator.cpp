@@ -8,7 +8,8 @@ void Generator::generate(int num_qubits,
                          std::unordered_map<DAGHashType,
                                             std::unordered_set<DAG *> > &dataset) {
   DAG *dag = new DAG(num_qubits, max_num_parameters);
-  std::vector<int> used_parameters(max_num_parameters, 0);
+  // We need a large vector for both input and internal parameters.
+  std::vector<int> used_parameters(max_num_parameters + max_num_gates, 0);
   dfs(0, max_num_gates, dag, used_parameters, dataset);
   for (const auto& it : dataset) {
     for (const auto& dag : it.second) {

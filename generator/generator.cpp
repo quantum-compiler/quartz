@@ -27,8 +27,8 @@ void Generator::dfs(int gate_idx,
   bool pass_checks = true;
   // check that qubits are used in an increasing order
   for (int i = 1; i < dag->get_num_qubits(); i++)
-    if (dag->outputs[i] == dag->nodes[i].get()
-        && dag->outputs[i - 1] != dag->nodes[i - 1].get())
+    if (dag->outputs[i] != dag->nodes[i].get()
+        && dag->outputs[i - 1] == dag->nodes[i - 1].get())
       pass_checks = false;
   // check that parameters are used in an increasing order
   for (int i = 1; i < dag->get_num_input_parameters(); i++)

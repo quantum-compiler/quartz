@@ -152,7 +152,9 @@ bool DAG::remove_last_gate() {
       }
     }
     // Remove the qubit wires.
-    while (!nodes.empty() && nodes.back()->input_edges.back() == edge) {
+    while (!nodes.empty()
+        && !(nodes.back()->input_edges.empty())
+        && (nodes.back()->input_edges.back() == edge)) {
       nodes.pop_back();
     }
   }
@@ -235,4 +237,19 @@ size_t DAG::hash(Context *ctx) {
   hash_value_ = result;
   hash_value_valid_ = true;
   return result;
+}
+
+bool DAG::print(Context *ctx) const {
+  for (size_t i = 0; i < edges.size(); i++) {
+    DAGHyperEdge* edge = edges[i].get();
+    printf("gate[%zu] type(%d)\n", i, edge->gate->tp);
+    for (size_t j = 0; j < edge->input_nodes.size(); j++) {
+      DAGNode* node = edge->input_nodes[j];
+      if (node->is_qubit()) {
+        printf("    inputs[%zu]: qubit(%d)\n", j, node->index);
+      } else {
+        printf("    inputs[%zu]: param(%d)\n", j, node->index);
+      }
+    }
+  }
 }

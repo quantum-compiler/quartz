@@ -29,6 +29,7 @@ class DAG {
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
   size_t hash(Context* ctx);
+  bool print(Context* ctx) const;
  private:
   int num_qubits, num_input_parameters;
   size_t hash_value_;

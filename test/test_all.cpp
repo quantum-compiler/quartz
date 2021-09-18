@@ -2,6 +2,7 @@
 #include "../dag/dag.h"
 #include "../math/vector.h"
 #include "../context/context.h"
+#include "test_generator.h"
 
 #include <iostream>
 
@@ -20,5 +21,7 @@ int main() {
   input_dis.print();
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
+
+  test_generator();
   return 0;
 }

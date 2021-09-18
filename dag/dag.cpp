@@ -134,12 +134,14 @@ bool DAG::remove_last_gate() {
   auto *gate = edge->gate;
   // Remove edges from input nodes.
   for (auto *input_node : edge->input_nodes) {
+    assert(!input_node->output_edges.empty());
     assert(input_node->output_edges.back() == edge);
     input_node->output_edges.pop_back();
   }
 
   if (gate->is_parameter_gate()) {
     // Remove the parameter.
+    assert(!nodes.empty());
     assert(nodes.back()->type == DAGNode::internal_param);
     assert(nodes.back()->index == (int) parameters.size() - 1);
     parameters.pop_back();
@@ -152,7 +154,8 @@ bool DAG::remove_last_gate() {
       }
     }
     // Remove the qubit wires.
-    while (!nodes.empty() && nodes.back()->input_edges.back() == edge) {
+    while (!nodes.empty() && !nodes.back()->input_edges.empty()
+        && nodes.back()->input_edges.back() == edge) {
       nodes.pop_back();
     }
   }
@@ -215,7 +218,7 @@ int DAG::get_num_total_parameters() const {
   return (int) parameters.size();
 }
 
-size_t DAG::hash(Context *ctx) {
+DAGHashType DAG::hash(Context *ctx) {
   if (hash_value_valid_) {
     return hash_value_;
   }
@@ -228,11 +231,43 @@ size_t DAG::hash(Context *ctx) {
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
   const int discard_bits = 10;
   assert(typeid(ComplexType::value_type) == typeid(double));
-  assert(sizeof(size_t) == sizeof(double));
+  assert(sizeof(DAGHashType) == sizeof(double));
   auto val1 = dot_product.real(), val2 = dot_product.imag();
-  size_t result = *((size_t *) (&val1)) >> discard_bits << discard_bits;
-  result ^= *((size_t *) (&val2)) >> discard_bits;
+  DAGHashType
+      result = *((DAGHashType * )(&val1)) >> discard_bits << discard_bits;
+  result ^= *((DAGHashType * )(&val2)) >> discard_bits;
   hash_value_ = result;
   hash_value_valid_ = true;
+  return result;
+}
+
+std::string DAG::to_string() const {
+  std::string result;
+  result += "DAG {\n";
+  const int num_edges = (int) edges.size();
+  for (int i = 0; i < num_edges; i++) {
+    result += "  ";
+    if (edges[i]->output_nodes.size() == 1) {
+      result += edges[i]->output_nodes[0]->to_string();
+    } else if (edges[i]->output_nodes.size() == 2) {
+      result += "[" + edges[i]->output_nodes[0]->to_string();
+      result += ", " + edges[i]->output_nodes[1]->to_string();
+      result += "]";
+    } else {
+      assert(false && "A hyperedge should have 1 or 2 outputs.");
+    }
+    result += " = ";
+    result += gate_type_name(edges[i]->gate->tp);
+    result += "(";
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      result += edges[i]->input_nodes[j]->to_string();
+      if (j != (int) edges[i]->input_nodes.size() - 1) {
+        result += ", ";
+      }
+    }
+    result += ")";
+    result += "\n";
+  }
+  result += "}\n";
   return result;
 }

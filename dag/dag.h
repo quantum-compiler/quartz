@@ -6,6 +6,8 @@
 #include "../gate/gate.h"
 #include "../math/vector.h"
 
+#include <string>
+
 class Context;
 
 class DAG {
@@ -28,9 +30,10 @@ class DAG {
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
-  size_t hash(Context* ctx);
+  DAGHashType hash(Context* ctx);
+  [[nodiscard]] std::string to_string() const;
  private:
   int num_qubits, num_input_parameters;
-  size_t hash_value_;
+  DAGHashType hash_value_;
   bool hash_value_valid_;
 };

@@ -7,6 +7,7 @@
 DAG::DAG(int _num_qubits, int _num_parameters)
     : num_qubits(_num_qubits),
       num_input_parameters(_num_parameters),
+      hash_value_(0),
       hash_value_valid_(false) {
   // Initialize num_qubits qubits
   for (int i = 0; i < num_qubits; i++) {
@@ -26,8 +27,49 @@ DAG::DAG(int _num_qubits, int _num_parameters)
   }
 }
 
-DAG::DAG(const DAG &other) {
-  // TODO: implement
+DAG::DAG(const DAG &other)
+    : num_qubits(other.num_qubits),
+      num_input_parameters(other.num_input_parameters),
+      hash_value_(other.hash_value_),
+      hash_value_valid_(other.hash_value_valid_) {
+  std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
+  std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;
+  nodes.reserve(other.nodes.size());
+  edges.reserve(other.edges.size());
+  outputs.reserve(other.outputs.size());
+  parameters.reserve(other.parameters.size());
+  for (int i = 0; i < (int) other.nodes.size(); i++) {
+    nodes.emplace_back(*(other.nodes[i]));
+    assert(nodes[i].get() != other.nodes[i].get()); // make sure we make a copy
+    nodes_mapping[other.nodes[i].get()] = nodes[i].get();
+  }
+  for (int i = 0; i < (int) other.edges.size(); i++) {
+    edges.emplace_back(*(other.edges[i]));
+    assert(edges[i].get() != other.edges[i].get());
+    edges_mapping[other.edges[i].get()] = edges[i].get();
+  }
+  for (auto &node : nodes) {
+    for (auto &edge : node->input_edges) {
+      edge = edges_mapping[edge];
+    }
+    for (auto &edge : node->output_edges) {
+      edge = edges_mapping[edge];
+    }
+  }
+  for (auto &edge : edges) {
+    for (auto &node : edge->input_nodes) {
+      node = nodes_mapping[node];
+    }
+    for (auto &node : edge->output_nodes) {
+      node = nodes_mapping[node];
+    }
+  }
+  for (auto &node : other.outputs) {
+    outputs.emplace_back(nodes_mapping[node]);
+  }
+  for (auto &node : other.parameters) {
+    parameters.emplace_back(nodes_mapping[node]);
+  }
 }
 
 bool DAG::add_gate(const std::vector<int> &qubit_indices,

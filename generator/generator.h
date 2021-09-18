@@ -14,7 +14,6 @@ class Generator {
   void dfs(Context *ctx,
            int gate_idx,
            int max_num_gates,
-           int next_unused_qubit_id,
            DAG *dag,
            std::vector<bool> &used_parameters,
            std::unordered_map<size_t, std::unordered_set<DAG *> > &dataset);

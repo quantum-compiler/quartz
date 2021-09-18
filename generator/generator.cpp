@@ -10,13 +10,12 @@ void Generator::generate(Context *ctx,
   DAG* dag = new DAG(num_qubits, max_num_parameters);
   std::unordered_map<size_t, std::unordered_set<DAG*> > dataset;
   std::vector<bool> used_parameters(max_num_parameters, false);
-  dfs(ctx, 0, max_num_gates, 0, 0, dag, used_parameters, dataset);
+  dfs(ctx, 0, max_num_gates, dag, used_parameters, dataset);
 }
 
 void Generator::dfs(Context *ctx,
                     int gate_idx,
                     int max_num_gates,
-                    int next_unused_qubit_id,
                     DAG *dag,
                     std::vector<bool> &used_parameters,
                     std::unordered_map<size_t,
@@ -25,10 +24,11 @@ void Generator::dfs(Context *ctx,
   bool pass_checks = true;
   // check that qubits are used in an increasing order
   for (int i = 1; i < dag->get_num_qubits(); i++)
-    if (outputs[i] == nodes[i].get() && outputs[i-1] != nodes[i-1].get())
+    if (dag->outputs[i] == dag->nodes[i].get()
+    && dag->outputs[i-1] != dag->nodes[i-1].get())
       pass_checks = false;
   // check that parameters are used in an increasing order
-  for (int i = 1; i < dag->get_num_parameters(); i++)
+  for (int i = 1; i < dag->get_num_input_parameters(); i++)
     if (used_parameters[i] && !used_parameters[i-1])
       pass_checks = false;
   // Return if we fail any checks
@@ -89,7 +89,7 @@ void Generator::dfs(Context *ctx,
             dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
             dfs(ctx, gate_idx+1, max_num_gates, dag, used_parameters, dataset);
             dag->remove_last_gate();
-            qubit_indices.pop();
+            qubit_indices.pop_back();
           }
           qubit_indices.pop_back();
         }

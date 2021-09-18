@@ -2,6 +2,7 @@
 #include "../gate/all_gates.h"
 
 #include <cassert>
+#include <cmath>
 #include <random>
 
 Context::Context(const std::vector<GateType> &supported_gates)
@@ -70,7 +71,7 @@ std::vector<ParamType> Context::get_generated_parameters(int num_params) {
   if (random_parameters_.size() < num_params) {
     // Standard mersenne_twister_engine seeded with 0
     static std::mt19937 gen(0);
-    static ParamType pi = ((ParamType) -1.0);
+    static ParamType pi = std::acos((ParamType) -1.0);
     static std::uniform_real_distribution<ParamType> dis_real(-pi, pi);
     while (random_parameters_.size() < num_params) {
       random_parameters_.emplace_back(dis_real(gen));

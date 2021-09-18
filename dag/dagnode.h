@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 class DAGHyperEdge;
@@ -17,6 +18,7 @@ class DAGNode {
 
   [[nodiscard]] bool is_qubit() const;
   [[nodiscard]] bool is_parameter() const;
+  [[nodiscard]] std::string to_string() const;
 
   Type type;
   // If this node is a qubit, |index| is the qubit id it correspond to,

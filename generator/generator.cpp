@@ -1,5 +1,7 @@
 #include "generator.h"
 
+#include <cassert>
+
 void Generator::generate(Context *ctx,
                          int num_qubits,
                          int max_num_parameters,
@@ -11,13 +13,14 @@ void Generator::generate(Context *ctx,
   dfs(ctx, 0, max_num_gates, 0, 0, dag, used_parameters, dataset);
 }
 
-void dfs(Context *ctx,
-         int gate_idx,
-         int max_num_gates,
-         int next_unused_qubit_id,
-         DAG* dag,
-         std::vector<bool>& used_parameters,
-         std::unordered_map<size_t, std::unordered_set<DAG*> >& dataset)
+void Generator::dfs(Context *ctx,
+                    int gate_idx,
+                    int max_num_gates,
+                    int next_unused_qubit_id,
+                    DAG *dag,
+                    std::vector<bool> &used_parameters,
+                    std::unordered_map<size_t,
+                                       std::unordered_set<DAG *> > &dataset)
 {
   bool pass_checks = true;
   // check that qubits are used in an increasing order
@@ -33,7 +36,7 @@ void dfs(Context *ctx,
     return;
 
   // save a clone of dag to dataset
-  dataset[dag->hash()].insert(new DAG(dag));
+  dataset[dag->hash(ctx)].insert(new DAG(*dag));
 
   if (gate_idx > max_num_gates)
     return;

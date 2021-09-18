@@ -39,12 +39,12 @@ DAG::DAG(const DAG &other)
   outputs.reserve(other.outputs.size());
   parameters.reserve(other.parameters.size());
   for (int i = 0; i < (int) other.nodes.size(); i++) {
-    nodes.emplace_back(*(other.nodes[i]));
+    nodes.emplace_back(std::make_unique<DAGNode>(*(other.nodes[i])));
     assert(nodes[i].get() != other.nodes[i].get()); // make sure we make a copy
     nodes_mapping[other.nodes[i].get()] = nodes[i].get();
   }
   for (int i = 0; i < (int) other.edges.size(); i++) {
-    edges.emplace_back(*(other.edges[i]));
+    edges.emplace_back(std::make_unique<DAGHyperEdge>(*(other.edges[i])));
     assert(edges[i].get() != other.edges[i].get());
     edges_mapping[other.edges[i].get()] = edges[i].get();
   }

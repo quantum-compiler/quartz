@@ -4,7 +4,7 @@
 
 void test_generator() {
   std::vector<GateType> support_gates =
-      {GateType::x, GateType::y, GateType::rx, GateType::ry, GateType::rz};
+      {GateType::x, GateType::y, GateType::rx, GateType::ry, GateType::rz, GateType::cx};
   Context ctx(support_gates);
   Generator generator(&ctx);
   std::unordered_map<DAGHashType, std::unordered_set<DAG*> > dataset;

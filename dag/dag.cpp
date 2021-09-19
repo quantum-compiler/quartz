@@ -145,6 +145,7 @@ bool DAG::remove_last_gate() {
     assert(nodes.back()->type == DAGNode::internal_param);
     assert(nodes.back()->index == (int) parameters.size() - 1);
     parameters.pop_back();
+    nodes.pop_back();
   } else {
     assert(gate->is_quantum_gate());
     // Restore the outputs.

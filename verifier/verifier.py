@@ -59,6 +59,25 @@ def RX(theta):
     return [[(cos_theta, 0), (0, -sin_theta)],
             [(0, -sin_theta), (cos_theta, 0)]]
 
+def RY(theta):
+    assert len(theta) == 2
+    cos_theta, sin_theta = theta
+    return [[(cos_theta, 0), (-sin_theta, 0)],
+            [(sin_theta, 0), (cos_theta, 0)]]
+
+def RZ(theta):
+    # e ^ {i * theta} = cos theta + i sin theta
+    assert len(theta) == 2
+    cos_theta, sin_theta = theta
+    return [[(cos_theta, -sin_theta), (0, 0)],
+            [(0, 0), (cos_theta, sin_theta)]]
+
+def U1(theta):
+    assert len(theta) == 2
+    cos_theta, sin_theta = theta
+    return [[(1, 1), (0, 0)],
+            [(0, 0), (cos_theta, sin_theta)]]
+
 if __name__ == "__main__":
     s1, c1, s2, c2 = z3.Reals('s1 c1 s2 c2')
     print('\nProving Rx(p1) Rx(p2) = Rx(p1 + p2)')

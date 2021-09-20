@@ -11,12 +11,12 @@ void Generator::generate(int num_qubits,
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_parameters + max_num_gates, 0);
   dfs(0, max_num_gates, dag, used_parameters, dataset);
-  for (const auto& it : dataset) {
+  /*for (const auto& it : dataset) {
     for (const auto& dag : it.second) {
-      printf("key = %zu \n", dag->hash(context));
+      printf("key = %llu \n", dag->hash(context));
       dag->print(context);
     }
-  }
+  }*/
 }
 
 void Generator::dfs(int gate_idx,
@@ -36,6 +36,15 @@ void Generator::dfs(int gate_idx,
     if (used_parameters[i] > 0 && used_parameters[i - 1] == 0)
       pass_checks = false;
   // Return if we fail any checks
+  if (!pass_checks)
+    return;
+  // check that this circuit is different with any other circuits in the dataset
+  for (auto &other_dag : dataset[dag->hash(context)]) {
+    if (verifier_.equivalent_on_the_fly(context, dag, other_dag)) {
+      pass_checks = false;
+      break;
+    }
+  }
   if (!pass_checks)
     return;
 

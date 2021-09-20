@@ -219,6 +219,10 @@ int DAG::get_num_total_parameters() const {
   return (int) parameters.size();
 }
 
+int DAG::get_num_gates() const {
+  return (int) edges.size();
+}
+
 DAGHashType DAG::hash(Context *ctx) {
   if (hash_value_valid_) {
     return hash_value_;

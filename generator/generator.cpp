@@ -40,13 +40,14 @@ void Generator::dfs(int gate_idx,
     return;
   // check that this circuit is different with any other circuits in the dataset
   for (auto &other_dag : dataset[dag->hash(context)]) {
-    if (verifier_.equivalent_on_the_fly(context, dag, other_dag)) {
-      pass_checks = false;
-      break;
+    // we could use BFS to avoid searching DAGs with more gates at first
+    if (dag->get_num_gates() >= other_dag->get_num_gates()
+        && verifier_.equivalent_on_the_fly(context, dag, other_dag)) {
+      // save a clone of dag to dataset and return
+      dataset[dag->hash(context)].insert(new DAG(*dag));
+      return;
     }
   }
-  if (!pass_checks)
-    return;
 
   // save a clone of dag to dataset
   dataset[dag->hash(context)].insert(new DAG(*dag));
@@ -55,8 +56,8 @@ void Generator::dfs(int gate_idx,
     return;
   std::vector<int> qubit_indices;
   std::vector<int> parameter_indices;
-  for (const auto& idx : context->get_supported_gates()) {
-    Gate* gate = context->get_gate(idx);
+  for (const auto &idx : context->get_supported_gates()) {
+    Gate *gate = context->get_gate(idx);
     if (gate->get_num_qubits() == 0) {
       if (gate->get_num_parameters() == 1) {
         assert(false && "Unsupported gate type");
@@ -68,10 +69,13 @@ void Generator::dfs(int gate_idx,
           for (int p2 = 0; p2 < dag->get_num_total_parameters(); p2++) {
             parameter_indices.push_back(p2);
             used_parameters[p2] += 1;
-	    int output_param_index;
-            bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, &output_param_index);
+            int output_param_index;
+            bool ret = dag->add_gate(qubit_indices,
+                                     parameter_indices,
+                                     gate,
+                                     &output_param_index);
             assert(ret);
-            dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
+            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
             ret = dag->remove_last_gate();
             assert(ret);
             used_parameters[p2] -= 1;
@@ -88,11 +92,12 @@ void Generator::dfs(int gate_idx,
         // Case: 1-qubit operators without parameters
         for (int i = 0; i < dag->get_num_qubits(); i++) {
           qubit_indices.push_back(i);
-          bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
-	  assert(ret);
-          dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
+          bool
+              ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
+          assert(ret);
+          dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
           ret = dag->remove_last_gate();
-	  assert(ret);
+          assert(ret);
           qubit_indices.pop_back();
         }
       } else if (gate->get_num_parameters() == 1) {
@@ -101,13 +106,14 @@ void Generator::dfs(int gate_idx,
           qubit_indices.push_back(q1);
           for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
             parameter_indices.push_back(p1);
-            bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
-	    assert(ret);
+            bool ret =
+                dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
+            assert(ret);
             used_parameters[p1] += 1;
-            dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
+            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
             used_parameters[p1] -= 1;
             ret = dag->remove_last_gate();
-	    assert(ret);
+            assert(ret);
             parameter_indices.pop_back();
           }
           qubit_indices.pop_back();
@@ -123,11 +129,12 @@ void Generator::dfs(int gate_idx,
           for (int q2 = 0; q2 < dag->get_num_qubits(); q2++) {
             if (q1 == q2) continue;
             qubit_indices.push_back(q2);
-            bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
-	    assert(ret);
-            dfs(gate_idx+1, max_num_gates, dag, used_parameters, dataset);
+            bool ret =
+                dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
+            assert(ret);
+            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
             ret = dag->remove_last_gate();
-	    assert(ret);
+            assert(ret);
             qubit_indices.pop_back();
           }
           qubit_indices.pop_back();

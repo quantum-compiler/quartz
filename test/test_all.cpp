@@ -22,6 +22,12 @@ int main() {
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
 
-  test_generator();
+  test_generator(/*support_gates=*/{GateType::x, GateType::y, GateType::rx,
+                                    GateType::ry, GateType::rz,
+                                    GateType::cx},
+      /*num_qubits=*/3,
+      /*max_num_parameters=*/2,
+      /*max_num_gates=*/4,
+      /*verbose=*/false);
   return 0;
 }

@@ -19,20 +19,17 @@ void test_generator(const std::vector<GateType> &support_gates,
     std::cout << "{" << std::endl;
     bool start0 = true; 
     for (auto &it : dataset) {
-      if (start0) {
-         start0= false; 
-      } else {
-         std::cout << ",";
-      }
+      if (start0)
+        start0= false;
+      else
+        std::cout << ",";
       std::cout << "\"" << std::hex << it.first << "\": [" << std::endl;
       bool start = true;
       for (auto &dag : it.second) {
-	if (start) {
-	     start = false;
-	} 
-	else {
-	     std::cout << ",";
-	}
+	if (start)
+          start = false;
+	else
+          std::cout << ",";
         std::cout << dag->to_string();
       }
       std::cout << "]" << std::endl;

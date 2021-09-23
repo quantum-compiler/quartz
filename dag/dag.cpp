@@ -239,8 +239,8 @@ DAGHashType DAG::hash(Context *ctx) {
   assert(sizeof(DAGHashType) == sizeof(double));
   auto val1 = dot_product.real(), val2 = dot_product.imag();
   DAGHashType
-      result = *((DAGHashType * )(&val1)) >> discard_bits << discard_bits;
-  result ^= *((DAGHashType * )(&val2)) >> discard_bits;
+      result = *((DAGHashType *) (&val1)) >> discard_bits << discard_bits;
+  result ^= *((DAGHashType *) (&val2)) >> discard_bits;
   hash_value_ = result;
   hash_value_valid_ = true;
   return result;
@@ -248,10 +248,10 @@ DAGHashType DAG::hash(Context *ctx) {
 
 void DAG::print(Context *ctx) const {
   for (size_t i = 0; i < edges.size(); i++) {
-    DAGHyperEdge* edge = edges[i].get();
+    DAGHyperEdge *edge = edges[i].get();
     printf("gate[%zu] type(%d)\n", i, edge->gate->tp);
     for (size_t j = 0; j < edge->input_nodes.size(); j++) {
-      DAGNode* node = edge->input_nodes[j];
+      DAGNode *node = edge->input_nodes[j];
       if (node->is_qubit()) {
         printf("    inputs[%zu]: qubit(%d)\n", j, node->index);
       } else {
@@ -263,13 +263,44 @@ void DAG::print(Context *ctx) const {
 
 std::string DAG::to_string() const {
   std::string result;
+  result += "DAG {\n";
+  const int num_edges = (int) edges.size();
+  for (int i = 0; i < num_edges; i++) {
+    result += "  ";
+    if (edges[i]->output_nodes.size() == 1) {
+      result += edges[i]->output_nodes[0]->to_string();
+    } else if (edges[i]->output_nodes.size() == 2) {
+      result += "[" + edges[i]->output_nodes[0]->to_string();
+      result += ", " + edges[i]->output_nodes[1]->to_string();
+      result += "]";
+    } else {
+      assert(false && "A hyperedge should have 1 or 2 outputs.");
+    }
+    result += " = ";
+    result += gate_type_name(edges[i]->gate->tp);
+    result += "(";
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      result += edges[i]->input_nodes[j]->to_string();
+      if (j != (int) edges[i]->input_nodes.size() - 1) {
+        result += ", ";
+      }
+    }
+    result += ")";
+    result += "\n";
+  }
+  result += "}\n";
+  return result;
+}
+
+std::string DAG::to_json() const {
+  std::string result;
   result += "[\n";
   const int num_edges = (int) edges.size();
   for (int i = 0; i < num_edges; i++) {
-    result += "["; 
-    result += "\""+gate_type_name(edges[i]->gate->tp)+"\", ";
+    result += "[";
+    result += "\"" + gate_type_name(edges[i]->gate->tp) + "\", ";
     if (edges[i]->output_nodes.size() == 1) {
-      result +="[\"" + edges[i]->output_nodes[0]->to_string() + "\"],";
+      result += "[\"" + edges[i]->output_nodes[0]->to_string() + "\"],";
     } else if (edges[i]->output_nodes.size() == 2) {
       result += "[\"" + edges[i]->output_nodes[0]->to_string();
       result += "\", \"" + edges[i]->output_nodes[1]->to_string();

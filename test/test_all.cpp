@@ -28,6 +28,7 @@ int main() {
       /*num_qubits=*/3,
       /*max_num_parameters=*/2,
       /*max_num_gates=*/4,
-      /*verbose=*/false);
+      /*verbose=*/false,
+      /*save_file_name=*/"data.json");
   return 0;
 }

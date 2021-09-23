@@ -36,3 +36,6 @@ cmake-build-*
 
 # IDE
 .idea/
+
+# Dataset
+*.json

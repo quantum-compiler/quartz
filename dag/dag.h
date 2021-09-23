@@ -33,6 +33,7 @@ class DAG {
   [[nodiscard]] int get_num_gates() const;
   DAGHashType hash(Context* ctx);
   [[nodiscard]] std::string to_string() const;
+  [[nodiscard]] std::string to_json() const;
   void print(Context* ctx) const;
  private:
   int num_qubits, num_input_parameters;

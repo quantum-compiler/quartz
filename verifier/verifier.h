@@ -1,3 +1,5 @@
+#pragma once
+
 #include "../context/context.h"
 #include "../dag/dag.h"
 

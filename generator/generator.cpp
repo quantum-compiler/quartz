@@ -5,8 +5,7 @@
 void Generator::generate(int num_qubits,
                          int max_num_parameters,
                          int max_num_gates,
-                         std::unordered_map<DAGHashType,
-                                            std::unordered_set<DAG *> > &dataset) {
+                         Dataset &dataset) {
   DAG *dag = new DAG(num_qubits, max_num_parameters);
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_parameters + max_num_gates, 0);
@@ -23,8 +22,7 @@ void Generator::dfs(int gate_idx,
                     int max_num_gates,
                     DAG *dag,
                     std::vector<int> &used_parameters,
-                    std::unordered_map<DAGHashType,
-                                       std::unordered_set<DAG *> > &dataset) {
+                    Dataset &dataset) {
   bool pass_checks = true;
   // check that qubits are used in an increasing order
   for (int i = 1; i < dag->get_num_qubits(); i++)

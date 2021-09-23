@@ -11,14 +11,14 @@ void test_generator(const std::vector<GateType> &support_gates,
                     bool verbose) {
   Context ctx(support_gates);
   Generator generator(&ctx);
-  std::unordered_map<DAGHashType, std::unordered_set<DAG *> > dataset;
+  Dataset dataset;
   auto start = std::chrono::steady_clock::now();
   generator.generate(num_qubits, max_num_parameters, max_num_gates, dataset);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {
     std::cout << "{" << std::endl;
-    bool start0 = true; 
-    for (auto &it : dataset) {
+    bool start0 = true;
+    for (auto &it : dataset.dataset) {
       if (start0)
         start0= false;
       else

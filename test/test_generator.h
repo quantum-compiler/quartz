@@ -16,16 +16,32 @@ void test_generator(const std::vector<GateType> &support_gates,
   generator.generate(num_qubits, max_num_parameters, max_num_gates, dataset);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {
+    std::cout << "{" << std::endl;
+    bool start0 = true; 
     for (auto &it : dataset) {
-      std::cout << std::hex << it.first << ":" << std::endl;
+      if (start0) {
+         start0= false; 
+      } else {
+         std::cout << ",";
+      }
+      std::cout << "\"" << std::hex << it.first << "\": [" << std::endl;
+      bool start = true;
       for (auto &dag : it.second) {
+	if (start) {
+	     start = false;
+	} 
+	else {
+	     std::cout << ",";
+	}
         std::cout << dag->to_string();
       }
+      std::cout << "]" << std::endl;
     }
+    std::cout << "}" << std::endl;
   }
-  std::cout << std::dec << "Circuits with " << dataset.size()
-            << " different hash values are found in "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - start).count() / 1000.0 << " seconds."
-            << std::endl;
+  //std::cout << std::dec << "Circuits with " << dataset.size()
+  //          << " different hash values are found in "
+  //          << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+  //              end - start).count() / 1000.0 << " seconds."
+  //          << std::endl;
 }

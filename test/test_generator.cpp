@@ -2,8 +2,8 @@
 
 int main() {
   test_generator(/*support_gates=*/{GateType::rx, GateType::ry,
-                                    GateType::add}, /*num_qubits=*/
-                                   1, /*max_num_parameters=*/
+                                    GateType::add, GateType::cx}, /*num_qubits=*/
+                                   2, /*max_num_parameters=*/
                                    2, /*max_num_gates=*/
                                    2, /*verbose=*/
                                    true);

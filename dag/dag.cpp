@@ -263,31 +263,31 @@ void DAG::print(Context *ctx) const {
 
 std::string DAG::to_string() const {
   std::string result;
-  result += "DAG {\n";
+  result += "[\n";
   const int num_edges = (int) edges.size();
   for (int i = 0; i < num_edges; i++) {
-    result += "  ";
+    result += "["; 
+    result += "\""+gate_type_name(edges[i]->gate->tp)+"\", ";
     if (edges[i]->output_nodes.size() == 1) {
-      result += edges[i]->output_nodes[0]->to_string();
+      result +="[\"" + edges[i]->output_nodes[0]->to_string() + "\"],";
     } else if (edges[i]->output_nodes.size() == 2) {
-      result += "[" + edges[i]->output_nodes[0]->to_string();
-      result += ", " + edges[i]->output_nodes[1]->to_string();
-      result += "]";
+      result += "[\"" + edges[i]->output_nodes[0]->to_string();
+      result += "\", \"" + edges[i]->output_nodes[1]->to_string();
+      result += "\"],";
     } else {
       assert(false && "A hyperedge should have 1 or 2 outputs.");
     }
-    result += " = ";
-    result += gate_type_name(edges[i]->gate->tp);
-    result += "(";
+    //result += " = ";
+    result += "[";
     for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
-      result += edges[i]->input_nodes[j]->to_string();
+      result += "\"" + edges[i]->input_nodes[j]->to_string() + "\"";
       if (j != (int) edges[i]->input_nodes.size() - 1) {
         result += ", ";
       }
     }
-    result += ")";
-    result += "\n";
+    result += "]]";
+    if (i + 1 != num_edges) result += ",\n";
   }
-  result += "}\n";
+  result += "]\n";
   return result;
 }

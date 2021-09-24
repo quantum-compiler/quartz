@@ -7,4 +7,5 @@
 #include "ry.h"
 #include "rz.h"
 #include "cx.h"
+#include "ccx.h"
 #include "add.h"

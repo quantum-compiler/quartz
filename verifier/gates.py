@@ -10,6 +10,14 @@ def add(a, b):
 
 # quantum gates
 
+def x():
+    return [[(0, 0), (1, 0)],
+            [(1, 0), (0, 0)]]
+
+def y():
+    return [[(0, 0), (0, -1)],
+            [(0, 1), (0, 0)]]
+
 def rx(theta):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
@@ -38,6 +46,11 @@ def u1(theta):
     return [[(1, 1), (0, 0)],
             [(0, 0), (cos_theta, sin_theta)]]
 
+def cx():
+    return [[(1, 0), (0, 0), (0, 0), (0, 0)],
+            [(0, 0), (0, 0), (0, 0), (1, 0)],
+            [(0, 0), (0, 0), (1, 0), (0, 0)],
+            [(0, 0), (1, 0), (0, 0), (0, 0)]]
 
 # functions exposed to verifier
 

@@ -162,7 +162,7 @@ def equivalent(dag1, dag2):
     output_vec2 = evaluate(dag2, vec, params)
     solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
     result = solver.check()
-    return result == 'unsat'
+    return result == z3.unsat
 
 
 def load_json(file_name):
@@ -185,11 +185,13 @@ def find_equivalences(input_file, output_file):
     total_equivalence_found = 0
     num_hashtags = 0
     num_dags = 0
+    num_potential_equivalences = 0
     for hashtag, dags in data.items():
         num_hashtags += 1
         num_dags += len(dags)
         if len(dags) <= 1:
             continue
+        num_potential_equivalences += len(dags) - 1
         different_dags_with_same_hash = []
         for dag in dags:
             equivalence_found = False
@@ -197,7 +199,7 @@ def find_equivalences(input_file, output_file):
                 other_dag = different_dags_with_same_hash[i]
                 equivalent_called += 1
                 if equivalent(dag, other_dag):
-                    current_tag = (hashtag, i)
+                    current_tag = hashtag + '_' + str(i)
                     if current_tag not in output_dict.keys():
                         output_dict[current_tag] = [other_dag]
                     output_dict[current_tag].append(dag)
@@ -208,7 +210,7 @@ def find_equivalences(input_file, output_file):
                 different_dags_with_same_hash.append(dag)
     dump_json(output_dict, output_file)
     print(f'{total_equivalence_found} equivalences found (solver invoked {equivalent_called} times for {num_dags} DAGs'
-          f' with {num_hashtags} different hash values).')
+          f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences).')
 
 
 def test_apply_matrix():

@@ -294,8 +294,20 @@ std::string DAG::to_string() const {
 
 std::string DAG::to_json() const {
   std::string result;
-  result += "[\n";
+  result += "[";
+
+  // basic info
+  result += "[";
+  result += std::to_string(get_num_qubits());
+  result += ",";
+  result += std::to_string(get_num_input_parameters());
+  result += ",";
+  result += std::to_string(get_num_total_parameters());
+  result += "],";
+
+  // gates
   const int num_edges = (int) edges.size();
+  result += "[";
   for (int i = 0; i < num_edges; i++) {
     result += "[";
     result += "\"" + gate_type_name(edges[i]->gate->tp) + "\", ";
@@ -308,7 +320,6 @@ std::string DAG::to_json() const {
     } else {
       assert(false && "A hyperedge should have 1 or 2 outputs.");
     }
-    //result += " = ";
     result += "[";
     for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
       result += "\"" + edges[i]->input_nodes[j]->to_string() + "\"";
@@ -319,6 +330,8 @@ std::string DAG::to_json() const {
     result += "]]";
     if (i + 1 != num_edges) result += ",\n";
   }
+  result += "]";
+
   result += "]\n";
   return result;
 }

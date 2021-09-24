@@ -104,6 +104,39 @@ def input_distribution(num_qubits, solver):
     return list(zip(real_part, imag_part))
 
 
+def evaluate(dag, input_dis):
+    output_dis = input_dis
+    gates = dag[1]
+    for gate in gates:
+        parameters = []
+        qubit_indices = []
+        for input in gate[2]:
+            if input.startswith('P'):
+                # parameter input
+                parameters.append(int(input[1:])) # TODO
+            else:
+                # qubit input
+                qubit_indices.append(int(input[1:]))
+        if gate[1][0].startswith('P'):
+            # parameter gate
+            pass # TODO
+        else:
+            # quantum gate
+            output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameters), qubit_indices)
+    return output_dis
+
+
+def equivalent(dag1, dag2):
+    solver = z3.Solver()
+    vec = input_distribution(1, solver)
+    output_vec1 = evaluate(dag1, vec)
+    output_vec2 = evaluate(dag2, vec)
+    print(dag1)
+    solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
+    result = solver.check()
+    return result == 'unsat'
+
+
 def angle(s, c):
     return s * s + c * c == 1
 
@@ -119,10 +152,6 @@ def dump_json(data, file_name):
     import json
     with open(file_name, 'w') as f:
         json.dump(data, f)
-
-
-def equivalent(dag1, dag2):
-    return False  # TODO
 
 
 def find_equivalences(input_file, output_file):
@@ -161,8 +190,8 @@ def test_apply_matrix():
     #     matmul(RX((c1, s1)), RX((c2, s2))),
     #     RX(Add((c1,s1), (c2,s2))))))
     vec = input_distribution(1, slv)
-    output_vec1 = apply_matrix(apply_matrix(vec, RX((c1, s1)), [0]), RX((c2, s2)), [0])
-    output_vec2 = apply_matrix(vec, RX(Add((c1, s1), (c2, s2))), [0])
+    output_vec1 = apply_matrix(apply_matrix(vec, rx((c1, s1)), [0]), rx((c2, s2)), [0])
+    output_vec2 = apply_matrix(vec, rx(add((c1, s1), (c2, s2))), [0])
     slv.add(z3.Not(eq_vector(output_vec1, output_vec2)))
     print(slv.check())
 

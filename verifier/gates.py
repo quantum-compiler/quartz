@@ -39,6 +39,11 @@ def u1(theta):
             [(0, 0), (cos_theta, sin_theta)]]
 
 
+def cx():
+    return [[(1, 0), (0, 0), (0, 0), (0, 0)], [(0, 0), (0, 0), (0, 0), (1, 0)], [(0, 0), (0, 0), (1, 0), (0, 0)],
+            [(0, 0), (1, 0), (0, 0), (0, 0)]]
+
+
 # functions exposed to verifier
 
 def get_matrix(gate_name, *params):

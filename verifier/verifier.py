@@ -108,7 +108,50 @@ def angle(s, c):
     return s * s + c * c == 1
 
 
-if __name__ == "__main__":
+def load_json(file_name):
+    import json
+    with open(file_name, "r") as f:
+        data = json.load(f)
+    return data
+
+
+def dump_json(data, file_name):
+    import json
+    with open(file_name, 'w') as f:
+        json.dump(data, f)
+
+
+def equivalent(dag1, dag2):
+    return False  # TODO
+
+
+def find_equivalences(input_file, output_file):
+    data = load_json(input_file)
+    output_dict = {}
+    total_equivalence_found = 0
+    for hashtag, dags in data.items():
+        if len(dags) <= 1:
+            continue
+        different_dags_with_same_hash = []
+        for dag in dags:
+            equivalence_found = False
+            for i in range(len(different_dags_with_same_hash)):
+                other_dag = different_dags_with_same_hash[i]
+                if equivalent(dag, other_dag):
+                    current_tag = (hashtag, i)
+                    if current_tag not in output_dict.keys():
+                        output_dict[current_tag] = [other_dag]
+                    output_dict[current_tag].append(dag)
+                    equivalence_found = True
+                    total_equivalence_found += 1
+                    break
+            if not equivalence_found:
+                different_dags_with_same_hash.append(dag)
+    dump_json(output_dict, output_file)
+    print(f'{total_equivalence_found} equivalences found.')
+
+
+def test_apply_matrix():
     s1, c1, s2, c2 = z3.Reals('s1 c1 s2 c2')
     print('\nProving Rx(p1) Rx(p2) = Rx(p1 + p2)')
     slv = z3.Solver()
@@ -122,3 +165,7 @@ if __name__ == "__main__":
     output_vec2 = apply_matrix(vec, RX(Add((c1, s1), (c2, s2))), [0])
     slv.add(z3.Not(eq_vector(output_vec1, output_vec2)))
     print(slv.check())
+
+
+if __name__ == "__main__":
+    find_equivalences('data.json', 'equivalences.json')

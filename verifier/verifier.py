@@ -104,41 +104,65 @@ def input_distribution(num_qubits, solver):
     return list(zip(real_part, imag_part))
 
 
-def evaluate(dag, input_dis):
+def angle(s, c):
+    return s * s + c * c == 1
+
+
+def create_parameters(num_parameters, solver):
+    param_cos = z3.RealVector('c', num_parameters)
+    param_sin = z3.RealVector('s', num_parameters)
+    for i in range(num_parameters):
+        solver.add(angle(param_cos[i], param_sin[i]))
+    return list(zip(param_cos, param_sin))
+
+
+def evaluate(dag, input_dis, input_parameters):
+    dag_meta = dag[0]
+    num_input_parameters = dag_meta[1]
+    num_total_parameters = dag_meta[2]
+    assert (len(input_parameters) >= num_input_parameters)
+    parameters = input_parameters[:num_input_parameters] + [None] * (num_total_parameters - num_input_parameters)
+
     output_dis = input_dis
     gates = dag[1]
     for gate in gates:
-        parameters = []
+        parameter_values = []
         qubit_indices = []
         for input in gate[2]:
             if input.startswith('P'):
                 # parameter input
-                parameters.append(int(input[1:])) # TODO
+                parameter_values.append(parameters[int(input[1:])])
             else:
                 # qubit input
                 qubit_indices.append(int(input[1:]))
         if gate[1][0].startswith('P'):
             # parameter gate
-            pass # TODO
+            assert len(gate[1]) == 1
+            parameter_index = int(gate[1][0][1:])
+            parameters[parameter_index] = compute(gate[0], *parameter_values)
         else:
             # quantum gate
-            output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameters), qubit_indices)
+            output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
     return output_dis
 
 
 def equivalent(dag1, dag2):
+    dag1_meta = dag1[0]
+    dag2_meta = dag2[0]
+    for index in [0]:
+        # check num_qubits
+        if dag1_meta[index] != dag2_meta[index]:
+            return False
+
     solver = z3.Solver()
     vec = input_distribution(1, solver)
-    output_vec1 = evaluate(dag1, vec)
-    output_vec2 = evaluate(dag2, vec)
-    print(dag1)
+    num_parameters = max(dag1_meta[1], dag2_meta[1])
+    params = create_parameters(num_parameters, solver)
+    output_vec1 = evaluate(dag1, vec, params)
+    output_vec2 = evaluate(dag2, vec, params)
     solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
     result = solver.check()
     return result == 'unsat'
-
-
-def angle(s, c):
-    return s * s + c * c == 1
 
 
 def load_json(file_name):
@@ -157,8 +181,13 @@ def dump_json(data, file_name):
 def find_equivalences(input_file, output_file):
     data = load_json(input_file)
     output_dict = {}
+    equivalent_called = 0
     total_equivalence_found = 0
+    num_hashtags = 0
+    num_dags = 0
     for hashtag, dags in data.items():
+        num_hashtags += 1
+        num_dags += len(dags)
         if len(dags) <= 1:
             continue
         different_dags_with_same_hash = []
@@ -166,6 +195,7 @@ def find_equivalences(input_file, output_file):
             equivalence_found = False
             for i in range(len(different_dags_with_same_hash)):
                 other_dag = different_dags_with_same_hash[i]
+                equivalent_called += 1
                 if equivalent(dag, other_dag):
                     current_tag = (hashtag, i)
                     if current_tag not in output_dict.keys():
@@ -177,7 +207,8 @@ def find_equivalences(input_file, output_file):
             if not equivalence_found:
                 different_dags_with_same_hash.append(dag)
     dump_json(output_dict, output_file)
-    print(f'{total_equivalence_found} equivalences found.')
+    print(f'{total_equivalence_found} equivalences found (solver invoked {equivalent_called} times for {num_dags} DAGs'
+          f' with {num_hashtags} different hash values).')
 
 
 def test_apply_matrix():

@@ -45,3 +45,8 @@ def get_matrix(gate_name, *params):
     except NameError:
         raise Exception(f'Gate \'{gate_name}\' is not implemented.')
     return result
+
+
+def compute(gate_name, *params):
+    # For parameter gates, but same as quantum gates
+    return get_matrix(gate_name, *params)

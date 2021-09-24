@@ -328,7 +328,7 @@ std::string DAG::to_json() const {
       }
     }
     result += "]]";
-    if (i + 1 != num_edges) result += ",\n";
+    if (i + 1 != num_edges) result += ",";
   }
   result += "]";
 

@@ -39,6 +39,8 @@ def u1(theta):
             [(0, 0), (cos_theta, sin_theta)]]
 
 
+# functions exposed to verifier
+
 def get_matrix(gate_name, *params):
     try:
         result = eval(gate_name)(*params)

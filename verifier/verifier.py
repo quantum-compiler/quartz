@@ -8,7 +8,8 @@ Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 
 import z3
 import math
-from gates import *
+from .gates import get_matrix, compute
+from .utils import *
 
 
 # functions for generating z3 constraints
@@ -118,8 +119,8 @@ def create_parameters(num_parameters, solver):
 
 def evaluate(dag, input_dis, input_parameters):
     dag_meta = dag[0]
-    num_input_parameters = dag_meta[1]
-    num_total_parameters = dag_meta[2]
+    num_input_parameters = dag_meta[meta_index_num_input_parameters]
+    num_total_parameters = dag_meta[meta_index_num_total_parameters]
     assert (len(input_parameters) >= num_input_parameters)
     parameters = input_parameters[:num_input_parameters] + [None] * (num_total_parameters - num_input_parameters)
 
@@ -133,6 +134,7 @@ def evaluate(dag, input_dis, input_parameters):
                 # parameter input
                 parameter_values.append(parameters[int(input[1:])])
             else:
+                assert (input.startswith('Q'))
                 # qubit input
                 qubit_indices.append(int(input[1:]))
         if gate[1][0].startswith('P'):
@@ -141,6 +143,7 @@ def evaluate(dag, input_dis, input_parameters):
             parameter_index = int(gate[1][0][1:])
             parameters[parameter_index] = compute(gate[0], *parameter_values)
         else:
+            assert (gate[1][0].startswith('Q'))
             # quantum gate
             output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
     return output_dis
@@ -149,14 +152,15 @@ def evaluate(dag, input_dis, input_parameters):
 def equivalent(dag1, dag2):
     dag1_meta = dag1[0]
     dag2_meta = dag2[0]
-    for index in [0]:
+    for index in [meta_index_num_qubits]:
         # check num_qubits
         if dag1_meta[index] != dag2_meta[index]:
             return False
 
     solver = z3.Solver()
-    vec = input_distribution(1, solver)
-    num_parameters = max(dag1_meta[1], dag2_meta[1])
+    num_qubits = dag1_meta[meta_index_num_qubits]
+    vec = input_distribution(num_qubits, solver)
+    num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
     params = create_parameters(num_parameters, solver)
     output_vec1 = evaluate(dag1, vec, params)
     output_vec2 = evaluate(dag2, vec, params)
@@ -178,7 +182,7 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-def find_equivalences(input_file, output_file):
+def find_equivalences(input_file, output_file, verbose=False):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -186,6 +190,8 @@ def find_equivalences(input_file, output_file):
     num_hashtags = 0
     num_dags = 0
     num_potential_equivalences = 0
+    import time
+    t_start = time.monotonic()
     for hashtag, dags in data.items():
         num_hashtags += 1
         num_dags += len(dags)
@@ -208,26 +214,11 @@ def find_equivalences(input_file, output_file):
                     break
             if not equivalence_found:
                 different_dags_with_same_hash.append(dag)
-    dump_json(output_dict, output_file)
-    print(f'{total_equivalence_found} equivalences found (solver invoked {equivalent_called} times for {num_dags} DAGs'
+    t_end = time.monotonic()
+    print(f'{total_equivalence_found} equivalences found in {t_end - t_start} seconds'
+          f' (solver invoked {equivalent_called} times for {num_dags} DAGs'
           f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences).')
-
-
-def test_apply_matrix():
-    s1, c1, s2, c2 = z3.Reals('s1 c1 s2 c2')
-    print('\nProving Rx(p1) Rx(p2) = Rx(p1 + p2)')
-    slv = z3.Solver()
-    slv.add(angle(s1, c1))
-    slv.add(angle(s2, c2))
-    # slv.add(z3.Not(eq_matrix(
-    #     matmul(RX((c1, s1)), RX((c2, s2))),
-    #     RX(Add((c1,s1), (c2,s2))))))
-    vec = input_distribution(1, slv)
-    output_vec1 = apply_matrix(apply_matrix(vec, rx((c1, s1)), [0]), rx((c2, s2)), [0])
-    output_vec2 = apply_matrix(vec, rx(add((c1, s1), (c2, s2))), [0])
-    slv.add(z3.Not(eq_vector(output_vec1, output_vec2)))
-    print(slv.check())
-
-
-if __name__ == "__main__":
-    find_equivalences('data.json', 'equivalences.json')
+    t_start = time.monotonic()
+    dump_json(output_dict, output_file)
+    t_end = time.monotonic()
+    print(f'Json saved in {t_end - t_start} seconds.')

@@ -23,4 +23,4 @@ def test_apply_matrix():
 
 if __name__ == '__main__':
     test_apply_matrix()
-    find_equivalences('data.json', 'equivalences.json')
+    find_equivalences('data.json', 'equivalences.json', verbose=True)

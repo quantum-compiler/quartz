@@ -199,6 +199,8 @@ def find_equivalences(input_file, output_file, verbose=False):
             continue
         num_potential_equivalences += len(dags) - 1
         different_dags_with_same_hash = []
+        if verbose:
+            print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
         for dag in dags:
             equivalence_found = False
             for i in range(len(different_dags_with_same_hash)):

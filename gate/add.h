@@ -11,4 +11,7 @@ class AddGate : public Gate {
     assert(input_params.size() == 2);
     return input_params[0] + input_params[1];
   }
+  bool is_commutative() const override {
+    return true;
+  }
 };

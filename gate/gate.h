@@ -9,10 +9,11 @@
 
 class Gate {
  public:
+  Gate(GateType tp, int num_qubits, int num_parameters);
   virtual MatrixBase *get_matrix();
   virtual MatrixBase *get_matrix(const std::vector<ParamType> &params);
   virtual ParamType compute(const std::vector<ParamType> &input_params);
-  Gate(GateType tp, int num_qubits, int num_parameters);
+  [[nodiscard]] virtual bool is_commutative() const;  // for traditional gates
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] bool is_parameter_gate() const;

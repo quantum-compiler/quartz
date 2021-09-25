@@ -18,6 +18,10 @@ ParamType Gate::compute(const std::vector<ParamType> &input_params) {
   return 0;
 }
 
+bool Gate::is_commutative() const {
+  return false;
+}
+
 int Gate::get_num_qubits() const {
   return num_qubits;
 }

@@ -6,7 +6,7 @@
 
 void test_generator(const std::vector<GateType> &support_gates,
                     int num_qubits,
-                    int max_num_parameters,
+                    int max_num_input_parameters,
                     int max_num_gates,
                     bool verbose,
                     const std::string &save_file_name) {
@@ -14,7 +14,7 @@ void test_generator(const std::vector<GateType> &support_gates,
   Generator generator(&ctx);
   Dataset dataset;
   auto start = std::chrono::steady_clock::now();
-  generator.generate(num_qubits, max_num_parameters, max_num_gates, dataset);
+  generator.generate(num_qubits, max_num_input_parameters, max_num_gates, dataset);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {
     for (auto &it : dataset.dataset) {

@@ -33,9 +33,9 @@ class DAG {
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   DAGHashType hash(Context* ctx);
+  void print(Context* ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
-  void print(Context* ctx) const;
  private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;

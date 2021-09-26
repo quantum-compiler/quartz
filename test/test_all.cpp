@@ -25,7 +25,7 @@ int main() {
   test_generator(/*support_gates=*/{GateType::x, GateType::y, GateType::rx,
                                     GateType::cx, GateType::add},
       /*num_qubits=*/3,
-      /*max_num_parameters=*/2,
+      /*max_num_input_parameters=*/2,
       /*max_num_gates=*/4,
       /*verbose=*/false,
       /*save_file_name=*/"data.json");

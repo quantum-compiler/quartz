@@ -11,7 +11,7 @@ class Generator {
  public:
   explicit Generator(Context *ctx) : context(ctx) {}
   void generate(int num_qubits,
-                int max_num_parameters,
+                int max_num_input_parameters,
                 int max_num_gates,
                 Dataset &dataset);
 

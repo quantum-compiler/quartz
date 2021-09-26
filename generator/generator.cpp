@@ -3,12 +3,12 @@
 #include <cassert>
 
 void Generator::generate(int num_qubits,
-                         int max_num_parameters,
+                         int max_num_input_parameters,
                          int max_num_gates,
                          Dataset &dataset) {
-  DAG *dag = new DAG(num_qubits, max_num_parameters);
+  DAG *dag = new DAG(num_qubits, max_num_input_parameters);
   // We need a large vector for both input and internal parameters.
-  std::vector<int> used_parameters(max_num_parameters + max_num_gates, 0);
+  std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
   dfs(0, max_num_gates, dag, used_parameters, dataset);
   /*for (const auto& it : dataset) {
     for (const auto& dag : it.second) {
@@ -29,26 +29,37 @@ void Generator::dfs(int gate_idx,
     if (dag->outputs[i] != dag->nodes[i].get()
         && dag->outputs[i - 1] == dag->nodes[i - 1].get())
       pass_checks = false;
-  // check that parameters are used in an increasing order
+  // check that input parameters are used in an increasing order
   for (int i = 1; i < dag->get_num_input_parameters(); i++)
     if (used_parameters[i] > 0 && used_parameters[i - 1] == 0)
       pass_checks = false;
+  // Note that we do not check that internal parameters are used in an
+  // increasing order here.
   // Return if we fail any checks
   if (!pass_checks)
     return;
+
+  int num_unused_internal_parameter = 0;
+  for (int i = dag->get_num_input_parameters();
+       i < dag->get_num_total_parameters(); i++) {
+    if (used_parameters[i] == 0)
+      num_unused_internal_parameter++;
+  }
+
+  bool save_into_dataset = (num_unused_internal_parameter == 0);
+  if (save_into_dataset) {
+    // save a clone of dag to dataset
+    dataset[dag->hash(context)].insert(new DAG(*dag));
+  }
+
   // check that this circuit is different with any other circuits in the dataset
   for (auto &other_dag : dataset[dag->hash(context)]) {
     // we could use BFS to avoid searching DAGs with more gates at first
     if (dag->get_num_gates() >= other_dag->get_num_gates()
         && verifier_.equivalent_on_the_fly(context, dag, other_dag)) {
-      // save a clone of dag to dataset and return
-      dataset[dag->hash(context)].insert(new DAG(*dag));
       return;
     }
   }
-
-  // save a clone of dag to dataset
-  dataset[dag->hash(context)].insert(new DAG(*dag));
 
   if (gate_idx >= max_num_gates)
     return;
@@ -105,7 +116,8 @@ void Generator::dfs(int gate_idx,
         for (int i = 0; i < dag->get_num_qubits(); i++) {
           qubit_indices.push_back(i);
           bool
-              ret = dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
+              ret =
+              dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
           assert(ret);
           dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
           ret = dag->remove_last_gate();

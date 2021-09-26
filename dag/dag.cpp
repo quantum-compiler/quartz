@@ -291,6 +291,12 @@ DAG &DAG::shrink_unused_input_parameters() {
   return *this;
 }
 
+std::unique_ptr<DAG> DAG::clone_and_shrink_unused_input_parameters() const {
+  auto cloned_dag = std::make_unique<DAG>(*this);
+  cloned_dag->shrink_unused_input_parameters();
+  return cloned_dag;
+}
+
 void DAG::print(Context *ctx) const {
   for (size_t i = 0; i < edges.size(); i++) {
     DAGHyperEdge *edge = edges[i].get();

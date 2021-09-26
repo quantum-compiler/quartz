@@ -32,9 +32,10 @@ class DAG {
   [[nodiscard]] int get_num_total_parameters() const;
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
-  DAGHashType hash(Context* ctx);
+  DAGHashType hash(Context *ctx);
   DAG &shrink_unused_input_parameters();
-  void print(Context* ctx) const;
+  [[nodiscard]] std::unique_ptr<DAG> clone_and_shrink_unused_input_parameters() const;
+  void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
  private:

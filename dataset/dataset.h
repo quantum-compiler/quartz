@@ -13,6 +13,11 @@ class Dataset {
     return dataset[val];
   }
 
+  void insert(Context *ctx, std::unique_ptr<DAG> dag) {
+    const auto hash_value = dag->hash(ctx);
+    dataset[hash_value].insert(std::move(dag));
+  }
+
   std::unordered_map<DAGHashType,
-                     std::unordered_set<DAG *> > dataset;
+                     std::unordered_set<std::unique_ptr<DAG>>> dataset;
 };

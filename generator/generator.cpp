@@ -61,7 +61,17 @@ void Generator::dfs(int gate_idx,
         assert(false && "Unsupported gate type");
       } else if (gate->get_num_parameters() == 2) {
         // Case: 0-qubit operators with 2 parameters
+        bool new_input_parameter_searched = false;
         for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+          if (p1 < dag->get_num_input_parameters() && !used_parameters[p1]) {
+            // We should use the new (unused) input parameter with smallest
+            // index if there are more than one of them.
+            if (new_input_parameter_searched) {
+              continue;
+            } else {
+              new_input_parameter_searched = true;
+            }
+          }
           parameter_indices.push_back(p1);
           used_parameters[p1] += 1;
           for (int p2 = 0; p2 < dag->get_num_total_parameters(); p2++) {

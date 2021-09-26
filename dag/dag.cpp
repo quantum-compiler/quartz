@@ -223,6 +223,10 @@ int DAG::get_num_gates() const {
   return (int) edges.size();
 }
 
+bool DAG::qubit_used(int qubit_index) const {
+  return outputs[qubit_index] != nodes[qubit_index].get();
+}
+
 DAGHashType DAG::hash(Context *ctx) {
   if (hash_value_valid_) {
     return hash_value_;

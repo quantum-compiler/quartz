@@ -23,8 +23,7 @@ int main() {
   output_dis.print();
 
   test_generator(/*support_gates=*/{GateType::x, GateType::y, GateType::rx,
-                                    GateType::ry, GateType::rz,
-                                    GateType::cx},
+                                    GateType::cx, GateType::add},
       /*num_qubits=*/3,
       /*max_num_parameters=*/2,
       /*max_num_gates=*/4,

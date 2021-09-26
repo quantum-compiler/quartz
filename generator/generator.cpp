@@ -65,6 +65,10 @@ void Generator::dfs(int gate_idx,
           parameter_indices.push_back(p1);
           used_parameters[p1] += 1;
           for (int p2 = 0; p2 < dag->get_num_total_parameters(); p2++) {
+            if (gate->is_commutative() && p1 > p2) {
+              // For commutative gates, enforce p1 <= p2
+              continue;
+            }
             parameter_indices.push_back(p2);
             used_parameters[p2] += 1;
             int output_param_index;

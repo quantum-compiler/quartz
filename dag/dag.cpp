@@ -4,11 +4,14 @@
 
 #include <cassert>
 
-DAG::DAG(int _num_qubits, int _num_parameters)
-    : num_qubits(_num_qubits),
-      num_input_parameters(_num_parameters),
+DAG::DAG(int num_qubits, int num_input_parameters)
+    : num_qubits(num_qubits),
+      num_input_parameters(num_input_parameters),
       hash_value_(0),
       hash_value_valid_(false) {
+  nodes.reserve(num_qubits + num_input_parameters);
+  outputs.reserve(num_qubits);
+  parameters.reserve(num_input_parameters);
   // Initialize num_qubits qubits
   for (int i = 0; i < num_qubits; i++) {
     auto node = std::make_unique<DAGNode>();
@@ -248,6 +251,44 @@ DAGHashType DAG::hash(Context *ctx) {
   hash_value_ = result;
   hash_value_valid_ = true;
   return result;
+}
+
+DAG &DAG::shrink_unused_input_parameters() {
+  // Warning: the hash function should be designed such that this function
+  // doesn't change the hash value.
+  if (get_num_input_parameters() == 0) {
+    return *this;
+  }
+  int last_unused_input_param_index = get_num_input_parameters();
+  while (last_unused_input_param_index > 0
+      && nodes[get_num_qubits() + last_unused_input_param_index
+          - 1]->output_edges.empty()) {
+    last_unused_input_param_index--;
+  }
+  if (last_unused_input_param_index == get_num_input_parameters()) {
+    // no need to shrink
+    return *this;
+  }
+  int num_parameters_shrinked =
+      get_num_input_parameters() - last_unused_input_param_index;
+
+  // Erase the parameters and the nodes
+  parameters.erase(parameters.begin() + last_unused_input_param_index,
+                   parameters.begin() + get_num_input_parameters());
+  nodes.erase(nodes.begin() + get_num_qubits() + last_unused_input_param_index,
+              nodes.begin() + get_num_qubits() + get_num_input_parameters());
+
+  // Update the parameter indices
+  for (auto &node : nodes) {
+    if (node->is_parameter() && node->index >= get_num_input_parameters()) {
+      // An internal parameter
+      node->index -= num_parameters_shrinked;
+    }
+  }
+
+  // Update num_input_parameters
+  num_input_parameters -= num_parameters_shrinked;
+  return *this;
 }
 
 void DAG::print(Context *ctx) const {

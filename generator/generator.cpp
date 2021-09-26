@@ -49,7 +49,7 @@ void Generator::dfs(int gate_idx,
   bool save_into_dataset = (num_unused_internal_parameter == 0);
   if (save_into_dataset) {
     // save a clone of dag to dataset
-    dataset[dag->hash(context)].insert(new DAG(*dag));
+    dataset[dag->hash(context)].insert(&((new DAG(*dag))->shrink_unused_input_parameters()));
   }
 
   // check that this circuit is different with any other circuits in the dataset

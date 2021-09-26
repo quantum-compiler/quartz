@@ -12,7 +12,7 @@ class Context;
 
 class DAG {
  public:
-  DAG(int _num_qubits, int _num_parameters);
+  DAG(int num_qubits, int num_input_parameters);
   DAG(const DAG &other);  // clone a DAG
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;
@@ -33,6 +33,7 @@ class DAG {
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   DAGHashType hash(Context* ctx);
+  DAG &shrink_unused_input_parameters();
   void print(Context* ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;

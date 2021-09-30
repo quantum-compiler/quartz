@@ -40,7 +40,7 @@ class DAG {
   [[nodiscard]] std::string to_json() const;
 
   // Returns true iff the DAG is already under the minimal representation.
-  // If |output| is true, output the minimal representation into |output_dag|.
+  // If |output| is true, store the minimal representation into |output_dag|.
   bool minimal_representation(std::unique_ptr<DAG> *output_dag,
                               bool output = true) const;
   [[nodiscard]] bool is_minimal_representation() const;

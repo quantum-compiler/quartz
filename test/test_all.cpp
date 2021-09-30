@@ -15,6 +15,7 @@ int main() {
 
   DAG dag(2, 0);
   dag.add_gate({0}, {}, y, nullptr);
+  std::cout << "Is_minimal=" << dag.is_minimal_representation() << std::endl;
 
   Vector input_dis = Vector::random_generate(2);
   Vector output_dis;

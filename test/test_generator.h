@@ -9,12 +9,16 @@ void test_generator(const std::vector<GateType> &support_gates,
                     int max_num_input_parameters,
                     int max_num_gates,
                     bool verbose,
-                    const std::string &save_file_name) {
+                    const std::string &save_file_name,
+                    bool count_minimal_representations = false) {
   Context ctx(support_gates);
   Generator generator(&ctx);
   Dataset dataset;
   auto start = std::chrono::steady_clock::now();
-  generator.generate(num_qubits, max_num_input_parameters, max_num_gates, dataset);
+  generator.generate(num_qubits,
+                     max_num_input_parameters,
+                     max_num_gates,
+                     dataset);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {
     for (auto &it : dataset.dataset) {
@@ -35,6 +39,31 @@ void test_generator(const std::vector<GateType> &support_gates,
     end = std::chrono::steady_clock::now();
     std::cout << "Json saved in "
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start).count() / 1000.0 << " seconds.";
+                  end - start).count() / 1000.0 << " seconds." << std::endl;
+  }
+  if (count_minimal_representations) {
+    int num_different_minrep = 0;
+    int num_missing_minrep = 0;
+    std::unique_ptr<DAG> tmp_dag;
+    for (auto &it : dataset.dataset) {
+      bool has_minimal_representation = false;
+      for (auto &dag : it.second) {
+        bool result = dag->minimal_representation(&tmp_dag);
+        if (result) {
+          has_minimal_representation = true;
+        } else {
+          if (dataset.dataset.count(tmp_dag->hash(&ctx)) == 0) {
+            num_missing_minrep++;
+          }
+        }
+      }
+      if (has_minimal_representation) {
+        num_different_minrep++;
+      }
+    }
+    std::cout << "Found DAGs with " << num_different_minrep
+              << " minimal representations with different hash values, among which "
+              << num_missing_minrep << " minimal DAGs are missing."
+              << std::endl;
   }
 }

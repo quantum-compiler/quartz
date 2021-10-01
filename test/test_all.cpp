@@ -29,6 +29,7 @@ int main() {
       /*max_num_input_parameters=*/2,
       /*max_num_gates=*/4,
       /*verbose=*/false,
-      /*save_file_name=*/"data.json");
+      /*save_file_name=*/"data.json",
+      /*count_minimal_representations=*/true);
   return 0;
 }

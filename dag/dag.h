@@ -15,11 +15,15 @@ class DAG {
  public:
   DAG(int num_qubits, int num_input_parameters);
   DAG(const DAG &other);  // clone a DAG
+  [[nodiscard]] bool fully_equivalent(const DAG &other) const;
+  [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
+
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;
   // The gates' information is owned by edges.
   std::vector<DAGNode *> outputs;
   std::vector<DAGNode *> parameters;
+
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices,
                 Gate *gate,

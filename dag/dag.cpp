@@ -76,6 +76,51 @@ DAG::DAG(const DAG &other)
   }
 }
 
+bool DAG::fully_equivalent(const DAG &other) const {
+  if (num_qubits != other.num_qubits
+      || num_input_parameters != other.num_input_parameters) {
+    return false;
+  }
+  if (nodes.size() != other.nodes.size()
+      || edges.size() != other.edges.size()) {
+    return false;
+  }
+  std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
+  for (int i = 0; i < (int) nodes.size(); i++) {
+    nodes_mapping[other.nodes[i].get()] = nodes[i].get();
+  }
+  for (int i = 0; i < (int) edges.size(); i++) {
+    if (edges[i]->gate->tp != other.edges[i]->gate->tp) {
+      return false;
+    }
+    if (edges[i]->input_nodes.size() != other.edges[i]->input_nodes.size()
+        || edges[i]->output_nodes.size()
+            != other.edges[i]->output_nodes.size()) {
+      return false;
+    }
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      if (nodes_mapping[other.edges[i]->input_nodes[j]]
+          != edges[i]->input_nodes[j]) {
+        return false;
+      }
+    }
+    for (int j = 0; j < (int) edges[i]->output_nodes.size(); j++) {
+      if (nodes_mapping[other.edges[i]->output_nodes[j]]
+          != edges[i]->output_nodes[j]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool DAG::fully_equivalent(Context *ctx, DAG &other) {
+  if (hash(ctx) != other.hash(ctx)) {
+    return false;
+  }
+  return fully_equivalent(other);
+}
+
 bool DAG::add_gate(const std::vector<int> &qubit_indices,
                    const std::vector<int> &parameter_indices,
                    Gate *gate,

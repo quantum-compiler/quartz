@@ -24,14 +24,25 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
     // New equivalence item
 
     // the tag
-    unsigned long long hash_value;
+    DAGHashType hash_value;
     fin >> std::hex >> hash_value;
     fin.ignore(); // '_'
     int id;
     fin >> std::dec >> id;
-    EquivalenceHashType tag = std::make_pair(hash_value, id);
-    assert (dataset.count(tag) == 0);
-    auto &dag_set = dataset[tag];
+    bool insert_at_end_of_list = false;
+    if (dataset[hash_value].size() <= id) {
+      dataset[hash_value].resize(id + 1);
+      insert_at_end_of_list = true;
+    }
+    auto insert_pos = dataset[hash_value].begin();
+    if (!insert_at_end_of_list) {
+      for (int i = 0; i < id; i++) {
+        insert_pos++;
+      }
+    }
+    auto &dag_set =
+        (insert_at_end_of_list ? dataset[hash_value].back() : *insert_pos);
+    assert (dag_set.empty());
 
     // the DAGs
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');

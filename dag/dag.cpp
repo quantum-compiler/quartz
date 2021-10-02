@@ -76,6 +76,10 @@ DAG::DAG(const DAG &other)
   }
 }
 
+std::unique_ptr<DAG> DAG::clone() const {
+  return std::make_unique<DAG>(*this);
+}
+
 bool DAG::fully_equivalent(const DAG &other) const {
   if (num_qubits != other.num_qubits
       || num_input_parameters != other.num_input_parameters) {

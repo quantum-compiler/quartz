@@ -15,6 +15,7 @@ class DAG {
  public:
   DAG(int num_qubits, int num_input_parameters);
   DAG(const DAG &other);  // clone a DAG
+  [[nodiscard]] std::unique_ptr<DAG> clone() const;
   [[nodiscard]] bool fully_equivalent(const DAG &other) const;
   [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
 

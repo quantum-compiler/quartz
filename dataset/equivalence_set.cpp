@@ -62,3 +62,50 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
   }
   return true;
 }
+
+void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
+  auto old_dataset = std::move(dataset);
+  dataset = std::unordered_map<DAGHashType,
+                               std::list<std::unordered_set<std::unique_ptr<DAG>>>>();
+  for (auto &item : old_dataset) {
+    const auto &hash_tag = item.first;
+    auto &equivalence_list = item.second;
+    for (auto &equiv_set : equivalence_list) {
+      // Compute the minimal minimal-representation in the set.
+      DAG *set_minrep_pos = nullptr;
+      std::unique_ptr<DAG> set_minrep = nullptr;
+      std::unique_ptr<DAG> dag_minrep = nullptr;  // temporary variables
+      for (auto &dag : equiv_set) {
+        dag->minimal_representation(&dag_minrep);
+        if (!set_minrep || dag_minrep->less_than(*set_minrep)) {
+          // destroying the previous content of |set_minrep|
+          set_minrep = std::move(dag_minrep);
+          set_minrep_pos = dag.get();
+        }
+      }
+      assert (set_minrep);
+      const auto new_hash_tag = set_minrep->hash(ctx);
+
+      // Find this equivalence in the new equivalence set
+      bool equiv_found = false;
+      std::unordered_set<std::unique_ptr<DAG>> *new_equiv_set_pos = nullptr;
+      for (auto &new_equiv_set : dataset[new_hash_tag]) {
+        // Note that std::hash<std::unique_ptr<DAG>> does not provide
+        // information about the DAG, so we need to loop over the elements
+        // of the std::unordered_set.
+        for (auto &new_dag : new_equiv_set) {
+          if (set_minrep->fully_equivalent(ctx, *new_dag)) {
+            equiv_found = true;
+            new_equiv_set_pos = &new_equiv_set;
+            break;
+          }
+        }
+        if (equiv_found) {
+          break;
+        }
+      }
+
+      // TODO: implement
+    }
+  }
+}

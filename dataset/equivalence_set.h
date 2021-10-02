@@ -13,10 +13,10 @@ class EquivalenceSet {
 
   // Normalize each clause of equivalent DAGs to have the minimum
   // (according to DAG::less_than) minimal representation.
-  void normalize_to_minimal_representations();
+  void normalize_to_minimal_representations(Context *ctx);
 
   // We cannot use std::vector here because that would need
-  // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructable.
+  // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
   //
   // Each std::unordered_set represents a clause of equivalent DAGs.
   std::unordered_map<DAGHashType,

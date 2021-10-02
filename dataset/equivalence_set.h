@@ -4,6 +4,7 @@
 #include "../dag/dag.h"
 
 #include <list>
+#include <set>
 #include <unordered_set>
 #include <unordered_map>
 
@@ -20,6 +21,7 @@ class EquivalenceSet {
   //
   // Each std::unordered_set represents a clause of equivalent DAGs.
   std::unordered_map<DAGHashType,
-                     std::list<std::unordered_set<std::unique_ptr<DAG>>>>
+                     std::list<std::set<std::unique_ptr<DAG>, /*Compare=*/
+                                        UniquePtrDAGComparator>>>
       dataset;
 };

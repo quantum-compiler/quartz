@@ -66,7 +66,8 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
 void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
   auto old_dataset = std::move(dataset);
   dataset = std::unordered_map<DAGHashType,
-                               std::list<std::unordered_set<std::unique_ptr<DAG>>>>();
+                               std::list<std::set<std::unique_ptr<DAG>,
+                                                  UniquePtrDAGComparator>>>();
   for (auto &item : old_dataset) {
     const auto &hash_tag = item.first;
     auto &equivalence_list = item.second;
@@ -86,21 +87,15 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
       assert (set_minrep);
       const auto new_hash_tag = set_minrep->hash(ctx);
 
-      // Find this equivalence in the new equivalence set
+      // Find this equivalence in the new equivalence set.
       bool equiv_found = false;
-      std::unordered_set<std::unique_ptr<DAG>> *new_equiv_set_pos = nullptr;
+      std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>
+          *new_equiv_set_pos = nullptr;
       for (auto &new_equiv_set : dataset[new_hash_tag]) {
-        // Note that std::hash<std::unique_ptr<DAG>> does not provide
-        // information about the DAG, so we need to loop over the elements
-        // of the std::unordered_set.
-        for (auto &new_dag : new_equiv_set) {
-          if (set_minrep->fully_equivalent(ctx, *new_dag)) {
-            equiv_found = true;
-            new_equiv_set_pos = &new_equiv_set;
-            break;
-          }
-        }
-        if (equiv_found) {
+        // Compare by the content of the DAG.
+        if (new_equiv_set.count(set_minrep) > 0) {
+          equiv_found = true;
+          new_equiv_set_pos = &new_equiv_set;
           break;
         }
       }

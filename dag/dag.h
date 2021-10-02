@@ -57,3 +57,11 @@ class DAG {
   DAGHashType hash_value_;
   bool hash_value_valid_;
 };
+
+class UniquePtrDAGComparator {
+ public:
+  bool operator()(const std::unique_ptr<DAG> &dag1,
+                  const std::unique_ptr<DAG> &dag2) const {
+    return dag1->less_than(*dag2);
+  }
+};

@@ -2,9 +2,12 @@
 
 #include <fstream>
 
-void Dataset::save_json(const std::string &file_name) {
+bool Dataset::save_json(const std::string &file_name) {
   std::ofstream fout;
   fout.open(file_name, std::ofstream::out);
+  if (!fout.is_open()) {
+    return false;
+  }
   fout << "{" << std::endl;
   bool start0 = true;
   for (auto &it : dataset) {
@@ -26,4 +29,5 @@ void Dataset::save_json(const std::string &file_name) {
     fout << "]" << std::endl;
   }
   fout << "}" << std::endl;
+  return true;
 }

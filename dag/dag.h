@@ -6,6 +6,7 @@
 #include "../gate/gate.h"
 #include "../math/vector.h"
 
+#include <istream>
 #include <string>
 
 class Context;
@@ -38,6 +39,7 @@ class DAG {
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
+  static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
 
   // Returns true iff the DAG is already under the minimal representation.
   // If |output| is true, store the minimal representation into |output_dag|.

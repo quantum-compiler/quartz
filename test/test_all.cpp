@@ -2,6 +2,7 @@
 #include "../dag/dag.h"
 #include "../math/vector.h"
 #include "../context/context.h"
+#include "test_dataset.h"
 #include "test_generator.h"
 
 #include <iostream>
@@ -31,5 +32,7 @@ int main() {
       /*verbose=*/false,
       /*save_file_name=*/"data.json",
       /*count_minimal_representations=*/true);
+
+  test_equivalence_set(all_supported_gates(), "equivalences.json");
   return 0;
 }

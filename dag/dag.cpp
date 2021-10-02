@@ -388,6 +388,86 @@ std::string DAG::to_json() const {
   return result;
 }
 
+std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+
+  // basic info
+  int num_dag_qubits, num_input_params, num_total_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  fin >> num_dag_qubits;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  fin >> num_input_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  fin >> num_total_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+
+  auto result = std::make_unique<DAG>(num_dag_qubits, num_input_params);
+
+  // gates
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  while (true) {
+    char ch;
+    fin.get(ch);
+    while (ch != '[' && ch != ']') {
+      fin.get(ch);
+    }
+    if (ch == ']') {
+      break;
+    }
+
+    // New gate
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    std::string name;
+    std::getline(fin, name, '\"');
+    auto gate_type = to_gate_type(name);
+    Gate *gate = ctx->get_gate(gate_type);
+
+    std::vector<int> input_qubits, input_params, output_qubits, output_params;
+    auto read_indices =
+        [&](std::vector<int> &qubit_indices, std::vector<int> &param_indices) {
+          fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+          while (true) {
+            fin.get(ch);
+            while (ch != '\"' && ch != ']') {
+              fin.get(ch);
+            }
+            if (ch == ']') {
+              break;
+            }
+
+            // New index
+            fin.get(ch);
+            assert (ch == 'P' || ch == 'Q');
+            int index;
+            fin >> index;
+            fin.ignore();  // '\"'
+            if (ch == 'Q') {
+              qubit_indices.push_back(index);
+            } else {
+              param_indices.push_back(index);
+            }
+          }
+        };
+    read_indices(output_qubits, output_params);
+    read_indices(input_qubits, input_params);
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+
+    int output_param_index;
+    result->add_gate(input_qubits,
+                     input_params,
+                     gate,
+                     &output_param_index);
+    if (gate->is_parameter_gate()) {
+      assert (output_param_index == output_params[0]);
+    }
+  }
+
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+
+  return result;
+}
+
 bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
                                  bool output) const {
   if (output) {

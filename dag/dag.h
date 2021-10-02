@@ -18,6 +18,7 @@ class DAG {
   [[nodiscard]] std::unique_ptr<DAG> clone() const;
   [[nodiscard]] bool fully_equivalent(const DAG &other) const;
   [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
+  [[nodiscard]] bool less_than(const DAG &other) const;
 
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;

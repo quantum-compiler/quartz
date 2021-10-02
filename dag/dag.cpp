@@ -125,6 +125,42 @@ bool DAG::fully_equivalent(Context *ctx, DAG &other) {
   return fully_equivalent(other);
 }
 
+bool DAG::less_than(const DAG &other) const {
+  if (num_qubits != other.num_qubits) {
+    return num_qubits < other.num_qubits;
+  }
+  if (get_num_gates() != other.get_num_gates()) {
+    return get_num_gates() < other.get_num_gates();
+  }
+  if (get_num_input_parameters() != other.get_num_input_parameters()) {
+    return get_num_input_parameters() < other.get_num_input_parameters();
+  }
+  if (get_num_total_parameters() != other.get_num_total_parameters()) {
+    // We want fewer quantum gates, i.e., more traditional parameters.
+    return get_num_total_parameters() > other.get_num_total_parameters();
+  }
+  for (int i = 0; i < (int) edges.size(); i++) {
+    if (edges[i]->gate->tp != other.edges[i]->gate->tp) {
+      return edges[i]->gate->tp < other.edges[i]->gate->tp;
+    }
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      if (edges[i]->input_nodes[j]->index
+          != other.edges[i]->input_nodes[j]->index) {
+        return edges[i]->input_nodes[j]->index
+            < other.edges[i]->input_nodes[j]->index;
+      }
+    }
+    for (int j = 0; j < (int) edges[i]->output_nodes.size(); j++) {
+      if (edges[i]->output_nodes[j]->index
+          != other.edges[i]->output_nodes[j]->index) {
+        return edges[i]->output_nodes[j]->index
+            < other.edges[i]->output_nodes[j]->index;
+      }
+    }
+  }
+  return false;  // fully equivalent
+}
+
 bool DAG::add_gate(const std::vector<int> &qubit_indices,
                    const std::vector<int> &parameter_indices,
                    Gate *gate,

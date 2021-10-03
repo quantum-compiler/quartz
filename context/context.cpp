@@ -6,11 +6,17 @@
 #include <random>
 
 Context::Context(const std::vector<GateType> &supported_gates)
-    : supported_gates_(supported_gates) {
+: supported_gates_(supported_gates), global_unique_id(100)
+{
   gates_.reserve(supported_gates.size());
   for (const auto &gate : supported_gates) {
     insert_gate(gate);
   }
+}
+
+size_t Context::next_global_unique_id(void)
+{
+  return global_unique_id++;
 }
 
 Gate *Context::get_gate(GateType tp) {

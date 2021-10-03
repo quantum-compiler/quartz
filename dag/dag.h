@@ -48,8 +48,17 @@ class DAG {
   static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
 
   // Returns true iff the DAG is already under the minimal representation.
-  // If |output| is true, store the minimal representation into |output_dag|.
+  // If |output| is true, store the minimal representation into |output_dag|,
+  // and store the permutation of qubits and parameters into |qubit_permutation|
+  // and |param_permutation|.
+  // The parameter |output_dag| should be a pointer containing nullptr,
+  // and the parameters |qubit_permutation| and |param_permutation| being
+  // nullptr means that the permutation is not required to store.
+  // |qubit_permutation[0] == 1| means that the qubit Q0 in this DAG maps to
+  // the qubit Q1 in the minimal representation.
   bool minimal_representation(std::unique_ptr<DAG> *output_dag,
+                              std::vector<int> *qubit_permutation = nullptr,
+                              std::vector<int> *param_permutation = nullptr,
                               bool output = true) const;
   [[nodiscard]] bool is_minimal_representation() const;
  private:

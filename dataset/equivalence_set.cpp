@@ -100,7 +100,12 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
         }
       }
 
-      // TODO: implement
+      if (!equiv_found) {
+        // If not found, insert a new equivalence set.
+        dataset[new_hash_tag].emplace_back();
+        new_equiv_set_pos = &dataset[new_hash_tag].back();
+      }
+      // TODO: permutation
     }
   }
 }

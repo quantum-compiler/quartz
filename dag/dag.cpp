@@ -554,8 +554,12 @@ std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
 }
 
 bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
+                                 std::vector<int> *qubit_permutation,
+                                 std::vector<int> *param_permutation,
                                  bool output) const {
   if (output) {
+    // |output_dag| cannot be nullptr but its content can be nullptr.
+    assert (output_dag);
     // This deletes the content |output_dag| previously stored.
     *output_dag =
         std::make_unique<DAG>(get_num_qubits(), get_num_input_parameters());
@@ -570,12 +574,18 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
     edge_id[edges[i].get()] = i;
   }
 
+  std::vector<int> temp_vec[2];
+
   // Qubit index map from the current DAG to the minimal representation.
-  std::vector<int> qubit_index_map(get_num_qubits(), -1);
+  std::vector<int>
+      &qubit_index_map = (qubit_permutation ? *qubit_permutation : temp_vec[0]);
+  qubit_index_map.assign(get_num_qubits(), -1);
   int num_qubits_mapped = 0;
 
   // Parameter index map from the current DAG to the minimal representation.
-  std::vector<int> param_index_map(get_num_total_parameters(), -1);
+  std::vector<int>
+      &param_index_map = (param_permutation ? *param_permutation : temp_vec[1]);
+  param_index_map.assign(get_num_total_parameters(), -1);
   int num_input_params_mapped = 0;
   int num_internal_params_mapped = 0;
 
@@ -691,6 +701,11 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
         }
       }
 
+      if (has_nodes_mapped) {
+        // The mapping has changed. We need to rebuild the heap.
+        std::make_heap(free_edges.begin(), free_edges.end());
+      }
+
       if (current_edge->gate->is_parameter_gate()) {
         for (auto &output_node : current_edge->output_nodes) {
           if (output_node->is_parameter()) {
@@ -758,5 +773,5 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
 }
 
 bool DAG::is_minimal_representation() const {
-  return minimal_representation(nullptr, false);
+  return minimal_representation(nullptr, nullptr, nullptr, false);
 }

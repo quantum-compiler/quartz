@@ -98,6 +98,7 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
 }
 
 void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
+  // TODO: why is the result different for each run?
   auto old_dataset = std::move(dataset);
   dataset = std::unordered_map<DAGHashType,
                                std::list<std::set<std::unique_ptr<DAG>,
@@ -160,10 +161,29 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
           new_equiv_set.insert(std::move(set_minrep));
           // Note that |set_minrep| is not usable anymore after std::move.
         } else {
+          /*
+          // Optimization: if |dag|'s minimal-representation is already in the
+          // set, do not insert it again.
+          dag->minimal_representation(&dag_minrep);
+          if (new_equiv_set.count(dag_minrep) > 0) {
+            continue;
+          }*/
           new_equiv_set.insert(dag->get_permuted_dag(set_qubit_perm,
                                                      set_param_perm));
         }
       }
+      // TODO: why does this increase the number of equivalence classes?
+      /*for (auto it = new_equiv_set.begin(); it != new_equiv_set.end(); ) {
+        // Optimization: if |dag|'s minimal-representation is already in the
+        // set, erase |dag|.
+        auto &dag = *it;
+        bool is_minimal = dag->minimal_representation(&dag_minrep);
+        if (!is_minimal && new_equiv_set.count(dag_minrep) > 0) {
+          new_equiv_set.erase(it++);
+        } else {
+          it++;
+        }
+      }*/
     }
   }
 }

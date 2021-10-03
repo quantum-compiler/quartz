@@ -7,9 +7,8 @@ Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
 import z3
-import math
 from .gates import get_matrix, compute
-from .utils import *
+from utils.utils import *
 
 
 # functions for generating z3 constraints

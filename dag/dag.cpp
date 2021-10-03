@@ -102,7 +102,14 @@ bool DAG::less_than(const DAG &other) const {
     if (edges[i]->gate->tp != other.edges[i]->gate->tp) {
       return edges[i]->gate->tp < other.edges[i]->gate->tp;
     }
+    assert (edges[i]->input_nodes.size() == other.edges[i]->input_nodes.size());
+    assert (
+        edges[i]->output_nodes.size() == other.edges[i]->output_nodes.size());
     for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      if (edges[i]->input_nodes[j]->is_qubit()
+          != other.edges[i]->input_nodes[j]->is_qubit()) {
+        return edges[i]->input_nodes[j]->is_qubit();
+      }
       if (edges[i]->input_nodes[j]->index
           != other.edges[i]->input_nodes[j]->index) {
         return edges[i]->input_nodes[j]->index
@@ -110,6 +117,10 @@ bool DAG::less_than(const DAG &other) const {
       }
     }
     for (int j = 0; j < (int) edges[i]->output_nodes.size(); j++) {
+      if (edges[i]->output_nodes[j]->is_qubit()
+          != other.edges[i]->output_nodes[j]->is_qubit()) {
+        return edges[i]->output_nodes[j]->is_qubit();
+      }
       if (edges[i]->output_nodes[j]->index
           != other.edges[i]->output_nodes[j]->index) {
         return edges[i]->output_nodes[j]->index

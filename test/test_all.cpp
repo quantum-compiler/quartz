@@ -24,7 +24,7 @@ int main() {
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
 
-  test_generator(/*support_gates=*/{GateType::x, GateType::y, GateType::rx,
+  test_generator(/*support_gates=*/{GateType::x, GateType::rx,
                                     GateType::cx, GateType::add},
       /*num_qubits=*/3,
       /*max_num_input_parameters=*/2,
@@ -32,6 +32,9 @@ int main() {
       /*verbose=*/false,
       /*save_file_name=*/"data.json",
       /*count_minimal_representations=*/true);
+
+  // Working directory is cmake-build-debug/ here.
+  system("python ../test/test_verifier.py");
 
   test_equivalence_set(all_supported_gates(), "equivalences.json");
   return 0;

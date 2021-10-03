@@ -113,17 +113,30 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
       std::vector<int> set_qubit_perm, set_param_perm;
       std::unique_ptr<DAG> dag_minrep = nullptr;  // temporary variables
       std::vector<int> dag_qubit_perm, dag_param_perm;
+      bool trivial_equivalence = true;
       for (auto &dag : equiv_set) {
         dag->minimal_representation(&dag_minrep,
                                     &dag_qubit_perm,
                                     &dag_param_perm);
         if (!set_minrep || dag_minrep->less_than(*set_minrep)) {
+          if (set_minrep) {
+            // We found two DAGs with different minimal-representations in the
+            // set.
+            trivial_equivalence = false;
+          }
           // destroying the previous content of |set_minrep|
           set_minrep = std::move(dag_minrep);
           set_qubit_perm = std::move(dag_qubit_perm);
           set_param_perm = std::move(dag_param_perm);
           set_minrep_pos = dag.get();
+        } else if (!dag_minrep->fully_equivalent(*set_minrep)) {
+          // We found two DAGs with different minimal-representations in the
+          // set.
+          trivial_equivalence = false;
         }
+      }
+      if (trivial_equivalence) {
+        continue;
       }
       assert (set_minrep);
       const auto new_hash_tag = set_minrep->hash(ctx);
@@ -161,13 +174,12 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
           new_equiv_set.insert(std::move(set_minrep));
           // Note that |set_minrep| is not usable anymore after std::move.
         } else {
-          /*
           // Optimization: if |dag|'s minimal-representation is already in the
           // set, do not insert it again.
           dag->minimal_representation(&dag_minrep);
           if (new_equiv_set.count(dag_minrep) > 0) {
             continue;
-          }*/
+          }
           new_equiv_set.insert(dag->get_permuted_dag(set_qubit_perm,
                                                      set_param_perm));
         }

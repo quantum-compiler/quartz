@@ -63,6 +63,40 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
   return true;
 }
 
+bool EquivalenceSet::save_json(const std::string &save_file_name) const {
+  std::ofstream fout;
+  fout.open(save_file_name, std::ofstream::out);
+  if (!fout.is_open()) {
+    return false;
+  }
+  fout << "{" << std::endl;
+  bool start0 = true;
+  for (const auto &item : dataset) {
+    int id = 0;
+    for (const auto &equiv_set : item.second) {
+      if (start0) {
+        start0 = false;
+      } else {
+        fout << ",";
+      }
+      fout << "\"" << std::hex << item.first << "_" << std::dec << id++
+           << "\": [" << std::endl;
+      bool start = true;
+      for (const auto &dag : equiv_set) {
+        if (start) {
+          start = false;
+        } else {
+          fout << ",";
+        }
+        fout << dag->to_json();
+      }
+      fout << "]" << std::endl;
+    }
+  }
+  fout << "}" << std::endl;
+  return true;
+}
+
 void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
   auto old_dataset = std::move(dataset);
   dataset = std::unordered_map<DAGHashType,
@@ -126,8 +160,6 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
           new_equiv_set.insert(std::move(set_minrep));
           // Note that |set_minrep| is not usable anymore after std::move.
         } else {
-          dag->get_permuted_dag(set_qubit_perm,
-                                set_param_perm);
           new_equiv_set.insert(dag->get_permuted_dag(set_qubit_perm,
                                                      set_param_perm));
         }

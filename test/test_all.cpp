@@ -36,6 +36,8 @@ int main() {
   // Working directory is cmake-build-debug/ here.
   system("python ../test/test_verifier.py");
 
-  test_equivalence_set(all_supported_gates(), "equivalences.json");
+  test_equivalence_set(all_supported_gates(),
+                       "equivalences.json",
+                       "equivalences_sorted.json");
   return 0;
 }

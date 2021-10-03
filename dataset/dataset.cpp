@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-bool Dataset::save_json(const std::string &file_name) {
+bool Dataset::save_json(const std::string &file_name) const {
   std::ofstream fout;
   fout.open(file_name, std::ofstream::out);
   if (!fout.is_open()) {
@@ -10,7 +10,7 @@ bool Dataset::save_json(const std::string &file_name) {
   }
   fout << "{" << std::endl;
   bool start0 = true;
-  for (auto &it : dataset) {
+  for (const auto &it : dataset) {
     if (start0) {
       start0 = false;
     } else {
@@ -18,7 +18,7 @@ bool Dataset::save_json(const std::string &file_name) {
     }
     fout << "\"" << std::hex << it.first << "\": [" << std::endl;
     bool start = true;
-    for (auto &dag : it.second) {
+    for (const auto &dag : it.second) {
       if (start) {
         start = false;
       } else {

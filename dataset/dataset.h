@@ -7,7 +7,7 @@
 
 class Dataset {
  public:
-  bool save_json(const std::string &file_name);
+  bool save_json(const std::string &file_name) const;
 
   auto &operator[](const DAGHashType &val) {
     return dataset[val];

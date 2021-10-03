@@ -12,6 +12,8 @@ class EquivalenceSet {
  public:
   bool load_json(Context *ctx, const std::string &file_name);
 
+  bool save_json(const std::string &file_name) const;
+
   // Normalize each clause of equivalent DAGs to have the minimum
   // (according to DAG::less_than) minimal representation.
   void normalize_to_minimal_representations(Context *ctx);

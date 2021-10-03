@@ -51,7 +51,8 @@ class DAG {
   // If |output| is true, store the minimal representation into |output_dag|,
   // and store the permutation of qubits and parameters into |qubit_permutation|
   // and |param_permutation|.
-  // The parameter |output_dag| should be a pointer containing nullptr,
+  // The parameter |output_dag| should be a pointer containing nullptr
+  // (otherwise its content will be deleted),
   // and the parameters |qubit_permutation| and |param_permutation| being
   // nullptr means that the permutation is not required to store.
   // |qubit_permutation[0] == 1| means that the qubit Q0 in this DAG maps to
@@ -61,7 +62,14 @@ class DAG {
                               std::vector<int> *param_permutation = nullptr,
                               bool output = true) const;
   [[nodiscard]] bool is_minimal_representation() const;
+  [[nodiscard]] std::unique_ptr<DAG> get_permuted_dag(const std::vector<int> &qubit_permutation,
+                                                      const std::vector<int> &param_permutation) const;
+
  private:
+  void clone_from(const DAG &other,
+                  const std::vector<int> &qubit_permutation,
+                  const std::vector<int> &param_permutation);
+
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
   bool hash_value_valid_;

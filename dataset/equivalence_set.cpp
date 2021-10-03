@@ -75,12 +75,18 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
       // Compute the minimal minimal-representation in the set.
       DAG *set_minrep_pos = nullptr;
       std::unique_ptr<DAG> set_minrep = nullptr;
+      std::vector<int> set_qubit_perm, set_param_perm;
       std::unique_ptr<DAG> dag_minrep = nullptr;  // temporary variables
+      std::vector<int> dag_qubit_perm, dag_param_perm;
       for (auto &dag : equiv_set) {
-        dag->minimal_representation(&dag_minrep);
+        dag->minimal_representation(&dag_minrep,
+                                    &dag_qubit_perm,
+                                    &dag_param_perm);
         if (!set_minrep || dag_minrep->less_than(*set_minrep)) {
           // destroying the previous content of |set_minrep|
           set_minrep = std::move(dag_minrep);
+          set_qubit_perm = std::move(dag_qubit_perm);
+          set_param_perm = std::move(dag_param_perm);
           set_minrep_pos = dag.get();
         }
       }
@@ -105,7 +111,45 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
         dataset[new_hash_tag].emplace_back();
         new_equiv_set_pos = &dataset[new_hash_tag].back();
       }
-      // TODO: permutation
+
+      // Insert the permuted DAGs into the new equivalence set.
+      auto &new_equiv_set = *new_equiv_set_pos;
+      for (auto &dag : equiv_set) {
+        if (dag.get() == set_minrep_pos) {
+          // Optimization: if |dag| is the DAG with the minimal
+          // minimal-representation in the set, do not re-compute the
+          // permuted DAG.
+          if (equiv_found) {
+            // Already in |new_equiv_set|.
+            continue;
+          }
+          new_equiv_set.insert(std::move(set_minrep));
+          // Note that |set_minrep| is not usable anymore after std::move.
+        } else {
+          dag->get_permuted_dag(set_qubit_perm,
+                                set_param_perm);
+          new_equiv_set.insert(dag->get_permuted_dag(set_qubit_perm,
+                                                     set_param_perm));
+        }
+      }
     }
   }
+}
+
+int EquivalenceSet::num_equivalence_classes() const {
+  int result = 0;
+  for (const auto &item : dataset) {
+    result += (int) item.second.size();
+  }
+  return result;
+}
+
+int EquivalenceSet::num_total_dags() const {
+  int result = 0;
+  for (const auto &item : dataset) {
+    for (const auto &dag_set : item.second) {
+      result += (int) dag_set.size();
+    }
+  }
+  return result;
 }

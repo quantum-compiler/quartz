@@ -31,49 +31,8 @@ DAG::DAG(int num_qubits, int num_input_parameters)
   }
 }
 
-DAG::DAG(const DAG &other)
-    : num_qubits(other.num_qubits),
-      num_input_parameters(other.num_input_parameters),
-      hash_value_(other.hash_value_),
-      hash_value_valid_(other.hash_value_valid_) {
-  std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
-  std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;
-  nodes.reserve(other.nodes.size());
-  edges.reserve(other.edges.size());
-  outputs.reserve(other.outputs.size());
-  parameters.reserve(other.parameters.size());
-  for (int i = 0; i < (int) other.nodes.size(); i++) {
-    nodes.emplace_back(std::make_unique<DAGNode>(*(other.nodes[i])));
-    assert(nodes[i].get() != other.nodes[i].get()); // make sure we make a copy
-    nodes_mapping[other.nodes[i].get()] = nodes[i].get();
-  }
-  for (int i = 0; i < (int) other.edges.size(); i++) {
-    edges.emplace_back(std::make_unique<DAGHyperEdge>(*(other.edges[i])));
-    assert(edges[i].get() != other.edges[i].get());
-    edges_mapping[other.edges[i].get()] = edges[i].get();
-  }
-  for (auto &node : nodes) {
-    for (auto &edge : node->input_edges) {
-      edge = edges_mapping[edge];
-    }
-    for (auto &edge : node->output_edges) {
-      edge = edges_mapping[edge];
-    }
-  }
-  for (auto &edge : edges) {
-    for (auto &node : edge->input_nodes) {
-      node = nodes_mapping[node];
-    }
-    for (auto &node : edge->output_nodes) {
-      node = nodes_mapping[node];
-    }
-  }
-  for (auto &node : other.outputs) {
-    outputs.emplace_back(nodes_mapping[node]);
-  }
-  for (auto &node : other.parameters) {
-    parameters.emplace_back(nodes_mapping[node]);
-  }
+DAG::DAG(const DAG &other) {
+  clone_from(other, {}, {});
 }
 
 std::unique_ptr<DAG> DAG::clone() const {
@@ -769,9 +728,117 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
     }
   }
 
+  // We don't need the mapping about internal parameters.
+  param_index_map.resize(get_num_input_parameters());
+
+  // Map the unused qubits and parameters to make them indeed permutations.
+  for (int i = 0; i < get_num_qubits(); i++) {
+    if (qubit_index_map[i] == -1) {
+      qubit_index_map[i] = num_qubits_mapped++;
+    }
+  }
+  for (int i = 0; i < get_num_input_parameters(); i++) {
+    if (param_index_map[i] == -1) {
+      param_index_map[i] = num_input_params_mapped++;
+    }
+  }
+
   return this_is_already_minimal;
 }
 
 bool DAG::is_minimal_representation() const {
   return minimal_representation(nullptr, nullptr, nullptr, false);
+}
+
+std::unique_ptr<DAG> DAG::get_permuted_dag(const std::vector<int> &qubit_permutation,
+                                           const std::vector<int> &param_permutation) const {
+  auto result = std::make_unique<DAG>(0, 0);
+  result->clone_from(*this, qubit_permutation, param_permutation);
+  return result;
+}
+
+void DAG::clone_from(const DAG &other,
+                     const std::vector<int> &qubit_permutation,
+                     const std::vector<int> &param_permutation) {
+  num_qubits = other.num_qubits;
+  num_input_parameters = other.num_input_parameters;
+  hash_value_ = other.hash_value_;
+  hash_value_valid_ = other.hash_value_valid_;
+  std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
+  std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;
+  nodes.reserve(other.nodes.size());
+  edges.reserve(other.edges.size());
+  outputs.reserve(other.outputs.size());
+  parameters.reserve(other.parameters.size());
+  if (qubit_permutation.empty() && param_permutation.empty()) {
+    for (int i = 0; i < (int) other.nodes.size(); i++) {
+      nodes.emplace_back(std::make_unique<DAGNode>(*(other.nodes[i])));
+      assert(
+          nodes[i].get() != other.nodes[i].get()); // make sure we make a copy
+      nodes_mapping[other.nodes[i].get()] = nodes[i].get();
+    }
+  } else {
+    assert (qubit_permutation.size() == num_qubits);
+    nodes.resize(other.nodes.size());
+    for (int i = 0; i < num_qubits; i++) {
+      assert (qubit_permutation[i] >= 0 && qubit_permutation[i] < num_qubits);
+      nodes[qubit_permutation[i]] =
+          std::make_unique<DAGNode>(*(other.nodes[i]));
+      nodes[qubit_permutation[i]]->index =
+          qubit_permutation[i];  // update index
+      assert (nodes[qubit_permutation[i]].get() != other.nodes[i].get());
+      nodes_mapping[other.nodes[i].get()] = nodes[qubit_permutation[i]].get();
+    }
+    const int num_permuted_parameters =
+        std::min(num_input_parameters, (int) param_permutation.size());
+    for (int i_inc = 0; i_inc < num_permuted_parameters; i_inc++) {
+      assert (param_permutation[i_inc] >= 0
+                  && param_permutation[i_inc] < num_input_parameters);
+      const int i = num_qubits + i_inc;
+      nodes[num_qubits + param_permutation[i_inc]] =
+          std::make_unique<DAGNode>(*(other.nodes[i]));
+      nodes[num_qubits + param_permutation[i_inc]]->index =
+          param_permutation[i_inc];  // update index
+      assert (nodes[num_qubits + param_permutation[i_inc]].get()
+                  != other.nodes[i].get());
+      nodes_mapping[other.nodes[i].get()] =
+          nodes[num_qubits + param_permutation[i_inc]].get();
+    }
+    for (int i = num_qubits + num_permuted_parameters;
+         i < (int) other.nodes.size(); i++) {
+      nodes[i] = std::make_unique<DAGNode>(*(other.nodes[i]));
+      if (nodes[i]->is_qubit()) {
+        nodes[i]->index = qubit_permutation[nodes[i]->index];  // update index
+      }
+      assert (nodes[i].get() != other.nodes[i].get());
+      nodes_mapping[other.nodes[i].get()] = nodes[i].get();
+    }
+  }
+  for (int i = 0; i < (int) other.edges.size(); i++) {
+    edges.emplace_back(std::make_unique<DAGHyperEdge>(*(other.edges[i])));
+    assert(edges[i].get() != other.edges[i].get());
+    edges_mapping[other.edges[i].get()] = edges[i].get();
+  }
+  for (auto &node : nodes) {
+    for (auto &edge : node->input_edges) {
+      edge = edges_mapping[edge];
+    }
+    for (auto &edge : node->output_edges) {
+      edge = edges_mapping[edge];
+    }
+  }
+  for (auto &edge : edges) {
+    for (auto &node : edge->input_nodes) {
+      node = nodes_mapping[node];
+    }
+    for (auto &node : edge->output_nodes) {
+      node = nodes_mapping[node];
+    }
+  }
+  for (auto &node : other.outputs) {
+    outputs.emplace_back(nodes_mapping[node]);
+  }
+  for (auto &node : other.parameters) {
+    parameters.emplace_back(nodes_mapping[node]);
+  }
 }

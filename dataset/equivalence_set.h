@@ -16,6 +16,12 @@ class EquivalenceSet {
   // (according to DAG::less_than) minimal representation.
   void normalize_to_minimal_representations(Context *ctx);
 
+  // This function runs in O(|dataset|.size()).
+  [[nodiscard]] int num_equivalence_classes() const;
+
+  // This function runs in O(num_equivalence_classes()).
+  [[nodiscard]] int num_total_dags() const;
+
   // We cannot use std::vector here because that would need
   // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
   //

@@ -6,6 +6,7 @@
 #include "../gate/gate.h"
 #include "../math/vector.h"
 
+#include <istream>
 #include <string>
 
 class Context;
@@ -14,11 +15,17 @@ class DAG {
  public:
   DAG(int num_qubits, int num_input_parameters);
   DAG(const DAG &other);  // clone a DAG
+  [[nodiscard]] std::unique_ptr<DAG> clone() const;
+  [[nodiscard]] bool fully_equivalent(const DAG &other) const;
+  [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
+  [[nodiscard]] bool less_than(const DAG &other) const;
+
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;
   // The gates' information is owned by edges.
   std::vector<DAGNode *> outputs;
   std::vector<DAGNode *> parameters;
+
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices,
                 Gate *gate,
@@ -38,8 +45,23 @@ class DAG {
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
+  static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
+
+  // Returns true iff the DAG is already under the minimal representation.
+  // If |output| is true, store the minimal representation into |output_dag|.
+  bool minimal_representation(std::unique_ptr<DAG> *output_dag,
+                              bool output = true) const;
+  [[nodiscard]] bool is_minimal_representation() const;
  private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
   bool hash_value_valid_;
+};
+
+class UniquePtrDAGComparator {
+ public:
+  bool operator()(const std::unique_ptr<DAG> &dag1,
+                  const std::unique_ptr<DAG> &dag2) const {
+    return dag1->less_than(*dag2);
+  }
 };

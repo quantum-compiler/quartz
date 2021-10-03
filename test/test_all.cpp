@@ -2,6 +2,7 @@
 #include "../dag/dag.h"
 #include "../math/vector.h"
 #include "../context/context.h"
+#include "test_dataset.h"
 #include "test_generator.h"
 
 #include <iostream>
@@ -15,6 +16,7 @@ int main() {
 
   DAG dag(2, 0);
   dag.add_gate({0}, {}, y, nullptr);
+  std::cout << "Is_minimal=" << dag.is_minimal_representation() << std::endl;
 
   Vector input_dis = Vector::random_generate(2);
   Vector output_dis;
@@ -28,6 +30,9 @@ int main() {
       /*max_num_input_parameters=*/2,
       /*max_num_gates=*/4,
       /*verbose=*/false,
-      /*save_file_name=*/"data.json");
+      /*save_file_name=*/"data.json",
+      /*count_minimal_representations=*/true);
+
+  test_equivalence_set(all_supported_gates(), "equivalences.json");
   return 0;
 }

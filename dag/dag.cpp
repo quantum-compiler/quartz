@@ -2,6 +2,7 @@
 #include "../gate/gate.h"
 #include "../context/context.h"
 
+#include <algorithm>
 #include <cassert>
 
 DAG::DAG(int num_qubits, int num_input_parameters)
@@ -73,6 +74,91 @@ DAG::DAG(const DAG &other)
   for (auto &node : other.parameters) {
     parameters.emplace_back(nodes_mapping[node]);
   }
+}
+
+std::unique_ptr<DAG> DAG::clone() const {
+  return std::make_unique<DAG>(*this);
+}
+
+bool DAG::fully_equivalent(const DAG &other) const {
+  if (num_qubits != other.num_qubits
+      || num_input_parameters != other.num_input_parameters) {
+    return false;
+  }
+  if (nodes.size() != other.nodes.size()
+      || edges.size() != other.edges.size()) {
+    return false;
+  }
+  std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
+  for (int i = 0; i < (int) nodes.size(); i++) {
+    nodes_mapping[other.nodes[i].get()] = nodes[i].get();
+  }
+  for (int i = 0; i < (int) edges.size(); i++) {
+    if (edges[i]->gate->tp != other.edges[i]->gate->tp) {
+      return false;
+    }
+    if (edges[i]->input_nodes.size() != other.edges[i]->input_nodes.size()
+        || edges[i]->output_nodes.size()
+            != other.edges[i]->output_nodes.size()) {
+      return false;
+    }
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      if (nodes_mapping[other.edges[i]->input_nodes[j]]
+          != edges[i]->input_nodes[j]) {
+        return false;
+      }
+    }
+    for (int j = 0; j < (int) edges[i]->output_nodes.size(); j++) {
+      if (nodes_mapping[other.edges[i]->output_nodes[j]]
+          != edges[i]->output_nodes[j]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool DAG::fully_equivalent(Context *ctx, DAG &other) {
+  if (hash(ctx) != other.hash(ctx)) {
+    return false;
+  }
+  return fully_equivalent(other);
+}
+
+bool DAG::less_than(const DAG &other) const {
+  if (num_qubits != other.num_qubits) {
+    return num_qubits < other.num_qubits;
+  }
+  if (get_num_gates() != other.get_num_gates()) {
+    return get_num_gates() < other.get_num_gates();
+  }
+  if (get_num_input_parameters() != other.get_num_input_parameters()) {
+    return get_num_input_parameters() < other.get_num_input_parameters();
+  }
+  if (get_num_total_parameters() != other.get_num_total_parameters()) {
+    // We want fewer quantum gates, i.e., more traditional parameters.
+    return get_num_total_parameters() > other.get_num_total_parameters();
+  }
+  for (int i = 0; i < (int) edges.size(); i++) {
+    if (edges[i]->gate->tp != other.edges[i]->gate->tp) {
+      return edges[i]->gate->tp < other.edges[i]->gate->tp;
+    }
+    for (int j = 0; j < (int) edges[i]->input_nodes.size(); j++) {
+      if (edges[i]->input_nodes[j]->index
+          != other.edges[i]->input_nodes[j]->index) {
+        return edges[i]->input_nodes[j]->index
+            < other.edges[i]->input_nodes[j]->index;
+      }
+    }
+    for (int j = 0; j < (int) edges[i]->output_nodes.size(); j++) {
+      if (edges[i]->output_nodes[j]->index
+          != other.edges[i]->output_nodes[j]->index) {
+        return edges[i]->output_nodes[j]->index
+            < other.edges[i]->output_nodes[j]->index;
+      }
+    }
+  }
+  return false;  // fully equivalent
 }
 
 bool DAG::add_gate(const std::vector<int> &qubit_indices,
@@ -385,4 +471,292 @@ std::string DAG::to_json() const {
 
   result += "]\n";
   return result;
+}
+
+std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+
+  // basic info
+  int num_dag_qubits, num_input_params, num_total_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  fin >> num_dag_qubits;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  fin >> num_input_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  fin >> num_total_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+
+  auto result = std::make_unique<DAG>(num_dag_qubits, num_input_params);
+
+  // gates
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  while (true) {
+    char ch;
+    fin.get(ch);
+    while (ch != '[' && ch != ']') {
+      fin.get(ch);
+    }
+    if (ch == ']') {
+      break;
+    }
+
+    // New gate
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    std::string name;
+    std::getline(fin, name, '\"');
+    auto gate_type = to_gate_type(name);
+    Gate *gate = ctx->get_gate(gate_type);
+
+    std::vector<int> input_qubits, input_params, output_qubits, output_params;
+    auto read_indices =
+        [&](std::vector<int> &qubit_indices, std::vector<int> &param_indices) {
+          fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+          while (true) {
+            fin.get(ch);
+            while (ch != '\"' && ch != ']') {
+              fin.get(ch);
+            }
+            if (ch == ']') {
+              break;
+            }
+
+            // New index
+            fin.get(ch);
+            assert (ch == 'P' || ch == 'Q');
+            int index;
+            fin >> index;
+            fin.ignore();  // '\"'
+            if (ch == 'Q') {
+              qubit_indices.push_back(index);
+            } else {
+              param_indices.push_back(index);
+            }
+          }
+        };
+    read_indices(output_qubits, output_params);
+    read_indices(input_qubits, input_params);
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+
+    int output_param_index;
+    result->add_gate(input_qubits,
+                     input_params,
+                     gate,
+                     &output_param_index);
+    if (gate->is_parameter_gate()) {
+      assert (output_param_index == output_params[0]);
+    }
+  }
+
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+
+  return result;
+}
+
+bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
+                                 bool output) const {
+  if (output) {
+    // This deletes the content |output_dag| previously stored.
+    *output_dag =
+        std::make_unique<DAG>(get_num_qubits(), get_num_input_parameters());
+  }
+
+  std::unordered_map<DAGNode *, int> node_id;
+  std::unordered_map<DAGHyperEdge *, int> edge_id;
+  for (int i = 0; i < (int) nodes.size(); i++) {
+    node_id[nodes[i].get()] = i;
+  }
+  for (int i = 0; i < (int) edges.size(); i++) {
+    edge_id[edges[i].get()] = i;
+  }
+
+  // Qubit index map from the current DAG to the minimal representation.
+  std::vector<int> qubit_index_map(get_num_qubits(), -1);
+  int num_qubits_mapped = 0;
+
+  // Parameter index map from the current DAG to the minimal representation.
+  std::vector<int> param_index_map(get_num_total_parameters(), -1);
+  int num_input_params_mapped = 0;
+  int num_internal_params_mapped = 0;
+
+  auto compare_node = [&](DAGNode *a, DAGNode *b) {
+    // Returns false iff we want to prioritize a over b.
+    if (a->is_qubit() != b->is_qubit()) {
+      return b->is_qubit(); // prioritize qubits over parameters
+    }
+    if (a->is_qubit()) {
+      if (qubit_index_map[a->index] == -1
+          && qubit_index_map[b->index] == -1) {
+        // Both qubits are not mapped yet, compare by index in the current DAG
+        return a->index > b->index;
+      } else if (qubit_index_map[a->index] == -1
+          || qubit_index_map[b->index] == -1) {
+        // One of them is mapped, prioritize it
+        return qubit_index_map[b->index] == -1;
+      } else {
+        return qubit_index_map[a->index] > qubit_index_map[b->index];
+      }
+    } else {
+      if (param_index_map[a->index] == -1
+          && param_index_map[b->index] == -1) {
+        return a->index > b->index;
+      } else if (param_index_map[a->index] == -1
+          || param_index_map[b->index] == -1) {
+        return param_index_map[b->index] == -1;
+      } else {
+        return param_index_map[a->index] > param_index_map[b->index];
+      }
+    }
+  };
+
+  auto compare_edge = [&](DAGHyperEdge *a, DAGHyperEdge *b) {
+    // Returns false iff we want to prioritize a over b.
+    if (a->gate->tp != b->gate->tp) {
+      // Prioritize the "smallest" type of gate.
+      return a->gate->tp > b->gate->tp;
+    }
+    // For the same type of gate, compare by their inputs.
+    const int num_inputs = (int) a->input_nodes.size();
+    assert(b->input_nodes.size() == num_inputs);
+    for (int i = 0; i < num_inputs; i++) {
+      assert(a->input_nodes[i]->is_qubit() == b->input_nodes[i]->is_qubit());
+      if (a->input_nodes[i]->index != b->input_nodes[i]->index) {
+        // Having different indices, we can compare the inputs
+        return compare_node(a->input_nodes[i], b->input_nodes[i]);
+      }
+    }
+    // Two edges are identical.
+    return false;
+  };
+
+  // We are not using std::priority_queue because we need to rebuild the heap
+  // once the mapping is changed.
+  std::vector<DAGHyperEdge *> free_edges;
+
+  std::vector<DAGNode *> free_nodes;
+  free_nodes.reserve(get_num_qubits() + get_num_input_parameters());
+
+  // Construct the |free_nodes| vector with the input nodes.
+  std::vector<int> node_in_degree(nodes.size(), 0);
+  std::vector<int> edge_in_degree(edges.size(), 0);
+  for (auto &node : nodes) {
+    node_in_degree[node_id[node.get()]] = (int) node->input_edges.size();
+    if (!node_in_degree[node_id[node.get()]]) {
+      free_nodes.push_back(node.get());
+    }
+  }
+  for (auto &edge : edges) {
+    edge_in_degree[edge_id[edge.get()]] = (int) edge->input_nodes.size();
+  }
+
+  int num_gates_mapped = 0;
+  bool this_is_already_minimal = true;
+
+  while (!free_nodes.empty() || !free_edges.empty()) {
+    // Remove the nodes in |free_nodes|.
+    for (auto &node : free_nodes) {
+      for (auto &output_edge : node->output_edges) {
+        if (!--edge_in_degree[edge_id[output_edge]]) {
+          free_edges.push_back(output_edge);
+          std::push_heap(free_edges.begin(), free_edges.end(), compare_edge);
+        }
+      }
+    }
+    free_nodes.clear();
+
+    if (!free_edges.empty()) {
+      std::pop_heap(free_edges.begin(), free_edges.end(), compare_edge);
+      DAGHyperEdge *current_edge = free_edges.back();
+      free_edges.pop_back();
+
+      // Map the current edge (gate).
+      bool has_nodes_mapped = false;
+      for (auto &input_node : current_edge->input_nodes) {
+        if (input_node->is_qubit()) {
+          if (qubit_index_map[input_node->index] == -1) {
+            qubit_index_map[input_node->index] = num_qubits_mapped++;
+            has_nodes_mapped = true;
+          }
+        } else {
+          if (param_index_map[input_node->index] == -1) {
+            has_nodes_mapped = true;
+            if (input_node->type == DAGNode::Type::input_param) {
+              param_index_map[input_node->index] = num_input_params_mapped++;
+            } else {
+              assert (false && "Internal parameter used before creation");
+              param_index_map[input_node->index] =
+                  get_num_input_parameters() + num_internal_params_mapped++;
+            }
+          }
+        }
+      }
+
+      if (current_edge->gate->is_parameter_gate()) {
+        for (auto &output_node : current_edge->output_nodes) {
+          if (output_node->is_parameter()) {
+            assert (param_index_map[output_node->index] == -1);
+            param_index_map[output_node->index] =
+                get_num_input_parameters() + num_internal_params_mapped++;
+          }
+        }
+      }
+
+      if (output) {
+        std::vector<int> qubit_indices, param_indices;
+        for (auto &input_node : current_edge->input_nodes) {
+          if (input_node->is_qubit()) {
+            qubit_indices.push_back(qubit_index_map[input_node->index]);
+          } else {
+            param_indices.push_back(param_index_map[input_node->index]);
+          }
+        }
+        int output_param_index;
+        (*output_dag)->add_gate(qubit_indices,
+                                param_indices,
+                                current_edge->gate,
+                                &output_param_index);
+        if (current_edge->gate->is_parameter_gate()) {
+          assert (param_index_map[current_edge->output_nodes[0]->index]
+                      == output_param_index);
+        }
+      }
+
+      if (edge_id[current_edge] != num_gates_mapped) {
+        this_is_already_minimal = false;
+      }
+      num_gates_mapped++;
+
+      // Update the free nodes.
+      for (auto &output_node : current_edge->output_nodes) {
+        if (!--node_in_degree[node_id[output_node]]) {
+          free_nodes.push_back(output_node);
+        }
+      }
+    }
+  }
+
+  // The DAG should have all gates mapped.
+  assert(num_gates_mapped == get_num_gates());
+
+  for (int i = 0; i < get_num_qubits(); i++) {
+    if (qubit_index_map[i] != -1 && qubit_index_map[i] != i) {
+      // There is a used qubit that is not mapped to itself
+      this_is_already_minimal = false;
+      break;
+    }
+  }
+
+  for (int i = 0; i < get_num_total_parameters(); i++) {
+    if (param_index_map[i] != -1 && param_index_map[i] != i) {
+      // There is a used parameter that is not mapped to itself
+      this_is_already_minimal = false;
+      break;
+    }
+  }
+
+  return this_is_already_minimal;
+}
+
+bool DAG::is_minimal_representation() const {
+  return minimal_representation(nullptr, false);
 }

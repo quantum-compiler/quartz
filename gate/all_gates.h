@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gate.h"
+#include "h.h"
 #include "x.h"
 #include "y.h"
 #include "rx.h"

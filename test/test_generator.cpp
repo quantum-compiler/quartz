@@ -1,9 +1,9 @@
 #include "test_generator.h"
 #include "../tasograph/substitution.h"
+#include "../parser/qasm_parser.h"
 
 int main() {
-  Context ctx({GateType::rx, GateType::ry, GateType::rz,
-                                    GateType::cx});
+  Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h});
   Generator gen(&ctx);
   Dataset dataset;
   gen.generate(3/*num_qubits*/,
@@ -22,13 +22,9 @@ int main() {
       }
     }
   }
-  test_generator(/*support_gates=*/{GateType::rx, GateType::ry, GateType::rz,
-                                    GateType::cx}, /*num_qubits=*/
-                                   3, /*max_num_input_parameters=*/
-                                   3, /*max_num_gates=*/
-                                   3, /*verbose=*/
-                                   true, /*save_file_name=*/
-                                   "data.json", /*count_minimal_representations=*/
-                                   true);
+
+  QASMParser parser(&ctx);
+  DAG* dag = NULL;
+  parser.load_qasm("test.qasm", dag);
   return 0;
 }

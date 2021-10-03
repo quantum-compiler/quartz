@@ -1,4 +1,5 @@
 // A mapping from GateType to Gate subclasses.
+PER_GATE(h, HGate)
 PER_GATE(x, XGate)
 PER_GATE(y, YGate)
 PER_GATE(rx, RXGate)

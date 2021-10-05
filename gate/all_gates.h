@@ -10,3 +10,8 @@
 #include "cx.h"
 #include "ccx.h"
 #include "add.h"
+#include "z.h"
+#include "s.h"
+#include "t.h"
+#include "swap.h"
+#include "ch.h"

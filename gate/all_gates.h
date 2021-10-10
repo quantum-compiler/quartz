@@ -13,5 +13,6 @@
 #include "z.h"
 #include "s.h"
 #include "t.h"
+#include "tdg.h"
 #include "swap.h"
 #include "ch.h"

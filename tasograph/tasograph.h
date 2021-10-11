@@ -85,6 +85,7 @@ struct EdgeCompare {
 class Graph {
 public:
   Graph();
+  Graph(Context *ctx, const DAG &dag);
   void remove_edge(Edge e);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);

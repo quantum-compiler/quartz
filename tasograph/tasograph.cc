@@ -18,6 +18,52 @@ const Op Op::INVALID_OP = Op();
 
 Graph::Graph() : totalCost(0.0f) {}
 
+Graph::Graph(Context *ctx, const DAG &dag) {
+  size_t op_id = 0;
+  std::map<DAGHyperEdge *, Op> edge_2_op;
+  for (auto &edge : dag.edges) {
+	auto e = edge.get();
+	if (edge_2_op.find(e) == edge_2_op.end()) {
+	  Op op(op_id++, edge->gate);
+	  edge_2_op[e] = op;
+	}
+  }
+
+  for (auto &node : dag.nodes) {
+	for (auto input_edge : node->input_edges) {
+	  int srcIdx;
+	  bool found = false;
+	  for (srcIdx = 0; srcIdx < input_edge->output_nodes.size(); ++srcIdx) {
+		if (node.get() == input_edge->output_nodes[srcIdx]) {
+		  found = true;
+		  break;
+		}
+	  }
+	  assert(found);
+	  assert(edge_2_op.find(input_edge) != edge_2_op.end());
+	  auto srcOp = edge_2_op[input_edge];
+
+	  for (auto output_edge : node->output_edges) {
+		int dstIdx;
+		bool found = false;
+		for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
+		  if (node.get() == output_edge->input_nodes[dstIdx]) {
+			found = true;
+			break;
+		  }
+		}
+		assert(found);
+		assert(edge_2_op.find(output_edge) != edge_2_op.end());
+		auto dstOp = edge_2_op[output_edge];
+
+		add_edge(srcOp, dstOp, srcIdx, dstIdx);
+	  }
+	}
+  }
+
+  totalCost = total_cost();
+}
+
 void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
   if (inEdges.find(dstOp) == inEdges.end()) {
 	inEdges[dstOp];
@@ -211,5 +257,4 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   // Print results
   return bestGraph;
 }
-
 }; // namespace TASOGraph

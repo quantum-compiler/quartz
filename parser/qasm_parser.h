@@ -126,11 +126,12 @@ public:
 		std::vector<int> qubit_indices, parameter_indices;
 		while (ss.good()) {
 		  std::string token;
-		  std::getline(ss, token, ' ');
+		  //   std::getline(ss, token, ' ');
+		  ss >> token;
 		  qubit_indices.push_back(string_to_number(token));
 		}
 		assert(dag != NULL);
-		dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
+		assert(dag->add_gate(qubit_indices, parameter_indices, gate, NULL));
 	  }
 	  else {
 		std::cout << "Unknown gate: " << command << std::endl;

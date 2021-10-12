@@ -23,24 +23,16 @@ int string_to_number(const std::string &input) {
 }
 
 bool is_gate_string(const std::string &token, GateType &type) {
-  if (token == "x") {
-	type = GateType::x;
-	return true;
-  }
-  if (token == "cx") {
-	type = GateType::cx;
-	return true;
-  }
   if (token == "h") {
 	type = GateType::h;
 	return true;
   }
-  if (token == "ccx") {
-	type = GateType::ccx;
+  if (token == "x") {
+	type = GateType::x;
 	return true;
   }
-  if (token == "ch") {
-	type = GateType::ch;
+  if (token == "y") {
+	type = GateType::y;
 	return true;
   }
   if (token == "rx") {
@@ -55,12 +47,16 @@ bool is_gate_string(const std::string &token, GateType &type) {
 	type = GateType::rz;
 	return true;
   }
-  if (token == "ccx") {
-	type = GateType::ccx;
+  if (token == "cx") {
+	type = GateType::cx;
 	return true;
   }
   if (token == "ccx") {
 	type = GateType::ccx;
+	return true;
+  }
+  if (token == "z") {
+	type = GateType::z;
 	return true;
   }
   if (token == "s") {
@@ -75,12 +71,12 @@ bool is_gate_string(const std::string &token, GateType &type) {
 	type = GateType::tdg;
 	return true;
   }
-  if (token == "y") {
-	type = GateType::y;
+  if (token == "swap") {
+	type = GateType::swap;
 	return true;
   }
-  if (token == "z") {
-	type = GateType::z;
+  if (token == "ch") {
+	type = GateType::ch;
 	return true;
   }
   return false;

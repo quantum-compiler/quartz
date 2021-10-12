@@ -1,6 +1,5 @@
 #include "tasograph.h"
 #include "substitution.h"
-#include "equivalence_set.h"
 #include "assert.h"
 
 namespace TASOGraph {
@@ -19,15 +18,16 @@ const Op Op::INVALID_OP = Op();
 Graph::Graph() : totalCost(0.0f) {}
 
 Graph::Graph(Context *ctx, const DAG &dag) {
-  size_t op_id = 0;
   std::map<DAGHyperEdge *, Op> edge_2_op;
   for (auto &edge : dag.edges) {
 	auto e = edge.get();
 	if (edge_2_op.find(e) == edge_2_op.end()) {
-	  Op op(op_id++, edge->gate);
+	  Op op(ctx->next_global_unique_id(), edge->gate);
 	  edge_2_op[e] = op;
 	}
   }
+
+  std::cout << edge_2_op.size() << std::endl;
 
   for (auto &node : dag.nodes) {
 	for (auto input_edge : node->input_edges) {
@@ -171,7 +171,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   auto start = std::chrono::steady_clock::now();
   if (!eqs.load_json(ctx, file_name)) {
 	std::cout << "Failed to load equivalence file." << std::endl;
-	return;
+	assert(false);
   }
   auto end = std::chrono::steady_clock::now();
   std::cout << std::dec << eqs.num_equivalence_classes()

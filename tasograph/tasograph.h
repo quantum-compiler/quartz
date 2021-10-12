@@ -1,11 +1,15 @@
 #pragma once
 
 #include "../gate/gate.h"
+#include "../context/context.h"
+#include "../dag/dag.h"
+#include "../dataset/equivalence_set.h"
 
 #include <unordered_map>
 #include <set>
 #include <map>
 #include <chrono>
+#include <iostream>
 
 namespace TASOGraph {
 

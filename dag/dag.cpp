@@ -274,9 +274,11 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
     assert(edge->output_nodes.size() == 1);
     auto node = edge->output_nodes[0];
     assert(node->type == DAGNode::internal_param);
-    for (auto &edge_using_param : node->output_edges) {
+    while (!node->output_edges.empty()) {
       // Remove edges using the parameter at first.
-      ret += remove_gate(edge_using_param);
+      // Note: we can't use a for loop with iterators because they will be
+      // invalidated.
+      ret += remove_gate(node->output_edges[0]);
     }
     auto it = std::find_if(nodes.begin(),
                            nodes.end(),

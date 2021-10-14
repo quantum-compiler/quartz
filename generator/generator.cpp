@@ -198,7 +198,9 @@ void Generator::dfs(int gate_idx,
   }
 }
 
-void Generator::bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &dataset, std::vector<DAG *> *new_representatives) {
+void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
+                    Dataset &dataset,
+                    std::vector<DAG *> *new_representatives) {
   auto try_to_add_to_result = [&](DAG *new_dag) {
     // A new DAG with |current_max_num_gates| + 1 gates.
     if (!verifier_.redundant(context, new_dag)) {
@@ -224,6 +226,9 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &datase
       std::vector<std::unique_ptr<DAG>> dags_to_search;
       // Assume all parameters are used in the current dag now.
       params_used_times.assign(dag->get_num_total_parameters(), 1);
+      params_used_times.resize(
+          dag->get_num_total_parameters() + (current_max_num_gates - num_gates)
+              + 1);
       dfs_parameter_gates(std::make_unique<DAG>(*dag),
                           current_max_num_gates
                               - num_gates, /*max_unused_params=*/
@@ -267,8 +272,12 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &datase
                 qubit_indices.push_back(q1);
                 // We must use the new parameter when |num_gates| <
                 // |current_max_num_gates|.
-                for (int p1 = (num_gates == current_max_num_gates ? 0 :
-                               dag_to_search->get_num_total_parameters() - 1);
+                int p1_start = 0;
+                if (num_gates < current_max_num_gates) {
+                  p1_start = dag_to_search->get_num_total_parameters() - 1;
+                  assert(p1_start >= 0);
+                }
+                for (int p1 = p1_start;
                      p1 < dag_to_search->get_num_total_parameters(); p1++) {
                   parameter_indices.push_back(p1);
                   bool ret =

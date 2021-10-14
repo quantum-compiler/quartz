@@ -183,3 +183,7 @@ void Generator::dfs(int gate_idx,
     }
   }
 }
+
+void Generator::bfs(std::vector<DAG *> dags_to_search, Dataset &dataset) {
+  // TODO: implement
+}

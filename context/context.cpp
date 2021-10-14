@@ -1,5 +1,6 @@
 #include "context.h"
 #include "../gate/all_gates.h"
+#include "../dag/dag.h"
 
 #include <cassert>
 #include <cmath>
@@ -85,4 +86,13 @@ std::vector<ParamType> Context::get_generated_parameters(int num_params) {
   }
   return std::vector<ParamType>(random_parameters_.begin(),
                                 random_parameters_.begin() + num_params);
+}
+
+DAG *Context::get_representative(DAG *dag) {
+  return representatives_[dag->hash(this)];
+}
+
+void Context::set_representative(std::unique_ptr<DAG> dag) {
+  representatives_[dag->hash(this)] = dag.get();
+  representative_dags_.emplace_back(std::move(dag));
 }

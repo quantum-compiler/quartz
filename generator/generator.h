@@ -22,6 +22,8 @@ class Generator {
            std::vector<int> &used_parameters,
            Dataset &dataset);
 
+  void bfs(std::vector<DAG *> dags_to_search, Dataset &dataset);
+
   Context *context;
   Verifier verifier_;
 };

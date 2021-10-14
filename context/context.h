@@ -2,10 +2,13 @@
 
 #include "../gate/gate_utils.h"
 #include "../math/vector.h"
+#include "../utils/utils.h"
 
 #include <unordered_map>
 #include <vector>
 #include <memory>
+
+class DAG;
 
 class Context {
  public:
@@ -17,6 +20,8 @@ class Context {
   const Vector &get_generated_hashing_dis(int num_qubits);
   std::vector<ParamType> get_generated_parameters(int num_params);
   size_t next_global_unique_id();
+  DAG *get_representative(DAG *dag);
+  void set_representative(std::unique_ptr<DAG> dag);
 
  private:
   bool insert_gate(GateType tp);
@@ -26,4 +31,10 @@ class Context {
   std::vector<Vector> random_input_distribution_;
   std::vector<Vector> random_hashing_distribution_;
   std::vector<ParamType> random_parameters_;
+
+  // A vector to store the representative DAGs.
+  std::vector<std::unique_ptr<DAG>> representative_dags_;
+
+  // XXX: this presumes that DAGs with the same hash value are equivalent.
+  std::unordered_map<DAGHashType, DAG *> representatives_;
 };

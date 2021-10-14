@@ -22,7 +22,15 @@ class Generator {
            std::vector<int> &used_parameters,
            Dataset &dataset);
 
-  void bfs(std::vector<DAG *> dags_to_search, Dataset &dataset);
+  // |dags[i]| is the DAGs with |i| gates.
+  void bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &dataset);
+
+  void dfs_parameter_gates(std::unique_ptr<DAG> dag,
+                           int remaining_gates,
+                           int max_unused_params,
+                           int current_unused_params,
+                           std::vector<int> &params_used_times,
+                           std::vector<std::unique_ptr<DAG>> &result);
 
   Context *context;
   Verifier verifier_;

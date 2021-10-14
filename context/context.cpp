@@ -12,6 +12,11 @@ Context::Context(const std::vector<GateType> &supported_gates)
   gates_.reserve(supported_gates.size());
   for (const auto &gate : supported_gates) {
     insert_gate(gate);
+    if (gates_[gate]->is_parameter_gate()) {
+      supported_parameter_gates_.emplace_back(gate);
+    } else {
+      supported_quantum_gates_.emplace_back(gate);
+    }
   }
 }
 
@@ -47,6 +52,14 @@ bool Context::insert_gate(GateType tp) {
 
 const std::vector<GateType> &Context::get_supported_gates() const {
   return supported_gates_;
+}
+
+const std::vector<GateType> &Context::get_supported_parameter_gates() const {
+  return supported_parameter_gates_;
+}
+
+const std::vector<GateType> &Context::get_supported_quantum_gates() const {
+  return supported_quantum_gates_;
 }
 
 const Vector &Context::get_generated_input_dis(int num_qubits) {

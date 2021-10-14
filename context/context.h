@@ -15,6 +15,8 @@ class Context {
   explicit Context(const std::vector<GateType> &supported_gates);
   Gate *get_gate(GateType tp);
   [[nodiscard]] const std::vector<GateType> &get_supported_gates() const;
+  [[nodiscard]] const std::vector<GateType> &get_supported_parameter_gates() const;
+  [[nodiscard]] const std::vector<GateType> &get_supported_quantum_gates() const;
   // Two deterministic (random) distributions for each number of qubits.
   const Vector &get_generated_input_dis(int num_qubits);
   const Vector &get_generated_hashing_dis(int num_qubits);
@@ -28,6 +30,8 @@ class Context {
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::vector<GateType> supported_gates_;
+  std::vector<GateType> supported_parameter_gates_;
+  std::vector<GateType> supported_quantum_gates_;
   std::vector<Vector> random_input_distribution_;
   std::vector<Vector> random_hashing_distribution_;
   std::vector<ParamType> random_parameters_;

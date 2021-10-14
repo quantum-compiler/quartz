@@ -10,8 +10,16 @@
 class Generator {
  public:
   explicit Generator(Context *ctx) : context(ctx) {}
+  void generate_dfs(int num_qubits,
+                    int max_num_input_parameters,
+                    int max_num_gates,
+                    Dataset &dataset);
+
+  // Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
+  // |num_input_parameters| input parameters (probably with some unused),
+  // and <= |max_num_gates| gates.
   void generate(int num_qubits,
-                int max_num_input_parameters,
+                int num_input_parameters,
                 int max_num_gates,
                 Dataset &dataset);
 
@@ -23,7 +31,9 @@ class Generator {
            Dataset &dataset);
 
   // |dags[i]| is the DAGs with |i| gates.
-  void bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &dataset);
+  void bfs(const std::vector<std::vector<DAG *>> &dags,
+           Dataset &dataset,
+           std::vector<DAG *> *new_representatives);
 
   void dfs_parameter_gates(std::unique_ptr<DAG> dag,
                            int remaining_gates,

@@ -2,10 +2,10 @@
 
 #include <cassert>
 
-void Generator::generate(int num_qubits,
-                         int max_num_input_parameters,
-                         int max_num_gates,
-                         Dataset &dataset) {
+void Generator::generate_dfs(int num_qubits,
+                             int max_num_input_parameters,
+                             int max_num_gates,
+                             Dataset &dataset) {
   DAG *dag = new DAG(num_qubits, max_num_input_parameters);
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
@@ -17,6 +17,20 @@ void Generator::generate(int num_qubits,
     }
   }*/
   delete dag;
+}
+
+void Generator::generate(int num_qubits,
+                         int num_input_parameters,
+                         int max_num_gates,
+                         Dataset &dataset) {
+  auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
+  std::vector<DAG *> dags_to_search(1, empty_dag.get());
+  std::vector<std::vector<DAG *>> dags(1, dags_to_search);
+  for (int num_gates = 1; num_gates <= max_num_gates; num_gates++) {
+    dags_to_search.clear();
+    bfs(dags, dataset, &dags_to_search);
+    dags.push_back(dags_to_search);
+  }
 }
 
 void Generator::dfs(int gate_idx,
@@ -184,11 +198,22 @@ void Generator::dfs(int gate_idx,
   }
 }
 
-void Generator::bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &dataset) {
+void Generator::bfs(const std::vector<std::vector<DAG *>> &dags, Dataset &dataset, std::vector<DAG *> *new_representatives) {
   auto try_to_add_to_result = [&](DAG *new_dag) {
     // A new DAG with |current_max_num_gates| + 1 gates.
     if (!verifier_.redundant(context, new_dag)) {
-      dataset.insert(context, std::make_unique<DAG>(*new_dag));
+      bool ret = dataset.insert(context, std::make_unique<DAG>(*new_dag));
+      if (ret) {
+        // The DAG's hash value is new to the DAG.
+        // XXX: presuming different hash values imply different DAGs.
+        // Note: this is the second instance of DAG we create in this function.
+        auto rep = std::make_unique<DAG>(*new_dag);
+        auto rep_ptr = rep.get();
+        context->set_representative(std::move(rep));
+        if (new_representatives) {
+          new_representatives->push_back(rep_ptr);
+        }
+      }
     }
   };
   int current_max_num_gates = (int) dags.size() - 1;

@@ -15,10 +15,10 @@ void test_generator(const std::vector<GateType> &support_gates,
   Generator generator(&ctx);
   Dataset dataset;
   auto start = std::chrono::steady_clock::now();
-  generator.generate(num_qubits,
-                     max_num_input_parameters,
-                     max_num_gates,
-                     dataset);
+  generator.generate_dfs(num_qubits,
+                         max_num_input_parameters,
+                         max_num_gates,
+                         dataset);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {
     for (auto &it : dataset.dataset) {

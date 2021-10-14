@@ -6,10 +6,10 @@ int main() {
   Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h});
   Generator gen(&ctx);
   Dataset dataset;
-  gen.generate(3/*num_qubits*/,
-               3/*max_num_input_parameters*/,
-               3/*max_num_gates*/,
-               dataset);
+  gen.generate_dfs(3/*num_qubits*/,
+                   3/*max_num_input_parameters*/,
+                   3/*max_num_gates*/,
+                   dataset);
   for (const auto& it : dataset.dataset) {
     bool is_first = true;
     DAG* first_dag = NULL;

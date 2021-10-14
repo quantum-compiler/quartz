@@ -298,7 +298,7 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
     assert(gate->is_quantum_gate());
     int num_outputs = (int) edge->output_nodes.size();
     int j = 0;
-    for (int i = 0; i < num_outputs; i++) {
+    for (int i = 0; i < num_outputs; i++, j++) {
       // Match the input qubits and the output qubits.
       while (j < (int) edge->input_nodes.size()
           && !edge->input_nodes[j]->is_qubit()) {
@@ -339,6 +339,7 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
                           [&](std::unique_ptr<DAGHyperEdge> &p) {
                             return p.get() == edge;
                           });
+  assert(edge_pos != edges.end());
   edges.erase(edge_pos);
 
   hash_value_valid_ = false;

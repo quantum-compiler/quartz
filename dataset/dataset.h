@@ -9,6 +9,12 @@ class Dataset {
  public:
   bool save_json(const std::string &file_name) const;
 
+  // This function runs in O(1).
+  [[nodiscard]] int num_hash_values() const;
+
+  // This function runs in O(num_hash_values()).
+  [[nodiscard]] int num_total_dags() const;
+
   auto &operator[](const DAGHashType &val) {
     return dataset[val];
   }

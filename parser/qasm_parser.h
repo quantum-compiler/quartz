@@ -23,62 +23,16 @@ int string_to_number(const std::string &input) {
 }
 
 bool is_gate_string(const std::string &token, GateType &type) {
-  if (token == "h") {
-	type = GateType::h;
-	return true;
+
+#define PER_GATE(x, XGate)                                                     \
+  if (token == std::string(#x)) {                                              \
+	type = GateType::x;                                                        \
+	return true;                                                               \
   }
-  if (token == "x") {
-	type = GateType::x;
-	return true;
-  }
-  if (token == "y") {
-	type = GateType::y;
-	return true;
-  }
-  if (token == "rx") {
-	type = GateType::rx;
-	return true;
-  }
-  if (token == "ry") {
-	type = GateType::ry;
-	return true;
-  }
-  if (token == "rz") {
-	type = GateType::rz;
-	return true;
-  }
-  if (token == "cx") {
-	type = GateType::cx;
-	return true;
-  }
-  if (token == "ccx") {
-	type = GateType::ccx;
-	return true;
-  }
-  if (token == "z") {
-	type = GateType::z;
-	return true;
-  }
-  if (token == "s") {
-	type = GateType::s;
-	return true;
-  }
-  if (token == "t") {
-	type = GateType::t;
-	return true;
-  }
-  if (token == "tdg") {
-	type = GateType::tdg;
-	return true;
-  }
-  if (token == "swap") {
-	type = GateType::swap;
-	return true;
-  }
-  if (token == "ch") {
-	type = GateType::ch;
-	return true;
-  }
+
+#include "../gate/gates.inc.h"
+
+#undef PER_GATE
   return false;
 }
 

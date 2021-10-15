@@ -15,10 +15,11 @@ bool Verifier::redundant(Context *ctx, DAG *dag) {
   while (subgraph->get_num_gates() > 0) {
     subgraph->remove_gate(subgraph->edges[0].get());
     subgraph->hash(ctx);
-    DAG *rep = ctx->get_representative(subgraph.get());
-    if (rep && !subgraph->fully_equivalent(*rep)) {
-      // |subgraph| already exists and is not the representative.
-      return true;
+    for (const auto &rep : ctx->get_possible_representatives(subgraph.get())) {
+      if (rep && !subgraph->fully_equivalent(*rep)) {
+        // |subgraph| already exists and is not the representative.
+        return true;
+      }
     }
   }
   return false;

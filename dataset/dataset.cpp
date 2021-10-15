@@ -9,7 +9,7 @@ int Dataset::num_hash_values() const {
 int Dataset::num_total_dags() const {
   int ret = 0;
   for (const auto &it : dataset) {
-    ret += it.second.size();
+    ret += (int) it.second.size();
   }
   return ret;
 }

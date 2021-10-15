@@ -3,6 +3,7 @@
 #include "../context/context.h"
 #include "../dag/dag.h"
 #include "../dataset/dataset.h"
+#include "../dataset/equivalence_set.h"
 #include "../verifier/verifier.h"
 
 #include <unordered_set>
@@ -10,6 +11,8 @@
 class Generator {
  public:
   explicit Generator(Context *ctx) : context(ctx) {}
+
+  // Deprecated.
   void generate_dfs(int num_qubits,
                     int max_num_input_parameters,
                     int max_num_gates,
@@ -21,7 +24,9 @@ class Generator {
   void generate(int num_qubits,
                 int num_input_parameters,
                 int max_num_gates,
-                Dataset &dataset);
+                Dataset *dataset,
+                bool verify_equivalences,
+                EquivalenceSet *equiv_set);
 
  private:
   void dfs(int gate_idx,
@@ -33,7 +38,8 @@ class Generator {
   // |dags[i]| is the DAGs with |i| gates.
   void bfs(const std::vector<std::vector<DAG *>> &dags,
            Dataset &dataset,
-           std::vector<DAG *> *new_representatives);
+           std::vector<DAG *> *new_representatives,
+           bool verify_equivalences);
 
   void dfs_parameter_gates(std::unique_ptr<DAG> dag,
                            int remaining_gates,

@@ -64,6 +64,11 @@ class DAG {
   // nullptr means that the permutation is not required to store.
   // |qubit_permutation[0] == 1| means that the qubit Q0 in this DAG maps to
   // the qubit Q1 in the minimal representation.
+  // FIXME: The implementation is wrong: it can't decide which gate should be
+  //  ordered first when >= two gates' inputs are not mapped yet.
+  // Nevertheless, the current implementation guarantees that if two circuits
+  // share the same "minimal_representation", they can have their qubits and
+  // parameters permuted to be equivalent.
   bool minimal_representation(std::unique_ptr<DAG> *output_dag,
                               std::vector<int> *qubit_permutation = nullptr,
                               std::vector<int> *param_permutation = nullptr,

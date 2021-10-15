@@ -217,3 +217,29 @@ int EquivalenceSet::num_total_dags() const {
   }
   return result;
 }
+
+void EquivalenceSet::set_representatives(Context *ctx,
+                                         std::vector<DAG *> *new_representatives) const {
+  for (const auto &item : dataset) {
+    int id = 0;
+    for (const auto &dag_set : item.second) {
+      assert(!dag_set.empty());
+      auto &rep = *dag_set.begin();
+      // Warning: we need the Dataset class to preserve the order of DAGs with
+      // the same hash value here.
+      if (!ctx->has_representative(rep->hash(ctx), id)) {
+        // Set rep as representative
+        auto new_rep = std::make_unique<DAG>(*rep);
+        if (new_representatives) {
+          new_representatives->push_back(new_rep.get());
+        }
+        ctx->set_representative(std::move(new_rep), id);
+      }
+      id++;
+    }
+  }
+}
+
+void EquivalenceSet::clear() {
+  dataset.clear();
+}

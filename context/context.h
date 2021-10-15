@@ -22,8 +22,16 @@ class Context {
   const Vector &get_generated_hashing_dis(int num_qubits);
   std::vector<ParamType> get_generated_parameters(int num_params);
   size_t next_global_unique_id();
-  DAG *get_representative(DAG *dag);
+  bool has_representative(DAGHashType hash_value, int equiv_id) const;
+  std::vector<DAG *> get_possible_representatives(DAG *dag);
+
+  // Warning: this presumes that DAGs with the same hash value are equivalent.
   void set_representative(std::unique_ptr<DAG> dag);
+
+  // This function is recommended.
+  void set_representative(std::unique_ptr<DAG> dag, int equiv_id);
+
+  void clear_representatives();
 
  private:
   bool insert_gate(GateType tp);
@@ -39,6 +47,5 @@ class Context {
   // A vector to store the representative DAGs.
   std::vector<std::unique_ptr<DAG>> representative_dags_;
 
-  // XXX: this presumes that DAGs with the same hash value are equivalent.
-  std::unordered_map<DAGHashType, DAG *> representatives_;
+  std::unordered_map<DAGHashType, std::vector<DAG *>> representatives_;
 };

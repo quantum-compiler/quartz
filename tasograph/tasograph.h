@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <set>
 #include <map>
+#include <vector>
 #include <chrono>
 #include <iostream>
 
@@ -100,7 +101,7 @@ public:
   void remove_node(Op oldOp);
   float total_cost() const;
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                  const std::string &file_name);
+                  const std::string &equiv_file_name);
 
 public:
   float totalCost;

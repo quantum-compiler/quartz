@@ -18,6 +18,24 @@ const Op Op::INVALID_OP = Op();
 Graph::Graph() : totalCost(0.0f) {}
 
 Graph::Graph(Context *ctx, const DAG &dag) {
+  // Guid for input qubit and input parameter nodes
+  size_t special_op_guid = 0;
+  int num_input_qubits = dag.get_num_qubits();
+  int num_input_params = dag.get_num_input_parameters();
+  // Currently only 100 vacant guid
+  assert(num_input_qubits + num_input_params <= 100);
+  std::vector<Op> input_qubits_op;
+  std::vector<Op> input_params_op;
+  input_qubits_op.reserve(num_input_qubits);
+  input_params_op.reserve(num_input_params);
+  for (int i = 0; i < num_input_qubits; ++i)
+	input_qubits_op.push_back(
+	    Op(special_op_guid++, ctx->get_gate(GateType::input_qubit)));
+  for (int i = 0; i < num_input_params; ++i)
+	input_params_op.push_back(
+	    Op(special_op_guid++, ctx->get_gate(GateType::input_param)));
+
+  // Map all edges in dag to Op
   std::map<DAGHyperEdge *, Op> edge_2_op;
   for (auto &edge : dag.edges) {
 	auto e = edge.get();
@@ -30,8 +48,19 @@ Graph::Graph(Context *ctx, const DAG &dag) {
   std::cout << edge_2_op.size() << std::endl;
 
   for (auto &node : dag.nodes) {
-	for (auto input_edge : node->input_edges) {
-	  int srcIdx;
+	int srcIdx = -1; // Assumption: a node can have at most 1 input
+	Op srcOp;
+	if (node->type == DAGNode::input_qubit) {
+	  srcOp = input_qubits_op[node->index];
+	  srcIdx = 0;
+	}
+	else if (node->type == DAGNode::input_param) {
+	  srcOp = input_params_op[node->index];
+	  srcIdx = 0;
+	}
+	else {
+	  assert(node->input_edges.size() == 1); // A node can have at most 1 input
+	  auto input_edge = node->input_edges[0];
 	  bool found = false;
 	  for (srcIdx = 0; srcIdx < input_edge->output_nodes.size(); ++srcIdx) {
 		if (node.get() == input_edge->output_nodes[srcIdx]) {
@@ -41,24 +70,57 @@ Graph::Graph(Context *ctx, const DAG &dag) {
 	  }
 	  assert(found);
 	  assert(edge_2_op.find(input_edge) != edge_2_op.end());
-	  auto srcOp = edge_2_op[input_edge];
-
-	  for (auto output_edge : node->output_edges) {
-		int dstIdx;
-		bool found = false;
-		for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
-		  if (node.get() == output_edge->input_nodes[dstIdx]) {
-			found = true;
-			break;
-		  }
-		}
-		assert(found);
-		assert(edge_2_op.find(output_edge) != edge_2_op.end());
-		auto dstOp = edge_2_op[output_edge];
-
-		add_edge(srcOp, dstOp, srcIdx, dstIdx);
-	  }
+	  srcOp = edge_2_op[input_edge];
 	}
+
+	assert(srcIdx >= 0);
+	assert(srcOp != Op::INVALID_OP);
+
+	for (auto output_edge : node->output_edges) {
+	  int dstIdx;
+	  bool found = false;
+	  for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
+		if (node.get() == output_edge->input_nodes[dstIdx]) {
+		  found = true;
+		  break;
+		}
+	  }
+	  assert(found);
+	  assert(edge_2_op.find(output_edge) != edge_2_op.end());
+	  auto dstOp = edge_2_op[output_edge];
+
+	  add_edge(srcOp, dstOp, srcIdx, dstIdx);
+	}
+
+	// for (auto input_edge : node->input_edges) {
+	//   int srcIdx;
+	//   bool found = false;
+	//   for (srcIdx = 0; srcIdx < input_edge->output_nodes.size(); ++srcIdx) {
+	// 	if (node.get() == input_edge->output_nodes[srcIdx]) {
+	// 	  found = true;
+	// 	  break;
+	// 	}
+	//   }
+	//   assert(found);
+	//   assert(edge_2_op.find(input_edge) != edge_2_op.end());
+	//   auto srcOp = edge_2_op[input_edge];
+
+	//   for (auto output_edge : node->output_edges) {
+	// 	int dstIdx;
+	// 	bool found = false;
+	// 	for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
+	// 	  if (node.get() == output_edge->input_nodes[dstIdx]) {
+	// 		found = true;
+	// 		break;
+	// 	  }
+	// 	}
+	// 	assert(found);
+	// 	assert(edge_2_op.find(output_edge) != edge_2_op.end());
+	// 	auto dstOp = edge_2_op[output_edge];
+
+	// 	add_edge(srcOp, dstOp, srcIdx, dstIdx);
+	//   }
+	// }
   }
 
   totalCost = total_cost();
@@ -143,7 +205,13 @@ size_t Graph::hash(void) {
 	std::set<Edge, EdgeCompare>::const_iterator it2;
 	for (it2 = list.begin(); it2 != list.end(); it2++) {
 	  Edge e = *it2;
-	  assert(hash_values.find(e.srcOp.guid) != hash_values.end());
+	  //   assert(hash_values.find(e.srcOp.guid) != hash_values.end());
+	  if (hash_values.find(e.srcOp.guid) == hash_values.end()) {
+		// scrOp is an input Op
+		assert(e.srcOp.ptr->tp == GateType::input_qubit or
+		       e.srcOp.ptr->tp == GateType::input_param);
+		hash_values[e.srcOp.guid] = 17 * 13 + (size_t)e.srcOp.ptr;
+	  }
 	  size_t edge_hash = hash_values[e.srcOp.guid];
 	  edge_hash = edge_hash * 31 + std::hash<int>()(e.srcIdx);
 	  edge_hash = edge_hash * 31 + std::hash<int>()(e.dstIdx);
@@ -165,11 +233,11 @@ float Graph::total_cost(void) const {
 }
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                       const std::string &file_name) {
+                       const std::string &equiv_file_name) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
-  if (!eqs.load_json(ctx, file_name)) {
+  if (!eqs.load_json(ctx, equiv_file_name)) {
 	std::cout << "Failed to load equivalence file." << std::endl;
 	assert(false);
   }

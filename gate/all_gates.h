@@ -16,3 +16,5 @@
 #include "tdg.h"
 #include "swap.h"
 #include "ch.h"
+#include "input_qubit.h"
+#include "input_param.h"

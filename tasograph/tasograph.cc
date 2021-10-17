@@ -199,27 +199,55 @@ size_t Graph::hash(void) {
   size_t total = 0;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
   std::unordered_map<size_t, size_t> hash_values;
-  for (it = inEdges.begin(); it != inEdges.end(); it++) {
-	size_t my_hash = 17 * 13 + (size_t)it->first.ptr;
-	std::set<Edge, EdgeCompare> list = it->second;
-	std::set<Edge, EdgeCompare>::const_iterator it2;
-	for (it2 = list.begin(); it2 != list.end(); it2++) {
-	  Edge e = *it2;
-	  //   assert(hash_values.find(e.srcOp.guid) != hash_values.end());
-	  if (hash_values.find(e.srcOp.guid) == hash_values.end()) {
-		// scrOp is an input Op
-		assert(e.srcOp.ptr->tp == GateType::input_qubit or
-		       e.srcOp.ptr->tp == GateType::input_param);
-		hash_values[e.srcOp.guid] = 17 * 13 + (size_t)e.srcOp.ptr;
-	  }
-	  size_t edge_hash = hash_values[e.srcOp.guid];
-	  edge_hash = edge_hash * 31 + std::hash<int>()(e.srcIdx);
-	  edge_hash = edge_hash * 31 + std::hash<int>()(e.dstIdx);
-	  my_hash = my_hash + edge_hash;
+  std::queue<Op> op_queue;
+  // Compute the hash value for input ops
+  for (it = outEdges.begin(); it != outEdges.end(); it++) {
+	if (it->first.ptr->tp == GateType::input_qubit ||
+	    it->first.ptr->tp == GateType::input_param) {
+	  size_t my_hash = 17 * 13 + (size_t)it->first.ptr;
+	  hash_values[it->first.guid] = my_hash;
+	  total += my_hash;
+	  op_queue.push(it->first);
 	}
-	hash_values[it->first.guid] = my_hash;
-	total += my_hash;
   }
+
+  // Construct in-degree map
+  std::map<Op, size_t> op_in_edges_cnt;
+  for (it = inEdges.begin(); it != inEdges.end(); ++it) {
+	op_in_edges_cnt[it->first] = it->second.size();
+  }
+
+  while (!op_queue.empty()) {
+	auto op = op_queue.front();
+	op_queue.pop();
+	if (hash_values.find(op.guid) == hash_values.end()) {
+	  std::set<Edge, EdgeCompare> list = inEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  size_t my_hash = 17 * 13 + (size_t)op.ptr;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		Edge e = *it2;
+		assert(hash_values.find(e.srcOp.guid) != hash_values.end());
+		auto edge_hash = hash_values[e.srcOp.guid];
+		edge_hash = edge_hash * 31 + std::hash<int>()(e.srcIdx);
+		edge_hash = edge_hash * 31 + std::hash<int>()(e.dstIdx);
+		my_hash = my_hash + edge_hash;
+	  }
+	  hash_values[op.guid] = my_hash;
+	  total += my_hash;
+	}
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> list = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		auto e = *it2;
+		op_in_edges_cnt[e.dstOp]--;
+		if (op_in_edges_cnt[e.dstOp] == 0) {
+		  op_queue.push(e.dstOp);
+		}
+	  }
+	}
+  }
+  //   std::cout << total << std::endl;
   return total;
 }
 
@@ -313,9 +341,9 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  break;
 	}
 	counter++;
-	for (size_t i = 0; i < xfers.size(); i++) {
-	  xfers[i]->run(0, subGraph, candidates, hashmap, bestCost * alpha,
-	                2 * maxNumOps);
+	for (auto &xfer : xfers) {
+	  xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
+	            2 * maxNumOps);
 	}
 	if (bestGraph != subGraph) {
 	  delete subGraph;

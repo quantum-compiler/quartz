@@ -7,7 +7,7 @@ int main() {
 
   const int num_qubits = 3;
   const int num_input_parameters = 2;
-  const int max_num_gates = 5;
+  const int max_num_gates = 3;
 
   Dataset dataset1;
   auto start = std::chrono::steady_clock::now();
@@ -51,6 +51,14 @@ int main() {
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                 end - start).count() / 1000.0 << " seconds."
             << std::endl;
-  dataset3.save_json("bfs_verified.json");
+  dataset3.save_json("tmp_before_verify.json");
+
+  equiv_set.clear();
+  system(
+      "python ../python/verify_equivalences.py tmp_before_verify.json bfs_verified.json");
+
+  equiv_set.load_json(&ctx, "bfs_verified.json");
+  std::cout << "equiv_set.has_common_first_or_last_gates() = " << std::hex << equiv_set.has_common_first_or_last_gates()
+            << std::endl;
   return 0;
 }

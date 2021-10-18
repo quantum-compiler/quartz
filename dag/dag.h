@@ -77,6 +77,8 @@ class DAG {
   [[nodiscard]] std::unique_ptr<DAG> get_permuted_dag(const std::vector<int> &qubit_permutation,
                                                       const std::vector<int> &param_permutation) const;
 
+  static bool same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2);
+
  private:
   void clone_from(const DAG &other,
                   const std::vector<int> &qubit_permutation,

@@ -36,7 +36,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
     }
     auto insert_pos = dataset[hash_value].begin();
     if (!insert_at_end_of_list) {
-      for (int i = 0; i < id; i++) {
+      for (int i = 0 ; i < id ; i++) {
         insert_pos++;
       }
     }
@@ -242,4 +242,46 @@ void EquivalenceSet::set_representatives(Context *ctx,
 
 void EquivalenceSet::clear() {
   dataset.clear();
+}
+
+DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
+  for (const auto &item : dataset) {
+    for (const auto &dag_set : item.second) {
+      // brute force here
+      for (const auto &dag1 : dag_set) {
+        if (dag1->get_num_gates() == 0) {
+          continue;
+        }
+        for (const auto &dag2 : dag_set) {
+          if (dag1 == dag2) {
+            continue;
+          }
+          if (dag2->get_num_gates() == 0) {
+            continue;
+          }
+          if (DAG::same_gate(*dag1, 0, *dag2, 0)) {
+            int id = 0;
+            bool same = true;
+            while (dag1->edges[id]->gate->is_parameter_gate()) {
+              // A prefix of only parameter gates doesn't count.
+              id++;
+              if (id >= dag1->get_num_gates() || id >= dag2->get_num_gates()) {
+                same = false;
+                break;
+              }
+              same = DAG::same_gate(*dag1, id, *dag2, id);
+            }
+            if (same) {
+              return item.first;
+            }
+          }
+          if (DAG::same_gate(*dag1, dag1->get_num_gates() - 1, *dag2, dag2->get_num_gates() - 1)) {
+            assert(dag1->edges[dag1->get_num_gates() - 1]->gate->is_quantum_gate());
+            return item.first;
+          }
+        }
+      }
+    }
+  }
+  return 0;  // no common first or last gates found
 }

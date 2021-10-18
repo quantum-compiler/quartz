@@ -985,3 +985,38 @@ void DAG::clone_from(const DAG &other,
     parameters.emplace_back(nodes_mapping[node]);
   }
 }
+
+bool DAG::same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2) {
+  assert(dag1.get_num_gates() > index1);
+  assert(dag2.get_num_gates() > index2);
+  if (dag1.edges[index1]->gate != dag2.edges[index2]->gate) {
+    return false;
+  }
+  if (dag1.edges[index1]->input_nodes.size() != dag2.edges[index2]->input_nodes.size()) {
+    return false;
+  }
+  for (int i = 0; i < (int) dag1.edges[index1]->input_nodes.size(); i++) {
+    if (dag1.edges[index1]->input_nodes[i]->type != dag2.edges[index2]->input_nodes[i]->type) {
+      return false;
+    }
+    if (dag1.edges[index1]->input_nodes[i]->index != dag2.edges[index2]->input_nodes[i]->index) {
+      return false;
+    }
+    if (dag1.edges[index1]->input_nodes[i]->type == DAGNode::internal_param) {
+      // Internal parameters are considered different.
+      return false;
+    }
+  }
+  if (dag1.edges[index1]->output_nodes.size() != dag2.edges[index2]->output_nodes.size()) {
+    return false;
+  }
+  for (int i = 0; i < (int) dag1.edges[index1]->output_nodes.size(); i++) {
+    if (dag1.edges[index1]->output_nodes[i]->type != dag2.edges[index2]->output_nodes[i]->type) {
+      return false;
+    }
+    if (dag1.edges[index1]->output_nodes[i]->index != dag2.edges[index2]->output_nodes[i]->index) {
+      return false;
+    }
+  }
+  return true;
+}

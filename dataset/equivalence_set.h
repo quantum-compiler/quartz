@@ -24,6 +24,11 @@ class EquivalenceSet {
   // This function runs in O(num_equivalence_classes()).
   [[nodiscard]] int num_total_dags() const;
 
+  void set_representatives(Context *ctx,
+                           std::vector<DAG *> *new_representatives) const;
+
+  void clear();
+
   // We cannot use std::vector here because that would need
   // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
   //

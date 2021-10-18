@@ -184,6 +184,25 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
   return true;
 }
 
+void DAG::add_input_parameter() {
+  auto node = std::make_unique<DAGNode>();
+  node->type = DAGNode::input_param;
+  node->index = num_input_parameters;
+  parameters.insert(parameters.begin() + num_input_parameters, node.get());
+  nodes.insert(nodes.begin() + num_input_parameters, std::move(node));
+
+  num_input_parameters++;
+
+  // Update internal parameters' indices
+  for (auto &it : nodes) {
+    if (it->type == DAGNode::internal_param) {
+      it->index++;
+    }
+  }
+
+  // This function should not modify the hash value.
+}
+
 bool DAG::remove_last_gate() {
   if (edges.empty()) {
     return false;
@@ -222,7 +241,111 @@ bool DAG::remove_last_gate() {
 
   // Remove the edge.
   edges.pop_back();
+
+  hash_value_valid_ = false;
   return true;
+}
+
+int DAG::remove_gate(DAGHyperEdge *edge) {
+  auto edge_pos = std::find_if(edges.begin(),
+                               edges.end(),
+                               [&](std::unique_ptr<DAGHyperEdge> &p) {
+                                 return p.get() == edge;
+                               });
+  if (edge_pos == edges.end()) {
+    return 0;
+  }
+
+  auto *gate = edge->gate;
+  // Remove edges from input nodes.
+  for (auto *input_node : edge->input_nodes) {
+    assert(!input_node->output_edges.empty());
+    auto it = std::find(input_node->output_edges.begin(),
+                        input_node->output_edges.end(),
+                        edge);
+    assert(it != input_node->output_edges.end());
+    input_node->output_edges.erase(it);
+  }
+
+  int ret = 1;
+
+  if (gate->is_parameter_gate()) {
+    // Remove the parameter.
+    assert(edge->output_nodes.size() == 1);
+    auto node = edge->output_nodes[0];
+    assert(node->type == DAGNode::internal_param);
+    while (!node->output_edges.empty()) {
+      // Remove edges using the parameter at first.
+      // Note: we can't use a for loop with iterators because they will be
+      // invalidated.
+      ret += remove_gate(node->output_edges[0]);
+    }
+    auto it = std::find_if(nodes.begin(),
+                           nodes.end(),
+                           [&](std::unique_ptr<DAGNode> &p) {
+                             return p.get() == node;
+                           });
+    assert(it != nodes.end());
+    auto idx = node->index;
+    assert(idx >= get_num_input_parameters());
+    nodes.erase(it);
+    parameters.erase(parameters.begin() + idx);
+    // Update the parameter indices.
+    for (auto &j : nodes) {
+      if (j->is_parameter() && j->index > idx) {
+        j->index--;
+      }
+    }
+  } else {
+    assert(gate->is_quantum_gate());
+    int num_outputs = (int) edge->output_nodes.size();
+    int j = 0;
+    for (int i = 0; i < num_outputs; i++, j++) {
+      // Match the input qubits and the output qubits.
+      while (j < (int) edge->input_nodes.size()
+          && !edge->input_nodes[j]->is_qubit()) {
+        j++;
+      }
+      assert(j < (int) edge->input_nodes.size());
+      assert(edge->input_nodes[j]->index == edge->output_nodes[i]->index);
+      if (outputs[edge->output_nodes[i]->index] == edge->output_nodes[i]) {
+        // Restore the outputs.
+        outputs[edge->output_nodes[i]->index] = edge->input_nodes[j];
+      }
+      if (edge->output_nodes[i]->output_edges.empty()) {
+        // Remove the qubit wires.
+        auto it = std::find_if(nodes.begin(),
+                               nodes.end(),
+                               [&](std::unique_ptr<DAGNode> &p) {
+                                 return p.get() == edge->output_nodes[i];
+                               });
+        assert(it != nodes.end());
+        nodes.erase(it);
+      } else {
+        // Merge the adjacent qubit wires.
+        for (auto &e : edge->output_nodes[i]->output_edges) {
+          auto it = std::find(e->input_nodes.begin(),
+                              e->input_nodes.end(),
+                              edge->output_nodes[i]);
+          assert(it != e->input_nodes.end());
+          *it = edge->input_nodes[j];
+          edge->input_nodes[j]->output_edges.push_back(e);
+        }
+      }
+    }
+  }
+
+  // Remove the edge.
+  edge_pos = std::find_if(edges.begin(),
+                          edges.end(),
+                          [&](std::unique_ptr<DAGHyperEdge> &p) {
+                            return p.get() == edge;
+                          });
+  assert(edge_pos != edges.end());
+  edges.erase(edge_pos);
+
+  hash_value_valid_ = false;
+  return ret;
 }
 
 bool DAG::evaluate(const Vector &input_dis,
@@ -351,6 +474,15 @@ std::unique_ptr<DAG> DAG::clone_and_shrink_unused_input_parameters() const {
   auto cloned_dag = std::make_unique<DAG>(*this);
   cloned_dag->shrink_unused_input_parameters();
   return cloned_dag;
+}
+
+bool DAG::has_unused_parameter() const {
+  for (auto &node : nodes) {
+    if (node->is_parameter() && node->output_edges.empty()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void DAG::print(Context *ctx) const {

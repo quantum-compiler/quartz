@@ -19,3 +19,6 @@ GateType to_gate_type(const std::string &name);
 std::vector<GateType> all_supported_gates();
 
 class Gate;
+
+const int kMaxParamInputPerParamGate = 2;
+const int kMaxParamInputPerQuantumGate = 1;

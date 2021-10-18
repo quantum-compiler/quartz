@@ -181,7 +181,7 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-def find_equivalences(input_file, output_file, verbose=False):
+def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_1_dag=False):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -194,7 +194,7 @@ def find_equivalences(input_file, output_file, verbose=False):
     for hashtag, dags in data.items():
         num_hashtags += 1
         num_dags += len(dags)
-        if len(dags) <= 1:
+        if not keep_classes_with_1_dag and len(dags) <= 1:
             continue
         num_potential_equivalences += len(dags) - 1
         different_dags_with_same_hash = []
@@ -208,17 +208,27 @@ def find_equivalences(input_file, output_file, verbose=False):
                 if equivalent(dag, other_dag):
                     current_tag = hashtag + '_' + str(i)
                     if current_tag not in output_dict.keys():
-                        output_dict[current_tag] = [other_dag]
+                        if not keep_classes_with_1_dag:
+                            # Insert |other_dag| now, when there is another DAG |dag| equivalent to it
+                            output_dict[current_tag] = [other_dag]
                     output_dict[current_tag].append(dag)
                     equivalence_found = True
                     total_equivalence_found += 1
                     break
             if not equivalence_found:
                 different_dags_with_same_hash.append(dag)
+                if keep_classes_with_1_dag:
+                    # Insert |dag| eagerly
+                    current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+                    output_dict[current_tag] = [dag]
+
+    if not keep_classes_with_1_dag:
+        output_dict = {k: v for k, v in output_dict.items() if len(v) >= 2}
     t_end = time.monotonic()
     print(f'{total_equivalence_found} equivalences found in {t_end - t_start} seconds'
           f' (solver invoked {equivalent_called} times for {num_dags} DAGs'
-          f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences).')
+          f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),'
+          f' output {len(output_dict)} equivalence classes.')
     t_start = time.monotonic()
     dump_json(output_dict, output_file)
     t_end = time.monotonic()

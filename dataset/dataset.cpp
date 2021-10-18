@@ -2,6 +2,18 @@
 
 #include <fstream>
 
+int Dataset::num_hash_values() const {
+  return (int) dataset.size();
+}
+
+int Dataset::num_total_dags() const {
+  int ret = 0;
+  for (const auto &it : dataset) {
+    ret += (int) it.second.size();
+  }
+  return ret;
+}
+
 bool Dataset::save_json(const std::string &file_name) const {
   std::ofstream fout;
   fout.open(file_name, std::ofstream::out);

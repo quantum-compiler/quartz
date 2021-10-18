@@ -30,7 +30,13 @@ class DAG {
                 const std::vector<int> &parameter_indices,
                 Gate *gate,
                 int *output_para_index);
+  void add_input_parameter();
   bool remove_last_gate();
+
+  // Return the total number of gates removed.
+  // The time complexity is O((number of gates removed) *
+  // ((total number of nodes) + (total number of edges))).
+  int remove_gate(DAGHyperEdge *edge);
   bool evaluate(const Vector &input_dis,
                 const std::vector<ParamType> &input_parameters,
                 Vector &output_dis) const;
@@ -42,6 +48,7 @@ class DAG {
   DAGHashType hash(Context *ctx);
   DAG &shrink_unused_input_parameters();
   [[nodiscard]] std::unique_ptr<DAG> clone_and_shrink_unused_input_parameters() const;
+  [[nodiscard]] bool has_unused_parameter() const;
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
@@ -57,6 +64,11 @@ class DAG {
   // nullptr means that the permutation is not required to store.
   // |qubit_permutation[0] == 1| means that the qubit Q0 in this DAG maps to
   // the qubit Q1 in the minimal representation.
+  // FIXME: The implementation is wrong: it can't decide which gate should be
+  //  ordered first when >= two gates' inputs are not mapped yet.
+  // Nevertheless, the current implementation guarantees that if two circuits
+  // share the same "minimal_representation", they can have their qubits and
+  // parameters permuted to be equivalent.
   bool minimal_representation(std::unique_ptr<DAG> *output_dag,
                               std::vector<int> *qubit_permutation = nullptr,
                               std::vector<int> *param_permutation = nullptr,

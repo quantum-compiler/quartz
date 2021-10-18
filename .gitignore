@@ -33,9 +33,13 @@
 
 # CMake
 cmake-build-*
+CMake*
 
 # IDE
 .idea/
 
 # Dataset
 *.json
+
+# Clang format
+.clang-format

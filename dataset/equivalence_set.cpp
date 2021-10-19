@@ -217,7 +217,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
       std::vector<bool>
           input_param_used(rep->get_num_input_parameters(), false);
       for (const auto &dag : dag_set) {
-        assert(qubit_used.size() == dag->get_num_gates());
+        assert(qubit_used.size() == dag->get_num_qubits());
         for (int i = 0; i < (int) qubit_used.size(); i++) {
           if (!qubit_used[i]) {
             if (dag->qubit_used(i)) {

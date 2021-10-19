@@ -45,7 +45,19 @@ class DAG {
   [[nodiscard]] int get_num_total_parameters() const;
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
+  [[nodiscard]] bool input_param_used(int param_index) const;
   DAGHashType hash(Context *ctx);
+
+  // Remove the qubit set of |unused_qubits|, given that they are unused.
+  // Returns false iff an error occurs.
+  bool remove_unused_qubits(const std::vector<int> &unused_qubits);
+
+  // Remove the parameter set of |unused_input_params|, given that they are
+  // unused input parameters
+  // Returns false iff an error occurs.
+  bool remove_unused_input_params(const std::vector<int> &unused_input_params);
+
+  // Remove a suffix of unused input parameters.
   DAG &shrink_unused_input_parameters();
   [[nodiscard]] std::unique_ptr<DAG> clone_and_shrink_unused_input_parameters() const;
   [[nodiscard]] bool has_unused_parameter() const;
@@ -93,6 +105,10 @@ class UniquePtrDAGComparator {
  public:
   bool operator()(const std::unique_ptr<DAG> &dag1,
                   const std::unique_ptr<DAG> &dag2) const {
+    if (!dag1 || !dag2) {
+      // nullptr
+      return !dag2;
+    }
     return dag1->less_than(*dag2);
   }
 };

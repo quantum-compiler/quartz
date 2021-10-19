@@ -12,5 +12,5 @@ public:
       : Gate(GateType::input_param, 0 /*num_qubits*/, 0 /*num_parameters*/),
         mat() {}
   MatrixBase *get_matrix() override { return &mat; }
-  Matrix<0> mat;
+  Matrix<1> mat;
 };

@@ -16,7 +16,17 @@ class EquivalenceSet {
 
   // Normalize each clause of equivalent DAGs to have the minimum
   // (according to DAG::less_than) minimal representation.
+  // Warning: see comments in DAG::minimal_representation().
   void normalize_to_minimal_representations(Context *ctx);
+
+  void clear();
+
+  // Remove unused qubits and input parameters if they are unused in
+  // each DAG of an equivalent class.
+  // Return the number of equivalent classes (modified and then) inserted.
+  // This function potentially changes the ordering of equivalent classes
+  // in the dataset.
+  int remove_unused_qubits_and_input_params(Context *ctx);
 
   // This function runs in O(|dataset|.size()).
   [[nodiscard]] int num_equivalence_classes() const;
@@ -26,8 +36,6 @@ class EquivalenceSet {
 
   void set_representatives(Context *ctx,
                            std::vector<DAG *> *new_representatives) const;
-
-  void clear();
 
   [[nodiscard]] DAGHashType has_common_first_or_last_gates() const;
 

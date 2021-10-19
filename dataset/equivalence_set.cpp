@@ -36,7 +36,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
     }
     auto insert_pos = dataset[hash_value].begin();
     if (!insert_at_end_of_list) {
-      for (int i = 0 ; i < id ; i++) {
+      for (int i = 0; i < id; i++) {
         insert_pos++;
       }
     }
@@ -200,6 +200,122 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
   }
 }
 
+void EquivalenceSet::clear() {
+  dataset.clear();
+}
+
+int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
+  std::vector<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>> new_dag_sets;
+  for (auto it0 = dataset.begin(); it0 != dataset.end();) {
+    auto &item = *it0;
+    for (auto it1 = item.second.begin(); it1 != item.second.end();) {
+      auto &dag_set = *it1;
+      assert(!dag_set.empty());
+      auto &rep = *dag_set.begin();
+      std::vector<bool> qubit_used(rep->get_num_qubits(), false);
+      std::vector<bool>
+          input_param_used(rep->get_num_input_parameters(), false);
+      for (const auto &dag : dag_set) {
+        assert(qubit_used.size() == dag->get_num_gates());
+        for (int i = 0; i < (int) qubit_used.size(); i++) {
+          if (!qubit_used[i]) {
+            if (dag->qubit_used(i)) {
+              qubit_used[i] = true;
+            }
+          }
+        }
+
+        if (dag->get_num_input_parameters() > (int) input_param_used.size()) {
+          input_param_used.resize(dag->get_num_input_parameters(), false);
+        }
+        for (int i = 0; i < dag->get_num_input_parameters(); i++) {
+          if (!input_param_used[i]) {
+            if (dag->input_param_used(i)) {
+              input_param_used[i] = true;
+            }
+          }
+        }
+      }
+      std::vector<int> unused_qubits, unused_input_params;
+      for (int i = 0; i < (int) qubit_used.size(); i++) {
+        if (!qubit_used[i]) {
+          unused_qubits.push_back(i);
+        }
+      }
+      for (int i = 0; i < (int) input_param_used.size(); i++) {
+        if (!input_param_used[i]) {
+          unused_input_params.push_back(i);
+        }
+      }
+      if (unused_qubits.empty() && unused_input_params.empty()) {
+        // No unused ones
+        it1++;
+        continue;
+      }
+
+      // Only keep the ones with a (possibly empty) suffix of input parameters
+      // removed, because others must be redundant
+      // Warning: this optimization presumes that initially all circuits
+      // share the same number of input parameters.
+      bool keep_dag_set = true;
+      if (!unused_input_params.empty()) {
+        for (int i = 0; i < (int) unused_input_params.size(); i++) {
+          if (unused_input_params[i]
+              != input_param_used.size() - unused_input_params.size() + i) {
+            keep_dag_set = false;
+            break;
+          }
+        }
+      }
+
+      if (keep_dag_set) {
+        // Construct a new DAG set
+        new_dag_sets.emplace_back();
+        auto &new_dag_set = new_dag_sets.back();
+        bool has_hash_value = false;
+        DAGHashType hash_value;
+        for (auto &dag : dag_set) {
+          auto new_dag = std::make_unique<DAG>(*dag);  // clone the DAG here
+          bool ret = new_dag->remove_unused_qubits(unused_qubits);
+          assert(ret);
+          ret = new_dag->remove_unused_input_params(unused_input_params);
+          assert(ret);
+          auto new_dag_hash = new_dag->hash(ctx);
+          if (has_hash_value) {
+            assert(new_dag_hash == hash_value);
+          } else {
+            hash_value = new_dag_hash;
+          }
+          new_dag_set.insert(std::move(new_dag));
+        }
+        // Do not insert the new DAG set to the original dataset
+        // to avoid invalidating iterators
+      }
+
+      // Erase the original one
+      auto it1_to_erase = it1;
+      it1++;
+      item.second.erase(it1_to_erase);
+    }
+    if (item.second.empty()) {
+      // Erase the whole hash value
+      auto it0_to_erase = it0;
+      it0++;
+      dataset.erase(it0_to_erase);
+    } else {
+      it0++;
+    }
+  }
+  const int num_dag_set_inserted = (int) new_dag_sets.size();
+  for (auto &new_dag_set : new_dag_sets) {
+    auto hash_value = (*new_dag_set.begin())->hash(ctx);
+    // Note: we don't check if the new equivalence set is already equivalent
+    // to an existing one here.
+    dataset[hash_value].push_back(std::move(new_dag_set));
+  }
+  return num_dag_set_inserted;
+}
+
 int EquivalenceSet::num_equivalence_classes() const {
   int result = 0;
   for (const auto &item : dataset) {
@@ -240,10 +356,6 @@ void EquivalenceSet::set_representatives(Context *ctx,
   }
 }
 
-void EquivalenceSet::clear() {
-  dataset.clear();
-}
-
 DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
   for (const auto &item : dataset) {
     for (const auto &dag_set : item.second) {
@@ -275,8 +387,12 @@ DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
               return item.first;
             }
           }
-          if (DAG::same_gate(*dag1, dag1->get_num_gates() - 1, *dag2, dag2->get_num_gates() - 1)) {
-            assert(dag1->edges[dag1->get_num_gates() - 1]->gate->is_quantum_gate());
+          if (DAG::same_gate(*dag1,
+                             dag1->get_num_gates() - 1,
+                             *dag2,
+                             dag2->get_num_gates() - 1)) {
+            assert(dag1->edges[dag1->get_num_gates()
+                - 1]->gate->is_quantum_gate());
             return item.first;
           }
         }

@@ -409,6 +409,12 @@ bool DAG::qubit_used(int qubit_index) const {
   return outputs[qubit_index] != nodes[qubit_index].get();
 }
 
+bool DAG::input_param_used(int param_index) const {
+  assert(nodes[get_num_qubits() + param_index]->type == DAGNode::input_param);
+  assert(nodes[get_num_qubits() + param_index]->index == param_index);
+  return !nodes[get_num_qubits() + param_index]->output_edges.empty();
+}
+
 DAGHashType DAG::hash(Context *ctx) {
   if (hash_value_valid_) {
     return hash_value_;
@@ -430,6 +436,56 @@ DAGHashType DAG::hash(Context *ctx) {
   hash_value_ = result;
   hash_value_valid_ = true;
   return result;
+}
+
+bool DAG::remove_unused_qubits(const std::vector<int> &unused_qubits) {
+  if (unused_qubits.empty()) {
+    return true;
+  }
+  for (auto &id : unused_qubits) {
+    if (id >= get_num_qubits()) {
+      return false;
+    }
+    if (nodes[id]->type != DAGNode::input_qubit) {
+      return false;
+    }
+    if (nodes[id]->index != id) {
+      return false;
+    }
+    if (!nodes[id]->output_edges.empty()) {
+      // used
+      return false;
+    }
+    nodes.erase(nodes.begin() + id);
+    num_qubits--;
+  }
+  hash_value_valid_ = false;
+  return true;
+}
+
+bool DAG::remove_unused_input_params(const std::vector<int> &unused_input_params) {
+  if (unused_input_params.empty()) {
+    return true;
+  }
+  for (auto &id : unused_input_params) {
+    if (id >= get_num_input_parameters()) {
+      return false;
+    }
+    if (nodes[get_num_qubits() + id]->type != DAGNode::input_param) {
+      return false;
+    }
+    if (nodes[get_num_qubits() + id]->index != id) {
+      return false;
+    }
+    if (!nodes[get_num_qubits() + id]->output_edges.empty()) {
+      // used
+      return false;
+    }
+    nodes.erase(nodes.begin() + get_num_qubits() + id);
+    num_input_parameters--;
+  }
+  hash_value_valid_ = false;
+  return true;
 }
 
 DAG &DAG::shrink_unused_input_parameters() {
@@ -992,14 +1048,17 @@ bool DAG::same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2) {
   if (dag1.edges[index1]->gate != dag2.edges[index2]->gate) {
     return false;
   }
-  if (dag1.edges[index1]->input_nodes.size() != dag2.edges[index2]->input_nodes.size()) {
+  if (dag1.edges[index1]->input_nodes.size()
+      != dag2.edges[index2]->input_nodes.size()) {
     return false;
   }
   for (int i = 0; i < (int) dag1.edges[index1]->input_nodes.size(); i++) {
-    if (dag1.edges[index1]->input_nodes[i]->type != dag2.edges[index2]->input_nodes[i]->type) {
+    if (dag1.edges[index1]->input_nodes[i]->type
+        != dag2.edges[index2]->input_nodes[i]->type) {
       return false;
     }
-    if (dag1.edges[index1]->input_nodes[i]->index != dag2.edges[index2]->input_nodes[i]->index) {
+    if (dag1.edges[index1]->input_nodes[i]->index
+        != dag2.edges[index2]->input_nodes[i]->index) {
       return false;
     }
     if (dag1.edges[index1]->input_nodes[i]->type == DAGNode::internal_param) {
@@ -1007,14 +1066,17 @@ bool DAG::same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2) {
       return false;
     }
   }
-  if (dag1.edges[index1]->output_nodes.size() != dag2.edges[index2]->output_nodes.size()) {
+  if (dag1.edges[index1]->output_nodes.size()
+      != dag2.edges[index2]->output_nodes.size()) {
     return false;
   }
   for (int i = 0; i < (int) dag1.edges[index1]->output_nodes.size(); i++) {
-    if (dag1.edges[index1]->output_nodes[i]->type != dag2.edges[index2]->output_nodes[i]->type) {
+    if (dag1.edges[index1]->output_nodes[i]->type
+        != dag2.edges[index2]->output_nodes[i]->type) {
       return false;
     }
-    if (dag1.edges[index1]->output_nodes[i]->index != dag2.edges[index2]->output_nodes[i]->index) {
+    if (dag1.edges[index1]->output_nodes[i]->index
+        != dag2.edges[index2]->output_nodes[i]->index) {
       return false;
     }
   }

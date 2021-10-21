@@ -50,12 +50,12 @@ class DAG {
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
   // Returns false iff an error occurs.
-  bool remove_unused_qubits(const std::vector<int> &unused_qubits);
+  bool remove_unused_qubits(std::vector<int> unused_qubits);
 
   // Remove the parameter set of |unused_input_params|, given that they are
   // unused input parameters
   // Returns false iff an error occurs.
-  bool remove_unused_input_params(const std::vector<int> &unused_input_params);
+  bool remove_unused_input_params(std::vector<int> unused_input_params);
 
   // Remove a suffix of unused input parameters.
   DAG &shrink_unused_input_parameters();

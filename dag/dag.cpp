@@ -469,10 +469,11 @@ DAGHashType DAG::hash(Context *ctx) {
   return hash_value_;
 }
 
-bool DAG::remove_unused_qubits(const std::vector<int> &unused_qubits) {
+bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
   if (unused_qubits.empty()) {
     return true;
   }
+  std::sort(unused_qubits.begin(), unused_qubits.end(), std::greater<>());
   for (auto &id : unused_qubits) {
     if (id >= get_num_qubits()) {
       return false;
@@ -489,15 +490,23 @@ bool DAG::remove_unused_qubits(const std::vector<int> &unused_qubits) {
     }
     nodes.erase(nodes.begin() + id);
     num_qubits--;
+    for (auto &node : nodes) {
+      if (node->is_qubit() && node->index > id) {
+        node->index--;
+      }
+    }
   }
   hash_value_valid_ = false;
   return true;
 }
 
-bool DAG::remove_unused_input_params(const std::vector<int> &unused_input_params) {
+bool DAG::remove_unused_input_params(std::vector<int> unused_input_params) {
   if (unused_input_params.empty()) {
     return true;
   }
+  std::sort(unused_input_params.begin(),
+            unused_input_params.end(),
+            std::greater<>());
   for (auto &id : unused_input_params) {
     if (id >= get_num_input_parameters()) {
       return false;
@@ -514,6 +523,11 @@ bool DAG::remove_unused_input_params(const std::vector<int> &unused_input_params
     }
     nodes.erase(nodes.begin() + get_num_qubits() + id);
     num_input_parameters--;
+    for (auto &node : nodes) {
+      if (node->is_parameter() && node->index > id) {
+        node->index--;
+      }
+    }
   }
   hash_value_valid_ = false;
   return true;

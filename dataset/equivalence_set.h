@@ -39,6 +39,8 @@ class EquivalenceSet {
 
   [[nodiscard]] DAGHashType has_common_first_or_last_gates() const;
 
+  [[nodiscard]] std::vector<std::vector<DAG *>> get_all_equivalence_sets() const;
+
   // We cannot use std::vector here because that would need
   // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
   //

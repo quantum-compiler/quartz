@@ -206,7 +206,8 @@ void EquivalenceSet::clear() {
 
 int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   // We cannot use vector here (otherwise there will be build errors).
-  std::list<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>> new_dag_sets;
+  std::list<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>>
+      new_dag_sets;
   for (auto it0 = dataset.begin(); it0 != dataset.end();) {
     auto &item = *it0;
     for (auto it1 = item.second.begin(); it1 != item.second.end();) {
@@ -402,4 +403,20 @@ DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
     }
   }
   return 0;  // no common first or last gates found
+}
+
+std::vector<std::vector<DAG *>> EquivalenceSet::get_all_equivalence_sets() const {
+  std::vector<std::vector<DAG *>> result;
+  result.reserve(num_equivalence_classes());
+  for (const auto &item : dataset) {
+    for (const auto &dag_set : item.second) {
+      result.emplace_back();
+      auto &equiv_set = result.back();
+      equiv_set.reserve(dag_set.size());
+      for (const auto &dag : dag_set) {
+        equiv_set.push_back(dag.get());
+      }
+    }
+  }
+  return result;
 }

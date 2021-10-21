@@ -181,7 +181,8 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_1_dag=False):
+def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_1_dag=False,
+                      assert_no_missing_equivalence=False):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -191,11 +192,10 @@ def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_
     num_potential_equivalences = 0
     import time
     t_start = time.monotonic()
+    num_different_dags_with_same_hash = {}
     for hashtag, dags in data.items():
         num_hashtags += 1
         num_dags += len(dags)
-        if not keep_classes_with_1_dag and len(dags) <= 1:
-            continue
         num_potential_equivalences += len(dags) - 1
         different_dags_with_same_hash = []
         if verbose:
@@ -207,20 +207,50 @@ def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_
                 equivalent_called += 1
                 if equivalent(dag, other_dag):
                     current_tag = hashtag + '_' + str(i)
-                    if current_tag not in output_dict.keys():
-                        if not keep_classes_with_1_dag:
-                            # Insert |other_dag| now, when there is another DAG |dag| equivalent to it
-                            output_dict[current_tag] = [other_dag]
+                    assert current_tag in output_dict.keys()
                     output_dict[current_tag].append(dag)
                     equivalence_found = True
                     total_equivalence_found += 1
                     break
             if not equivalence_found:
                 different_dags_with_same_hash.append(dag)
-                if keep_classes_with_1_dag:
-                    # Insert |dag| eagerly
-                    current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
-                    output_dict[current_tag] = [dag]
+                # Insert |dag| eagerly
+                current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+                output_dict[current_tag] = [dag]
+        num_different_dags_with_same_hash[hashtag] = len(different_dags_with_same_hash)
+
+    if assert_no_missing_equivalence:
+        equivalent_called_2 = 0
+        for hashtag, dags in output_dict.items():
+            other_hashtags = set()
+            assert len(dags) > 0
+            for dag in dags:
+                dag_meta = dag[0]
+                other_hashtags.update(dag_meta[meta_index_other_hash_values])
+            assert hashtag.split('_')[0] not in other_hashtags
+            if len(other_hashtags) == 0:
+                print(f'Warning: other hash values unspecified for hash value {hashtag}.'
+                      f' Cannot guarantee there are no missing equivalences.')
+            possible_equivalent_dags = []
+            for other_hashtag in other_hashtags:
+                if other_hashtag not in data.keys():
+                    # Not equivalent to any other ones
+                    continue
+                assert other_hashtag in num_different_dags_with_same_hash.keys()
+                i_range = num_different_dags_with_same_hash[other_hashtag]
+                for i in range(i_range):
+                    current_tag = other_hashtag + '_' + str(i)
+                    possible_equivalent_dags.append((output_dict[current_tag][0], current_tag))
+            if verbose and len(possible_equivalent_dags) > 0:
+                print(f'Verifying {len(possible_equivalent_dags)} possible missing equivalences'
+                      f' with hash value {hashtag} and {len(other_hashtags)} other hash values...')
+            for other_dag in possible_equivalent_dags:
+                equivalent_called_2 += 1
+                if equivalent(dags[0], other_dag[0]):
+                    raise Exception(f'Equivalence missed at {hashtag} and {other_dag[1]}:\n'
+                                    f'{dags[0]}\n'
+                                    f'{other_dag[0]}')
+        print(f'Solver invoked {equivalent_called_2} times to prove that there are no missing equivalences.')
 
     if not keep_classes_with_1_dag:
         output_dict = {k: v for k, v in output_dict.items() if len(v) >= 2}

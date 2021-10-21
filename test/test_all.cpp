@@ -28,7 +28,7 @@ int main() {
                                     GateType::cx, GateType::add},
       /*num_qubits=*/3,
       /*max_num_input_parameters=*/2,
-      /*max_num_gates=*/4,
+      /*max_num_gates=*/3,
       /*verbose=*/false,
       /*save_file_name=*/"data.json",
       /*count_minimal_representations=*/true);

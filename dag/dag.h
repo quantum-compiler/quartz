@@ -98,6 +98,7 @@ class DAG {
 
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
+  std::vector<DAGHashType> other_hash_values_for_floating_point_error_;
   bool hash_value_valid_;
 };
 

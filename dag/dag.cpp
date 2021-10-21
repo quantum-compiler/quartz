@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <charconv>
 
 DAG::DAG(int num_qubits, int num_input_parameters)
     : num_qubits(num_qubits),
@@ -426,16 +427,46 @@ DAGHashType DAG::hash(Context *ctx) {
            output_dis);
   ComplexType dot_product =
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
-  const int discard_bits = 10;
+  constexpr int discard_bits = kDAGHashDiscardBits;
   assert(typeid(ComplexType::value_type) == typeid(double));
   assert(sizeof(DAGHashType) == sizeof(double));
   auto val1 = dot_product.real(), val2 = dot_product.imag();
+  DAGHashType val1hash = *((DAGHashType *) (&val1));
+  DAGHashType val2hash = *((DAGHashType *) (&val2));
   DAGHashType
-      result = *((DAGHashType *) (&val1)) >> discard_bits << discard_bits;
-  result ^= *((DAGHashType *) (&val2)) >> discard_bits;
+      result = val1hash >> discard_bits << discard_bits;
+  result ^= val2hash >> discard_bits;
   hash_value_ = result;
   hash_value_valid_ = true;
-  return result;
+
+  // Besides rounding both values down, we might want to round them up to
+  // account for floating point errors.
+  // For example, it is possible that a DAG's hash value is
+  // ...10100000000000
+  // which is rounded down to
+  // ...1010
+  // after discarding the last 10 bits,
+  // but another equivalent DAG's hash value is
+  // ...10011111111111
+  // which is rounded down to
+  // ...1001
+  // after discarding the last 10 bits.
+  // Rounding the latter up can solve this issue.
+  DAGHashType tmp;
+  other_hash_values_for_floating_point_error_.clear();
+  tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
+  tmp ^= val2hash >> discard_bits;
+  assert(tmp != hash_value_);
+  other_hash_values_for_floating_point_error_.push_back(tmp);
+  tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
+  tmp ^= (val2hash >> discard_bits) + 1;
+  assert(tmp != hash_value_);
+  other_hash_values_for_floating_point_error_.push_back(tmp);
+  tmp = val1hash >> discard_bits << discard_bits;
+  tmp ^= (val2hash >> discard_bits) + 1;
+  assert(tmp != hash_value_);
+  other_hash_values_for_floating_point_error_.push_back(tmp);
+  return hash_value_;
 }
 
 bool DAG::remove_unused_qubits(const std::vector<int> &unused_qubits) {
@@ -598,6 +629,28 @@ std::string DAG::to_json() const {
   result += std::to_string(get_num_input_parameters());
   result += ",";
   result += std::to_string(get_num_total_parameters());
+  result += ",";
+
+  result += "[";
+  if (hash_value_valid_) {
+    bool first_other_hash_value = true;
+    for (const auto &val : other_hash_values_for_floating_point_error_) {
+      if (first_other_hash_value) {
+        first_other_hash_value = false;
+      } else {
+        result += ",";
+      }
+      static char buffer[64];
+      auto[ptr, ec] = std::to_chars(buffer,
+                                    buffer + sizeof(buffer),
+                                    val, /*base=*/
+                                    16);
+      assert(ec == std::errc());
+      result += "\"" + std::string(buffer, ptr) + "\"";
+    }
+  }
+  result += "]";
+
   result += "],";
 
   // gates
@@ -962,6 +1015,8 @@ void DAG::clone_from(const DAG &other,
   num_qubits = other.num_qubits;
   num_input_parameters = other.num_input_parameters;
   hash_value_ = other.hash_value_;
+  other_hash_values_for_floating_point_error_ =
+      other.other_hash_values_for_floating_point_error_;
   hash_value_valid_ = other.hash_value_valid_;
   std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
   std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;

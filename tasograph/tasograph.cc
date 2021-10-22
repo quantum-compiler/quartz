@@ -45,7 +45,7 @@ Graph::Graph(Context *ctx, const DAG &dag) {
 	}
   }
 
-  std::cout << edge_2_op.size() << std::endl;
+  //   std::cout << edge_2_op.size() << std::endl;
 
   for (auto &node : dag.nodes) {
 	int srcIdx = -1; // Assumption: a node can have at most 1 input
@@ -91,36 +91,6 @@ Graph::Graph(Context *ctx, const DAG &dag) {
 
 	  add_edge(srcOp, dstOp, srcIdx, dstIdx);
 	}
-
-	// for (auto input_edge : node->input_edges) {
-	//   int srcIdx;
-	//   bool found = false;
-	//   for (srcIdx = 0; srcIdx < input_edge->output_nodes.size(); ++srcIdx) {
-	// 	if (node.get() == input_edge->output_nodes[srcIdx]) {
-	// 	  found = true;
-	// 	  break;
-	// 	}
-	//   }
-	//   assert(found);
-	//   assert(edge_2_op.find(input_edge) != edge_2_op.end());
-	//   auto srcOp = edge_2_op[input_edge];
-
-	//   for (auto output_edge : node->output_edges) {
-	// 	int dstIdx;
-	// 	bool found = false;
-	// 	for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
-	// 	  if (node.get() == output_edge->input_nodes[dstIdx]) {
-	// 		found = true;
-	// 		break;
-	// 	  }
-	// 	}
-	// 	assert(found);
-	// 	assert(edge_2_op.find(output_edge) != edge_2_op.end());
-	// 	auto dstOp = edge_2_op[output_edge];
-
-	// 	add_edge(srcOp, dstOp, srcIdx, dstIdx);
-	//   }
-	// }
   }
 
   totalCost = total_cost();
@@ -279,18 +249,30 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                    1000.0
             << " seconds." << std::endl;
 
-  // Normalize dags to minimal representations
   start = std::chrono::steady_clock::now();
-  eqs.normalize_to_minimal_representations(ctx);
+  auto num_equiv_class_inserted =
+      eqs.remove_unused_qubits_and_input_params(ctx);
   end = std::chrono::steady_clock::now();
-  std::cout << "After normalizing to minimal representations in "
+  std::cout << std::dec << num_equiv_class_inserted
+            << " classes of equivalences inserted in "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /
                    1000.0
-            << " seconds, " << eqs.num_equivalence_classes()
-            << " classes of equivalences with " << eqs.num_total_dags()
-            << " DAGs are found." << std::endl;
+            << " seconds." << std::endl;
+  // Normalize dags to minimal representations
+  //   start = std::chrono::steady_clock::now();
+  //   eqs.normalize_to_minimal_representations(ctx);
+  //   end = std::chrono::steady_clock::now();
+  //   std::cout << "After normalizing to minimal representations in "
+  //             <<
+  //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+  //                    end - start)
+  //                        .count() /
+  //                    1000.0
+  //             << " seconds, " << eqs.num_equivalence_classes()
+  //             << " classes of equivalences with " << eqs.num_total_dags()
+  //             << " DAGs are found." << std::endl;
 
   std::vector<GraphXfer *> xfers;
   for (const auto &item : eqs.dataset) {
@@ -307,15 +289,23 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		else {
 		  DAG *other_dag = new DAG(*dag);
 		  // first_dag is src, others are dst
-		  xfers.push_back(new GraphXfer(ctx, first_dag, other_dag));
+		  auto first_2_other =
+		      GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
 		  // first_dag is dst, others are src
-		  xfers.push_back(new GraphXfer(ctx, other_dag, first_dag));
+		  auto other_2_first =
+		      GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
+		  if (first_2_other != nullptr)
+			xfers.push_back(first_2_other);
+		  if (other_2_first != nullptr)
+			xfers.push_back(other_2_first);
 		  delete other_dag;
 		}
 	  }
 	  delete first_dag;
 	}
   }
+
+  std::cout << xfers.size() << std::endl;
 
   int counter = 0;
   int maxNumOps = inEdges.size();
@@ -338,9 +328,11 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	}
 	if (counter > budget) {
 	  // TODO: free all remaining candidates when budget exhausted
-	  break;
+	  //   break;
+	  ;
 	}
 	counter++;
+
 	for (auto &xfer : xfers) {
 	  xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
 	            2 * maxNumOps);

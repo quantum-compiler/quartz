@@ -275,34 +275,32 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   //             << " DAGs are found." << std::endl;
 
   std::vector<GraphXfer *> xfers;
-  for (const auto &item : eqs.get_all_equivalence_sets()) {
-	for (const auto &equiv_set : item) {
-	  bool first = true;
-	  DAG *first_dag = nullptr;
-	  for (const auto &dag : equiv_set) {
-		if (first) {
-		  // Used raw pointer according to the GraphXfer API
-		  // May switch to smart pointer later
-		  first_dag = new DAG(*dag);
-		  first = false;
-		}
-		else {
-		  DAG *other_dag = new DAG(*dag);
-		  // first_dag is src, others are dst
-		  auto first_2_other =
-		      GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
-		  // first_dag is dst, others are src
-		  auto other_2_first =
-		      GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
-		  if (first_2_other != nullptr)
-			xfers.push_back(first_2_other);
-		  if (other_2_first != nullptr)
-			xfers.push_back(other_2_first);
-		  delete other_dag;
-		}
-	  }
-	  delete first_dag;
-	}
+  for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
+    bool first = true;
+    DAG *first_dag = nullptr;
+    for (const auto &dag : equiv_set) {
+      if (first) {
+        // Used raw pointer according to the GraphXfer API
+        // May switch to smart pointer later
+        first_dag = new DAG(*dag);
+        first = false;
+      }
+      else {
+        DAG *other_dag = new DAG(*dag);
+        // first_dag is src, others are dst
+        auto first_2_other =
+            GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
+        // first_dag is dst, others are src
+        auto other_2_first =
+            GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
+        if (first_2_other != nullptr)
+          xfers.push_back(first_2_other);
+        if (other_2_first != nullptr)
+          xfers.push_back(other_2_first);
+        delete other_dag;
+      }
+    }
+    delete first_dag;
   }
 
   std::cout << xfers.size() << std::endl;

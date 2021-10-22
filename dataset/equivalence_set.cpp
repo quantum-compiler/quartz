@@ -4,6 +4,24 @@
 #include <fstream>
 #include <limits>
 
+std::vector<DAG *> EquivalenceSetWithOneHashValue::get_all_dags() const {
+  std::vector<DAG *> result;
+  if (next) {
+    result = next->get_all_dags();
+  }
+  result.reserve(result.size() + dags.size());
+  for (const auto &dag : dags) {
+    result.push_back(dag.get());
+  }
+  return result;
+}
+
+DAGHashType EquivalenceSetWithOneHashValue::get_hash() const {
+  assert(!dags.empty());
+  assert(dags[0]->hash_value_valid());
+  return dags[0]->cached_hash_value();
+}
+
 bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
   std::ifstream fin;
   fin.open(file_name, std::ifstream::in);
@@ -30,18 +48,18 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
     int id;
     fin >> std::dec >> id;
     bool insert_at_end_of_list = false;
-    if (dataset[hash_value].size() <= id) {
-      dataset[hash_value].resize(id + 1);
+    if (dataset_prev[hash_value].size() <= id) {
+      dataset_prev[hash_value].resize(id + 1);
       insert_at_end_of_list = true;
     }
-    auto insert_pos = dataset[hash_value].begin();
+    auto insert_pos = dataset_prev[hash_value].begin();
     if (!insert_at_end_of_list) {
       for (int i = 0; i < id; i++) {
         insert_pos++;
       }
     }
     auto &dag_set =
-        (insert_at_end_of_list ? dataset[hash_value].back() : *insert_pos);
+        (insert_at_end_of_list ? dataset_prev[hash_value].back() : *insert_pos);
     assert (dag_set.empty());
 
     // the DAGs
@@ -71,7 +89,7 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
   }
   fout << "{" << std::endl;
   bool start0 = true;
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     int id = 0;
     for (const auto &equiv_set : item.second) {
       if (start0) {
@@ -99,9 +117,9 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
 
 void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
   // TODO: why is the result different for each run?
-  auto old_dataset = std::move(dataset);
-  dataset = std::unordered_map<DAGHashType,
-                               std::list<std::set<std::unique_ptr<DAG>,
+  auto old_dataset = std::move(dataset_prev);
+  dataset_prev = std::unordered_map<DAGHashType,
+                                    std::list<std::set<std::unique_ptr<DAG>,
                                                   UniquePtrDAGComparator>>>();
   for (auto &item : old_dataset) {
     const auto &hash_tag = item.first;
@@ -145,7 +163,7 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
       bool equiv_found = false;
       std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>
           *new_equiv_set_pos = nullptr;
-      for (auto &new_equiv_set : dataset[new_hash_tag]) {
+      for (auto &new_equiv_set : dataset_prev[new_hash_tag]) {
         // Compare by the content of the DAG.
         if (new_equiv_set.count(set_minrep) > 0) {
           equiv_found = true;
@@ -156,8 +174,8 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
 
       if (!equiv_found) {
         // If not found, insert a new equivalence set.
-        dataset[new_hash_tag].emplace_back();
-        new_equiv_set_pos = &dataset[new_hash_tag].back();
+        dataset_prev[new_hash_tag].emplace_back();
+        new_equiv_set_pos = &dataset_prev[new_hash_tag].back();
       }
 
       // Insert the permuted DAGs into the new equivalence set.
@@ -201,14 +219,14 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
 }
 
 void EquivalenceSet::clear() {
-  dataset.clear();
+  dataset_prev.clear();
 }
 
 int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   // We cannot use vector here (otherwise there will be build errors).
   std::list<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>>
       new_dag_sets;
-  for (auto it0 = dataset.begin(); it0 != dataset.end();) {
+  for (auto it0 = dataset_prev.begin(); it0 != dataset_prev.end();) {
     auto &item = *it0;
     for (auto it1 = item.second.begin(); it1 != item.second.end();) {
       auto &dag_set = *it1;
@@ -291,7 +309,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
           }
           new_dag_set.insert(std::move(new_dag));
         }
-        // Do not insert the new DAG set to the original dataset
+        // Do not insert the new DAG set to the original dataset_prev
         // to avoid invalidating iterators
       }
 
@@ -304,7 +322,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
       // Erase the whole hash value
       auto it0_to_erase = it0;
       it0++;
-      dataset.erase(it0_to_erase);
+      dataset_prev.erase(it0_to_erase);
     } else {
       it0++;
     }
@@ -314,14 +332,14 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
     auto hash_value = (*new_dag_set.begin())->hash(ctx);
     // Note: we don't check if the new equivalence set is already equivalent
     // to an existing one here.
-    dataset[hash_value].push_back(std::move(new_dag_set));
+    dataset_prev[hash_value].push_back(std::move(new_dag_set));
   }
   return num_dag_set_inserted;
 }
 
 int EquivalenceSet::num_equivalence_classes() const {
   int result = 0;
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     result += (int) item.second.size();
   }
   return result;
@@ -329,7 +347,7 @@ int EquivalenceSet::num_equivalence_classes() const {
 
 int EquivalenceSet::num_total_dags() const {
   int result = 0;
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     for (const auto &dag_set : item.second) {
       result += (int) dag_set.size();
     }
@@ -339,7 +357,7 @@ int EquivalenceSet::num_total_dags() const {
 
 void EquivalenceSet::set_representatives(Context *ctx,
                                          std::vector<DAG *> *new_representatives) const {
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     int id = 0;
     for (const auto &dag_set : item.second) {
       assert(!dag_set.empty());
@@ -360,7 +378,7 @@ void EquivalenceSet::set_representatives(Context *ctx,
 }
 
 DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     for (const auto &dag_set : item.second) {
       // brute force here
       for (const auto &dag1 : dag_set) {
@@ -408,7 +426,7 @@ DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
 std::vector<std::vector<DAG *>> EquivalenceSet::get_all_equivalence_sets() const {
   std::vector<std::vector<DAG *>> result;
   result.reserve(num_equivalence_classes());
-  for (const auto &item : dataset) {
+  for (const auto &item : dataset_prev) {
     for (const auto &dag_set : item.second) {
       result.emplace_back();
       auto &equiv_set = result.back();

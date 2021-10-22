@@ -469,6 +469,15 @@ DAGHashType DAG::hash(Context *ctx) {
   return hash_value_;
 }
 
+bool DAG::hash_value_valid() const {
+  return hash_value_valid_;
+}
+
+DAGHashType DAG::cached_hash_value() const {
+  assert(hash_value_valid_);
+  return hash_value_;
+}
+
 bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
   if (unused_qubits.empty()) {
     return true;
@@ -489,6 +498,7 @@ bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
       return false;
     }
     nodes.erase(nodes.begin() + id);
+    outputs.erase(outputs.begin() + id);
     num_qubits--;
     for (auto &node : nodes) {
       if (node->is_qubit() && node->index > id) {
@@ -522,6 +532,7 @@ bool DAG::remove_unused_input_params(std::vector<int> unused_input_params) {
       return false;
     }
     nodes.erase(nodes.begin() + get_num_qubits() + id);
+    parameters.erase(parameters.begin() + id);
     num_input_parameters--;
     for (auto &node : nodes) {
       if (node->is_parameter() && node->index > id) {

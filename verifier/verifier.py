@@ -181,8 +181,8 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_1_dag=False,
-                      assert_no_missing_equivalence=False):
+def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
+                      check_equivalence_with_different_hash=True):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -219,7 +219,9 @@ def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_
                 output_dict[current_tag] = [dag]
         num_different_dags_with_same_hash[hashtag] = len(different_dags_with_same_hash)
 
-    if assert_no_missing_equivalence:
+    hashtags_in_more_equivalences = set()
+    if check_equivalence_with_different_hash:
+        more_equivalences = []
         equivalent_called_2 = 0
         for hashtag, dags in output_dict.items():
             other_hashtags = set()
@@ -247,19 +249,32 @@ def find_equivalences(input_file, output_file, verbose=False, keep_classes_with_
             for other_dag in possible_equivalent_dags:
                 equivalent_called_2 += 1
                 if equivalent(dags[0], other_dag[0]):
-                    raise Exception(f'Equivalence missed at {hashtag} and {other_dag[1]}:\n'
-                                    f'{dags[0]}\n'
-                                    f'{other_dag[0]}')
-        print(f'Solver invoked {equivalent_called_2} times to prove that there are no missing equivalences.')
+                    more_equivalences.append((hashtag, other_dag[1]))
+                    hashtags_in_more_equivalences.update(hashtag)
+                    hashtags_in_more_equivalences.update(other_dag[1])
+                    if verbose:
+                        print(f'Equivalence with hash value {hashtag} and {other_dag[1]}:\n'
+                              f'{dags[0]}\n'
+                              f'{other_dag[0]}')
+        output_dict = [more_equivalences, output_dict]
+        if print_basic_info:
+            print(f'Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences'
+                  f' with different hash.')
+    else:
+        # Add a placeholder here
+        output_dict = [[], output_dict]
 
     if not keep_classes_with_1_dag:
-        output_dict = {k: v for k, v in output_dict.items() if len(v) >= 2}
+        output_dict[1] = {k: v for k, v in output_dict[1].items() if
+                          (len(v) >= 2 or k in hashtags_in_more_equivalences)}
     t_end = time.monotonic()
-    print(f'{total_equivalence_found} equivalences found in {t_end - t_start} seconds'
-          f' (solver invoked {equivalent_called} times for {num_dags} DAGs'
-          f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),'
-          f' output {len(output_dict)} equivalence classes.')
+    if print_basic_info:
+        print(f'{total_equivalence_found} equivalences found in {t_end - t_start} seconds'
+              f' (solver invoked {equivalent_called} times for {num_dags} DAGs'
+              f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),'
+              f' output {len(output_dict[1])} equivalence classes.')
     t_start = time.monotonic()
     dump_json(output_dict, output_file)
     t_end = time.monotonic()
-    print(f'Json saved in {t_end - t_start} seconds.')
+    if print_basic_info:
+        print(f'Json saved in {t_end - t_start} seconds.')

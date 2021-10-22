@@ -20,12 +20,6 @@ class DAG {
   [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
   [[nodiscard]] bool less_than(const DAG &other) const;
 
-  std::vector<std::unique_ptr<DAGNode>> nodes;
-  std::vector<std::unique_ptr<DAGHyperEdge>> edges;
-  // The gates' information is owned by edges.
-  std::vector<DAGNode *> outputs;
-  std::vector<DAGNode *> parameters;
-
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices,
                 Gate *gate,
@@ -47,6 +41,8 @@ class DAG {
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   [[nodiscard]] bool input_param_used(int param_index) const;
   DAGHashType hash(Context *ctx);
+  [[nodiscard]] bool hash_value_valid() const;
+  [[nodiscard]] DAGHashType cached_hash_value() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
   // Returns false iff an error occurs.
@@ -89,13 +85,24 @@ class DAG {
   [[nodiscard]] std::unique_ptr<DAG> get_permuted_dag(const std::vector<int> &qubit_permutation,
                                                       const std::vector<int> &param_permutation) const;
 
-  static bool same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2);
+  static bool same_gate(const DAG &dag1,
+                        int index1,
+                        const DAG &dag2,
+                        int index2);
 
  private:
   void clone_from(const DAG &other,
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
 
+ public:
+  std::vector<std::unique_ptr<DAGNode>> nodes;
+  std::vector<std::unique_ptr<DAGHyperEdge>> edges;
+  // The gates' information is owned by edges.
+  std::vector<DAGNode *> outputs;
+  std::vector<DAGNode *> parameters;
+
+ private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
   std::vector<DAGHashType> other_hash_values_for_floating_point_error_;

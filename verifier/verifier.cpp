@@ -14,6 +14,9 @@ bool Verifier::redundant(Context *ctx, DAG *dag) {
   auto subgraph = std::make_unique<DAG>(*dag);
   while (subgraph->get_num_gates() > 0) {
     subgraph->remove_gate(subgraph->edges[0].get());
+    if (subgraph->get_num_gates() == 0) {
+      break;
+    }
     subgraph->hash(ctx);
     for (const auto &rep : ctx->get_possible_representatives(subgraph.get())) {
       if (rep && !subgraph->fully_equivalent(*rep)) {

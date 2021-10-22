@@ -332,6 +332,14 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
           *it = edge->input_nodes[j];
           edge->input_nodes[j]->output_edges.push_back(e);
         }
+        // And then remove the disconnected qubit wire.
+        auto it = std::find_if(nodes.begin(),
+                               nodes.end(),
+                               [&](std::unique_ptr<DAGNode> &p) {
+                                 return p.get() == edge->output_nodes[i];
+                               });
+        assert(it != nodes.end());
+        nodes.erase(it);
       }
     }
   }

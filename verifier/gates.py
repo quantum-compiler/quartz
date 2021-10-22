@@ -1,4 +1,6 @@
+import math
 # parameter gates
+
 
 def add(a, b):
     assert len(a) == 2
@@ -14,9 +16,11 @@ def x():
     return [[(0, 0), (1, 0)],
             [(1, 0), (0, 0)]]
 
+
 def y():
     return [[(0, 0), (0, -1)],
             [(0, 1), (0, 0)]]
+
 
 def rx(theta):
     assert len(theta) == 2
@@ -46,6 +50,7 @@ def u1(theta):
     return [[(1, 1), (0, 0)],
             [(0, 0), (cos_theta, sin_theta)]]
 
+
 def cx():
     return [[(1, 0), (0, 0), (0, 0), (0, 0)],
             [(0, 0), (0, 0), (0, 0), (1, 0)],
@@ -53,7 +58,28 @@ def cx():
             [(0, 0), (1, 0), (0, 0), (0, 0)]]
 
 
+def h():
+    return [[(1 / math.sqrt(2), 0), (1 / math.sqrt(2), 0)],
+            [(1 / math.sqrt(2), 0), (-1 / math.sqrt(2), 0)]]
+
+
+def s():
+    return [[(1, 0), (0, 0)], [(0, 0), (0, 1)]]
+
+
+def t():
+    return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, math.sqrt(2) / 2)]]
+
+
+def tdg():
+    return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, - math.sqrt(2) / 2)]]
+
+
+def z():
+    return [[(1, 0), (0, 0)], [(0, 0), (-1, 0)]]
+
 # functions exposed to verifier
+
 
 def get_matrix(gate_name, *params):
     try:

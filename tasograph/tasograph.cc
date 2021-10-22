@@ -293,8 +293,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
             << " DAGs are found." << std::endl;
 
   std::vector<GraphXfer *> xfers;
-  for (const auto &item : eqs.dataset) {
-	for (const auto &equiv_set : item.second) {
+  for (const auto &item : eqs.get_all_equivalence_sets()) {
+	for (const auto &equiv_set : item) {
 	  bool first = true;
 	  DAG *first_dag = nullptr;
 	  for (const auto &dag : equiv_set) {

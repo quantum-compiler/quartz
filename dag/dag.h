@@ -47,6 +47,8 @@ class DAG {
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   [[nodiscard]] bool input_param_used(int param_index) const;
   DAGHashType hash(Context *ctx);
+  [[nodiscard]] bool hash_value_valid() const;
+  [[nodiscard]] DAGHashType cached_hash_value() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
   // Returns false iff an error occurs.

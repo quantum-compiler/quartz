@@ -469,6 +469,15 @@ DAGHashType DAG::hash(Context *ctx) {
   return hash_value_;
 }
 
+bool DAG::hash_value_valid() const {
+  return hash_value_valid_;
+}
+
+DAGHashType DAG::cached_hash_value() const {
+  assert(hash_value_valid_);
+  return hash_value_;
+}
+
 bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
   if (unused_qubits.empty()) {
     return true;

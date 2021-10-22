@@ -11,7 +11,7 @@ void Generator::generate_dfs(int num_qubits,
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
   dfs(0, max_num_gates, dag, used_parameters, dataset);
-  /*for (const auto& it : dataset) {
+  /*for (const auto& it : dataset_prev) {
     for (const auto& dag : it.second) {
       printf("key = %llu \n", dag->hash(context));
       dag->print(context);
@@ -93,11 +93,11 @@ void Generator::dfs(int gate_idx,
 
   bool save_into_dataset = (num_unused_internal_parameter == 0);
   if (save_into_dataset) {
-    // save a clone of dag to dataset
+    // save a clone of dag to dataset_prev
     dataset.insert(context, dag->clone_and_shrink_unused_input_parameters());
   }
 
-  // check that this circuit is different with any other circuits in the dataset
+  // check that this circuit is different with any other circuits in the dataset_prev
   for (auto &other_dag : dataset[dag->hash(context)]) {
     // we could use BFS to avoid searching DAGs with more gates at first
     if (dag->get_num_gates() >= other_dag->get_num_gates()

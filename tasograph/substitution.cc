@@ -15,6 +15,88 @@ void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 
 GraphXfer::GraphXfer(::Context *_context) : context(_context), tensorId(10) {}
 
+GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
+                                       const ::DAG *src_graph,
+                                       const ::DAG *dst_graph) {
+  auto src_num_qubits = src_graph->get_num_qubits();
+  for (int i = 0; i < src_num_qubits; ++i) {
+	if (!src_graph->qubit_used(i))
+	  return nullptr;
+  }
+
+  GraphXfer *graphXfer = new GraphXfer(_context);
+  assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
+  assert(src_graph->get_num_input_parameters() ==
+         dst_graph->get_num_input_parameters());
+  std::unordered_map<DAGNode *, TensorX> src_to_tx, dst_to_tx;
+  int cnt = 0;
+  for (int i = 0; i < src_graph->get_num_qubits(); i++) {
+	::DAGNode *src_node = src_graph->nodes[cnt].get();
+	::DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+	assert(src_node->is_qubit());
+	assert(dst_node->is_qubit());
+	assert(src_node->index == i);
+	assert(dst_node->index == i);
+	TensorX qubit_tensor = graphXfer->new_tensor();
+	src_to_tx[src_node] = qubit_tensor;
+	dst_to_tx[dst_node] = qubit_tensor;
+  }
+  for (int i = 0; i < src_graph->get_num_input_parameters(); i++) {
+	::DAGNode *src_node = src_graph->nodes[cnt].get();
+	::DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+	assert(src_node->is_parameter());
+	assert(dst_node->is_parameter());
+	assert(src_node->index == i);
+	assert(dst_node->index == i);
+	TensorX parameter_tensor = graphXfer->new_tensor();
+	src_to_tx[src_node] = parameter_tensor;
+	dst_to_tx[dst_node] = parameter_tensor;
+  }
+  for (size_t i = 0; i < src_graph->edges.size(); i++) {
+	::DAGHyperEdge *e = src_graph->edges[i].get();
+	OpX *op = new OpX(e->gate->tp);
+	for (size_t j = 0; j < e->input_nodes.size(); j++) {
+	  assert(src_to_tx.find(e->input_nodes[j]) != src_to_tx.end());
+	  TensorX input = src_to_tx[e->input_nodes[j]];
+	  op->add_input(input);
+	}
+	for (size_t j = 0; j < e->output_nodes.size(); j++) {
+	  //   if (e->output_nodes[j]->is_qubit()) {
+	  //     TensorX output(op, j);
+	  //     op->add_output(output);
+	  //     src_to_tx[e->output_nodes[j]] = output;
+	  //   }
+	  TensorX output(op, j);
+	  op->add_output(output);
+	  src_to_tx[e->output_nodes[j]] = output;
+	}
+	graphXfer->srcOps.push_back(op);
+  }
+  for (size_t i = 0; i < dst_graph->edges.size(); i++) {
+	::DAGHyperEdge *e = dst_graph->edges[i].get();
+	OpX *op = new OpX(e->gate->tp);
+	for (size_t j = 0; j < e->input_nodes.size(); j++) {
+	  TensorX input = dst_to_tx[e->input_nodes[j]];
+	  op->add_input(input);
+	}
+	for (size_t j = 0; j < e->output_nodes.size(); j++) {
+	  //   if (e->output_nodes[j]->is_qubit()) {
+	  TensorX output(op, j);
+	  op->add_output(output);
+	  dst_to_tx[e->output_nodes[j]] = output;
+	  //   }
+	}
+	graphXfer->dstOps.push_back(op);
+  }
+  for (int i = 0; i < src_graph->get_num_qubits(); i++) {
+	assert(src_to_tx.find(src_graph->outputs[i]) != src_to_tx.end());
+	assert(dst_to_tx.find(dst_graph->outputs[i]) != dst_to_tx.end());
+	graphXfer->map_output(src_to_tx[src_graph->outputs[i]],
+	                      dst_to_tx[dst_graph->outputs[i]]);
+  }
+  return graphXfer;
+}
+
 GraphXfer::GraphXfer(::Context *_context, const ::DAG *src_graph,
                      const ::DAG *dst_graph)
     : context(_context), tensorId(10) {
@@ -249,6 +331,7 @@ void GraphXfer::run(int depth, Graph *graph,
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
 		candidates.push(newGraph);
+		std::cout << newGraph->total_cost() << " ";
 	  }
 	}
 	else {

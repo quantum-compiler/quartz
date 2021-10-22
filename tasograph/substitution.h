@@ -64,6 +64,11 @@ public:
   bool create_new_operator(const OpX *opx, Op &op);
 
 public:
+  static GraphXfer *create_GraphXfer(::Context *_context,
+                                     const ::DAG *src_graph,
+                                     const ::DAG *dst_graph);
+
+public:
   ::Context *context;
   int tensorId;
   std::map<Op, OpX *, OpCompare> mappedOps;

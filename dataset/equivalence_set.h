@@ -58,7 +58,10 @@ class EquivalenceSet {
   void set_representatives(Context *ctx,
                            std::vector<DAG *> *new_representatives) const;
 
-  [[nodiscard]] DAGHashType has_common_first_or_last_gates() const;
+  // Returns the position in |classes_|, or -1 if not found.
+  [[nodiscard]] int first_class_with_common_first_or_last_gates() const;
+
+  [[nodiscard]] std::string get_class_id(int num_class) const;
 
   [[nodiscard]] std::vector<std::vector<DAG *>> get_all_equivalence_sets() const;
 

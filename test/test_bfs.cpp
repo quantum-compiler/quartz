@@ -58,7 +58,12 @@ int main() {
       "python ../python/verify_equivalences.py tmp_before_verify.json bfs_verified.json");
 
   equiv_set.load_json(&ctx, "bfs_verified.json");
-  std::cout << "equiv_set.has_common_first_or_last_gates() = " << std::hex << equiv_set.has_common_first_or_last_gates()
-            << std::endl;
+  auto result = equiv_set.first_class_with_common_first_or_last_gates();
+  if (result == -1) {
+    std::cout << "No common first or last gates." << std::endl;
+  } else {
+    std::cout << "Found common first or last gates in "
+              << equiv_set.get_class_id(result) << std::endl;
+  }
   return 0;
 }

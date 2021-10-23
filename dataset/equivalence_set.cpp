@@ -198,8 +198,7 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
     } else {
       fout << ",";
     }
-    fout << "\"" << std::hex << id++ << "_" << std::dec << item->size()
-         << "\": [" << std::endl;
+    fout << "\"" << get_class_id(id++) << "\": [" << std::endl;
     bool start = true;
     for (const auto &dag : item->get_all_dags()) {
       if (start) {
@@ -337,7 +336,6 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
       classes_to_remove.emplace_back(item.get());
       continue;
     }
-    std::cout << dags[0]->to_json() << std::endl;
     auto &rep = dags.front();
     std::vector<bool> qubit_used(rep->get_num_qubits(), false);
     std::vector<bool>
@@ -472,7 +470,8 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
   std::swap(prev_classes, classes_);
   // Now |classes_| is empty.
-  classes_.reserve(prev_classes.size() + classes_to_insert.size() - classes_to_remove.size());
+  classes_.reserve(prev_classes.size() + classes_to_insert.size()
+                       - classes_to_remove.size());
   auto remove_it = classes_to_remove.begin();
   for (auto &item : prev_classes) {
     if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
@@ -525,50 +524,56 @@ void EquivalenceSet::set_representatives(Context *ctx,
   }
 }
 
-DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
-  for (const auto &item : dataset_prev) {
-    for (const auto &dag_set : item.second) {
-      // brute force here
-      for (const auto &dag1 : dag_set) {
-        if (dag1->get_num_gates() == 0) {
+int EquivalenceSet::first_class_with_common_first_or_last_gates() const {
+  int class_id = 0;
+  for (const auto &item : classes_) {
+    const auto &dags = item->get_all_dags();
+    // brute force here
+    for (const auto &dag1 : dags) {
+      if (dag1->get_num_gates() == 0) {
+        continue;
+      }
+      for (const auto &dag2 : dags) {
+        if (dag1 == dag2) {
           continue;
         }
-        for (const auto &dag2 : dag_set) {
-          if (dag1 == dag2) {
-            continue;
-          }
-          if (dag2->get_num_gates() == 0) {
-            continue;
-          }
-          if (DAG::same_gate(*dag1, 0, *dag2, 0)) {
-            int id = 0;
-            bool same = true;
-            while (dag1->edges[id]->gate->is_parameter_gate()) {
-              // A prefix of only parameter gates doesn't count.
-              id++;
-              if (id >= dag1->get_num_gates() || id >= dag2->get_num_gates()) {
-                same = false;
-                break;
-              }
-              same = DAG::same_gate(*dag1, id, *dag2, id);
+        if (dag2->get_num_gates() == 0) {
+          continue;
+        }
+        if (DAG::same_gate(*dag1, 0, *dag2, 0)) {
+          int id = 0;
+          bool same = true;
+          while (dag1->edges[id]->gate->is_parameter_gate()) {
+            // A prefix of only parameter gates doesn't count.
+            id++;
+            if (id >= dag1->get_num_gates() || id >= dag2->get_num_gates()) {
+              same = false;
+              break;
             }
-            if (same) {
-              return item.first;
-            }
+            same = DAG::same_gate(*dag1, id, *dag2, id);
           }
-          if (DAG::same_gate(*dag1,
-                             dag1->get_num_gates() - 1,
-                             *dag2,
-                             dag2->get_num_gates() - 1)) {
-            assert(dag1->edges[dag1->get_num_gates()
-                - 1]->gate->is_quantum_gate());
-            return item.first;
+          if (same) {
+            return class_id;
           }
+        }
+        if (DAG::same_gate(*dag1,
+                           dag1->get_num_gates() - 1,
+                           *dag2,
+                           dag2->get_num_gates() - 1)) {
+          assert(dag1->edges[dag1->get_num_gates()
+              - 1]->gate->is_quantum_gate());
+          return class_id;
         }
       }
     }
+    class_id++;
   }
-  return 0;  // no common first or last gates found
+  return -1;  // no common first or last gates found
+}
+
+std::string EquivalenceSet::get_class_id(int num_class) const {
+  return std::to_string(num_class) + "_"
+      + std::to_string(classes_[num_class]->size());
 }
 
 std::vector<std::vector<DAG *>> EquivalenceSet::get_all_equivalence_sets() const {

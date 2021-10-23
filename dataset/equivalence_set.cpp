@@ -170,31 +170,37 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
   if (!fout.is_open()) {
     return false;
   }
+
+  // To adapt the format
+  fout << "[[]," << std::endl;
+
   fout << "{" << std::endl;
   bool start0 = true;
-  for (const auto &item : dataset_prev) {
-    int id = 0;
-    for (const auto &equiv_set : item.second) {
-      if (start0) {
-        start0 = false;
+  int id = 0;
+  for (const auto &item : classes_) {
+    if (start0) {
+      start0 = false;
+    } else {
+      fout << ",";
+    }
+    fout << "\"" << std::hex << id++ << "_" << std::dec << item->size()
+         << "\": [" << std::endl;
+    bool start = true;
+    for (const auto &dag : item->get_all_dags()) {
+      if (start) {
+        start = false;
       } else {
         fout << ",";
       }
-      fout << "\"" << std::hex << item.first << "_" << std::dec << id++
-           << "\": [" << std::endl;
-      bool start = true;
-      for (const auto &dag : equiv_set) {
-        if (start) {
-          start = false;
-        } else {
-          fout << ",";
-        }
-        fout << dag->to_json();
-      }
-      fout << "]" << std::endl;
+      fout << dag->to_json();
     }
+    fout << "]" << std::endl;
   }
   fout << "}" << std::endl;
+
+  // To adapt the format
+  fout << "]" << std::endl;
+
   return true;
 }
 

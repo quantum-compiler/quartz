@@ -41,6 +41,9 @@ std::unique_ptr<DAG> DAG::clone() const {
 }
 
 bool DAG::fully_equivalent(const DAG &other) const {
+  // Do not check the hash value because of floating point errors
+  // and it is possible that one of the two DAGs may have not calculated
+  // the hash value.
   if (num_qubits != other.num_qubits
       || num_input_parameters != other.num_input_parameters) {
     return false;
@@ -486,6 +489,11 @@ DAGHashType DAG::cached_hash_value() const {
   return hash_value_;
 }
 
+std::vector<DAGHashType> DAG::other_hash_values() const {
+  assert(hash_value_valid_);
+  return other_hash_values_for_floating_point_error_;
+}
+
 bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
   if (unused_qubits.empty()) {
     return true;
@@ -663,6 +671,8 @@ std::string DAG::to_json() const {
   result += ",";
   result += std::to_string(get_num_total_parameters());
   result += ",";
+  result += std::to_string(get_num_gates());
+  result += ",";
 
   result += "[";
   if (hash_value_valid_) {
@@ -721,13 +731,15 @@ std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
 
   // basic info
-  int num_dag_qubits, num_input_params, num_total_params;
+  int num_dag_qubits, num_input_params, num_total_params, num_gates;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
   fin >> num_dag_qubits;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_input_params;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_total_params;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  fin >> num_gates;
 
   // ignore other hash values
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');

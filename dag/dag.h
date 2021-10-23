@@ -43,6 +43,7 @@ class DAG {
   DAGHashType hash(Context *ctx);
   [[nodiscard]] bool hash_value_valid() const;
   [[nodiscard]] DAGHashType cached_hash_value() const;
+  [[nodiscard]] std::vector<DAGHashType> other_hash_values() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
   // Returns false iff an error occurs.

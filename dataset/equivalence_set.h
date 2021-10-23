@@ -16,6 +16,13 @@ class EquivalenceClass {
   void insert(std::unique_ptr<DAG> dag);
 
   [[nodiscard]] int size() const;
+  void reserve(std::size_t new_cap);
+
+  // Extract all DAGs in this equivalence class, and make this class empty.
+  std::vector<std::unique_ptr<DAG>> extract();
+
+  // Replace |dags_| with |dags|.
+  void set_dags(std::vector<std::unique_ptr<DAG>> dags);
 
  private:
   std::vector<std::unique_ptr<DAG>> dags_;
@@ -31,15 +38,15 @@ class EquivalenceSet {
   // Normalize each clause of equivalent DAGs to have the minimum
   // (according to DAG::less_than) minimal representation.
   // Warning: see comments in DAG::minimal_representation().
+  // TODO: adapt to the new equivalence set format
   void normalize_to_minimal_representations(Context *ctx);
 
   void clear();
 
   // Remove unused qubits and input parameters if they are unused in
   // each DAG of an equivalent class.
-  // Return the number of equivalent classes (modified and then) inserted.
-  // This function potentially changes the ordering of equivalent classes
-  // in the dataset_prev.
+  // Return the number of equivalent classes removed
+  // (and possibly inserted again).
   int remove_unused_qubits_and_input_params(Context *ctx);
 
   // This function runs in O(1).
@@ -55,6 +62,8 @@ class EquivalenceSet {
 
   [[nodiscard]] std::vector<std::vector<DAG *>> get_all_equivalence_sets() const;
 
+  [[nodiscard]] std::vector<EquivalenceClass *> get_possible_classes(const DAGHashType &hash_value) const;
+
   // We cannot use std::vector here because that would need
   // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
   //
@@ -66,11 +75,12 @@ class EquivalenceSet {
 
  private:
   void set_possible_class(const DAGHashType &hash_value, EquivalenceClass *equiv_class);
+  void remove_possible_class(const DAGHashType &hash_value, EquivalenceClass *equiv_class);
 
   std::vector<std::unique_ptr<EquivalenceClass>> classes_;
 
   // A map from the hash value to all equivalence classes with at least one
   // DAG of the hash value.
-  std::unordered_map<DAGHashType, std::vector<EquivalenceClass *>>
+  std::unordered_map<DAGHashType, std::set<EquivalenceClass *>>
       possible_classes_;
 };

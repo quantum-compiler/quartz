@@ -22,6 +22,18 @@ int EquivalenceClass::size() const {
   return (int) dags_.size();
 }
 
+void EquivalenceClass::reserve(std::size_t new_cap) {
+  dags_.reserve(new_cap);
+}
+
+std::vector<std::unique_ptr<DAG>> EquivalenceClass::extract() {
+  return std::move(dags_);
+}
+
+void EquivalenceClass::set_dags(std::vector<std::unique_ptr<DAG>> dags) {
+  dags_ = std::move(dags);
+}
+
 bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
   std::ifstream fin;
   fin.open(file_name, std::ifstream::in);
@@ -158,6 +170,9 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
       // platforms, |dag_hash_value| can be different from |hash_value|.
       // So we have recalculated it here.
       set_possible_class(dag_hash_value, equiv_class);
+      for (const auto &other_hash_value : dag->other_hash_values()) {
+        set_possible_class(other_hash_value, equiv_class);
+      }
       equiv_class->insert(std::move(dag));
     }
   }
@@ -311,123 +326,169 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
 void EquivalenceSet::clear() {
   possible_classes_.clear();
   classes_.clear();
-  // dataset_prev.clear();
 }
 
 int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
-  assert(false);  // TODO
-  // We cannot use vector here (otherwise there will be build errors).
-  std::list<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>>
-      new_dag_sets;
-  for (auto it0 = dataset_prev.begin(); it0 != dataset_prev.end();) {
-    auto &item = *it0;
-    for (auto it1 = item.second.begin(); it1 != item.second.end();) {
-      auto &dag_set = *it1;
-      assert(!dag_set.empty());
-      auto &rep = *dag_set.begin();
-      std::vector<bool> qubit_used(rep->get_num_qubits(), false);
-      std::vector<bool>
-          input_param_used(rep->get_num_input_parameters(), false);
-      for (const auto &dag : dag_set) {
-        assert(qubit_used.size() == dag->get_num_qubits());
-        for (int i = 0; i < (int) qubit_used.size(); i++) {
-          if (!qubit_used[i]) {
-            if (dag->qubit_used(i)) {
-              qubit_used[i] = true;
-            }
-          }
-        }
-
-        if (dag->get_num_input_parameters() > (int) input_param_used.size()) {
-          input_param_used.resize(dag->get_num_input_parameters(), false);
-        }
-        for (int i = 0; i < dag->get_num_input_parameters(); i++) {
-          if (!input_param_used[i]) {
-            if (dag->input_param_used(i)) {
-              input_param_used[i] = true;
-            }
-          }
-        }
-      }
-      std::vector<int> unused_qubits, unused_input_params;
+  std::vector<EquivalenceClass *> classes_to_remove;
+  std::vector<std::unique_ptr<EquivalenceClass>> classes_to_insert;
+  for (auto &item : classes_) {
+    auto dags = item->get_all_dags();
+    if (dags.empty()) {
+      classes_to_remove.emplace_back(item.get());
+      continue;
+    }
+    std::cout << dags[0]->to_json() << std::endl;
+    auto &rep = dags.front();
+    std::vector<bool> qubit_used(rep->get_num_qubits(), false);
+    std::vector<bool>
+        input_param_used(rep->get_num_input_parameters(), false);
+    for (const auto &dag : dags) {
+      assert(qubit_used.size() == dag->get_num_qubits());
       for (int i = 0; i < (int) qubit_used.size(); i++) {
         if (!qubit_used[i]) {
-          unused_qubits.push_back(i);
+          if (dag->qubit_used(i)) {
+            qubit_used[i] = true;
+          }
         }
-      }
-      for (int i = 0; i < (int) input_param_used.size(); i++) {
-        if (!input_param_used[i]) {
-          unused_input_params.push_back(i);
-        }
-      }
-      if (unused_qubits.empty() && unused_input_params.empty()) {
-        // No unused ones
-        it1++;
-        continue;
       }
 
-      // Only keep the ones with a (possibly empty) suffix of input parameters
-      // removed, because others must be redundant
-      // Warning: this optimization presumes that initially all circuits
-      // share the same number of input parameters.
-      bool keep_dag_set = true;
-      if (!unused_input_params.empty()) {
-        for (int i = 0; i < (int) unused_input_params.size(); i++) {
-          if (unused_input_params[i]
-              != input_param_used.size() - unused_input_params.size() + i) {
-            keep_dag_set = false;
+      if (dag->get_num_input_parameters() > (int) input_param_used.size()) {
+        input_param_used.resize(dag->get_num_input_parameters(), false);
+      }
+      for (int i = 0; i < dag->get_num_input_parameters(); i++) {
+        if (!input_param_used[i]) {
+          if (dag->input_param_used(i)) {
+            input_param_used[i] = true;
+          }
+        }
+      }
+    }
+    std::vector<int> unused_qubits, unused_input_params;
+    for (int i = 0; i < (int) qubit_used.size(); i++) {
+      if (!qubit_used[i]) {
+        unused_qubits.push_back(i);
+      }
+    }
+    for (int i = 0; i < (int) input_param_used.size(); i++) {
+      if (!input_param_used[i]) {
+        unused_input_params.push_back(i);
+      }
+    }
+    if (unused_qubits.empty() && unused_input_params.empty()) {
+      // No unused ones
+      continue;
+    }
+
+    // Lazily remove the original DAG class.
+    classes_to_remove.emplace_back(item.get());
+    // Remove all pointers to the current class.
+    for (auto &dag : dags) {
+      remove_possible_class(dag->hash(ctx), item.get());
+      for (const auto &other_hash : dag->other_hash_values()) {
+        remove_possible_class(other_hash, item.get());
+      }
+    }
+
+    // Only keep the ones with a (possibly empty) suffix of input parameters
+    // removed, because others must be redundant
+    // Warning: this optimization presumes that initially all circuits
+    // share the same number of input parameters.
+    bool keep_dag_class = true;
+    if (!unused_input_params.empty()) {
+      for (int i = 0; i < (int) unused_input_params.size(); i++) {
+        if (unused_input_params[i]
+            != input_param_used.size() - unused_input_params.size() + i) {
+          keep_dag_class = false;
+          break;
+        }
+      }
+    }
+
+    if (keep_dag_class) {
+      // Construct a new DAG class
+      classes_to_insert.push_back(std::make_unique<EquivalenceClass>());
+      auto &new_dag_class = classes_to_insert.back();
+      new_dag_class->reserve(item->size());
+      auto dags_unique_ptr = item->extract();
+      bool already_exist = false;
+      // We only need to check the first DAG to see if the class already exists.
+      bool first_dag = true;
+      for (auto &dag : dags_unique_ptr) {
+        bool ret = dag->remove_unused_qubits(unused_qubits);
+        assert(ret);
+        ret = dag->remove_unused_input_params(unused_input_params);
+        assert(ret);
+        auto check_hash_value = [&](const DAGHashType &hash_value) {
+          if (already_exist) {
+            return;
+          }
+          for (auto &possible_class : get_possible_classes(hash_value)) {
+            for (auto &other_dag : possible_class->get_all_dags()) {
+              if (dag->fully_equivalent(*other_dag)) {
+                already_exist = true;
+                break;
+              }
+            }
+            if (already_exist) {
+              break;
+            }
+          }
+        };
+        if (first_dag) {
+          auto hash_value = dag->hash(ctx);
+          check_hash_value(hash_value);
+          for (const auto &other_hash : dag->other_hash_values()) {
+            check_hash_value(other_hash);
+          }
+          if (already_exist) {
             break;
           }
+          first_dag = false;
         }
+        new_dag_class->insert(std::move(dag));
       }
-
-      if (keep_dag_set) {
-        // Construct a new DAG set
-        new_dag_sets.emplace_back();
-        auto &new_dag_set = new_dag_sets.back();
-        bool has_hash_value = false;
-        DAGHashType hash_value;
-        for (auto &dag : dag_set) {
-          auto new_dag = std::make_unique<DAG>(*dag);  // clone the DAG here
-          bool ret = new_dag->remove_unused_qubits(unused_qubits);
-          assert(ret);
-          ret = new_dag->remove_unused_input_params(unused_input_params);
-          assert(ret);
-          auto new_dag_hash = new_dag->hash(ctx);
-          if (has_hash_value) {
-            assert(new_dag_hash == hash_value);
-          } else {
-            hash_value = new_dag_hash;
-            has_hash_value = true;
+      if (already_exist) {
+        // Remove the new class.
+        classes_to_insert.pop_back();
+        keep_dag_class = false;  // unused
+      } else {
+        // Add pointers to the new class.
+        for (auto &dag : new_dag_class->get_all_dags()) {
+          assert(dag);
+          set_possible_class(dag->hash(ctx), new_dag_class.get());
+          for (const auto &other_hash : dag->other_hash_values()) {
+            set_possible_class(other_hash, new_dag_class.get());
           }
-          new_dag_set.insert(std::move(new_dag));
         }
-        // Do not insert the new DAG set to the original dataset_prev
-        // to avoid invalidating iterators
       }
+    }
+  }
 
-      // Erase the original one
-      auto it1_to_erase = it1;
-      it1++;
-      item.second.erase(it1_to_erase);
-    }
-    if (item.second.empty()) {
-      // Erase the whole hash value
-      auto it0_to_erase = it0;
-      it0++;
-      dataset_prev.erase(it0_to_erase);
+  if (classes_to_remove.empty()) {
+    assert(classes_to_insert.empty());
+    return 0;
+  }
+
+  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
+  std::swap(prev_classes, classes_);
+  // Now |classes_| is empty.
+  classes_.reserve(prev_classes.size() + classes_to_insert.size() - classes_to_remove.size());
+  auto remove_it = classes_to_remove.begin();
+  for (auto &item : prev_classes) {
+    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
+      // Remove the equivalence class.
+      remove_it++;
     } else {
-      it0++;
+      assert(item->size() > 0);
+      classes_.push_back(std::move(item));
     }
   }
-  const int num_dag_set_inserted = (int) new_dag_sets.size();
-  for (auto &new_dag_set : new_dag_sets) {
-    auto hash_value = (*new_dag_set.begin())->hash(ctx);
-    // Note: we don't check if the new equivalence set is already equivalent
-    // to an existing one here.
-    dataset_prev[hash_value].push_back(std::move(new_dag_set));
+
+  for (auto &item : classes_to_insert) {
+    classes_.push_back(std::move(item));
   }
-  return num_dag_set_inserted;
+
+  return (int) classes_to_remove.size();
 }
 
 int EquivalenceSet::num_equivalence_classes() const {
@@ -519,11 +580,23 @@ std::vector<std::vector<DAG *>> EquivalenceSet::get_all_equivalence_sets() const
   return result;
 }
 
+std::vector<EquivalenceClass *> EquivalenceSet::get_possible_classes(const DAGHashType &hash_value) const {
+  auto it = possible_classes_.find(hash_value);
+  if (it == possible_classes_.end()) {
+    return std::vector<EquivalenceClass *>();
+  }
+  return std::vector<EquivalenceClass *>(it->second.begin(),
+                                         it->second.end());
+}
+
 void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,
                                         EquivalenceClass *equiv_class) {
   auto &possible_classes = possible_classes_[hash_value];
-  if (std::find(possible_classes.begin(), possible_classes.end(), equiv_class)
-      == possible_classes.end()) {
-    possible_classes.push_back(equiv_class);
-  }
+  possible_classes.insert(equiv_class);
+}
+
+void EquivalenceSet::remove_possible_class(const DAGHashType &hash_value,
+                                           EquivalenceClass *equiv_class) {
+  auto &possible_classes = possible_classes_[hash_value];
+  possible_classes.erase(equiv_class);
 }

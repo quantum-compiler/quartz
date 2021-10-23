@@ -728,6 +728,11 @@ std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
   fin >> num_input_params;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_total_params;
+
+  // ignore other hash values
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
 

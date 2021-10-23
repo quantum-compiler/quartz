@@ -8,21 +8,20 @@
 #include <unordered_set>
 #include <unordered_map>
 
-class EquivalenceSetWithOneHashValue {
+class EquivalenceClass {
  public:
-  // Return all DAGs in this equivalence set, regardless of hash values.
+  // Returns all DAGs in this equivalence class.
   [[nodiscard]] std::vector<DAG *> get_all_dags() const;
-  [[nodiscard]] DAGHashType get_hash() const;
 
-  std::vector<std::unique_ptr<DAG>> dags;
+  void insert(std::unique_ptr<DAG> dag);
 
-  // The next equivalence set with a different hash value but equivalent to
-  // this one.
-  // This variable form a linked list.
-  EquivalenceSetWithOneHashValue *next{nullptr};
+  [[nodiscard]] int size() const;
+
+ private:
+  std::vector<std::unique_ptr<DAG>> dags_;
 };
 
-// This class stores all equivalence sets.
+// This class stores all equivalence classes.
 class EquivalenceSet {
  public:
   bool load_json(Context *ctx, const std::string &file_name);
@@ -43,10 +42,10 @@ class EquivalenceSet {
   // in the dataset_prev.
   int remove_unused_qubits_and_input_params(Context *ctx);
 
-  // This function runs in O(|dataset_prev|.size()).
+  // This function runs in O(1).
   [[nodiscard]] int num_equivalence_classes() const;
 
-  // This function runs in O(num_equivalence_classes()).
+  // This function runs in O(|classes_|.size()).
   [[nodiscard]] int num_total_dags() const;
 
   void set_representatives(Context *ctx,
@@ -66,9 +65,12 @@ class EquivalenceSet {
       dataset_prev;
 
  private:
-  std::vector<std::unique_ptr<EquivalenceSetWithOneHashValue>> equiv_sets_;
+  void set_possible_class(const DAGHashType &hash_value, EquivalenceClass *equiv_class);
 
-  // Heads of the linked lists.
-  std::unordered_map<DAGHashType, std::vector<EquivalenceSetWithOneHashValue *>>
-      equiv_set_heads_;
+  std::vector<std::unique_ptr<EquivalenceClass>> classes_;
+
+  // A map from the hash value to all equivalence classes with at least one
+  // DAG of the hash value.
+  std::unordered_map<DAGHashType, std::vector<EquivalenceClass *>>
+      possible_classes_;
 };

@@ -3,23 +3,23 @@
 #include <cassert>
 #include <fstream>
 #include <limits>
+#include <queue>
 
-std::vector<DAG *> EquivalenceSetWithOneHashValue::get_all_dags() const {
+std::vector<DAG *> EquivalenceClass::get_all_dags() const {
   std::vector<DAG *> result;
-  if (next) {
-    result = next->get_all_dags();
-  }
-  result.reserve(result.size() + dags.size());
-  for (const auto &dag : dags) {
+  result.reserve(dags_.size());
+  for (const auto &dag : dags_) {
     result.push_back(dag.get());
   }
   return result;
 }
 
-DAGHashType EquivalenceSetWithOneHashValue::get_hash() const {
-  assert(!dags.empty());
-  assert(dags[0]->hash_value_valid());
-  return dags[0]->cached_hash_value();
+void EquivalenceClass::insert(std::unique_ptr<DAG> dag) {
+  dags_.push_back(std::move(dag));
+}
+
+int EquivalenceClass::size() const {
+  return (int) dags_.size();
 }
 
 bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
@@ -28,6 +28,82 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
   if (!fin.is_open()) {
     return false;
   }
+
+  // Equivalences between equivalence classes with different hash values.
+  using EquivClassTag = std::pair<DAGHashType, int>;
+  // This vector stores edges in an undirected graph with nodes being
+  // equivalence classes.
+  std::unordered_map<EquivClassTag, std::vector<EquivClassTag>, PairHash>
+      equiv_edges;
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  while (true) {
+    char ch;
+    fin.get(ch);
+    while (ch != '[' && ch != ']') {
+      fin.get(ch);
+    }
+    if (ch == ']') {
+      break;
+    }
+
+    // New equivalence between a pair of equivalence class
+
+    DAGHashType hash_value;
+    int id;
+
+    // the tags
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    fin >> std::hex >> hash_value;
+    fin.ignore(); // '_'
+    fin >> std::dec >> id;
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    EquivClassTag class1 = std::make_pair(hash_value, id);
+
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    fin >> std::hex >> hash_value;
+    fin.ignore(); // '_'
+    fin >> std::dec >> id;
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+    EquivClassTag class2 = std::make_pair(hash_value, id);
+
+    equiv_edges[class1].push_back(class2);
+    equiv_edges[class2].push_back(class1);
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+  }
+
+  // BFS to merge the equivalence classes.
+  std::unordered_map<EquivClassTag, int, PairHash> merged_equiv_class_id;
+  int num_merged_equiv_classes = 0;
+  for (const auto &start_pair : equiv_edges) {
+    const auto &start_node = start_pair.first;
+    if (merged_equiv_class_id.count(start_node) > 0) {
+      // Already searched.
+      continue;
+    }
+    std::queue<EquivClassTag> to_visit;
+    // Create a new equivalence class.
+    merged_equiv_class_id[start_node] = num_merged_equiv_classes;
+    to_visit.push(start_node);
+    while (!to_visit.empty()) {
+      auto node = to_visit.front();
+      to_visit.pop();
+      for (const auto &next_node : equiv_edges[node]) {
+        if (merged_equiv_class_id.count(next_node) == 0) {
+          // Not searched yet
+          merged_equiv_class_id[next_node] = num_merged_equiv_classes;
+          to_visit.push(next_node);
+        }
+      }
+    }
+    num_merged_equiv_classes++;
+  }
+
+  // The |num_merged_equiv_classes| classes are not yet created.
+  std::vector<EquivalenceClass *>
+      merged_equiv_class(num_merged_equiv_classes, nullptr);
+
+  // Input the equivalence classes.
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '{');
   while (true) {
     char ch;
@@ -39,7 +115,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
       break;
     }
 
-    // New equivalence item
+    // New equivalence class
 
     // the tag
     DAGHashType hash_value;
@@ -47,20 +123,21 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
     fin.ignore(); // '_'
     int id;
     fin >> std::dec >> id;
-    bool insert_at_end_of_list = false;
-    if (dataset_prev[hash_value].size() <= id) {
-      dataset_prev[hash_value].resize(id + 1);
-      insert_at_end_of_list = true;
-    }
-    auto insert_pos = dataset_prev[hash_value].begin();
-    if (!insert_at_end_of_list) {
-      for (int i = 0; i < id; i++) {
-        insert_pos++;
+    EquivClassTag class_tag = std::make_pair(hash_value, id);
+    bool merged = merged_equiv_class_id.count(class_tag) > 0;
+    EquivalenceClass *equiv_class;
+    if (merged) {
+      if (!merged_equiv_class[merged_equiv_class_id[class_tag]]) {
+        classes_.push_back(std::make_unique<EquivalenceClass>());
+        merged_equiv_class[merged_equiv_class_id[class_tag]] =
+            classes_.back().get();
       }
+      equiv_class = merged_equiv_class[merged_equiv_class_id[class_tag]];
+    } else {
+      classes_.push_back(std::make_unique<EquivalenceClass>());
+      equiv_class = classes_.back().get();
     }
-    auto &dag_set =
-        (insert_at_end_of_list ? dataset_prev[hash_value].back() : *insert_pos);
-    assert (dag_set.empty());
+    assert(equiv_class);
 
     // the DAGs
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
@@ -75,7 +152,13 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
 
       // New DAG
       fin.unget();  // '['
-      dag_set.insert(DAG::read_json(ctx, fin));
+      auto dag = DAG::read_json(ctx, fin);
+      auto dag_hash_value = dag->hash(ctx);
+      // Due to floating point errors and for compatibility of different
+      // platforms, |dag_hash_value| can be different from |hash_value|.
+      // So we have recalculated it here.
+      set_possible_class(dag_hash_value, equiv_class);
+      equiv_class->insert(std::move(dag));
     }
   }
   return true;
@@ -116,11 +199,12 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
 }
 
 void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
+  assert(false);  // TODO
   // TODO: why is the result different for each run?
   auto old_dataset = std::move(dataset_prev);
   dataset_prev = std::unordered_map<DAGHashType,
                                     std::list<std::set<std::unique_ptr<DAG>,
-                                                  UniquePtrDAGComparator>>>();
+                                                       UniquePtrDAGComparator>>>();
   for (auto &item : old_dataset) {
     const auto &hash_tag = item.first;
     auto &equivalence_list = item.second;
@@ -219,10 +303,13 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
 }
 
 void EquivalenceSet::clear() {
-  dataset_prev.clear();
+  possible_classes_.clear();
+  classes_.clear();
+  // dataset_prev.clear();
 }
 
 int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
+  assert(false);  // TODO
   // We cannot use vector here (otherwise there will be build errors).
   std::list<std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>>
       new_dag_sets;
@@ -338,19 +425,13 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
 }
 
 int EquivalenceSet::num_equivalence_classes() const {
-  int result = 0;
-  for (const auto &item : dataset_prev) {
-    result += (int) item.second.size();
-  }
-  return result;
+  return (int) classes_.size();
 }
 
 int EquivalenceSet::num_total_dags() const {
   int result = 0;
-  for (const auto &item : dataset_prev) {
-    for (const auto &dag_set : item.second) {
-      result += (int) dag_set.size();
-    }
+  for (const auto &item : classes_) {
+    result += item->size();
   }
   return result;
 }
@@ -426,15 +507,17 @@ DAGHashType EquivalenceSet::has_common_first_or_last_gates() const {
 std::vector<std::vector<DAG *>> EquivalenceSet::get_all_equivalence_sets() const {
   std::vector<std::vector<DAG *>> result;
   result.reserve(num_equivalence_classes());
-  for (const auto &item : dataset_prev) {
-    for (const auto &dag_set : item.second) {
-      result.emplace_back();
-      auto &equiv_set = result.back();
-      equiv_set.reserve(dag_set.size());
-      for (const auto &dag : dag_set) {
-        equiv_set.push_back(dag.get());
-      }
-    }
+  for (const auto &item : classes_) {
+    result.push_back(item->get_all_dags());
   }
   return result;
+}
+
+void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,
+                                        EquivalenceClass *equiv_class) {
+  auto &possible_classes = possible_classes_[hash_value];
+  if (std::find(possible_classes.begin(), possible_classes.end(), equiv_class)
+      == possible_classes.end()) {
+    possible_classes.push_back(equiv_class);
+  }
 }

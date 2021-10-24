@@ -7,7 +7,7 @@ int main() {
 
   const int num_qubits = 3;
   const int num_input_parameters = 2;
-  const int max_num_gates = 3;
+  const int max_num_gates = 4;
 
   Dataset dataset1;
   auto start = std::chrono::steady_clock::now();
@@ -26,8 +26,13 @@ int main() {
 
   Dataset dataset2;
   start = std::chrono::steady_clock::now();
-  gen.generate(num_qubits, num_input_parameters, max_num_gates,
-               &dataset2, /*verify_equivalences=*/false, nullptr);
+  gen.generate(num_qubits,
+               num_input_parameters,
+               max_num_gates,
+               &dataset2, /*verify_equivalences=*/
+               false,
+               nullptr, /*verbose=*/
+               true);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "BFS: " << dataset2.num_total_dags()
             << " Circuits with " << dataset2.num_hash_values()
@@ -42,8 +47,13 @@ int main() {
   Dataset dataset3;
   EquivalenceSet equiv_set;
   start = std::chrono::steady_clock::now();
-  gen.generate(num_qubits, num_input_parameters, max_num_gates,
-               &dataset3, /*verify_equivalences=*/true, &equiv_set);
+  gen.generate(num_qubits,
+               num_input_parameters,
+               max_num_gates,
+               &dataset3, /*verify_equivalences=*/
+               true,
+               &equiv_set, /*verbose=*/
+               true);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "BFS verified: " << dataset3.num_total_dags()
             << " Circuits with " << dataset3.num_hash_values()

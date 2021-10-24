@@ -26,7 +26,8 @@ class Generator {
                 int max_num_gates,
                 Dataset *dataset,
                 bool verify_equivalences,
-                EquivalenceSet *equiv_set);
+                EquivalenceSet *equiv_set,
+                bool verbose = false);
 
  private:
   void dfs(int gate_idx,

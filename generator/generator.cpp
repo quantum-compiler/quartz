@@ -19,7 +19,8 @@ void Generator::generate(int num_qubits,
                          int max_num_gates,
                          Dataset *dataset,
                          bool verify_equivalences,
-                         EquivalenceSet *equiv_set) {
+                         EquivalenceSet *equiv_set,
+                         bool verbose) {
   auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
   std::vector<DAG *> dags_to_search(1, empty_dag.get());
   if (verify_equivalences) {
@@ -33,7 +34,15 @@ void Generator::generate(int num_qubits,
   dataset->insert(context, std::move(empty_dag));
   std::vector<std::vector<DAG *>> dags(1, dags_to_search);
 
+  // To avoid EquivalenceSet deleting the DAGs in |dags| when calling clear().
+  std::vector<std::unique_ptr<DAG>> dag_holder;
+
   for (int num_gates = 1; num_gates <= max_num_gates; num_gates++) {
+    if (verbose) {
+      std::cout << "BFS: " << dags_to_search.size()
+                << " representative DAGs to search with "
+                << num_gates - 1 << " gates." << std::endl;
+    }
     if (!verify_equivalences) {
       assert(dataset);
       dags_to_search.clear();
@@ -59,6 +68,11 @@ void Generator::generate(int num_qubits,
       ret = equiv_set->load_json(context,
                                  "tmp_after_verify.json",
                                  &dags_to_search);
+      for (auto &dag : dags_to_search) {
+        auto new_dag = std::make_unique<DAG>(*dag);
+        dag = new_dag.get();
+        dag_holder.push_back(std::move(new_dag));
+      }
       assert(ret);
     }
     dags.push_back(dags_to_search);

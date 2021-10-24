@@ -18,21 +18,38 @@ GraphXfer::GraphXfer(::Context *_context) : context(_context), tensorId(10) {}
 GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
                                        const ::DAG *src_graph,
                                        const ::DAG *dst_graph) {
-  auto src_num_qubits = src_graph->get_num_qubits();
+  // Remove common unused qubits
+  assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
+  auto qubit_num = src_graph->get_num_qubits();
+  std::vector<int> unused_qubits;
+  for (int i = 0; i < qubit_num; ++i) {
+	if (!src_graph->qubit_used(i) && !dst_graph->qubit_used(i))
+	  unused_qubits.push_back(i);
+  }
+  DAG *src_dag = new DAG(*src_graph), *dst_dag = new DAG(*dst_graph);
+  bool ret = src_dag->remove_unused_qubits(unused_qubits);
+  assert(ret);
+  ret = dst_dag->remove_unused_qubits(unused_qubits);
+  assert(ret);
+
+  // TODO: remove common input parameters?
+
+  // Eliminate transfers where src dag has unused qubits
+  auto src_num_qubits = src_dag->get_num_qubits();
   for (int i = 0; i < src_num_qubits; ++i) {
-	if (!src_graph->qubit_used(i))
+	if (!src_dag->qubit_used(i))
 	  return nullptr;
   }
 
+  assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
+  assert(src_dag->get_num_input_parameters() ==
+         dst_dag->get_num_input_parameters());
   GraphXfer *graphXfer = new GraphXfer(_context);
-  assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
-  assert(src_graph->get_num_input_parameters() ==
-         dst_graph->get_num_input_parameters());
   std::unordered_map<DAGNode *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
-  for (int i = 0; i < src_graph->get_num_qubits(); i++) {
-	::DAGNode *src_node = src_graph->nodes[cnt].get();
-	::DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+  for (int i = 0; i < src_dag->get_num_qubits(); i++) {
+	::DAGNode *src_node = src_dag->nodes[cnt].get();
+	::DAGNode *dst_node = dst_dag->nodes[cnt++].get();
 	assert(src_node->is_qubit());
 	assert(dst_node->is_qubit());
 	assert(src_node->index == i);
@@ -41,9 +58,9 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 	src_to_tx[src_node] = qubit_tensor;
 	dst_to_tx[dst_node] = qubit_tensor;
   }
-  for (int i = 0; i < src_graph->get_num_input_parameters(); i++) {
-	::DAGNode *src_node = src_graph->nodes[cnt].get();
-	::DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+  for (int i = 0; i < src_dag->get_num_input_parameters(); i++) {
+	::DAGNode *src_node = src_dag->nodes[cnt].get();
+	::DAGNode *dst_node = dst_dag->nodes[cnt++].get();
 	assert(src_node->is_parameter());
 	assert(dst_node->is_parameter());
 	assert(src_node->index == i);
@@ -52,8 +69,8 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 	src_to_tx[src_node] = parameter_tensor;
 	dst_to_tx[dst_node] = parameter_tensor;
   }
-  for (size_t i = 0; i < src_graph->edges.size(); i++) {
-	::DAGHyperEdge *e = src_graph->edges[i].get();
+  for (size_t i = 0; i < src_dag->edges.size(); i++) {
+	::DAGHyperEdge *e = src_dag->edges[i].get();
 	OpX *op = new OpX(e->gate->tp);
 	for (size_t j = 0; j < e->input_nodes.size(); j++) {
 	  assert(src_to_tx.find(e->input_nodes[j]) != src_to_tx.end());
@@ -72,8 +89,8 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 	}
 	graphXfer->srcOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_graph->edges.size(); i++) {
-	::DAGHyperEdge *e = dst_graph->edges[i].get();
+  for (size_t i = 0; i < dst_dag->edges.size(); i++) {
+	::DAGHyperEdge *e = dst_dag->edges[i].get();
 	OpX *op = new OpX(e->gate->tp);
 	for (size_t j = 0; j < e->input_nodes.size(); j++) {
 	  TensorX input = dst_to_tx[e->input_nodes[j]];
@@ -88,12 +105,14 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 	}
 	graphXfer->dstOps.push_back(op);
   }
-  for (int i = 0; i < src_graph->get_num_qubits(); i++) {
-	assert(src_to_tx.find(src_graph->outputs[i]) != src_to_tx.end());
-	assert(dst_to_tx.find(dst_graph->outputs[i]) != dst_to_tx.end());
-	graphXfer->map_output(src_to_tx[src_graph->outputs[i]],
-	                      dst_to_tx[dst_graph->outputs[i]]);
+  for (int i = 0; i < src_dag->get_num_qubits(); i++) {
+	assert(src_to_tx.find(src_dag->outputs[i]) != src_to_tx.end());
+	assert(dst_to_tx.find(dst_dag->outputs[i]) != dst_to_tx.end());
+	graphXfer->map_output(src_to_tx[src_dag->outputs[i]],
+	                      dst_to_tx[dst_dag->outputs[i]]);
   }
+  delete src_dag;
+  delete dst_dag;
   return graphXfer;
 }
 

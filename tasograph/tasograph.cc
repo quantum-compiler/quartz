@@ -276,34 +276,45 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   std::vector<GraphXfer *> xfers;
   for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
-    bool first = true;
-    DAG *first_dag = nullptr;
-    for (const auto &dag : equiv_set) {
-      if (first) {
-        // Used raw pointer according to the GraphXfer API
-        // May switch to smart pointer later
-        first_dag = new DAG(*dag);
-        first = false;
-      }
-      else {
-        DAG *other_dag = new DAG(*dag);
-        // first_dag is src, others are dst
-        auto first_2_other =
-            GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
-        // first_dag is dst, others are src
-        auto other_2_first =
-            GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
-        if (first_2_other != nullptr)
-          xfers.push_back(first_2_other);
-        if (other_2_first != nullptr)
-          xfers.push_back(other_2_first);
-        delete other_dag;
-      }
-    }
-    delete first_dag;
+	bool first = true;
+	DAG *first_dag = nullptr;
+	for (const auto &dag : equiv_set) {
+	  if (first) {
+		// Used raw pointer according to the GraphXfer API
+		// May switch to smart pointer later
+		first_dag = new DAG(*dag);
+		first = false;
+	  }
+	  else {
+		DAG *other_dag = new DAG(*dag);
+		// first_dag is src, others are dst
+		if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
+		  std::cout << first_dag->get_num_gates() << " "
+		            << other_dag->get_num_gates() << " ";
+		}
+		auto first_2_other =
+		    GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
+		// first_dag is dst, others are src
+		auto other_2_first =
+		    GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
+		if (first_2_other != nullptr)
+		  xfers.push_back(first_2_other);
+		else
+		  std::cout << "nullptr"
+		            << " ";
+		if (other_2_first != nullptr)
+		  xfers.push_back(other_2_first);
+		else
+		  std::cout << "nullptr"
+		            << " ";
+		delete other_dag;
+	  }
+	}
+	delete first_dag;
   }
 
-  std::cout << xfers.size() << std::endl;
+  std::cout << "Number of different transfers is " << xfers.size() << "."
+            << std::endl;
 
   int counter = 0;
   int maxNumOps = inEdges.size();
@@ -320,7 +331,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	Graph *subGraph = candidates.top();
 	candidates.pop();
 	if (subGraph->total_cost() < bestCost) {
-	  delete bestGraph;
+	  if (bestGraph != this)
+		delete bestGraph;
 	  bestCost = subGraph->total_cost();
 	  bestGraph = subGraph;
 	}
@@ -341,6 +353,10 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results
+  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::iterator it;
+  for (it = bestGraph->inEdges.begin(); it != bestGraph->inEdges.end(); ++it) {
+	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
+  }
   return bestGraph;
 }
 }; // namespace TASOGraph

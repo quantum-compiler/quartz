@@ -34,12 +34,53 @@ void EquivalenceClass::set_dags(std::vector<std::unique_ptr<DAG>> dags) {
   dags_ = std::move(dags);
 }
 
-bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
+DAG *EquivalenceClass::get_representative() {
+  assert(!dags_.empty());
+  return dags_[0].get();
+}
+
+bool EquivalenceClass::contains(const DAG &dag) const {
+  for (const auto &dag_in_class : dags_) {
+    if (dag.fully_equivalent(*dag_in_class)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool EquivalenceClass::set_as_representative(const DAG &dag) {
+  if (dag.fully_equivalent(*dags_[0])) {
+    // |dag| is already the representative.
+    return true;
+  }
+  for (int i = 1; i < (int) dags_.size(); i++) {
+    if (dag.fully_equivalent(*dags_[i])) {
+      std::swap(dags_[0], dags_[i]);
+      return true;
+    }
+  }
+  return false;
+}
+
+bool EquivalenceSet::load_json(Context *ctx,
+                               const std::string &file_name,
+                               std::vector<DAG *> *new_representatives) {
   std::ifstream fin;
   fin.open(file_name, std::ifstream::in);
   if (!fin.is_open()) {
     return false;
   }
+
+  // If the current equivalence set is not empty, keep the representatives.
+  std::vector<std::unique_ptr<DAG>> representatives;
+  representatives.reserve(classes_.size());
+  for (auto &item : classes_) {
+    auto dags = item->extract();
+    if (!dags.empty()) {
+      representatives.push_back(std::move(dags[0]));
+    }
+  }
+  clear();
 
   // Equivalences between equivalence classes with different hash values.
   using EquivClassTag = std::pair<DAGHashType, int>;
@@ -176,6 +217,44 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name) {
       equiv_class->insert(std::move(dag));
     }
   }
+
+  // Move all previous representatives to the beginning of the corresponding
+  // equivalence class, and find new representatives.
+  std::unordered_set<EquivalenceClass *> existing_classes;
+  for (auto &rep : representatives) {
+    EquivalenceClass *found_equiv_class = nullptr;
+    for (auto &equiv_class : get_possible_classes(rep->hash(ctx))) {
+      if (equiv_class->set_as_representative(*rep)) {
+        found_equiv_class = equiv_class;
+        break;
+      }
+    }
+    if (!found_equiv_class) {
+      for (const auto &other_hash_value : rep->other_hash_values()) {
+        for (auto &equiv_class : get_possible_classes(other_hash_value)) {
+          if (equiv_class->set_as_representative(*rep)) {
+            found_equiv_class = equiv_class;
+            break;
+          }
+        }
+        if (found_equiv_class) {
+          break;
+        }
+      }
+    }
+    if (new_representatives) {
+      existing_classes.insert(found_equiv_class);
+    }
+  }
+  if (new_representatives) {
+    for (auto &item : classes_) {
+      if (existing_classes.count(item.get()) == 0) {
+        // A new equivalence class.
+        new_representatives->push_back(item->get_representative());
+      }
+    }
+  }
+
   return true;
 }
 
@@ -502,28 +581,6 @@ int EquivalenceSet::num_total_dags() const {
   return result;
 }
 
-void EquivalenceSet::set_representatives(Context *ctx,
-                                         std::vector<DAG *> *new_representatives) const {
-  for (const auto &item : dataset_prev) {
-    int id = 0;
-    for (const auto &dag_set : item.second) {
-      assert(!dag_set.empty());
-      auto &rep = *dag_set.begin();
-      // Warning: we need the Dataset class to preserve the order of DAGs with
-      // the same hash value here.
-      if (!ctx->has_representative(rep->hash(ctx), id)) {
-        // Set rep as representative
-        auto new_rep = std::make_unique<DAG>(*rep);
-        if (new_representatives) {
-          new_representatives->push_back(new_rep.get());
-        }
-        ctx->set_representative(std::move(new_rep), id);
-      }
-      id++;
-    }
-  }
-}
-
 int EquivalenceSet::first_class_with_common_first_or_last_gates() const {
   int class_id = 0;
   for (const auto &item : classes_) {
@@ -592,6 +649,19 @@ std::vector<EquivalenceClass *> EquivalenceSet::get_possible_classes(const DAGHa
   }
   return std::vector<EquivalenceClass *>(it->second.begin(),
                                          it->second.end());
+}
+
+void EquivalenceSet::insert_class(Context *ctx, std::unique_ptr<EquivalenceClass> equiv_class) {
+  // Add pointers to the new class.
+  for (auto &dag : equiv_class->get_all_dags()) {
+    assert(dag);
+    set_possible_class(dag->hash(ctx), equiv_class.get());
+    for (const auto &other_hash : dag->other_hash_values()) {
+      set_possible_class(other_hash, equiv_class.get());
+    }
+  }
+
+  classes_.push_back(std::move(equiv_class));
 }
 
 void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,

@@ -39,7 +39,8 @@ class Generator {
   void bfs(const std::vector<std::vector<DAG *>> &dags,
            Dataset &dataset,
            std::vector<DAG *> *new_representatives,
-           bool verify_equivalences);
+           bool verify_equivalences,
+           const EquivalenceSet *equiv_set);
 
   void dfs_parameter_gates(std::unique_ptr<DAG> dag,
                            int remaining_gates,

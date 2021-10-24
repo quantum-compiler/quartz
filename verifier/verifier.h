@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../context/context.h"
+#include "../dataset/equivalence_set.h"
 #include "../dag/dag.h"
 
 // Verify if two circuits are equivalent and other things about DAGs.
@@ -12,5 +13,11 @@ class Verifier {
 
   // Check if the DAG is redundant (equivalence opportunities have already
   // been covered by smaller circuits).
+  // This function assumes that two DAGs are equivalent iff they share the same
+  // hash value.
   bool redundant(Context *ctx, DAG *dag);
+
+  // Check if the DAG is redundant (equivalence opportunities have already
+  // been covered by smaller circuits).
+  bool redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag);
 };

@@ -28,22 +28,32 @@ void Generator::generate(int num_qubits,
                          EquivalenceSet *equiv_set) {
   auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
   std::vector<DAG *> dags_to_search(1, empty_dag.get());
-  context->set_representative(std::make_unique<DAG>(*empty_dag));
+  if (verify_equivalences) {
+    assert(equiv_set);
+    auto equiv_class = std::make_unique<EquivalenceClass>();
+    equiv_class->insert(std::make_unique<DAG>(*empty_dag));
+    equiv_set->insert_class(context, std::move(equiv_class));
+  } else {
+    context->set_representative(std::make_unique<DAG>(*empty_dag));
+  }
   dataset->insert(context, std::move(empty_dag));
   std::vector<std::vector<DAG *>> dags(1, dags_to_search);
 
   for (int num_gates = 1; num_gates <= max_num_gates; num_gates++) {
-    dags_to_search.clear();
-    if (!verify_equivalences || num_gates == max_num_gates) {
-      // Do not verify when |num_gates == max_num_gates|.
+    if (!verify_equivalences) {
       assert(dataset);
-      // Note that the parameter is still |verify_equivalences| here,
-      // not |false|.
-      bfs(dags, *dataset, &dags_to_search, verify_equivalences);
+      dags_to_search.clear();
+      bfs(dags, *dataset, &dags_to_search, verify_equivalences, nullptr);
     } else {
       assert(dataset);
       assert(equiv_set);
-      bfs(dags, *dataset, nullptr, verify_equivalences);
+      bfs(dags, *dataset, nullptr, verify_equivalences, equiv_set);
+      // Do not verify when |num_gates == max_num_gates|.
+      // This is to make the behavior the same when |verify_equivalences| is
+      // true or false.
+      if (num_gates == max_num_gates) {
+        break;
+      }
       bool ret = dataset->save_json("tmp_before_verify.json");
       assert(ret);
 
@@ -51,14 +61,12 @@ void Generator::generate(int num_qubits,
       system(
           "python ../python/verify_equivalences.py tmp_before_verify.json tmp_after_verify.json");
 
-      equiv_set->clear();
-      ret = equiv_set->load_json(context, "tmp_after_verify.json");
+      dags_to_search.clear();
+      ret = equiv_set->load_json(context,
+                                 "tmp_after_verify.json",
+                                 &dags_to_search);
       assert(ret);
-
-      equiv_set->set_representatives(context, &dags_to_search);
     }
-    /*std::cout << "BFS " << num_gates << " gates: " << dags_to_search.size()
-              << " DAGs to search." << std::endl;*/
     dags.push_back(dags_to_search);
   }
 }
@@ -231,20 +239,31 @@ void Generator::dfs(int gate_idx,
 void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
                     Dataset &dataset,
                     std::vector<DAG *> *new_representatives,
-                    bool verify_equivalences) {
+                    bool verify_equivalences,
+                    const EquivalenceSet *equiv_set) {
   auto try_to_add_to_result = [&](DAG *new_dag) {
     // A new DAG with |current_max_num_gates| + 1 gates.
-    if (verifier_.redundant(context, new_dag)) {
-      return;
-    }
-    bool ret = dataset.insert(context, std::make_unique<DAG>(*new_dag));
-
-    // We should set the representative later in Generator::generate()
-    // when |verify_equivalences| is true.
-    if (!verify_equivalences) {
+    if (verify_equivalences) {
+      assert(equiv_set);
+      if (!verifier_.redundant(context, equiv_set, new_dag)) {
+        auto new_new_dag = std::make_unique<DAG>(*new_dag);
+        auto new_new_dag_ptr = new_new_dag.get();
+        dataset.insert(context, std::move(new_new_dag));
+        if (new_representatives) {
+          // Warning: this is not the new representatives -- only the new DAGs.
+          new_representatives->push_back(new_new_dag_ptr);
+        }
+      }
+    } else {
+      // If we will not verify the equivalence later, we should update
+      // the representatives in the context now.
+      if (verifier_.redundant(context, new_dag)) {
+        return;
+      }
+      bool ret = dataset.insert(context, std::make_unique<DAG>(*new_dag));
       // Presuming different hash values imply different DAGs.
       if (ret) {
-        // The DAG's hash value is new to the DAG.
+        // The DAG's hash value is new to the dataset.
         // Note: this is the second instance of DAG we create in this function.
         auto rep = std::make_unique<DAG>(*new_dag);
         auto rep_ptr = rep.get();

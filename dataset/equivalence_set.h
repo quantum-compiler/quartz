@@ -24,6 +24,17 @@ class EquivalenceClass {
   // Replace |dags_| with |dags|.
   void set_dags(std::vector<std::unique_ptr<DAG>> dags);
 
+  // The first DAG is the representative.
+  DAG *get_representative();
+
+  // Returns if this equivalence class contains |dag|.
+  [[nodiscard]] bool contains(const DAG &dag) const;
+
+  // If this equivalence class contains |dag|, set |dag| as the representative
+  // of the class and return true.
+  // Otherwise, return false.
+  [[nodiscard]] bool set_as_representative(const DAG &dag);
+
  private:
   std::vector<std::unique_ptr<DAG>> dags_;
 };
@@ -31,7 +42,12 @@ class EquivalenceClass {
 // This class stores all equivalence classes.
 class EquivalenceSet {
  public:
-  bool load_json(Context *ctx, const std::string &file_name);
+  // |new_representatives| is for Generator::generate().
+  // It will be pushed back all representatives previously not in
+  // the equivalence set.
+  bool load_json(Context *ctx,
+                 const std::string &file_name,
+                 std::vector<DAG *> *new_representatives = nullptr);
 
   bool save_json(const std::string &file_name) const;
 
@@ -55,9 +71,6 @@ class EquivalenceSet {
   // This function runs in O(|classes_|.size()).
   [[nodiscard]] int num_total_dags() const;
 
-  void set_representatives(Context *ctx,
-                           std::vector<DAG *> *new_representatives) const;
-
   // Returns the position in |classes_|, or -1 if not found.
   [[nodiscard]] int first_class_with_common_first_or_last_gates() const;
 
@@ -66,6 +79,12 @@ class EquivalenceSet {
   [[nodiscard]] std::vector<std::vector<DAG *>> get_all_equivalence_sets() const;
 
   [[nodiscard]] std::vector<EquivalenceClass *> get_possible_classes(const DAGHashType &hash_value) const;
+
+  // A hacky function to insert a single class to the equivalence set.
+  // There's no guarantee that the class inserted is different with any other
+  // classes already in the set.
+  void insert_class(Context *ctx,
+                    std::unique_ptr<EquivalenceClass> equiv_class);
 
   // We cannot use std::vector here because that would need
   // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
@@ -77,8 +96,10 @@ class EquivalenceSet {
       dataset_prev;
 
  private:
-  void set_possible_class(const DAGHashType &hash_value, EquivalenceClass *equiv_class);
-  void remove_possible_class(const DAGHashType &hash_value, EquivalenceClass *equiv_class);
+  void set_possible_class(const DAGHashType &hash_value,
+                          EquivalenceClass *equiv_class);
+  void remove_possible_class(const DAGHashType &hash_value,
+                             EquivalenceClass *equiv_class);
 
   std::vector<std::unique_ptr<EquivalenceClass>> classes_;
 

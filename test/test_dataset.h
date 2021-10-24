@@ -23,9 +23,9 @@ void test_equivalence_set(const std::vector<GateType> &support_gates,
                 end - start).count() / 1000.0 << " seconds."
             << std::endl;
   start = std::chrono::steady_clock::now();
-  eqs.remove_unused_qubits_and_input_params(&ctx);
+  eqs.simplify(&ctx);
   end = std::chrono::steady_clock::now();
-  std::cout << "After removing unused qubits and input parameters "
+  std::cout << "After simplification in "
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                 end - start).count() / 1000.0 << " seconds, "
             << eqs.num_equivalence_classes()

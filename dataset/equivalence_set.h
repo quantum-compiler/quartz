@@ -59,6 +59,15 @@ class EquivalenceSet {
 
   void clear();
 
+  // A final pass of simplification before feeding the equivalences
+  // to the optimizer.
+  // Returns if the pass does some simplification or not.
+  bool simplify(Context *ctx);
+
+  // Remove equivalence classes with only one DAG.
+  // Return the number of equivalent classes removed.
+  int remove_singletons();
+
   // Remove unused qubits and input parameters if they are unused in
   // each DAG of an equivalent class.
   // Return the number of equivalent classes removed

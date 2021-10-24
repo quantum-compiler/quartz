@@ -408,6 +408,45 @@ void EquivalenceSet::clear() {
   classes_.clear();
 }
 
+bool EquivalenceSet::simplify(Context *ctx) {
+  bool simplified = false;
+  if (remove_unused_qubits_and_input_params(ctx)) {
+    simplified = true;
+  }
+  if (remove_singletons()) {
+    simplified = true;
+  }
+  return simplified;
+}
+
+int EquivalenceSet::remove_singletons() {
+  bool have_singletons_to_remove = false;
+  for (auto &item : classes_) {
+    if (item->size() <= 1) {
+      have_singletons_to_remove = true;
+      break;
+    }
+  }
+  if (!have_singletons_to_remove) {
+    return 0;
+  }
+
+  int num_removed = 0;
+  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
+  std::swap(prev_classes, classes_);
+  // Now |classes_| is empty.
+  classes_.reserve(prev_classes.size());
+  for (auto &item : prev_classes) {
+    if (item->size() > 1) {
+      classes_.push_back(std::move(item));
+    } else {
+      num_removed++;
+    }
+  }
+  assert(num_removed > 0);
+  return num_removed;
+}
+
 int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   std::vector<EquivalenceClass *> classes_to_remove;
   std::vector<std::unique_ptr<EquivalenceClass>> classes_to_insert;

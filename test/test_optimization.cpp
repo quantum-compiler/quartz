@@ -4,7 +4,11 @@
 #include <iostream>
 
 int main() {
-  Context ctx(all_supported_gates());
-  test_optimization(&ctx, "circuit/example-circuits/barenco_tof_3_basic.qasm",
-                    "cmake-build-debug/equivalences_sorted.json");
+  Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
+               GateType::h, GateType::s, GateType::t, GateType::tdg,
+               GateType::x, GateType::add, GateType::z});
+  //   test_optimization(&ctx, "circuit/example-circuits/voqc_fig5.qasm",
+  //                     "cmake-build-debug/bfs_verified.json");
+  test_optimization(&ctx, "circuit/example-circuits/barenco_tof_3.qasm",
+                    "cmake-build-debug/bfs_verified.json");
 }

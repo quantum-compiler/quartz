@@ -250,16 +250,16 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
             << " seconds." << std::endl;
 
   start = std::chrono::steady_clock::now();
-  auto num_equiv_class_inserted =
-      eqs.remove_unused_qubits_and_input_params(ctx);
+  auto num_equiv_class_inserted = eqs.simplify(ctx);
   end = std::chrono::steady_clock::now();
-  std::cout << std::dec << num_equiv_class_inserted
-            << " classes of equivalences inserted in "
+  std::cout << std::dec << eqs.num_equivalence_classes()
+            << " classes of equivalences remain after simplication after "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /
                    1000.0
             << " seconds." << std::endl;
+
   // Normalize dags to minimal representations
   //   start = std::chrono::steady_clock::now();
   //   eqs.normalize_to_minimal_representations(ctx);

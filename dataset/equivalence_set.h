@@ -86,15 +86,6 @@ class EquivalenceSet {
   void insert_class(Context *ctx,
                     std::unique_ptr<EquivalenceClass> equiv_class);
 
-  // We cannot use std::vector here because that would need
-  // std::unordered_set<std::unique_ptr<DAG>> to be copy-constructible.
-  //
-  // Each std::unordered_set represents a clause of equivalent DAGs.
-  std::unordered_map<DAGHashType,
-                     std::list<std::set<std::unique_ptr<DAG>, /*Compare=*/
-                                        UniquePtrDAGComparator>>>
-      dataset_prev;
-
  private:
   void set_possible_class(const DAGHashType &hash_value,
                           EquivalenceClass *equiv_class);

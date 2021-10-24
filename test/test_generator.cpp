@@ -9,7 +9,8 @@ int main() {
   gen.generate_dfs(3/*num_qubits*/,
                    3/*max_num_input_parameters*/,
                    3/*max_num_gates*/,
-                   dataset);
+                   dataset,
+                   true/*restrict_search_space*/);
   for (const auto& it : dataset.dataset) {
     bool is_first = true;
     DAG* first_dag = NULL;

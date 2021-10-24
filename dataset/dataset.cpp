@@ -43,3 +43,14 @@ bool Dataset::save_json(const std::string &file_name) const {
   fout << "}" << std::endl;
   return true;
 }
+
+bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
+  const auto hash_value = dag->hash(ctx);
+  bool ret = dataset.count(hash_value) == 0;
+  dataset[hash_value].push_back(std::move(dag));
+  return ret;
+}
+
+void Dataset::clear() {
+  dataset.clear();
+}

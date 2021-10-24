@@ -6,11 +6,12 @@
 void Generator::generate_dfs(int num_qubits,
                              int max_num_input_parameters,
                              int max_num_gates,
-                             Dataset &dataset) {
+                             Dataset &dataset,
+                             bool restrict_search_space) {
   DAG *dag = new DAG(num_qubits, max_num_input_parameters);
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
-  dfs(0, max_num_gates, dag, used_parameters, dataset);
+  dfs(0, max_num_gates, dag, used_parameters, dataset, restrict_search_space);
   delete dag;
 }
 
@@ -83,22 +84,27 @@ void Generator::dfs(int gate_idx,
                     int max_num_gates,
                     DAG *dag,
                     std::vector<int> &used_parameters,
-                    Dataset &dataset) {
-  bool pass_checks = true;
-  // check that qubits are used in an increasing order
-  for (int i = 1; i < dag->get_num_qubits(); i++)
-    if (dag->outputs[i] != dag->nodes[i].get()
-        && dag->outputs[i - 1] == dag->nodes[i - 1].get())
-      pass_checks = false;
-  // check that input parameters are used in an increasing order
-  for (int i = 1; i < dag->get_num_input_parameters(); i++)
-    if (used_parameters[i] > 0 && used_parameters[i - 1] == 0)
-      pass_checks = false;
-  // Note that we do not check that internal parameters are used in an
-  // increasing order here.
-  // Return if we fail any checks
-  if (!pass_checks)
-    return;
+                    Dataset &dataset,
+                    bool restrict_search_space) {
+  if (restrict_search_space) {
+    // An optimization to restrict the search space, but may also cause
+    // the equivalences found to be incomplete.
+    bool pass_checks = true;
+    // check that qubits are used in an increasing order
+    for (int i = 1; i < dag->get_num_qubits(); i++)
+      if (dag->outputs[i] != dag->nodes[i].get()
+          && dag->outputs[i - 1] == dag->nodes[i - 1].get())
+        pass_checks = false;
+    // check that input parameters are used in an increasing order
+    for (int i = 1; i < dag->get_num_input_parameters(); i++)
+      if (used_parameters[i] > 0 && used_parameters[i - 1] == 0)
+        pass_checks = false;
+    // Note that we do not check that internal parameters are used in an
+    // increasing order here.
+    // Return if we fail any checks
+    if (!pass_checks)
+      return;
+  }
 
   int num_unused_internal_parameter = 0;
   for (int i = dag->get_num_input_parameters();
@@ -137,13 +143,15 @@ void Generator::dfs(int gate_idx,
         // Case: 0-qubit operators with 2 parameters
         bool new_input_parameter_searched = false;
         for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-          if (p1 < dag->get_num_input_parameters() && !used_parameters[p1]) {
-            // We should use the new (unused) input parameter with smallest
-            // index as the first input if there are more than one of them.
-            if (new_input_parameter_searched) {
-              continue;
-            } else {
-              new_input_parameter_searched = true;
+          if (restrict_search_space) {
+            if (p1 < dag->get_num_input_parameters() && !used_parameters[p1]) {
+              // We should use the new (unused) input parameter with smallest
+              // index as the first input if there are more than one of them.
+              if (new_input_parameter_searched) {
+                continue;
+              } else {
+                new_input_parameter_searched = true;
+              }
             }
           }
           parameter_indices.push_back(p1);
@@ -161,7 +169,12 @@ void Generator::dfs(int gate_idx,
                                      gate,
                                      &output_param_index);
             assert(ret);
-            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
+            dfs(gate_idx + 1,
+                max_num_gates,
+                dag,
+                used_parameters,
+                dataset,
+                restrict_search_space);
             ret = dag->remove_last_gate();
             assert(ret);
             used_parameters[p2] -= 1;
@@ -182,7 +195,12 @@ void Generator::dfs(int gate_idx,
               ret =
               dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
           assert(ret);
-          dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
+          dfs(gate_idx + 1,
+              max_num_gates,
+              dag,
+              used_parameters,
+              dataset,
+              restrict_search_space);
           ret = dag->remove_last_gate();
           assert(ret);
           qubit_indices.pop_back();
@@ -197,7 +215,12 @@ void Generator::dfs(int gate_idx,
                 dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
             assert(ret);
             used_parameters[p1] += 1;
-            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
+            dfs(gate_idx + 1,
+                max_num_gates,
+                dag,
+                used_parameters,
+                dataset,
+                restrict_search_space);
             used_parameters[p1] -= 1;
             ret = dag->remove_last_gate();
             assert(ret);
@@ -213,13 +236,15 @@ void Generator::dfs(int gate_idx,
         // Case: 2-qubit operators without parameters
         bool new_qubit_searched = false;
         for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
-          if (q1 < dag->get_num_input_parameters() && !dag->qubit_used(q1)) {
-            // We should use the new (unused) qubit with smallest index
-            // as the first input if there are more than one of them.
-            if (new_qubit_searched) {
-              continue;
-            } else {
-              new_qubit_searched = true;
+          if (restrict_search_space) {
+            if (q1 < dag->get_num_input_parameters() && !dag->qubit_used(q1)) {
+              // We should use the new (unused) qubit with smallest index
+              // as the first input if there are more than one of them.
+              if (new_qubit_searched) {
+                continue;
+              } else {
+                new_qubit_searched = true;
+              }
             }
           }
           qubit_indices.push_back(q1);
@@ -229,7 +254,12 @@ void Generator::dfs(int gate_idx,
             bool ret =
                 dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
             assert(ret);
-            dfs(gate_idx + 1, max_num_gates, dag, used_parameters, dataset);
+            dfs(gate_idx + 1,
+                max_num_gates,
+                dag,
+                used_parameters,
+                dataset,
+                restrict_search_space);
             ret = dag->remove_last_gate();
             assert(ret);
             qubit_indices.pop_back();

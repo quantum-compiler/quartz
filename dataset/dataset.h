@@ -20,12 +20,9 @@ class Dataset {
   }
 
   // Returns true iff the hash value is new to the |dataset|.
-  bool insert(Context *ctx, std::unique_ptr<DAG> dag) {
-    const auto hash_value = dag->hash(ctx);
-    bool ret = dataset.count(hash_value) == 0;
-    dataset[hash_value].push_back(std::move(dag));
-    return ret;
-  }
+  bool insert(Context *ctx, std::unique_ptr<DAG> dag);
+
+  void clear();
 
   std::unordered_map<DAGHashType,
                      std::vector<std::unique_ptr<DAG>>> dataset;

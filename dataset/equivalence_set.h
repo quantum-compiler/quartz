@@ -30,7 +30,7 @@ class EquivalenceClass {
   // The first DAG is the representative.
   DAG *get_representative();
 
-  // Returns if this equivalence class contains |dag|.
+  // Returns whether this equivalence class contains |dag|.
   [[nodiscard]] bool contains(const DAG &dag) const;
 
   // If this equivalence class contains |dag|, set |dag| as the representative

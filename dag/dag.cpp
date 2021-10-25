@@ -1160,7 +1160,7 @@ std::vector<DAGHyperEdge *> DAG::first_quantum_gates() const {
     if (edge->gate->is_parameter_gate()) {
       continue;
     }
-    if (depend_on_other_gates.find(edge.get()) != depend_on_other_gates.end()) {
+    if (depend_on_other_gates.find(edge.get()) == depend_on_other_gates.end()) {
       result.push_back(edge.get());
     }
     for (const auto &output_node : edge->output_nodes) {

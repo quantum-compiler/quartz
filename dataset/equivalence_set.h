@@ -74,7 +74,7 @@ class EquivalenceSet {
 
   // Remove equivalence classes with only one DAG.
   // Return the number of equivalent classes removed.
-  int remove_singletons();
+  int remove_singletons(Context *ctx);
 
   // Remove unused qubits and input parameters if they are unused in
   // each DAG of an equivalent class.

@@ -105,6 +105,7 @@ int EquivalenceClass::remove_common_first_or_last_gates() {
   std::vector<std::unique_ptr<DAG>> previous_dags;
   std::swap(dags_, previous_dags);
   // |dags_| is empty now.
+  assert(previous_dags.size() >= removing_ids.size());
   dags_.reserve(previous_dags.size() - removing_ids.size());
   auto removing_it = removing_ids.begin();
   for (int i = 0; i < (int) previous_dags.size(); i++) {
@@ -471,7 +472,7 @@ bool EquivalenceSet::simplify(Context *ctx) {
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
-    if (remove_singletons()) {
+    if (remove_singletons(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -493,7 +494,7 @@ bool EquivalenceSet::simplify(Context *ctx) {
   return ever_simplified;
 }
 
-int EquivalenceSet::remove_singletons() {
+int EquivalenceSet::remove_singletons(Context *ctx) {
   bool have_singletons_to_remove = false;
   for (auto &item : classes_) {
     if (item->size() <= 1) {
@@ -515,6 +516,15 @@ int EquivalenceSet::remove_singletons() {
       classes_.push_back(std::move(item));
     } else {
       num_removed++;
+      // Remove all pointers to the equivalence class.
+      if (item->size() > 0) {
+        for (auto &dag : item->get_all_dags()) {
+          remove_possible_class(dag->hash(ctx), item.get());
+          for (const auto &other_hash : dag->other_hash_values()) {
+            remove_possible_class(other_hash, item.get());
+          }
+        }
+      }
     }
   }
   assert(num_removed > 0);
@@ -664,6 +674,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
   std::swap(prev_classes, classes_);
   // Now |classes_| is empty.
+  assert(prev_classes.size() + classes_to_insert.size() >= classes_to_remove.size());
   classes_.reserve(prev_classes.size() + classes_to_insert.size()
                        - classes_to_remove.size());
   auto remove_it = classes_to_remove.begin();

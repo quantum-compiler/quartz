@@ -414,6 +414,10 @@ int DAG::get_num_total_parameters() const {
   return (int) parameters.size();
 }
 
+int DAG::get_num_internal_parameters() const {
+  return (int) parameters.size() - num_input_parameters;
+}
+
 int DAG::get_num_gates() const {
   return (int) edges.size();
 }

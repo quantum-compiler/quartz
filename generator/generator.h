@@ -46,7 +46,7 @@ class Generator {
  private:
   void dfs(int gate_idx,
            int max_num_gates,
-           int remaining_param_gates,
+           int max_remaining_param_gates,
            DAG *dag,
            std::vector<int> &used_parameters,
            Dataset &dataset,
@@ -54,6 +54,7 @@ class Generator {
 
   // |dags[i]| is the DAGs with |i| gates.
   void bfs(const std::vector<std::vector<DAG *>> &dags,
+           int max_num_param_gates,
            Dataset &dataset,
            std::vector<DAG *> *new_representatives,
            bool verify_equivalences,

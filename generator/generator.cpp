@@ -55,11 +55,21 @@ void Generator::generate(int num_qubits,
     if (!verify_equivalences) {
       assert(dataset);
       dags_to_search.clear();
-      bfs(dags, *dataset, &dags_to_search, verify_equivalences, nullptr);
+      bfs(dags,
+          max_num_param_gates,
+          *dataset,
+          &dags_to_search,
+          verify_equivalences,
+          nullptr);
     } else {
       assert(dataset);
       assert(equiv_set);
-      bfs(dags, *dataset, nullptr, verify_equivalences, equiv_set);
+      bfs(dags,
+          max_num_param_gates,
+          *dataset,
+          nullptr,
+          verify_equivalences,
+          equiv_set);
       // Do not verify when |num_gates == max_num_gates|.
       // This is to make the behavior the same when |verify_equivalences| is
       // true or false.
@@ -90,7 +100,7 @@ void Generator::generate(int num_qubits,
 
 void Generator::dfs(int gate_idx,
                     int max_num_gates,
-                    int remaining_param_gates,
+                    int max_remaining_param_gates,
                     DAG *dag,
                     std::vector<int> &used_parameters,
                     Dataset &dataset,
@@ -146,7 +156,7 @@ void Generator::dfs(int gate_idx,
   for (const auto &idx : context->get_supported_gates()) {
     Gate *gate = context->get_gate(idx);
     if (gate->get_num_qubits() == 0) {
-      if (!remaining_param_gates) {
+      if (!max_remaining_param_gates) {
         // We can't add more parameter gates.
         continue;
       }
@@ -184,7 +194,7 @@ void Generator::dfs(int gate_idx,
             assert(ret);
             dfs(gate_idx + 1,
                 max_num_gates,
-                remaining_param_gates - 1,
+                max_remaining_param_gates - 1,
                 dag,
                 used_parameters,
                 dataset,
@@ -211,7 +221,7 @@ void Generator::dfs(int gate_idx,
           assert(ret);
           dfs(gate_idx + 1,
               max_num_gates,
-              remaining_param_gates,
+              max_remaining_param_gates,
               dag,
               used_parameters,
               dataset,
@@ -232,7 +242,7 @@ void Generator::dfs(int gate_idx,
             used_parameters[p1] += 1;
             dfs(gate_idx + 1,
                 max_num_gates,
-                remaining_param_gates,
+                max_remaining_param_gates,
                 dag,
                 used_parameters,
                 dataset,
@@ -272,7 +282,7 @@ void Generator::dfs(int gate_idx,
             assert(ret);
             dfs(gate_idx + 1,
                 max_num_gates,
-                remaining_param_gates,
+                max_remaining_param_gates,
                 dag,
                 used_parameters,
                 dataset,
@@ -294,6 +304,7 @@ void Generator::dfs(int gate_idx,
 }
 
 void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
+                    int max_num_param_gates,
                     Dataset &dataset,
                     std::vector<DAG *> *new_representatives,
                     bool verify_equivalences,
@@ -333,9 +344,19 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
   };
   int current_max_num_gates = (int) dags.size() - 1;
   std::vector<int> params_used_times;
-  for (int num_gates = 0; num_gates <= current_max_num_gates; num_gates++) {
+  int min_num_gates = 0;
+  if (current_max_num_gates - max_num_param_gates > 0) {
+    min_num_gates = current_max_num_gates - max_num_param_gates;
+  }
+  for (int num_gates = min_num_gates; num_gates <= current_max_num_gates;
+       num_gates++) {
     for (auto &dag : dags[num_gates]) {
       // Add (current_max_num_gates - num_gates) parameter gates.
+      if (current_max_num_gates - num_gates + dag->get_num_internal_parameters()
+          > max_num_param_gates) {
+        // Too many parameter gates.
+        continue;
+      }
       std::vector<std::unique_ptr<DAG>> dags_to_search;
       // Assume all parameters are used in the current dag now.
       params_used_times.assign(dag->get_num_total_parameters(), 1);

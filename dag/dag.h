@@ -37,6 +37,7 @@ class DAG {
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
+  [[nodiscard]] int get_num_internal_parameters() const;
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   [[nodiscard]] bool input_param_used(int param_index) const;

@@ -62,6 +62,62 @@ bool EquivalenceClass::set_as_representative(const DAG &dag) {
   return false;
 }
 
+int EquivalenceClass::remove_common_first_or_last_gates() {
+  std::vector<DAGHyperEdge *> all_first_gates, all_last_gates;
+  std::vector<int> removing_ids;
+  for (int i = 0; i < (int) dags_.size(); i++) {
+    auto first_gates = dags_[i]->first_quantum_gates();
+    auto last_gates = dags_[i]->last_quantum_gates();
+    bool remove = false;
+    for (auto &first_gate : first_gates) {
+      if (remove) {
+        break;
+      }
+      for (auto &other_first_gate : all_first_gates) {
+        if (DAG::same_gate(first_gate, other_first_gate)) {
+          remove = true;
+          break;
+        }
+      }
+    }
+    for (auto &last_gate : last_gates) {
+      if (remove) {
+        break;
+      }
+      for (auto &other_last_gate : all_last_gates) {
+        if (DAG::same_gate(last_gate, other_last_gate)) {
+          remove = true;
+          break;
+        }
+      }
+    }
+    if (remove) {
+      removing_ids.push_back(i);
+    } else {
+      all_first_gates.insert(all_first_gates.end(), first_gates.begin(), first_gates.end());
+      all_last_gates.insert(all_last_gates.end(), last_gates.begin(),
+                            last_gates.end());
+    }
+  }
+  if (removing_ids.empty()) {
+    return 0;
+  }
+  std::vector<std::unique_ptr<DAG>> previous_dags;
+  std::swap(dags_, previous_dags);
+  // |dags_| is empty now.
+  dags_.reserve(previous_dags.size() - removing_ids.size());
+  auto removing_it = removing_ids.begin();
+  for (int i = 0; i < (int) previous_dags.size(); i++) {
+    if (removing_it != removing_ids.end() && *removing_it == i) {
+      removing_it++;
+    } else {
+      // not removed
+      dags_.push_back(std::move(previous_dags[i]));
+    }
+  }
+  return 0;
+}
+
 bool EquivalenceSet::load_json(Context *ctx,
                                const std::string &file_name,
                                std::vector<DAG *> *new_representatives) {
@@ -416,6 +472,10 @@ bool EquivalenceSet::simplify(Context *ctx) {
   if (remove_singletons()) {
     simplified = true;
   }
+  if (remove_common_first_or_last_gates()) {
+    simplified = true;
+    remove_singletons();
+  }
   return simplified;
 }
 
@@ -608,6 +668,16 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   }
 
   return (int) classes_to_remove.size();
+}
+
+int EquivalenceSet::remove_common_first_or_last_gates() {
+  int num_classes_modified = 0;
+  for (auto &item : classes_) {
+    if (item->remove_common_first_or_last_gates()) {
+      num_classes_modified++;
+    }
+  }
+  return num_classes_modified;
 }
 
 int EquivalenceSet::num_equivalence_classes() const {

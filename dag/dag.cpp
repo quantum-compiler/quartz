@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
+#include <unordered_set>
 
 DAG::DAG(int num_qubits, int num_input_parameters)
     : num_qubits(num_qubits),
@@ -1147,42 +1148,93 @@ void DAG::clone_from(const DAG &other,
   }
 }
 
+std::vector<DAGHyperEdge *> DAG::first_quantum_gates() const {
+  std::vector<DAGHyperEdge *> result;
+  std::unordered_set<DAGHyperEdge *> depend_on_other_gates;
+  depend_on_other_gates.reserve(edges.size());
+  for (const auto &edge : edges) {
+    if (edge->gate->is_parameter_gate()) {
+      continue;
+    }
+    if (depend_on_other_gates.find(edge.get()) != depend_on_other_gates.end()) {
+      result.push_back(edge.get());
+    }
+    for (const auto &output_node : edge->output_nodes) {
+      for (const auto &output_edge : output_node->output_edges) {
+        depend_on_other_gates.insert(output_edge);
+      }
+    }
+  }
+  return result;
+}
+
+std::vector<DAGHyperEdge *> DAG::last_quantum_gates() const {
+  std::vector<DAGHyperEdge *> result;
+  for (const auto &edge : edges) {
+    if (edge->gate->is_parameter_gate()) {
+      continue;
+    }
+    bool all_output = true;
+    for (const auto &output_node : edge->output_nodes) {
+      if (outputs[output_node->index] != output_node) {
+        all_output = false;
+        break;
+      }
+    }
+    if (all_output) {
+      result.push_back(edge.get());
+    }
+  }
+  return result;
+}
+
 bool DAG::same_gate(const DAG &dag1, int index1, const DAG &dag2, int index2) {
   assert(dag1.get_num_gates() > index1);
   assert(dag2.get_num_gates() > index2);
-  if (dag1.edges[index1]->gate != dag2.edges[index2]->gate) {
+  return same_gate(dag1.edges[index1].get(), dag2.edges[index2].get());
+}
+
+bool DAG::same_gate(DAGHyperEdge *edge1, DAGHyperEdge *edge2) {
+  if (edge1->gate != edge2->gate) {
     return false;
   }
-  if (dag1.edges[index1]->input_nodes.size()
-      != dag2.edges[index2]->input_nodes.size()) {
+  if (edge1->input_nodes.size()
+      != edge2->input_nodes.size()) {
     return false;
   }
-  for (int i = 0; i < (int) dag1.edges[index1]->input_nodes.size(); i++) {
-    if (dag1.edges[index1]->input_nodes[i]->type
-        != dag2.edges[index2]->input_nodes[i]->type) {
-      return false;
-    }
-    if (dag1.edges[index1]->input_nodes[i]->index
-        != dag2.edges[index2]->input_nodes[i]->index) {
-      return false;
-    }
-    if (dag1.edges[index1]->input_nodes[i]->type == DAGNode::internal_param) {
-      // Internal parameters are considered different.
-      return false;
-    }
-  }
-  if (dag1.edges[index1]->output_nodes.size()
-      != dag2.edges[index2]->output_nodes.size()) {
+  if (edge1->output_nodes.size()
+      != edge2->output_nodes.size()) {
     return false;
   }
-  for (int i = 0; i < (int) dag1.edges[index1]->output_nodes.size(); i++) {
-    if (dag1.edges[index1]->output_nodes[i]->type
-        != dag2.edges[index2]->output_nodes[i]->type) {
+  for (int i = 0; i < (int) edge1->output_nodes.size(); i++) {
+    if (edge1->output_nodes[i]->type
+        != edge2->output_nodes[i]->type) {
       return false;
     }
-    if (dag1.edges[index1]->output_nodes[i]->index
-        != dag2.edges[index2]->output_nodes[i]->index) {
+    if (edge1->output_nodes[i]->index
+        != edge2->output_nodes[i]->index
+        && edge1->output_nodes[i]->type != DAGNode::internal_param) {
       return false;
+    }
+  }
+  for (int i = 0; i < (int) edge1->input_nodes.size(); i++) {
+    if (edge1->input_nodes[i]->type
+        != edge2->input_nodes[i]->type) {
+      return false;
+    }
+    if (edge1->input_nodes[i]->index
+        != edge2->input_nodes[i]->index
+        && edge1->input_nodes[i]->type != DAGNode::internal_param) {
+      return false;
+    }
+    if (edge1->input_nodes[i]->type == DAGNode::internal_param) {
+      // Internal parameters are checked recursively.
+      assert(edge1->input_nodes[i]->input_edges.size() == 1);
+      assert(edge2->input_nodes[i]->input_edges.size() == 1);
+      if (!same_gate(edge1->input_nodes[i]->input_edges[0],
+                     edge2->input_nodes[i]->input_edges[0])) {
+        return false;
+      }
     }
   }
   return true;

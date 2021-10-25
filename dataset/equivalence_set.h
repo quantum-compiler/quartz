@@ -35,6 +35,14 @@ class EquivalenceClass {
   // Otherwise, return false.
   [[nodiscard]] bool set_as_representative(const DAG &dag);
 
+  // For each pair of circuits in this class, if they share
+  // a common "first" gate or a common "last" gate, remove the latter one.
+  // Here "first" means a quantum gate which does not topologically depend
+  // on any other quantum gates, and "last" means a quantum gate which can
+  // appear at last in some topological order of the DAG.
+  // Return the number of circuits removed.
+  int remove_common_first_or_last_gates();
+
  private:
   std::vector<std::unique_ptr<DAG>> dags_;
 };
@@ -73,6 +81,14 @@ class EquivalenceSet {
   // Return the number of equivalent classes removed
   // (and possibly inserted again).
   int remove_unused_qubits_and_input_params(Context *ctx);
+
+  // For each pair of circuits in one equivalence class, if they share
+  // a common "first" gate or a common "last" gate, remove the latter one.
+  // Here "first" means a quantum gate which does not topologically depend
+  // on any other quantum gates, and "last" means a quantum gate which can
+  // appear at last in some topological order of the DAG.
+  // Return the number of equivalent classes modified.
+  int remove_common_first_or_last_gates();
 
   // This function runs in O(1).
   [[nodiscard]] int num_equivalence_classes() const;

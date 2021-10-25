@@ -86,10 +86,19 @@ class DAG {
   [[nodiscard]] std::unique_ptr<DAG> get_permuted_dag(const std::vector<int> &qubit_permutation,
                                                       const std::vector<int> &param_permutation) const;
 
+  // Returns quantum gates which do not topologically depend on any other
+  // quantum gates.
+  std::vector<DAGHyperEdge *> first_quantum_gates() const;
+  // Returns quantum gates which can appear at last in some topological order
+  // of the DAG.
+  std::vector<DAGHyperEdge *> last_quantum_gates() const;
+
   static bool same_gate(const DAG &dag1,
                         int index1,
                         const DAG &dag2,
                         int index2);
+
+  static bool same_gate(DAGHyperEdge *edge1, DAGHyperEdge *edge2);
 
  private:
   void clone_from(const DAG &other,

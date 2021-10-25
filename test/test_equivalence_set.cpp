@@ -2,6 +2,6 @@
 
 int main() {
   test_equivalence_set(all_supported_gates(),
-                       "bfs_verified.json",
+                       "equivalences.json",
                        "equivalences_simplified.json");
 }

@@ -115,7 +115,7 @@ int EquivalenceClass::remove_common_first_or_last_gates() {
       dags_.push_back(std::move(previous_dags[i]));
     }
   }
-  return 0;
+  return (int) removing_ids.size();
 }
 
 bool EquivalenceSet::load_json(Context *ctx,
@@ -465,18 +465,32 @@ void EquivalenceSet::clear() {
 }
 
 bool EquivalenceSet::simplify(Context *ctx) {
-  bool simplified = false;
-  if (remove_unused_qubits_and_input_params(ctx)) {
-    simplified = true;
+  bool ever_simplified = false;
+  // If there are 2 continuous optimizations with no effect, break.
+  constexpr int kNumOptimizationsToPerform = 2;
+  // Initially we want to run all optimizations once.
+  int remaining_optimizations = kNumOptimizationsToPerform + 1;
+  while (true) {
+    if (remove_singletons()) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (remove_unused_qubits_and_input_params(ctx)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (remove_common_first_or_last_gates()) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
   }
-  if (remove_singletons()) {
-    simplified = true;
-  }
-  if (remove_common_first_or_last_gates()) {
-    simplified = true;
-    remove_singletons();
-  }
-  return simplified;
+  return ever_simplified;
 }
 
 int EquivalenceSet::remove_singletons() {

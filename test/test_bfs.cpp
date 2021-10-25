@@ -133,9 +133,9 @@ int main() {
   equiv_set.clear();
   system(
       "python ../python/verify_equivalences.py tmp_before_verify.json bfs_verified.json");
-  equiv_set.load_json(&ctx, "bfs_unverified_verified.json");
+  equiv_set.load_json(&ctx, "bfs_verified.json");
   equiv_set.simplify(&ctx);
-  equiv_set.save_json("bfs_unverified_simplified.json");
+  equiv_set.save_json("bfs_verified_simplified.json");
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "BFS verified: there are "
             << equiv_set.num_total_dags()

@@ -62,7 +62,9 @@ bool EquivalenceClass::set_as_representative(const DAG &dag) {
   return false;
 }
 
-int EquivalenceClass::remove_common_first_or_last_gates() {
+int EquivalenceClass::remove_common_first_or_last_gates(Context *ctx,
+                                                        std::unordered_set<DAGHashType> &hash_values_to_remove) {
+  assert(hash_values_to_remove.empty());
   std::vector<DAGHyperEdge *> all_first_gates, all_last_gates;
   std::vector<int> removing_ids;
   for (int i = 0; i < (int) dags_.size(); i++) {
@@ -93,6 +95,10 @@ int EquivalenceClass::remove_common_first_or_last_gates() {
     }
     if (remove) {
       removing_ids.push_back(i);
+      hash_values_to_remove.insert(dags_[i]->hash(ctx));
+      for (const auto &other_hash : dags_[i]->other_hash_values()) {
+        hash_values_to_remove.insert(other_hash);
+      }
     } else {
       all_first_gates.insert(all_first_gates.end(), first_gates.begin(), first_gates.end());
       all_last_gates.insert(all_last_gates.end(), last_gates.begin(),
@@ -102,12 +108,30 @@ int EquivalenceClass::remove_common_first_or_last_gates() {
   if (removing_ids.empty()) {
     return 0;
   }
+
+  // Update the pointers to this equivalence class.
+  auto removing_it = removing_ids.begin();
+  for (int i = 0; i < (int) dags_.size(); i++) {
+    if (removing_it != removing_ids.end() && *removing_it == i) {
+      removing_it++;
+    } else {
+      // Not removed, keep the hash values.
+      hash_values_to_remove.erase(dags_[i]->hash(ctx));
+      for (const auto &other_hash : dags_[i]->other_hash_values()) {
+        hash_values_to_remove.erase(other_hash);
+      }
+      if (hash_values_to_remove.empty()) {
+        break;
+      }
+    }
+  }
+
   std::vector<std::unique_ptr<DAG>> previous_dags;
   std::swap(dags_, previous_dags);
   // |dags_| is empty now.
   assert(previous_dags.size() >= removing_ids.size());
   dags_.reserve(previous_dags.size() - removing_ids.size());
-  auto removing_it = removing_ids.begin();
+  removing_it = removing_ids.begin();
   for (int i = 0; i < (int) previous_dags.size(); i++) {
     if (removing_it != removing_ids.end() && *removing_it == i) {
       removing_it++;
@@ -484,7 +508,7 @@ bool EquivalenceSet::simplify(Context *ctx) {
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (remove_common_first_or_last_gates()) {
+    if (remove_common_first_or_last_gates(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -695,11 +719,15 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   return (int) classes_to_remove.size();
 }
 
-int EquivalenceSet::remove_common_first_or_last_gates() {
+int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx) {
   int num_classes_modified = 0;
   for (auto &item : classes_) {
-    if (item->remove_common_first_or_last_gates()) {
+    std::unordered_set<DAGHashType> hash_values_to_remove;
+    if (item->remove_common_first_or_last_gates(ctx, hash_values_to_remove)) {
       num_classes_modified++;
+      for (const auto &hash_value : hash_values_to_remove) {
+        remove_possible_class(hash_value, item.get());
+      }
     }
   }
   return num_classes_modified;

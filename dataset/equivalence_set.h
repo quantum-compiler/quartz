@@ -3,10 +3,13 @@
 #include "../context/context.h"
 #include "../dag/dag.h"
 
+#include <functional>
 #include <list>
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
+
+class EquivalenceSet;
 
 class EquivalenceClass {
  public:
@@ -41,7 +44,8 @@ class EquivalenceClass {
   // on any other quantum gates, and "last" means a quantum gate which can
   // appear at last in some topological order of the DAG.
   // Return the number of circuits removed.
-  int remove_common_first_or_last_gates();
+  int remove_common_first_or_last_gates(Context *ctx,
+                                        std::unordered_set<DAGHashType> &hash_values_to_remove);
 
  private:
   std::vector<std::unique_ptr<DAG>> dags_;
@@ -88,7 +92,7 @@ class EquivalenceSet {
   // on any other quantum gates, and "last" means a quantum gate which can
   // appear at last in some topological order of the DAG.
   // Return the number of equivalent classes modified.
-  int remove_common_first_or_last_gates();
+  int remove_common_first_or_last_gates(Context *ctx);
 
   // This function runs in O(1).
   [[nodiscard]] int num_equivalence_classes() const;

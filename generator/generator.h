@@ -26,15 +26,18 @@ class Generator {
   void generate_dfs(int num_qubits,
                     int max_num_input_parameters,
                     int max_num_gates,
+                    int max_num_param_gates,
                     Dataset &dataset,
                     bool restrict_search_space);
 
   // Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
   // |num_input_parameters| input parameters (probably with some unused),
-  // and <= |max_num_gates| gates.
+  // <= |max_num_gates| gates, and <= |max_num_param_gates| parameter gates
+  // (which is also the number of internal parameters).
   void generate(int num_qubits,
                 int num_input_parameters,
                 int max_num_gates,
+                int max_num_param_gates,
                 Dataset *dataset,
                 bool verify_equivalences,
                 EquivalenceSet *equiv_set,
@@ -43,6 +46,7 @@ class Generator {
  private:
   void dfs(int gate_idx,
            int max_num_gates,
+           int remaining_param_gates,
            DAG *dag,
            std::vector<int> &used_parameters,
            Dataset &dataset,

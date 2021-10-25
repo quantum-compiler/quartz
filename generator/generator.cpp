@@ -6,18 +6,26 @@
 void Generator::generate_dfs(int num_qubits,
                              int max_num_input_parameters,
                              int max_num_gates,
+                             int max_num_param_gates,
                              Dataset &dataset,
                              bool restrict_search_space) {
   DAG *dag = new DAG(num_qubits, max_num_input_parameters);
   // We need a large vector for both input and internal parameters.
   std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
-  dfs(0, max_num_gates, dag, used_parameters, dataset, restrict_search_space);
+  dfs(0,
+      max_num_gates,
+      max_num_param_gates,
+      dag,
+      used_parameters,
+      dataset,
+      restrict_search_space);
   delete dag;
 }
 
 void Generator::generate(int num_qubits,
                          int num_input_parameters,
                          int max_num_gates,
+                         int max_num_param_gates,
                          Dataset *dataset,
                          bool verify_equivalences,
                          EquivalenceSet *equiv_set,
@@ -82,6 +90,7 @@ void Generator::generate(int num_qubits,
 
 void Generator::dfs(int gate_idx,
                     int max_num_gates,
+                    int remaining_param_gates,
                     DAG *dag,
                     std::vector<int> &used_parameters,
                     Dataset &dataset,
@@ -137,6 +146,10 @@ void Generator::dfs(int gate_idx,
   for (const auto &idx : context->get_supported_gates()) {
     Gate *gate = context->get_gate(idx);
     if (gate->get_num_qubits() == 0) {
+      if (!remaining_param_gates) {
+        // We can't add more parameter gates.
+        continue;
+      }
       if (gate->get_num_parameters() == 1) {
         assert(false && "Unsupported gate type");
       } else if (gate->get_num_parameters() == 2) {
@@ -171,6 +184,7 @@ void Generator::dfs(int gate_idx,
             assert(ret);
             dfs(gate_idx + 1,
                 max_num_gates,
+                remaining_param_gates - 1,
                 dag,
                 used_parameters,
                 dataset,
@@ -197,6 +211,7 @@ void Generator::dfs(int gate_idx,
           assert(ret);
           dfs(gate_idx + 1,
               max_num_gates,
+              remaining_param_gates,
               dag,
               used_parameters,
               dataset,
@@ -217,6 +232,7 @@ void Generator::dfs(int gate_idx,
             used_parameters[p1] += 1;
             dfs(gate_idx + 1,
                 max_num_gates,
+                remaining_param_gates,
                 dag,
                 used_parameters,
                 dataset,
@@ -256,6 +272,7 @@ void Generator::dfs(int gate_idx,
             assert(ret);
             dfs(gate_idx + 1,
                 max_num_gates,
+                remaining_param_gates,
                 dag,
                 used_parameters,
                 dataset,

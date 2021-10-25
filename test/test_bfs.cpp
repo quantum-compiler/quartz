@@ -8,13 +8,17 @@ int main() {
   const int num_qubits = 3;
   const int num_input_parameters = 2;
   const int max_num_gates = 3;
+  const int max_num_param_gates = 1;
 
   EquivalenceSet equiv_set;
 
   Dataset dataset1;
   auto start = std::chrono::steady_clock::now();
-  gen.generate_dfs(num_qubits, num_input_parameters, max_num_gates,
-                   dataset1, /*restrict_search_space=*/true);
+  gen.generate_dfs(num_qubits,
+                   num_input_parameters,
+                   max_num_gates, max_num_param_gates,
+                   dataset1, /*restrict_search_space=*/
+                   true);
   auto end = std::chrono::steady_clock::now();
   std::cout << std::dec << "DFS with search space restricted: "
             << dataset1.num_total_dags()
@@ -45,8 +49,11 @@ int main() {
   dataset1.clear();
 
   start = std::chrono::steady_clock::now();
-  gen.generate_dfs(num_qubits, num_input_parameters, max_num_gates,
-                   dataset1, /*restrict_search_space=*/false);
+  gen.generate_dfs(num_qubits,
+                   num_input_parameters,
+                   max_num_gates, max_num_param_gates,
+                   dataset1, /*restrict_search_space=*/
+                   false);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "DFS for all DAGs: "
             << dataset1.num_total_dags()
@@ -79,7 +86,7 @@ int main() {
   start = std::chrono::steady_clock::now();
   gen.generate(num_qubits,
                num_input_parameters,
-               max_num_gates,
+               max_num_gates, max_num_param_gates,
                &dataset2, /*verify_equivalences=*/
                false,
                nullptr, /*verbose=*/
@@ -115,7 +122,7 @@ int main() {
   start = std::chrono::steady_clock::now();
   gen.generate(num_qubits,
                num_input_parameters,
-               max_num_gates,
+               max_num_gates, max_num_param_gates,
                &dataset3, /*verify_equivalences=*/
                true,
                &equiv_set, /*verbose=*/

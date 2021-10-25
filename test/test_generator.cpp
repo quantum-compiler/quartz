@@ -9,12 +9,13 @@ int main() {
   gen.generate_dfs(3/*num_qubits*/,
                    3/*max_num_input_parameters*/,
                    3/*max_num_gates*/,
+                   1/*max_num_param_gates*/,
                    dataset,
                    true/*restrict_search_space*/);
-  for (const auto& it : dataset.dataset) {
+  for (const auto &it : dataset.dataset) {
     bool is_first = true;
-    DAG* first_dag = NULL;
-    for (auto& dag : it.second) {
+    DAG *first_dag = NULL;
+    for (auto &dag : it.second) {
       if (is_first) {
         first_dag = dag.get();
         is_first = false;
@@ -25,7 +26,7 @@ int main() {
   }
 
   QASMParser parser(&ctx);
-  DAG* dag = NULL;
+  DAG *dag = NULL;
   parser.load_qasm("test.qasm", dag);
   return 0;
 }

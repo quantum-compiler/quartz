@@ -17,5 +17,6 @@
 #include "swap.h"
 #include "ch.h"
 #include "p.h"
+#include "pdg.h"
 #include "input_qubit.h"
 #include "input_param.h"

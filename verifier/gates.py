@@ -78,6 +78,21 @@ def tdg():
 def z():
     return [[(1, 0), (0, 0)], [(0, 0), (-1, 0)]]
 
+
+def p(phi):
+    assert len(phi) == 2
+    cos_phi, sin_phi = phi
+    return [[(1, 0), (0, 0)],
+            [(0, 0), (cos_phi, sin_phi)]]
+
+
+def pdg(phi):
+    assert len(phi) == 2
+    cos_phi, sin_phi = phi
+    return [[(1, 0), (0, 0)],
+            [(0, 0), (cos_phi, -sin_phi)]]
+
+
 # functions exposed to verifier
 
 

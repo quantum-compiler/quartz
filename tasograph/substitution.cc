@@ -1,5 +1,4 @@
 #include "substitution.h"
-#include "assert.h"
 
 namespace TASOGraph {
 
@@ -350,7 +349,7 @@ void GraphXfer::run(int depth, Graph *graph,
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
 		candidates.push(newGraph);
-		std::cout << newGraph->total_cost() << " ";
+		// std::cout << newGraph->total_cost() << " ";
 	  }
 	}
 	else {

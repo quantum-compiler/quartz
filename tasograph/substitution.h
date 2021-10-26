@@ -4,6 +4,8 @@
 #include "../gate/gate_utils.h"
 #include "../dag/dag.h"
 #include "../context/context.h"
+#include "assert.h"
+#include "../gate/gate_utils.h"
 #include <queue>
 
 namespace TASOGraph {

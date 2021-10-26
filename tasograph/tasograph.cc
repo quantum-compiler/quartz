@@ -249,30 +249,17 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                    1000.0
             << " seconds." << std::endl;
 
-  start = std::chrono::steady_clock::now();
-  auto num_equiv_class_inserted = eqs.simplify(ctx);
-  end = std::chrono::steady_clock::now();
-  std::cout << std::dec << eqs.num_equivalence_classes()
-            << " classes of equivalences remain after simplication after "
-            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                   end - start)
-                       .count() /
-                   1000.0
-            << " seconds." << std::endl;
-
-  // Normalize dags to minimal representations
   //   start = std::chrono::steady_clock::now();
-  //   eqs.normalize_to_minimal_representations(ctx);
+  //   auto num_equiv_class_inserted = eqs.simplify(ctx);
   //   end = std::chrono::steady_clock::now();
-  //   std::cout << "After normalizing to minimal representations in "
+  //   std::cout << std::dec << eqs.num_equivalence_classes()
+  //             << " classes of equivalences remain after simplication after "
   //             <<
   //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
   //                    end - start)
   //                        .count() /
   //                    1000.0
-  //             << " seconds, " << eqs.num_equivalence_classes()
-  //             << " classes of equivalences with " << eqs.num_total_dags()
-  //             << " DAGs are found." << std::endl;
+  //             << " seconds." << std::endl;
 
   std::vector<GraphXfer *> xfers;
   for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
@@ -342,6 +329,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  ;
 	}
 	counter++;
+
+	std::cout << bestCost << " ";
 
 	for (auto &xfer : xfers) {
 	  xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,

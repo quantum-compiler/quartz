@@ -1,4 +1,4 @@
-import math
+import z3
 # parameter gates
 
 
@@ -59,8 +59,8 @@ def cx():
 
 
 def h():
-    return [[(1 / math.sqrt(2), 0), (1 / math.sqrt(2), 0)],
-            [(1 / math.sqrt(2), 0), (-1 / math.sqrt(2), 0)]]
+    return [[(1 / z3.Sqrt(2), 0), (1 / z3.Sqrt(2), 0)],
+            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2), 0)]]
 
 
 def s():
@@ -68,11 +68,11 @@ def s():
 
 
 def t():
-    return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, math.sqrt(2) / 2)]]
+    return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, z3.Sqrt(2) / 2)]]
 
 
 def tdg():
-    return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, - math.sqrt(2) / 2)]]
+    return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, - z3.Sqrt(2) / 2)]]
 
 
 def z():

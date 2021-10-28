@@ -10,6 +10,7 @@
 #include "cx.h"
 #include "ccx.h"
 #include "add.h"
+#include "neg.h"
 #include "z.h"
 #include "s.h"
 #include "t.h"

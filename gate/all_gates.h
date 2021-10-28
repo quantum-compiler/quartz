@@ -19,5 +19,8 @@
 #include "ch.h"
 #include "p.h"
 #include "pdg.h"
+#include "u1.h"
+#include "u2.h"
+#include "u3.h"
 #include "input_qubit.h"
 #include "input_param.h"

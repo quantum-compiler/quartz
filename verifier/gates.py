@@ -7,7 +7,13 @@ def add(a, b):
     assert len(b) == 2
     cos_a, sin_a = a
     cos_b, sin_b = b
-    return (cos_a * cos_b - sin_a * sin_b, sin_a * cos_b + cos_a * sin_b)
+    return cos_a * cos_b - sin_a * sin_b, sin_a * cos_b + cos_a * sin_b
+
+
+def neg(a):
+    assert len(a) == 2
+    cos_a, sin_a = a
+    return cos_a, -sin_a
 
 
 # quantum gates

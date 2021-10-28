@@ -11,12 +11,16 @@
 class DAG;
 
 class Context {
- public:
+public:
   explicit Context(const std::vector<GateType> &supported_gates);
   Gate *get_gate(GateType tp);
   [[nodiscard]] const std::vector<GateType> &get_supported_gates() const;
-  [[nodiscard]] const std::vector<GateType> &get_supported_parameter_gates() const;
-  [[nodiscard]] const std::vector<GateType> &get_supported_quantum_gates() const;
+  [[nodiscard]] const std::vector<GateType> &
+  get_supported_parameter_gates() const;
+  [[nodiscard]] const std::vector<GateType> &
+  get_supported_quantum_gates() const;
+  [[nodiscard]] const std::vector<GateType> &get_ibmq_gates() const;
+  [[nodiscard]] const std::vector<GateType> &get_voqc_gates() const;
   // Two deterministic (random) distributions for each number of qubits.
   const Vector &get_generated_input_dis(int num_qubits);
   const Vector &get_generated_hashing_dis(int num_qubits);
@@ -32,7 +36,7 @@ class Context {
   void set_representative(std::unique_ptr<DAG> dag);
   void clear_representatives();
 
- private:
+private:
   bool insert_gate(GateType tp);
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
@@ -42,6 +46,10 @@ class Context {
   std::vector<Vector> random_input_distribution_;
   std::vector<Vector> random_hashing_distribution_;
   std::vector<ParamType> random_parameters_;
+  std::vector<GateType> ibmq_gates_ = {GateType::u1, GateType::u2, GateType::u3,
+                                       GateType::cx};
+  std::vector<GateType> voqc_gates_ = {GateType::h, GateType::x, GateType::rz,
+                                       GateType::cx};
 
   // A vector to store the representative DAGs.
   std::vector<std::unique_ptr<DAG>> representative_dags_;

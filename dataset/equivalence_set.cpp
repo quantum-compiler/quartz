@@ -828,6 +828,29 @@ void EquivalenceSet::insert_class(Context *ctx, std::unique_ptr<EquivalenceClass
   classes_.push_back(std::move(equiv_class));
 }
 
+bool EquivalenceSet::contains(Context *ctx, DAG *dag) const {
+  auto possible_classes = get_possible_classes(dag->hash(ctx));
+  for (auto &equiv_class : possible_classes) {
+    if (equiv_class->contains(*dag)) {
+      return true;
+    }
+  }
+  auto possible_class_set = std::unordered_set<EquivalenceClass *>(possible_classes.begin(), possible_classes.end());
+  for (const auto &other_hash : dag->other_hash_values()) {
+    possible_classes = get_possible_classes(other_hash);
+    for (auto &equiv_class : possible_classes) {
+      if (possible_class_set.count(equiv_class) == 0) {
+        // not cached
+        possible_class_set.insert(equiv_class);
+        if (equiv_class->contains(*dag)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,
                                         EquivalenceClass *equiv_class) {
   auto &possible_classes = possible_classes_[hash_value];

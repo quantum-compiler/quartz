@@ -30,7 +30,7 @@ class EquivalenceClass {
   // The first DAG is the representative.
   DAG *get_representative();
 
-  // Returns whether this equivalence class contains |dag|.
+  // Returns whether this equivalence class contains (a DAG fully equivalent to) |dag|.
   [[nodiscard]] bool contains(const DAG &dag) const;
 
   // If this equivalence class contains |dag|, set |dag| as the representative
@@ -114,6 +114,9 @@ class EquivalenceSet {
   // classes already in the set.
   void insert_class(Context *ctx,
                     std::unique_ptr<EquivalenceClass> equiv_class);
+
+  // Returns whether the whole equivalence set contains a DAG fully equivalent to |dag|.
+  [[nodiscard]] bool contains(Context *ctx, DAG *dag) const;
 
  private:
   void set_possible_class(const DAGHashType &hash_value,

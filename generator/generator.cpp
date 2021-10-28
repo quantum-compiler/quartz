@@ -61,6 +61,7 @@ void Generator::generate(int num_qubits,
           &dags_to_search,
           verify_equivalences,
           nullptr);
+      dags.push_back(dags_to_search);
     } else {
       assert(dataset);
       assert(equiv_set);
@@ -87,14 +88,26 @@ void Generator::generate(int num_qubits,
       ret = equiv_set->load_json(context,
                                  "tmp_after_verify.json",
                                  &dags_to_search);
+      assert(ret);
       for (auto &dag : dags_to_search) {
         auto new_dag = std::make_unique<DAG>(*dag);
         dag = new_dag.get();
         dag_holder.push_back(std::move(new_dag));
       }
-      assert(ret);
+
+      dags.push_back(dags_to_search);
+      /* Seems problematic
+      equiv_set->remove_common_first_or_last_gates(context);
+      std::vector<DAG *> simplified_dags_to_search;
+      simplified_dags_to_search.reserve(dags_to_search.size());
+      for (auto &dag : dags_to_search) {
+        if (equiv_set->contains(context, dag)) {
+          simplified_dags_to_search.push_back(dag);
+        }
+      }
+      dags.push_back(simplified_dags_to_search);
+      */
     }
-    dags.push_back(dags_to_search);
   }
 }
 

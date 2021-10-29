@@ -57,14 +57,6 @@ const std::vector<GateType> &Context::get_supported_quantum_gates() const {
   return supported_quantum_gates_;
 }
 
-const std::vector<GateType> &Context::get_ibmq_gates() const {
-  return ibmq_gates_;
-}
-
-const std::vector<GateType> &Context::get_voqc_gates() const {
-  return voqc_gates_;
-}
-
 const Vector &Context::get_generated_input_dis(int num_qubits) {
   assert(num_qubits >= 0);
   if (random_input_distribution_.size() <= num_qubits) {

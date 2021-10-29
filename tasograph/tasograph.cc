@@ -230,8 +230,12 @@ float Graph::total_cost(void) const {
   return (float)cnt;
 }
 
-Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                       const std::string &equiv_file_name) {
+Graph *Graph::optimize(float alpha,
+                       int budget,
+                       bool print_subst,
+                       Context *ctx,
+                       const std::string &equiv_file_name,
+                       bool use_simulated_annealing) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -277,7 +281,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		// first_dag is src, others are dst
 		if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
 		  std::cout << first_dag->get_num_gates() << " "
-		            << other_dag->get_num_gates() << " ";
+		            << other_dag->get_num_gates() << "; ";
 		}
 		auto first_2_other =
 		    GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
@@ -314,31 +318,44 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   float bestCost = total_cost();
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
-  while (!candidates.empty()) {
-	Graph *subGraph = candidates.top();
-	candidates.pop();
-	if (subGraph->total_cost() < bestCost) {
-	  if (bestGraph != this)
-		delete bestGraph;
-	  bestCost = subGraph->total_cost();
-	  bestGraph = subGraph;
-	}
-	if (counter > budget) {
-	  // TODO: free all remaining candidates when budget exhausted
-	  //   break;
-	  ;
-	}
-	counter++;
+  if (use_simulated_annealing) {
+    const double kSABeginTemp = bestCost;
+    const double kSAEndTemp = kSABeginTemp / 1e6;
+    const double kSACoolingFactor = 1.0 - 1e-3;
+    const int kNumKeepGraph = 50;
+    std::vector<Graph *> sa_candidates;
+    sa_candidates.reserve(kNumKeepGraph);
+    sa_candidates.push_back(this);
+    for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
 
-	std::cout << bestCost << " ";
+    }
+  } else {
+    while (!candidates.empty()) {
+      Graph *subGraph = candidates.top();
+      candidates.pop();
+      if (subGraph->total_cost() < bestCost) {
+        if (bestGraph != this)
+          delete bestGraph;
+        bestCost = subGraph->total_cost();
+        bestGraph = subGraph;
+      }
+      if (counter > budget) {
+        // TODO: free all remaining candidates when budget exhausted
+        //   break;
+        ;
+      }
+      counter++;
 
-	for (auto &xfer : xfers) {
-	  xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
-	            2 * maxNumOps);
-	}
-	if (bestGraph != subGraph) {
-	  delete subGraph;
-	}
+      std::cout << bestCost << " ";
+
+      for (auto &xfer : xfers) {
+        xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
+                  2 * maxNumOps);
+      }
+      if (bestGraph != subGraph) {
+        delete subGraph;
+      }
+    }
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results

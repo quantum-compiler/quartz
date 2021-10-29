@@ -2,14 +2,15 @@
 
 int main() {
   Context ctx
-      ({GateType::cx, GateType::rz, GateType::add, GateType::neg});
+      ({GateType::h,
+        GateType::t, GateType::cx, GateType::tdg});
   Generator gen(&ctx);
 
-  const int num_qubits = 2;
-  const int num_input_parameters = 2;
-  const int max_num_gates = 3;
-  const int max_num_param_gates = 2;
-  const bool only_run_bfs_verified = false;
+  const int num_qubits = 3;
+  const int num_input_parameters = 0;
+  const int max_num_gates = 4;
+  const int max_num_param_gates = 0;
+  const bool only_run_bfs_verified = true;
 
   EquivalenceSet equiv_set;
 

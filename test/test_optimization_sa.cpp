@@ -8,8 +8,15 @@ int main() {
                GateType::t, GateType::cx, GateType::tdg});
   //   test_optimization(&ctx, "circuit/example-circuits/voqc_fig5.qasm",
   //                     "cmake-build-debug/bfs_verified.json");
+#ifdef __linux
+  test_optimization(&ctx,
+                    "/home/mingkuan/quantum-superoptimization/circuit/example-circuits/barenco_tof_3.qasm",
+                    "/home/mingkuan/quantum-superoptimization/cmake-build-debug/bfs_verified_simplified.json",
+                    false/*use_simulated_annealing*/);
+#else
   test_optimization(&ctx,
                     "circuit/example-circuits/barenco_tof_3.qasm",
                     "cmake-build-debug/bfs_verified_simplified.json",
                     false/*use_simulated_annealing*/);
+#endif
 }

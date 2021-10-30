@@ -346,7 +346,7 @@ Graph *Graph::optimize(float alpha,
       }
       counter++;
 
-      std::cout << bestCost << " ";
+      std::cout << bestCost << " " << std::flush;
 
       for (auto &xfer : xfers) {
         xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,

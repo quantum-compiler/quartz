@@ -31,7 +31,7 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
 
-  // TODO: remove common input parameters?
+  // TODO: remove common unused input parameters?
 
   // Eliminate transfers where src dag has unused qubits
   auto src_num_qubits = src_dag->get_num_qubits();
@@ -112,6 +112,80 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
   }
   delete src_dag;
   delete dst_dag;
+  return graphXfer;
+}
+
+GraphXfer *
+GraphXfer::create_single_gate_GraphXfer(Command src_cmd, Context *dst_ctx,
+                                        std::vector<Command> dst_cmds) {
+  // Currently only support source command with no constant parameters
+  // Assume the only added parameters are constant parameters
+  // Assume the number of non constant parameters are equal
+  GateType src_tp = src_cmd.get_gate_type();
+  std::vector temp_gate_set(dst_ctx->get_supported_gates());
+  temp_gate_set.push_back(src_tp);
+  Context *ctx = new Context(temp_gate_set);
+  GraphXfer *graphXfer = new GraphXfer(ctx);
+
+  Gate *gate = ctx->get_gate(src_tp);
+  auto num_qubit = gate->get_num_qubits();
+  auto num_non_constant_params = gate->get_num_parameters();
+
+  OpX *src_op = new OpX(src_tp);
+  std::map<int, TensorX> dst_qubits_2_tensorx;
+  std::map<int, TensorX> dst_params_2_tensorx;
+
+  for (int i = 0; i < num_qubit; ++i) {
+	TensorX qubit_tensor = graphXfer->new_tensor();
+	src_op->add_input(qubit_tensor);
+	dst_qubits_2_tensorx[i] = qubit_tensor;
+  }
+
+  for (int i = 0; i < num_non_constant_params; ++i) {
+	TensorX param_tensor = graphXfer->new_tensor();
+	src_op->add_input(param_tensor);
+	dst_params_2_tensorx[i] = param_tensor;
+  }
+
+  for (int i = 0; i < num_qubit; ++i) {
+	TensorX tensor(src_op, i);
+	src_op->add_output(tensor);
+  }
+  graphXfer->srcOps.push_back(src_op);
+
+  for (auto cmd : dst_cmds) {
+	OpX *op = new OpX(cmd.get_gate_type());
+	auto num_qubit = cmd.qubit_idx.size();
+	for (int i = 0; i < num_qubit; ++i) {
+	  assert(dst_qubits_2_tensorx.find(cmd.qubit_idx[i]) !=
+	         dst_qubits_2_tensorx.end());
+	  op->add_input(dst_qubits_2_tensorx[cmd.qubit_idx[i]]);
+	  TensorX tensor(op, i);
+	  op->add_output(tensor);
+	  // Update output tensors
+	  dst_qubits_2_tensorx[cmd.qubit_idx[i]] = tensor;
+	}
+	auto num_params = cmd.param_idx.size();
+	for (int i = 0; i < num_params; ++i) {
+	  // Non-constant parameters
+	  if (cmd.param_idx[i] != -1) {
+		assert(dst_params_2_tensorx.find(cmd.param_idx[i]) !=
+		       dst_params_2_tensorx.end());
+		op->add_input(dst_params_2_tensorx[cmd.param_idx[i]]);
+	  }
+	  // Constant parameters
+	  else {
+		TensorX constant_param = graphXfer->new_tensor();
+		graphXfer->paramValues[constant_param.idx] = cmd.constant_params[i];
+		op->add_input(constant_param);
+	  }
+	}
+	graphXfer->dstOps.push_back(op);
+  }
+  for (int i = 0; i < num_qubit; ++i) {
+	graphXfer->map_output(src_op->outputs[i],
+	                      dst_qubits_2_tensorx[src_cmd.qubit_idx[i]]);
+  }
   return graphXfer;
 }
 
@@ -300,6 +374,73 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, Graph *graph) {
   srcOp->mapOp.ptr = NULL;
 }
 
+Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
+  if (depth >= (int)srcOps.size()) {
+	// Create dst operators
+	bool pass = true;
+	std::vector<OpX *>::const_iterator dstIt;
+	for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++)
+	  if (pass) {
+		OpX *dstOp = *dstIt;
+		pass = (pass & create_new_operator(dstOp, dstOp->mapOp));
+	  }
+	if (!pass)
+	  return nullptr;
+	// Check that output tensors with external edges are mapped
+	std::map<Op, OpX *, OpCompare>::const_iterator opIt;
+	for (opIt = mappedOps.begin(); opIt != mappedOps.end(); opIt++) {
+	  const std::set<Edge, EdgeCompare> &list =
+	      src_graph->outEdges[opIt->first];
+	  std::set<Edge, EdgeCompare>::const_iterator it;
+	  for (it = list.begin(); it != list.end(); it++)
+		if (mappedOps.find(it->dstOp) == mappedOps.end()) {
+		  // dstOp is external, (srcOp, srcIdx) must be in mappedOutputs
+		  TensorX srcTen;
+		  srcTen.op = opIt->second;
+		  srcTen.idx = it->srcIdx;
+		  if (mappedOutputs.find(srcTen) == mappedOutputs.end()) {
+			pass = false;
+			return nullptr;
+		  }
+		}
+	}
+	// Generate a new graph by applying xfer rule
+	auto dst_graph = create_new_graph(src_graph);
+	// Check that the new graph should not have any loop
+	if (dst_graph->has_loop()) {
+	  std::cout << "Found a new graph with LOOP!!!!\n" << std::endl;
+	  delete dst_graph;
+	  return nullptr;
+	}
+	// TODO: remove me for better performance
+	assert(dst_graph->check_correctness());
+	if (dst_graph->hash() == src_graph->hash()) {
+	  delete dst_graph;
+	  return nullptr;
+	}
+	return dst_graph;
+  }
+  else {
+	OpX *srcOp = srcOps[depth];
+	std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
+	for (it = src_graph->inEdges.begin(); it != src_graph->inEdges.end();
+	     ++it) {
+	  // printf("can_match(%d)\n", can_match(srcOp, it->first, graph));
+	  if (can_match(srcOp, it->first, src_graph) &&
+	      (mappedOps.find(it->first) == mappedOps.end())) {
+		Op op = it->first;
+		// Check mapOutput
+		match(srcOp, op, src_graph);
+		auto dst_graph = run_1_time(depth + 1, src_graph);
+		unmatch(srcOp, op, src_graph);
+		if (dst_graph != nullptr)
+		  return dst_graph;
+	  }
+	}
+  }
+  return nullptr;
+}
+
 void GraphXfer::run(int depth, Graph *graph,
                     std::priority_queue<Graph *, std::vector<Graph *>,
                                         GraphCompare> &candidates,
@@ -415,6 +556,15 @@ Graph *GraphXfer::create_new_graph(Graph *graph) {
 	for (size_t i = 0; i < dstOp->inputs.size(); i++)
 	  if (dstOp->inputs[i].op == NULL) {
 		// unmapped src -> mapped dst
+		if (paramValues.find(dstOp->inputs[i].idx) != paramValues.end()) {
+		  // New constant parameters
+		  Op input_constant_param_op(newGraph->get_next_special_op_guid(),
+		                             context->get_gate(GateType::input_param));
+		  newGraph->constant_param_values[input_constant_param_op] =
+		      paramValues[dstOp->inputs[i].idx];
+		  newGraph->add_edge(input_constant_param_op, dstOp->mapOp, 0, i);
+		  continue;
+		};
 		std::multimap<int, std::pair<Op, int>>::const_iterator it =
 		    mappedInputs.find(dstOp->inputs[i].idx);
 		assert(it != mappedInputs.end());

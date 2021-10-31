@@ -6,6 +6,7 @@
 #include "../context/context.h"
 #include "assert.h"
 #include "../gate/gate_utils.h"
+#include "../context/rule_parser.h"
 #include <queue>
 
 namespace TASOGraph {
@@ -62,6 +63,7 @@ public:
   void run(int depth, Graph *graph,
            std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> &,
            std::set<size_t> &, float threshold, int maxNumOps);
+  Graph *run_1_time(int depth, Graph *graph);
   Graph *create_new_graph(Graph *graph);
   bool create_new_operator(const OpX *opx, Op &op);
 
@@ -69,6 +71,9 @@ public:
   static GraphXfer *create_GraphXfer(::Context *_context,
                                      const ::DAG *src_graph,
                                      const ::DAG *dst_graph);
+  static GraphXfer *create_single_gate_GraphXfer(Command src_cmd,
+                                                 Context *dst_ctx,
+                                                 std::vector<Command> dst_cmds);
 
 public:
   ::Context *context;
@@ -78,6 +83,7 @@ public:
   std::map<TensorX, TensorX, TensorXCompare> mappedOutputs;
   std::vector<OpX *> srcOps;
   std::vector<OpX *> dstOps;
+  std::unordered_map<int, ParamType> paramValues;
 };
 
 } // namespace TASOGraph

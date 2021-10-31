@@ -4,6 +4,7 @@
 #include "../context/context.h"
 #include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
+#include "../context/rule_parser.h"
 
 #include <unordered_map>
 #include <set>
@@ -101,12 +102,19 @@ public:
   void replace_node(Op oldOp, Op newOp);
   void remove_node(Op oldOp);
   float total_cost() const;
+  size_t get_next_special_op_guid();
+  Graph *context_shift(Context *src_ctx, Context *dst_ctx,
+                       RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name);
 
 public:
   float totalCost;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
+  std::map<Op, ParamType> constant_param_values;
+
+private:
+  size_t special_op_guid;
 };
 
 }; // namespace TASOGraph

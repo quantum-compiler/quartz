@@ -15,11 +15,10 @@ Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
 
-Graph::Graph() : totalCost(0.0f) {}
+Graph::Graph() : special_op_guid(0), totalCost(0.0f) {}
 
-Graph::Graph(Context *ctx, const DAG &dag) {
+Graph::Graph(Context *ctx, const DAG &dag) : special_op_guid(0) {
   // Guid for input qubit and input parameter nodes
-  size_t special_op_guid = 0;
   int num_input_qubits = dag.get_num_qubits();
   int num_input_params = dag.get_num_input_parameters();
   // Currently only 100 vacant guid
@@ -30,10 +29,10 @@ Graph::Graph(Context *ctx, const DAG &dag) {
   input_params_op.reserve(num_input_params);
   for (int i = 0; i < num_input_qubits; ++i)
 	input_qubits_op.push_back(
-	    Op(special_op_guid++, ctx->get_gate(GateType::input_qubit)));
+	    Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit)));
   for (int i = 0; i < num_input_params; ++i)
 	input_params_op.push_back(
-	    Op(special_op_guid++, ctx->get_gate(GateType::input_param)));
+	    Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
 
   // Map all edges in dag to Op
   std::map<DAGHyperEdge *, Op> edge_2_op;
@@ -94,6 +93,12 @@ Graph::Graph(Context *ctx, const DAG &dag) {
   }
 
   totalCost = total_cost();
+}
+
+size_t Graph::get_next_special_op_guid() {
+  special_op_guid++;
+  assert(special_op_guid < 100);
+  return special_op_guid;
 }
 
 void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
@@ -165,6 +170,7 @@ bool Graph::check_correctness(void) {
   return okay;
 }
 
+// TODO: add constant parameters
 size_t Graph::hash(void) {
   size_t total = 0;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
@@ -228,6 +234,35 @@ float Graph::total_cost(void) const {
 	  cnt++;
   }
   return (float)cnt;
+}
+
+Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
+                            RuleParser *rule_parser) {
+  auto src_gates = src_ctx->get_supported_gates();
+  auto dst_gate_set = std::set<GateType>(dst_ctx->get_supported_gates().begin(),
+                                         dst_ctx->get_supported_gates().end());
+  std::map<GateType, GraphXfer *> tp_2_xfer;
+  for (auto gate_tp : src_gates) {
+	if (dst_gate_set.find(gate_tp) == dst_gate_set.end()) {
+	  std::vector<Command> cmds;
+	  Command src_cmd;
+	  assert(
+	      rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
+
+	  tp_2_xfer[gate_tp] =
+	      GraphXfer::create_single_gate_GraphXfer(src_cmd, dst_ctx, cmds);
+	}
+  }
+  Graph *src_graph = this;
+  Graph *dst_graph = nullptr;
+  for (auto it = tp_2_xfer.begin(); it != tp_2_xfer.end(); ++it) {
+	while ((dst_graph = it->second->run_1_time(0, src_graph)) != nullptr) {
+	  if (src_graph != this)
+		delete src_graph;
+	  src_graph = dst_graph;
+	}
+  }
+  return src_graph;
 }
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,

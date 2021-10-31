@@ -12,10 +12,20 @@ public:
 	ParamType theta = params[0];
 	ParamType phi = params[1];
 	ParamType lambda = params[2];
-	auto mat = std::make_unique<Matrix<2>>(Matrix<2>(
-	    {{cos(theta / 2), sin(theta / 2) * (cos(lambda) + 1.0i * sin(lambda))},
-	     {sin(theta / 2) * (cos(phi) + 1.0i * sin(phi)),
-	      cos(theta / 2) * (cos(phi + lambda) + 1.0i * sin(phi + lambda))}}));
-	return mat.get();
+	if (cached_matrices.find(theta) == cached_matrices.end() ||
+	    cached_matrices[theta].find(phi) == cached_matrices[theta].end() ||
+	    cached_matrices[theta][phi].find(lambda) ==
+	        cached_matrices[theta][phi].end()) {
+	  auto mat = std::make_unique<Matrix<2>>(Matrix<2>(
+	      {{cos(theta), sin(theta) * (cos(lambda) + 1.0i * sin(lambda))},
+	       {sin(theta) * (cos(phi) + 1.0i * sin(phi)),
+	        cos(theta) * (cos(phi + lambda) + 1.0i * sin(phi + lambda))}}));
+	  cached_matrices[theta][phi][lambda] = std::move(mat);
+	}
+	return cached_matrices[theta][phi][lambda].get();
   }
+  std::unordered_map<
+      float, std::unordered_map<
+                 float, std::unordered_map<float, std::unique_ptr<Matrix<2>>>>>
+      cached_matrices;
 };

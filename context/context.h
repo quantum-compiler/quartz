@@ -34,6 +34,10 @@ public:
   void set_representative(std::unique_ptr<DAG> dag);
   void clear_representatives();
 
+  // This function generates a deterministic series of random numbers ranging
+  // [0, 1].
+  double random_number();
+
 private:
   bool insert_gate(GateType tp);
   size_t global_unique_id;

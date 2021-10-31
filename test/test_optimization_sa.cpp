@@ -12,11 +12,11 @@ int main() {
   test_optimization(&ctx,
                     "/home/mingkuan/quantum-superoptimization/circuit/example-circuits/barenco_tof_3.qasm",
                     "/home/mingkuan/quantum-superoptimization/cmake-build-debug/bfs_verified_simplified.json",
-                    false/*use_simulated_annealing*/);
+                    true/*use_simulated_annealing*/);
 #else
   test_optimization(&ctx,
                     "circuit/example-circuits/barenco_tof_3.qasm",
                     "cmake-build-debug/bfs_verified_simplified.json",
-                    false/*use_simulated_annealing*/);
+                    true/*use_simulated_annealing*/);
 #endif
 }

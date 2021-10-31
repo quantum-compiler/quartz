@@ -61,7 +61,7 @@ public:
   void match(OpX *srcOp, Op op, Graph *graph);
   void unmatch(OpX *srcOp, Op op, Graph *graph);
   void run(int depth, Graph *graph,
-           std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> &,
+           std::vector<Graph *> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps);
   Graph *run_1_time(int depth, Graph *graph);
   Graph *create_new_graph(Graph *graph);

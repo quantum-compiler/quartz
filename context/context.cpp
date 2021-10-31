@@ -109,3 +109,9 @@ void Context::clear_representatives() {
   representatives_.clear();
   representative_dags_.clear();
 }
+
+double Context::random_number() {
+  static std::mt19937 gen(0);
+  static std::uniform_real_distribution<double> dis_real(0, 1);
+  return dis_real(gen);
+}

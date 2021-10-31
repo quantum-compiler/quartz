@@ -9,7 +9,7 @@
 #include <iostream>
 
 void test_optimization(Context *ctx, const std::string file_name,
-                       const std::string equivalent_file_name) {
+                       const std::string equivalent_file_name, bool use_simulated_annealing) {
   QASMParser qasm_parser(ctx);
   DAG *dag = nullptr;
   if (!qasm_parser.load_qasm(file_name, dag)) {
@@ -21,7 +21,7 @@ void test_optimization(Context *ctx, const std::string file_name,
   std::cout << graph.total_cost() << " gates in circuit before optimizing."
             << std::endl;
   auto start = std::chrono::steady_clock::now();
-  graph.optimize(1.1, 0, false, ctx, equivalent_file_name);
+  graph.optimize(1.1, 0, false, ctx, equivalent_file_name, use_simulated_annealing);
   auto end = std::chrono::steady_clock::now();
   std::cout << "After optimizing graph in "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(

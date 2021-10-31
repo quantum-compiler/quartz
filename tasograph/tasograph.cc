@@ -236,37 +236,12 @@ float Graph::total_cost(void) const {
   return (float)cnt;
 }
 
-Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
-                            RuleParser *rule_parser) {
-  auto src_gates = src_ctx->get_supported_gates();
-  auto dst_gate_set = std::set<GateType>(dst_ctx->get_supported_gates().begin(),
-                                         dst_ctx->get_supported_gates().end());
-  std::map<GateType, GraphXfer *> tp_2_xfer;
-  for (auto gate_tp : src_gates) {
-	if (dst_gate_set.find(gate_tp) == dst_gate_set.end()) {
-	  std::vector<Command> cmds;
-	  Command src_cmd;
-	  assert(
-	      rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
-
-	  tp_2_xfer[gate_tp] =
-	      GraphXfer::create_single_gate_GraphXfer(src_cmd, dst_ctx, cmds);
-	}
-  }
-  Graph *src_graph = this;
-  Graph *dst_graph = nullptr;
-  for (auto it = tp_2_xfer.begin(); it != tp_2_xfer.end(); ++it) {
-	while ((dst_graph = it->second->run_1_time(0, src_graph)) != nullptr) {
-	  if (src_graph != this)
-		delete src_graph;
-	  src_graph = dst_graph;
-	}
-  }
-  return src_graph;
-}
-
-Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                       const std::string &equiv_file_name) {
+Graph *Graph::optimize(float alpha,
+                       int budget,
+                       bool print_subst,
+                       Context *ctx,
+                       const std::string &equiv_file_name,
+                       bool use_simulated_annealing) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -312,7 +287,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		// first_dag is src, others are dst
 		if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
 		  std::cout << first_dag->get_num_gates() << " "
-		            << other_dag->get_num_gates() << " ";
+		            << other_dag->get_num_gates() << "; ";
 		}
 		auto first_2_other =
 		    GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
@@ -349,31 +324,44 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   float bestCost = total_cost();
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
-  while (!candidates.empty()) {
-	Graph *subGraph = candidates.top();
-	candidates.pop();
-	if (subGraph->total_cost() < bestCost) {
-	  if (bestGraph != this)
-		delete bestGraph;
-	  bestCost = subGraph->total_cost();
-	  bestGraph = subGraph;
-	}
-	if (counter > budget) {
-	  // TODO: free all remaining candidates when budget exhausted
-	  //   break;
-	  ;
-	}
-	counter++;
+  if (use_simulated_annealing) {
+    const double kSABeginTemp = bestCost;
+    const double kSAEndTemp = kSABeginTemp / 1e6;
+    const double kSACoolingFactor = 1.0 - 1e-3;
+    const int kNumKeepGraph = 50;
+    std::vector<Graph *> sa_candidates;
+    sa_candidates.reserve(kNumKeepGraph);
+    sa_candidates.push_back(this);
+    for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
 
-	std::cout << bestCost << " ";
+    }
+  } else {
+    while (!candidates.empty()) {
+      Graph *subGraph = candidates.top();
+      candidates.pop();
+      if (subGraph->total_cost() < bestCost) {
+        if (bestGraph != this)
+          delete bestGraph;
+        bestCost = subGraph->total_cost();
+        bestGraph = subGraph;
+      }
+      if (counter > budget) {
+        // TODO: free all remaining candidates when budget exhausted
+        //   break;
+        ;
+      }
+      counter++;
 
-	for (auto &xfer : xfers) {
-	  xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
-	            2 * maxNumOps);
-	}
-	if (bestGraph != subGraph) {
-	  delete subGraph;
-	}
+      std::cout << bestCost << " " << std::flush;
+
+      for (auto &xfer : xfers) {
+        xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
+                  2 * maxNumOps);
+      }
+      if (bestGraph != subGraph) {
+        delete subGraph;
+      }
+    }
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results

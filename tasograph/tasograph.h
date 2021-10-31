@@ -106,7 +106,7 @@ public:
   Graph *context_shift(Context *src_ctx, Context *dst_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                  const std::string &equiv_file_name);
+                  const std::string &equiv_file_name, bool use_simulated_annealing);
 
 public:
   float totalCost;

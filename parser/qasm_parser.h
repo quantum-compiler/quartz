@@ -14,10 +14,14 @@ void find_and_replace_all(std::string &data, const std::string &tofind,
 }
 
 int string_to_number(const std::string &input) {
-  int ret = 0;
+  int ret = -1;
   for (int i = 0; i < input.length(); i++) {
-	if (input[i] >= '0' && input[i] <= '9')
-	  ret = ret * 10 + input[i] - '0';
+	if (input[i] >= '0' && input[i] <= '9') {
+	  if (ret == -1) {
+	    ret = 0;
+	  }
+      ret = ret * 10 + input[i] - '0';
+	}
   }
   return ret;
 }
@@ -82,7 +86,10 @@ public:
 		  std::string token;
 		  //   std::getline(ss, token, ' ');
 		  ss >> token;
-		  qubit_indices.push_back(string_to_number(token));
+		  int index = string_to_number(token);
+		  if (index != -1) {
+            qubit_indices.push_back(index);
+		  }
 		}
 		assert(dag != NULL);
 		assert(dag->add_gate(qubit_indices, parameter_indices, gate, NULL));

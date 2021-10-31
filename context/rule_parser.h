@@ -90,7 +90,9 @@ public:
 	  while (!iss1.eof()) {
 		getline(iss1, input, ';');
 		std::cout << input << std::endl;
-		cmds.push_back(Command(input));
+		if (!input.empty()) {
+		  cmds.push_back(Command(input));
+		}
 	  }
 	  std::set<GateType> tp_set;
 	  for (auto cmd : cmds) {

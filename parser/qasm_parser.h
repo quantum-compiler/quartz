@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cassert>
 #include "../context/context.h"
+#include "../dag/dag.h"
 
 void find_and_replace_all(std::string &data, const std::string &tofind,
                           const std::string &toreplace) {
@@ -18,9 +19,9 @@ int string_to_number(const std::string &input) {
   for (int i = 0; i < input.length(); i++) {
 	if (input[i] >= '0' && input[i] <= '9') {
 	  if (ret == -1) {
-	    ret = 0;
+		ret = 0;
 	  }
-      ret = ret * 10 + input[i] - '0';
+	  ret = ret * 10 + input[i] - '0';
 	}
   }
   return ret;
@@ -88,7 +89,7 @@ public:
 		  ss >> token;
 		  int index = string_to_number(token);
 		  if (index != -1) {
-            qubit_indices.push_back(index);
+			qubit_indices.push_back(index);
 		  }
 		}
 		assert(dag != NULL);

@@ -10,6 +10,8 @@
 #include "../gate/gate_utils.h"
 #include "context.h"
 
+#define PI 3.14159265358979323846
+
 class Command {
 public:
   Command() {}
@@ -39,14 +41,14 @@ public:
 		  constant_params[param_idx.size()] = std::stod(input);
 		}
 		else if (pi_pos == 0) {
-		  constant_params[param_idx.size()] = M_PI;
+		  constant_params[param_idx.size()] = PI;
 		}
 		else if (pi_pos == 1 && input[0] == '-') {
-		  constant_params[param_idx.size()] = -M_PI;
+		  constant_params[param_idx.size()] = -PI;
 		}
 		else {
 		  constant_params[param_idx.size()] =
-		      M_PI * std::stod(input.substr(0, pi_pos));
+		      PI * std::stod(input.substr(0, pi_pos));
 		}
 		param_idx.push_back(-1);
 	  }

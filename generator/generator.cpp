@@ -244,35 +244,18 @@ void Generator::dfs(int gate_idx,
         assert(false && "Unsupported gate type");
       }
     } else if (gate->get_num_qubits() == 1) {
-      if (gate->get_num_parameters() == 0) {
-        // Case: 1-qubit operators without parameters
-        for (int i = 0; i < dag->get_num_qubits(); i++) {
-          qubit_indices.push_back(i);
-          bool
-              ret =
-              dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
-          assert(ret);
-          dfs(gate_idx + 1,
-              max_num_gates,
-              max_remaining_param_gates,
-              dag,
-              used_parameters,
-              dataset,
-              restrict_search_space);
-          ret = dag->remove_last_gate();
-          assert(ret);
-          qubit_indices.pop_back();
-        }
-      } else if (gate->get_num_parameters() == 1) {
-        // Case: 1-qubit operators with 1 parameter
-        for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
-          qubit_indices.push_back(q1);
-          for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-            parameter_indices.push_back(p1);
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
+      for (int i = 0; i < dag->get_num_qubits(); i++) {
+        qubit_indices.push_back(i);
+        auto search_parameters = [&](int num_remaining_parameters,
+                                     auto &search_parameters_ref/*feed in the lambda implementation to itself as a parameter*/) {
+          if (num_remaining_parameters == 0) {
+            bool
+                ret =
+                dag->add_gate(qubit_indices,
+                              parameter_indices,
+                              gate,
+                              nullptr);
             assert(ret);
-            used_parameters[p1] += 1;
             dfs(gate_idx + 1,
                 max_num_gates,
                 max_remaining_param_gates,
@@ -280,15 +263,24 @@ void Generator::dfs(int gate_idx,
                 used_parameters,
                 dataset,
                 restrict_search_space);
-            used_parameters[p1] -= 1;
             ret = dag->remove_last_gate();
             assert(ret);
+            return;
+          }
+
+          for (int p1 = 0;
+               p1 < dag->get_num_total_parameters(); p1++) {
+            parameter_indices.push_back(p1);
+            used_parameters[p1] += 1;
+            search_parameters_ref(num_remaining_parameters - 1,
+                                  search_parameters_ref);
+            used_parameters[p1] -= 1;
             parameter_indices.pop_back();
           }
-          qubit_indices.pop_back();
-        }
-      } else {
-        assert(false && "To be implemented...");
+        };
+        search_parameters(gate->get_num_parameters(), search_parameters);
+
+        qubit_indices.pop_back();
       }
     } else if (gate->get_num_qubits() == 2) {
       if (gate->get_num_parameters() == 0) {

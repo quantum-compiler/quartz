@@ -9,6 +9,7 @@
 #include "rz.h"
 #include "cx.h"
 #include "ccx.h"
+#include "ccz.h"
 #include "add.h"
 #include "neg.h"
 #include "z.h"

@@ -21,7 +21,7 @@ std::vector<GateType> all_supported_gates();
 class Gate;
 
 const int kMaxParamInputPerParamGate = 2;
-const int kMaxParamInputPerQuantumGate = 1;
+const int kMaxParamInputPerQuantumGate = 3;
 
 std::vector<GateType> ibmq_gate_set();
 std::vector<GateType> voqc_gate_set();

@@ -15,10 +15,9 @@ Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
 
-Graph::Graph(Context *ctx)
-    : context(ctx), special_op_guid(0), totalCost(0.0f) {}
+Graph::Graph() : special_op_guid(0), totalCost(0.0f) {}
 
-Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
+Graph::Graph(Context *ctx, const DAG &dag) : special_op_guid(0) {
   // Guid for input qubit and input parameter nodes
   int num_input_qubits = dag.get_num_qubits();
   int num_input_params = dag.get_num_input_parameters();
@@ -228,6 +227,16 @@ size_t Graph::hash(void) {
   return total;
 }
 
+float Graph::total_cost(void) const {
+  size_t cnt = 0;
+  for (const auto &it : inEdges) {
+	if (it.first.ptr->is_quantum_gate())
+	  cnt++;
+  }
+  return (float)cnt;
+}
+
+<<<<<<< HEAD
 Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
                             RuleParser *rule_parser) {
   auto src_gates = src_ctx->get_supported_gates();
@@ -257,171 +266,16 @@ Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
   return src_graph;
 }
 
-float Graph::total_cost(void) const {
-  size_t cnt = 0;
-  for (const auto &it : inEdges) {
-	if (it.first.ptr->is_quantum_gate())
-	  cnt++;
-  }
-  return (float)cnt;
-}
-
-void Graph::remove_node(Op oldOp) {
-  assert(oldOp.ptr->tp != GateType::input_qubit);
-  // Add edges between the inputs and outputs of the to-be removed node
-  // Only add edges that connect qubits
-  if (inEdges.find(oldOp) != inEdges.end() &&
-      outEdges.find(oldOp) != outEdges.end()) {
-	auto input_edges = inEdges[oldOp];
-	auto output_edges = outEdges[oldOp];
-	int num_qubits = oldOp.ptr->get_num_qubits();
-	for (auto in_edge : input_edges) {
-	  for (auto out_edge : output_edges) {
-		if (in_edge.dstIdx == out_edge.srcIdx) {
-		  if (in_edge.dstIdx < num_qubits) {
-			add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
-			         out_edge.dstIdx);
-		  }
-		}
-	  }
-	}
-  }
-  inEdges.erase(oldOp);
-  outEdges.erase(oldOp);
-  constant_param_values.erase(oldOp);
-}
-
-// Merge constant parameters
-// Eliminate rotation with parameter 0
-void Graph::constant_eliminate() {
-  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
-  std::unordered_map<size_t, size_t> hash_values;
-  std::queue<Op> op_queue;
-  // Compute the hash value for input ops
-  for (it = outEdges.begin(); it != outEdges.end(); it++) {
-	if (it->first.ptr->tp == GateType::input_qubit ||
-	    it->first.ptr->tp == GateType::input_param) {
-	  op_queue.push(it->first);
-	}
-  }
-
-  // Construct in-degree map
-  std::map<Op, size_t> op_in_edges_cnt;
-  for (it = inEdges.begin(); it != inEdges.end(); ++it) {
-	op_in_edges_cnt[it->first] = it->second.size();
-  }
-
-  while (!op_queue.empty()) {
-	auto op = op_queue.front();
-	op_queue.pop();
-	// Won't remove node in op_queue
-	// Remove node won't change the in-degree of other nodes
-	if (op.ptr->is_parameter_gate()) {
-	  // Parameter gate, check if all its params are constant
-	  assert(inEdges.find(op) != inEdges.end());
-	  bool all_constants = true;
-	  auto list = inEdges[op];
-	  for (auto it = list.begin(); it != list.end(); ++it) {
-		auto src_op = it->srcOp;
-		if (constant_param_values.find(src_op) == constant_param_values.end()) {
-		  all_constants = false;
-		  break;
-		}
-	  }
-	  if (all_constants) {
-		if (op.ptr->tp == GateType::add) {
-		  ParamType params[2], result = 0;
-		  for (auto it = list.begin(); it != list.end(); ++it) {
-			auto edge = *it;
-			params[edge.dstIdx] = constant_param_values[edge.srcOp];
-			remove_node(edge.srcOp);
-		  }
-		  result = params[0] + params[1];
-
-		  assert(outEdges[op].size() == 1);
-		  auto output_dst_op = (*outEdges[op].begin()).dstOp;
-		  auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
-		  remove_node(op);
-
-		  Op merged_op(get_next_special_op_guid(),
-		               context->get_gate(GateType::input_param));
-		  add_edge(merged_op, output_dst_op, 0, output_dst_idx);
-		  constant_param_values[merged_op] = result;
-		}
-		else if (op.ptr->tp == GateType::neg) {
-		  ParamType params[2], result = 0;
-		  for (auto it = list.begin(); it != list.end(); ++it) {
-			auto edge = *it;
-			params[edge.dstIdx] = constant_param_values[edge.srcOp];
-			remove_node(edge.srcOp);
-		  }
-		  result = params[0] - params[1];
-
-		  assert(outEdges[op].size() == 1);
-		  auto output_dst_op = (*outEdges[op].begin()).dstOp;
-		  auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
-		  remove_node(op);
-
-		  Op merged_op(get_next_special_op_guid(),
-		               context->get_gate(GateType::input_param));
-		  add_edge(merged_op, output_dst_op, 0, output_dst_idx);
-		  constant_param_values[merged_op] = result;
-		}
-		else {
-		  assert(false && "Unimplemented parameter gates");
-		}
-	  }
-	}
-	else if (op.ptr->is_parametrized_gate()) {
-	  // Rotation gate, check if all its parameters are 0
-	  auto input_edges = inEdges[op];
-	  bool all_parameter_is_0 = true;
-	  int num_qubits = op.ptr->get_num_qubits();
-	  int num_params = op.ptr->get_num_parameters();
-	  for (auto in_edge : input_edges) {
-		if (in_edge.dstIdx >= num_qubits &&
-		    in_edge.srcOp.ptr->is_parameter_gate()) {
-		  all_parameter_is_0 = false;
-		  break;
-		}
-		else if (in_edge.dstIdx >= num_qubits) {
-		  if (constant_param_values.find(in_edge.srcOp) ==
-		      constant_param_values.end()) {
-			// Not a constant parameter
-			all_parameter_is_0 = false;
-			break;
-		  }
-		  else {
-			// A constant parameter
-			if (std::abs(constant_param_values[in_edge.srcOp]) > eps) {
-			  // The constant parameter is not 0
-			  all_parameter_is_0 = false;
-			  break;
-			}
-		  }
-		}
-	  }
-	  if (all_parameter_is_0) {
-		remove_node(op);
-	  }
-	}
-	if (outEdges.find(op) != outEdges.end()) {
-	  std::set<Edge, EdgeCompare> list = outEdges[op];
-	  std::set<Edge, EdgeCompare>::const_iterator it2;
-	  for (it2 = list.begin(); it2 != list.end(); it2++) {
-		auto e = *it2;
-		op_in_edges_cnt[e.dstOp]--;
-		if (op_in_edges_cnt[e.dstOp] == 0) {
-		  op_queue.push(e.dstOp);
-		}
-	  }
-	}
-  }
-}
-
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
+                       const std::string &equiv_file_name) {
+=======
+Graph *Graph::optimize(float alpha,
+                       int budget,
+                       bool print_subst,
+                       Context *ctx,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing) {
+>>>>>>> 0d2d26506cc46c0e3956a87552a6ecf3fc6250a7
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -505,43 +359,43 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
   if (use_simulated_annealing) {
-	const double kSABeginTemp = bestCost;
-	const double kSAEndTemp = kSABeginTemp / 1e6;
-	const double kSACoolingFactor = 1.0 - 1e-3;
-	const int kNumKeepGraph = 50;
-	std::vector<Graph *> sa_candidates;
-	sa_candidates.reserve(kNumKeepGraph);
-	sa_candidates.push_back(this);
-	for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
-	}
-  }
-  else {
-	while (!candidates.empty()) {
-	  Graph *subGraph = candidates.top();
-	  candidates.pop();
-	  if (subGraph->total_cost() < bestCost) {
-		if (bestGraph != this)
-		  delete bestGraph;
-		bestCost = subGraph->total_cost();
-		bestGraph = subGraph;
-	  }
-	  if (counter > budget) {
-		// TODO: free all remaining candidates when budget exhausted
-		//   break;
-		;
-	  }
-	  counter++;
+    const double kSABeginTemp = bestCost;
+    const double kSAEndTemp = kSABeginTemp / 1e6;
+    const double kSACoolingFactor = 1.0 - 1e-3;
+    const int kNumKeepGraph = 50;
+    std::vector<Graph *> sa_candidates;
+    sa_candidates.reserve(kNumKeepGraph);
+    sa_candidates.push_back(this);
+    for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
 
-	  std::cout << bestCost << " " << std::flush;
+    }
+  } else {
+    while (!candidates.empty()) {
+      Graph *subGraph = candidates.top();
+      candidates.pop();
+      if (subGraph->total_cost() < bestCost) {
+        if (bestGraph != this)
+          delete bestGraph;
+        bestCost = subGraph->total_cost();
+        bestGraph = subGraph;
+      }
+      if (counter > budget) {
+        // TODO: free all remaining candidates when budget exhausted
+        //   break;
+        ;
+      }
+      counter++;
 
-	  for (auto &xfer : xfers) {
-		xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
-		          2 * maxNumOps);
-	  }
-	  if (bestGraph != subGraph) {
-		delete subGraph;
-	  }
-	}
+      std::cout << bestCost << " " << std::flush;
+
+      for (auto &xfer : xfers) {
+        xfer->run(0, subGraph, candidates, hashmap, bestCost * alpha,
+                  2 * maxNumOps);
+      }
+      if (bestGraph != subGraph) {
+        delete subGraph;
+      }
+    }
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results

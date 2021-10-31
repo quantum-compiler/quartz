@@ -16,6 +16,8 @@
 
 namespace TASOGraph {
 
+#define eps 1e-8
+
 class Op {
 public:
   Op(void);
@@ -91,7 +93,7 @@ struct EdgeCompare {
 
 class Graph {
 public:
-  Graph();
+  Graph(Context *ctx);
   Graph(Context *ctx, const DAG &dag);
   void remove_edge(Edge e);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
@@ -106,9 +108,13 @@ public:
   Graph *context_shift(Context *src_ctx, Context *dst_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                  const std::string &equiv_file_name, bool use_simulated_annealing);
+                  const std::string &equiv_file_name,
+                  bool use_simulated_annealing);
+  void constant_eliminate();
+  void rotation_propagation();
 
 public:
+  Context *context;
   float totalCost;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;

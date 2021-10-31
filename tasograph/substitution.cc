@@ -524,7 +524,7 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 }
 
 Graph *GraphXfer::create_new_graph(Graph *graph) {
-  Graph *newGraph = new Graph();
+  Graph *newGraph = new Graph(context);
   // Step 1: map dst ops
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
   std::vector<OpX *>::const_iterator dstIt;

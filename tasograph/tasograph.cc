@@ -326,6 +326,8 @@ void Graph::constant_eliminate() {
           break;
         }
       }
+      // Assume that all inputs to a parameter gate are constant
+      assert(all_constants);
       if (all_constants) {
         if (op.ptr->tp == GateType::add) {
           ParamType params[2], result = 0;

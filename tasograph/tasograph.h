@@ -112,7 +112,6 @@ public:
                   bool use_simulated_annealing);
   void constant_eliminate();
   void rotation_propagation();
-
 public:
   Context *context;
   float totalCost;

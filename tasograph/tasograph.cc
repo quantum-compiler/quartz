@@ -416,6 +416,152 @@ void Graph::constant_eliminate() {
   }
 }
 
+#ifdef DEADCODE
+void Graph::expand(
+            std::pair<Op, int> pos,
+            bool left,
+            std::unordered_set<std::pair<Op, int> >& covered)
+{
+  covered.insert(pos);
+  while (true) {
+    if (left) {
+      if (!move_left(pos))
+        return;
+    } else {
+      if (!move_right(pos))
+        return;
+    }
+    if (pos.first.ptr->tp == GateType::cnot) {
+      // Insert the other side of cnot to anchor_points;
+    } else if (moveable(pos.frist.ptr->tp)) {
+      continue;
+    } else {
+      break;
+    }
+  }
+}
+
+void Graph::remove(std::pair<Op, int> pos, bool left, 
+            std::unordered_set<std::pair<Op, int> >& covered)
+{
+  if (covered.find(pos) == covered.end())
+    return;
+  covered.remove(pos);
+  if (/*pos is the control qubit of a cnot*/)
+    remove(target_pos, left, covered);
+  if (left) {
+    if (!move_left(pos))
+      return;
+  } else {
+    if (!move_right(pos))
+      return;
+  }
+  remove(pos, covered);
+}
+
+void Graph::explore(std::pair<Op, int> pos, bool left, 
+            std::unordered_set<std::pair<Op, int> >& covered)
+{
+  while (true) {
+    if (covered.find(pos) == covered.end())
+      return;
+    if (/*pos is the target qubit of a cnot*/) {
+      remove(pos, left, covered);
+    } else {
+      if (left) {
+        if (!move_left(pos))
+          return;
+      } else {
+        if (!move_right(pos))
+          return;
+      }
+    }
+  }
+}
+
+bool Graph::rotation_merging(void)
+{
+  std::unordered_set<Op> visited_cnot;
+  // Step 1: calculate the bitmask of each operator
+  std::unordered_map<std::pair<Op, int>, uint_128t> bitmasks;
+  std::unordered_map<std::pair<Op, int>, int> op_to_qubits;
+  std::queue<Op> todos;
+  for (const auto& it : inEdges) {
+    if (it.second.size() == 0) {
+      todos.push(it.first);
+      bitmasks[std::make_pair(it.first, 0)] = 1<<it.first.ptr->index;
+      op_to_qubits[std::make_pair(it.first, 0)] = it.first.ptr->index;
+    }
+  }
+  while (todos.size() > 0) {
+    auto op = todos.front();
+    todos.pop();
+    //TODO: explore the outEdges of op
+    //
+    if (op.ptr->tp == GateType::cnot) {
+      bitmasks[std::make_pair(op, 0)] = bitmasks[in0];
+      bitmasks[std::make_pair(op, 1)] = bitmasks[in0] xor bitmasks[in1];
+      op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
+      op_to_qubits[std::make_pair(op, 1)] = op_to_qubits[in1];
+    } else if (op.ptr->tp == GateType::x) {
+      bitmasks[std::makr_pair(op, 0)] = bitmasks[in0];
+      op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
+    } else {
+      bitmasks[std::make_pair(op, 0)] = bitmasks[in0];
+      op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
+    }
+  }
+
+  // Step 2: Propagate all CNOTs
+  std::queue<Op> todo_cnot;
+  for (const auto& it : inEdges)
+    if (it.first.ptr->tp ==GateType::cnot) {
+      todo_cnot.push(it.first);
+    }
+  while (todo_cnot.size() != 0) {
+    const auto cnot = todo_cnot.front();
+    todo_cnot.pop();
+    if (visited_cnot.find(cnot) != visited_cnot.end())
+      continue;
+    std::unordered_map<int, std::pair<Op, int> > anchor_point;
+    anchor_point[op_to_qubits[std::make_pair(cnot, 0)]] = std::make_pair(cnot, 0);
+    anchor_point[op_to_qubits[std::make_pair(cnot, 1)]] = std::make_pair(cnot, 1);
+    std::queue<int> todo_qubits;
+    todo_qubits.push(op_to_qubits[std::make_pair(cnot, 0)]);
+    todo_qubits.push(op_to_qubits[std::make_pair(cnot, 1)]);
+    std::unordered_set<std::pair<Op, int> > covered;
+    while (todo_qubits.size() > 0) {
+      int qid = todo_qubits.front();
+      todo_qubits.pop();
+      expand(anchor_point[qid], true, covered);
+      expand(anchor_point[qid], false, covered);
+    }
+  }
+  // Step 3: deal with partial cnot
+  for (const auto& start_pos : anchor_point) {
+    pos = start_pos;
+    explore(pos, true, covered);
+    explore(pos, false, covered);
+  }
+  // Step 4: merge rotations with the same bitmasks
+  std::unordered_map<uint128_t, std::pair<Op, int> > bitmask_to_pos;
+  for (const auto& it : covered) {
+    if (it.first.op.ptr->ty == GateType::rz) {
+      uint128_t bm = bitmasks[it.first];
+      if (bitmask_to_pos(bm) != bitmask_to_pos.end()) {
+        std::pair<Op, int> old_pos = bitmask_to_pos[bm];
+        // remove it from the graph
+        // 
+        // change the degree of old_pos
+        old_pos.first.ptr->degree += it.first.ptr->degree;
+      } else {
+        bitmask_to_pos[bm] = it;
+      }
+    }
+  }
+}
+#endif
+
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing) {

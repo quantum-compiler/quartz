@@ -10,8 +10,8 @@ int main() {
   //                     "cmake-build-debug/bfs_verified.json");
 #ifdef __linux
   test_optimization(&ctx,
-                    "/home/mingkuan/quantum-superoptimization/circuit/example-circuits/barenco_tof_3.qasm",
-                    "/home/mingkuan/quantum-superoptimization/cmake-build-debug/bfs_verified_simplified.json",
+                    "circuit/example-circuits/barenco_tof_3.qasm",
+                    "cmake-build-debug/bfs_verified_simplified.json",
                     true/*use_simulated_annealing*/);
 #else
   test_optimization(&ctx,

@@ -541,8 +541,17 @@ Graph *GraphXfer::create_new_graph(Graph *graph) {
 		  srcTen.idx = it->srcIdx;
 		  assert(mappedOutputs.find(srcTen) != mappedOutputs.end());
 		  TensorX dstTen = mappedOutputs[srcTen];
-		  newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
-		                     it->dstIdx);
+		  if (dstTen.op == NULL) {
+		    // mappedOutput is an input --- this indicates an empty target graph
+	            std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
+		        mappedInputs.find(dstTen.idx);
+		    assert(it2 != mappedInputs.end());
+		    std::pair<Op, int> srcEdge = it2->second;
+		    newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second, it->dstIdx);
+		  } else {
+		    newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
+		                       it->dstIdx);
+		  }
 		}
 		else {
 		  // unmapped src -> unmmaped dst

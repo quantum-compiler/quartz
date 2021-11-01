@@ -95,7 +95,6 @@ class Graph {
 public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG &dag);
-  void remove_edge(Edge e);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_loop();
@@ -103,6 +102,7 @@ public:
   bool check_correctness();
   void replace_node(Op oldOp, Op newOp);
   void remove_node(Op oldOp);
+  void remove_edge(Op srcOp, Op dstOp);
   float total_cost() const;
   size_t get_next_special_op_guid();
   Graph *context_shift(Context *src_ctx, Context *dst_ctx,
@@ -110,8 +110,8 @@ public:
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing);
-  void constant_eliminate();
-  void rotation_propagation();
+  void constant_eliminate_and_rotation_merging();
+  void rotation_merging_using_phase_polynomials();
 
 public:
   Context *context;

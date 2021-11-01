@@ -564,6 +564,12 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
         std::partial_sort(new_candidates.begin(),
                           new_candidates.begin() + kNumKeepGraph,
                           new_candidates.end());
+        for (int i = kNumKeepGraph; i < (int) new_candidates.size(); i++) {
+          if (new_candidates[i].second != this
+              && new_candidates[i].second != bestGraph) {
+            delete new_candidates[i].second;
+          }
+        }
         new_candidates.resize(kNumKeepGraph);
       }
       sa_candidates = std::move(new_candidates);

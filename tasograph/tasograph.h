@@ -110,8 +110,9 @@ public:
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing);
-  void constant_eliminate();
+  void constant_and_rotation_elimination();
   void rotation_propagation();
+
 public:
   Context *context;
   float totalCost;

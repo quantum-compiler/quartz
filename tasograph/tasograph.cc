@@ -1,6 +1,8 @@
 #include "tasograph.h"
 #include "substitution.h"
-#include "assert.h"
+
+#include <cassert>
+#include <iomanip>
 
 namespace TASOGraph {
 
@@ -499,7 +501,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   if (use_simulated_annealing) {
     const double kSABeginTemp = bestCost;
     const double kSAEndTemp = kSABeginTemp / 1e6;
-    const double kSACoolingFactor = 1.0 - 1e-3;
+    const double kSACoolingFactor = 1.0 - 1e-1;
     const int kNumKeepGraph = 50;
     // <cost, graph>
     std::vector<std::pair<float, Graph *>> sa_candidates;
@@ -543,11 +545,18 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
           }
         }
       }
-      std::cout << "Iteration " << num_iteration << ": bestcost = " << bestCost
-                << ", " << new_candidates.size() << " out of "
-                << num_possible_new_candidates
-                << " possible new candidates accepted."
-                << std::endl;
+
+      // Compute some statistical information to output, can be commented
+      // when verbose=false
+      const auto num_new_candidates = new_candidates.size();
+      assert(!new_candidates.empty());
+      auto min_cost = new_candidates[0].first;
+      auto max_cost = new_candidates[0].first;
+      for (const auto &new_candidate : new_candidates) {
+        min_cost = std::min(min_cost, new_candidate.first);
+        max_cost = std::max(max_cost, new_candidate.first);
+      }
+
       if (new_candidates.size() > kNumKeepGraph) {
         // Prune some candidates.
         // TODO: make sure the candidates kept are far from each other
@@ -558,6 +567,14 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
         new_candidates.resize(kNumKeepGraph);
       }
       sa_candidates = std::move(new_candidates);
+
+      std::cout << "Iteration " << num_iteration << ": T = " << std::fixed
+                << std::setprecision(2) << T << ", bestcost = " << bestCost
+                << ", " << num_new_candidates << " out of "
+                << num_possible_new_candidates
+                << " possible new candidates accepted, cost ranging ["
+                << min_cost << ", " << max_cost << "]"
+                << std::endl;
     }
   } else {
     while (!candidates.empty()) {

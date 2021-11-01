@@ -660,6 +660,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
               << std::endl;
     for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
       num_iteration++;
+      hashmap.clear();
       std::vector<std::pair<float, Graph *>> new_candidates;
       new_candidates.reserve(sa_candidates.size() * xfers.size());
       int num_possible_new_candidates = 0;

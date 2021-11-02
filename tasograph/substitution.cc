@@ -116,18 +116,15 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 }
 
 GraphXfer *
-GraphXfer::create_single_gate_GraphXfer(Command src_cmd, Context *dst_ctx,
+GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
                                         std::vector<Command> dst_cmds) {
   // Currently only support source command with no constant parameters
   // Assume the only added parameters are constant parameters
   // Assume the number of non constant parameters are equal
   GateType src_tp = src_cmd.get_gate_type();
-  std::vector temp_gate_set(dst_ctx->get_supported_gates());
-  temp_gate_set.push_back(src_tp);
-  Context *ctx = new Context(temp_gate_set);
-  GraphXfer *graphXfer = new GraphXfer(ctx);
+  GraphXfer *graphXfer = new GraphXfer(union_ctx);
 
-  Gate *gate = ctx->get_gate(src_tp);
+  Gate *gate = union_ctx->get_gate(src_tp);
   auto num_qubit = gate->get_num_qubits();
   auto num_non_constant_params = gate->get_num_parameters();
 

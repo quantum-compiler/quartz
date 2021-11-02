@@ -14,6 +14,8 @@
 #include <iostream>
 #include <queue>
 
+typedef unsigned __int128 uint128_t;
+
 namespace TASOGraph {
 
 #define eps 1e-8
@@ -63,6 +65,24 @@ struct OpCompare {
   };
 };
 
+class Pos {
+public:
+  Pos(Op op_, int idx_) : op(op_), idx(idx_) {}
+  Op op;
+  int idx;
+};
+
+struct PosCompare {
+  bool operator()(const Pos &a, const Pos &b) const {
+	if (a.op.guid != b.op.guid)
+	  return a.op.guid < b.op.guid;
+	if (a.op.ptr != b.op.ptr)
+	  return a.op.ptr < b.op.ptr;
+
+	return a.idx < b.idx;
+  };
+};
+
 class Tensor {
 public:
   Tensor(void);
@@ -108,13 +128,21 @@ public:
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
-  Graph *context_shift(Context *src_ctx, Context *dst_ctx,
+  Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
-  void rotation_propagation();
+  void rotation_merging();
+  uint128_t xor_bitmap(uint128_t src_bitmap, int src_idx, uint128_t dst_bitmap,
+                       int dst_idx);
+  void explore(Pos pos, bool left,
+               std::unordered_set<Pos, PosCompare> &covered);
+  void expand(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
+  void remove();
+  bool move_right();
+  bool move_left();
 
 public:
   Context *context;

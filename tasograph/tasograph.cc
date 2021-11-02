@@ -581,7 +581,7 @@ bool Graph::move_right() {}
 
 bool Graph::move_left() {}
 
-void Graph::rotation_merging() {
+void Graph::rotation_merging(GateType target_rotation) {
   // Step 1: calculate the bitmask of each operator
   std::unordered_map<Pos, uint64_t, PosCompare> bitmasks;
   std::unordered_map<Pos, int, PosCompare> pos_to_qubits;

@@ -132,9 +132,9 @@ public:
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
-  void rotation_merging();
-  uint128_t xor_bitmap(uint128_t src_bitmap, int src_idx, uint128_t dst_bitmap,
-                       int dst_idx);
+  void rotation_merging(GateType target_rotation);
+  uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
+                      int dst_idx);
   void explore(Pos pos, bool left,
                std::unordered_set<Pos, PosCompare> &covered);
   void expand(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);

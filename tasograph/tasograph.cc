@@ -104,6 +104,12 @@ size_t Graph::get_next_special_op_guid() {
   return special_op_guid;
 }
 
+size_t Graph::get_special_op_guid() { return special_op_guid; }
+
+void Graph::set_special_op_guid(size_t _special_op_guid) {
+  special_op_guid = _special_op_guid;
+}
+
 void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
   if (inEdges.find(dstOp) == inEdges.end()) {
 	inEdges[dstOp];
@@ -293,6 +299,27 @@ void Graph::remove_node(Op oldOp) {
   constant_param_values.erase(oldOp);
 }
 
+void Graph::remove_edge(Op srcOp, Op dstOp) {
+  if (inEdges.find(dstOp) != inEdges.end()) {
+	auto &edge_list = inEdges[dstOp];
+	for (auto edge : edge_list) {
+	  if (edge.srcOp == srcOp) {
+		edge_list.erase(edge);
+		break;
+	  }
+	}
+  }
+  if (outEdges.find(srcOp) != outEdges.end()) {
+	auto &edge_list = outEdges[srcOp];
+	for (auto edge : edge_list) {
+	  if (edge.dstOp == dstOp) {
+		edge_list.erase(edge);
+		break;
+	  }
+	}
+  }
+}
+
 // Merge constant parameters
 // Eliminate rotation with parameter 0
 void Graph::constant_and_rotation_elimination() {
@@ -384,17 +411,18 @@ void Graph::constant_and_rotation_elimination() {
 		  // Same rotation found, merge them
 		  int num_qubits = op.ptr->get_num_qubits();
 		  int num_params = op.ptr->get_num_parameters();
-		  auto pre_rotation_op = edge.srcOp;
+		  auto pre_op = edge.srcOp;
+
 		  std::map<int, Op> pre_param_idx_2_op;
 		  std::map<int, Op> param_idx_2_op;
-		  assert(inEdges.find(pre_rotation_op) != inEdges.end());
-		  auto pre_rotation_input_edges = inEdges[pre_rotation_op];
-		  for (auto it = pre_rotation_input_edges.begin();
-		       it != pre_rotation_input_edges.end(); ++it) {
-			auto pre_rotation_edge = *it;
-			if (pre_rotation_edge.dstIdx >= num_qubits) {
-			  pre_param_idx_2_op[pre_rotation_edge.dstIdx] =
-			      pre_rotation_edge.srcOp;
+		  assert(inEdges.find(pre_op) != inEdges.end());
+		  auto pre_input_edges = inEdges[pre_op];
+		  for (auto it = pre_input_edges.begin(); it != pre_input_edges.end();
+		       ++it) {
+			auto pre_edge = *it;
+			if (pre_edge.dstIdx >= num_qubits) {
+			  // Which means that it is a parameter input
+			  pre_param_idx_2_op[pre_edge.dstIdx] = pre_edge.srcOp;
 			}
 		  }
 		  for (auto it = input_edges.begin(); it != input_edges.end(); ++it) {
@@ -408,6 +436,7 @@ void Graph::constant_and_rotation_elimination() {
 			        constant_param_values.end() &&
 			    constant_param_values.find(param_idx_2_op[i]) !=
 			        constant_param_values.end()) {
+			  // Index i parameter at both Ops are constant
 			  ParamType sum = constant_param_values[pre_param_idx_2_op[i]] +
 			                  constant_param_values[param_idx_2_op[i]];
 			  remove_node(pre_param_idx_2_op[i]);
@@ -415,18 +444,24 @@ void Graph::constant_and_rotation_elimination() {
 			  Op new_constant_op(get_next_special_op_guid(),
 			                     context->get_gate(GateType::input_param));
 			  add_edge(new_constant_op, op, 0, i);
+			  constant_param_values[new_constant_op] = sum;
 			}
 			else {
+			  // Add a add gate
 			  Op new_add_op(context->next_global_unique_id(),
 			                context->get_gate(GateType::add));
 			  add_edge(pre_param_idx_2_op[i], new_add_op, 0, 0);
 			  add_edge(param_idx_2_op[i], new_add_op, 0, 1);
+			  add_edge(new_add_op, op, 0, i);
+			  remove_edge(pre_param_idx_2_op[i], pre_op);
+			  remove_edge(param_idx_2_op[i], op);
 			}
 		  }
+		  remove_node(pre_op);
 		}
 	  }
 
-	  // Rotation gate
+	  // Eliminate 0 rotation gates
 	  bool all_parameter_is_0 = true;
 	  int num_qubits = op.ptr->get_num_qubits();
 	  int num_params = op.ptr->get_num_parameters();

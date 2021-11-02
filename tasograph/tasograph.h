@@ -105,6 +105,8 @@ public:
   void remove_edge(Op srcOp, Op dstOp);
   float total_cost() const;
   size_t get_next_special_op_guid();
+  size_t get_special_op_guid();
+  void set_special_op_guid(size_t _special_op_guid);
   Graph *context_shift(Context *src_ctx, Context *dst_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,

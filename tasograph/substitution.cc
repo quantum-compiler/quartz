@@ -488,7 +488,7 @@ void GraphXfer::run(int depth, Graph *graph,
 	    (int)newGraph->inEdges.size() < maxNumOps) {
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
-        new_candidates.push_back(newGraph);
+		new_candidates.push_back(newGraph);
 		// std::cout << newGraph->total_cost() << " ";
 	  }
 	}
@@ -524,6 +524,7 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 
 Graph *GraphXfer::create_new_graph(Graph *graph) {
   Graph *newGraph = new Graph(context);
+  newGraph->set_special_op_guid(graph->get_special_op_guid());
   // Step 1: map dst ops
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
   std::vector<OpX *>::const_iterator dstIt;
@@ -542,15 +543,17 @@ Graph *GraphXfer::create_new_graph(Graph *graph) {
 		  assert(mappedOutputs.find(srcTen) != mappedOutputs.end());
 		  TensorX dstTen = mappedOutputs[srcTen];
 		  if (dstTen.op == NULL) {
-		    // mappedOutput is an input --- this indicates an empty target graph
-	            std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
-		        mappedInputs.find(dstTen.idx);
-		    assert(it2 != mappedInputs.end());
-		    std::pair<Op, int> srcEdge = it2->second;
-		    newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second, it->dstIdx);
-		  } else {
-		    newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
-		                       it->dstIdx);
+			// mappedOutput is an input --- this indicates an empty target graph
+			std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
+			    mappedInputs.find(dstTen.idx);
+			assert(it2 != mappedInputs.end());
+			std::pair<Op, int> srcEdge = it2->second;
+			newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second,
+			                   it->dstIdx);
+		  }
+		  else {
+			newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
+			                   it->dstIdx);
 		  }
 		}
 		else {

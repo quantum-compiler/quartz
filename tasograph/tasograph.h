@@ -95,6 +95,7 @@ class Graph {
 public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG &dag);
+  Graph(const Graph &graph);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_loop();

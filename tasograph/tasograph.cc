@@ -98,6 +98,12 @@ Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
   totalCost = total_cost();
 }
 
+Graph::Graph(const Graph &graph) {
+  context = graph.context;
+  constant_param_values = graph.constant_param_values;
+  special_op_guid = graph.special_op_guid;
+}
+
 size_t Graph::get_next_special_op_guid() {
   special_op_guid++;
   assert(special_op_guid < 100);

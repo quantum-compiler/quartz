@@ -150,8 +150,9 @@ def evaluate(dag, input_dis, input_parameters):
 
 def phase_shift(vec, lam):
     # shift |vec| by exp(i * lam)
+    import copy
     assert len(lam) == 2  # cos, sin
-    shifted_vec = vec
+    shifted_vec = copy.deepcopy(vec)
     for i in range(len(shifted_vec)):
         assert len(shifted_vec[i]) == 2
         shifted_vec[i] = (shifted_vec[i][0] * lam[0] - shifted_vec[i][1] * lam[1],
@@ -176,11 +177,12 @@ def equivalent(dag1, dag2, check_phase_shift=False):
     output_vec1 = evaluate(dag1, vec, params)
     output_vec2 = evaluate(dag2, vec, params)
     if check_phase_shift:
-        cosL = z3.Reals('cosL')
-        sinL = z3.Reals('sinL')
+        cosL = z3.Real('cosL')
+        sinL = z3.Real('sinL')
+        variables = [item for value in vec + params for item in value]
         output_vec2 = phase_shift(output_vec2, [cosL, sinL])
         solver.add(z3.ForAll([cosL, sinL], z3.Implies(angle(cosL, sinL),
-                                                      z3.Exists(vec + params, z3.And(equation_list,
+                                                      z3.Exists(variables, z3.And(z3.And(equation_list),
                                                                                      z3.Not(eq_vector(output_vec1, output_vec2)))))))
     else:
         solver.add(z3.And(equation_list))

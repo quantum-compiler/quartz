@@ -6,11 +6,12 @@
 
 namespace TASOGraph {
 
+// TODO: GUID_PRESERVED depends on the
 enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 19,
+  GUID_PRESERVED = 80,
 };
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
@@ -513,7 +514,6 @@ void Graph::constant_and_rotation_elimination() {
   }
 }
 
-#ifdef DEADCODE
 void Graph::expand(Pos pos, bool left,
                    std::unordered_set<Pos, PosCompare> &covered) {
   covered.insert(pos);
@@ -583,7 +583,7 @@ bool Graph::move_left() {}
 
 void Graph::rotation_merging() {
   // Step 1: calculate the bitmask of each operator
-  std::unordered_map<Pos, uint128_t, PosCompare> bitmasks;
+  std::unordered_map<Pos, uint64_t, PosCompare> bitmasks;
   std::unordered_map<Pos, int, PosCompare> pos_to_qubits;
   std::queue<Op> todos;
   /*
@@ -699,10 +699,10 @@ void Graph::rotation_merging() {
 	}
 
 	// Step 4: merge rotations with the same bitmasks
-	std::unordered_map<uint128_t, Pos> bitmask_to_pos;
+	std::unordered_map<uint64_t, Pos> bitmask_to_pos;
 	for (const auto &pos : covered) {
 	  if (pos.op.ptr->tp == GateType::rz) {
-		uint128_t bm = bitmasks[pos];
+		uint64_t bm = bitmasks[pos];
 		if (bitmask_to_pos.find(bm) != bitmask_to_pos.end()) {
 		  Pos old_pos = bitmask_to_pos[bm];
 		  // TODO
@@ -728,10 +728,10 @@ void Graph::rotation_merging() {
   */
   // Step 4: merge rotations with the same bitmasks
   /*
-  std::unordered_map<uint128_t, std::pair<Op, int>> bitmask_to_pos;
+  std::unordered_map<uint64_t, std::pair<Op, int>> bitmask_to_pos;
   for (const auto &it : covered) {
     if (it.first.op.ptr->ty == GateType::rz) {
-      uint128_t bm = bitmasks[it.first];
+      uint64_t bm = bitmasks[it.first];
       if (bitmask_to_pos(bm) != bitmask_to_pos.end()) {
         std::pair<Op, int> old_pos = bitmask_to_pos[bm];
         // remove it from the graph
@@ -746,6 +746,7 @@ void Graph::rotation_merging() {
   }
   */
 }
+#ifdef DEADCODE
 #endif
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,

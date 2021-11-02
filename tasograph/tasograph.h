@@ -14,8 +14,6 @@
 #include <iostream>
 #include <queue>
 
-typedef unsigned __int128 uint128_t;
-
 namespace TASOGraph {
 
 #define eps 1e-8

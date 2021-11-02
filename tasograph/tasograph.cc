@@ -1,6 +1,8 @@
 #include "tasograph.h"
 #include "substitution.h"
-#include "assert.h"
+
+#include <cassert>
+#include <iomanip>
 
 namespace TASOGraph {
 
@@ -706,98 +708,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
   if (use_simulated_annealing) {
-<<<<<<< HEAD
-	const double kSABeginTemp = bestCost;
-	const double kSAEndTemp = kSABeginTemp / 1e6;
-	const double kSACoolingFactor = 1.0 - 1e-3;
-	const int kNumKeepGraph = 50;
-	// <cost, graph>
-	std::vector<std::pair<float, Graph *>> sa_candidates;
-	sa_candidates.reserve(kNumKeepGraph);
-	sa_candidates.emplace_back(bestCost, this);
-	int num_iteration = 0;
-	std::cout << "Begin simulated annealing with " << xfers.size() << " xfers."
-	          << std::endl;
-	for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
-	  num_iteration++;
-	  std::vector<std::pair<float, Graph *>> new_candidates;
-	  new_candidates.reserve(sa_candidates.size() * xfers.size());
-	  int num_possible_new_candidates = 0;
-	  for (auto &candidate : sa_candidates) {
-		const auto current_cost = candidate.first;
-		std::vector<Graph *> current_new_candidates;
-		current_new_candidates.reserve(xfers.size());
-		for (auto &xfer : xfers) {
-		  xfer->run(0, candidate.second, current_new_candidates, hashmap,
-		            bestCost * alpha, 2 * maxNumOps);
-		}
-		num_possible_new_candidates += current_new_candidates.size();
-		for (auto &new_candidate : current_new_candidates) {
-		  const auto new_cost = new_candidate->total_cost();
-		  if (new_cost < bestCost) {
-			bestGraph = new_candidate;
-			bestCost = new_cost;
-		  }
-		  // Apply the criteria of simulated annealing.
-		  // Cost is the smaller the better here.
-		  if (new_cost < current_cost ||
-		      ctx->random_number() < std::exp((current_cost - new_cost) / T)) {
-			// Accept the new candidate.
-			new_candidates.emplace_back(new_cost, new_candidate);
-		  }
-		  else {
-			delete new_candidate;
-		  }
-		}
-	  }
-	  std::cout << "Iteration " << num_iteration << ": bestcost = " << bestCost
-	            << ", " << new_candidates.size() << " out of "
-	            << num_possible_new_candidates
-	            << " possible new candidates accepted." << std::endl;
-	  if (new_candidates.size() > kNumKeepGraph) {
-		// Prune some candidates.
-		// TODO: make sure the candidates kept are far from each other
-		// TODO: use hashmap to avoid keep searching for the same graphs
-		std::partial_sort(new_candidates.begin(),
-		                  new_candidates.begin() + kNumKeepGraph,
-		                  new_candidates.end());
-		new_candidates.resize(kNumKeepGraph);
-	  }
-	  sa_candidates = std::move(new_candidates);
-	}
-  }
-  else {
-	while (!candidates.empty()) {
-	  Graph *subGraph = candidates.top();
-	  candidates.pop();
-	  if (subGraph->total_cost() < bestCost) {
-		if (bestGraph != this)
-		  delete bestGraph;
-		bestCost = subGraph->total_cost();
-		bestGraph = subGraph;
-	  }
-	  if (counter > budget) {
-		// TODO: free all remaining candidates when budget exhausted
-		//   break;
-		;
-	  }
-	  counter++;
-
-	  std::cout << bestCost << " " << std::flush;
-
-	  std::vector<Graph *> new_candidates;
-	  for (auto &xfer : xfers) {
-		xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,
-		          2 * maxNumOps);
-	  }
-	  for (auto &candidate : new_candidates) {
-		candidates.push(candidate);
-	  }
-	  if (bestGraph != subGraph) {
-		delete subGraph;
-	  }
-	}
-=======
 	const double kSABeginTemp = bestCost;
 	const double kSAEndTemp = kSABeginTemp / 1e6;
 	const double kSACoolingFactor = 1.0 - 1e-1;
@@ -910,7 +820,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		delete subGraph;
 	  }
 	}
->>>>>>> 42c6d79d51f597c2d5c45657fc5f42a2a0491c15
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results

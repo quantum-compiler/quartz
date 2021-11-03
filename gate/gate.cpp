@@ -18,25 +18,19 @@ ParamType Gate::compute(const std::vector<ParamType> &input_params) {
   return 0;
 }
 
-bool Gate::is_commutative() const {
-  return false;
-}
+bool Gate::is_commutative() const { return false; }
 
-int Gate::get_num_qubits() const {
-  return num_qubits;
-}
+int Gate::get_num_qubits() const { return num_qubits; }
 
-int Gate::get_num_parameters() const {
-  return num_parameters;
-}
+int Gate::get_num_parameters() const { return num_parameters; }
 
 bool Gate::is_parameter_gate() const {
-  return num_qubits == 0;
+  // Only arithmetic computation gates are count
+  return num_qubits == 0 && tp != GateType::input_param &&
+         tp != GateType::input_qubit;
 }
 
-bool Gate::is_quantum_gate() const {
-  return num_qubits > 0;
-}
+bool Gate::is_quantum_gate() const { return num_qubits > 0; }
 
 bool Gate::is_parametrized_gate() const {
   return num_qubits > 0 && num_parameters > 0;

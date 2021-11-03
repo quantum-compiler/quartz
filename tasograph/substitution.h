@@ -60,8 +60,7 @@ public:
   bool can_match(OpX *srcOp, Op op, Graph *graph);
   void match(OpX *srcOp, Op op, Graph *graph);
   void unmatch(OpX *srcOp, Op op, Graph *graph);
-  void run(int depth, Graph *graph,
-           std::vector<Graph *> &new_candidates,
+  void run(int depth, Graph *graph, std::vector<Graph *> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps);
   Graph *run_1_time(int depth, Graph *graph);
   Graph *create_new_graph(Graph *graph);
@@ -71,8 +70,8 @@ public:
   static GraphXfer *create_GraphXfer(::Context *_context,
                                      const ::DAG *src_graph,
                                      const ::DAG *dst_graph);
-  static GraphXfer *create_single_gate_GraphXfer(Command src_cmd,
-                                                 Context *dst_ctx,
+  static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
+                                                 Command src_cmd,
                                                  std::vector<Command> dst_cmds);
 
 public:

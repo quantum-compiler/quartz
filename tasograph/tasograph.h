@@ -133,14 +133,6 @@ public:
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
-                      int dst_idx);
-  void explore(Pos pos, bool left,
-               std::unordered_set<Pos, PosCompare> &covered);
-  void expand(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
-  void remove();
-  bool move_right();
-  bool move_left();
 
 public:
   Context *context;
@@ -150,6 +142,15 @@ public:
 
 private:
   size_t special_op_guid;
+  uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
+                      int dst_idx);
+  void explore(Pos pos, bool left,
+               std::unordered_set<Pos, PosCompare> &covered);
+  void expand(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
+  void remove();
+  bool move_right();
+  bool move_left();
+  bool merge_2_rotation_op();
 };
 
 }; // namespace TASOGraph

@@ -65,6 +65,36 @@ struct OpCompare {
 
 class Pos {
 public:
+  Pos() {
+	op = Op();
+	idx = 0;
+  }
+  inline bool operator==(const Pos &b) const {
+	if (op != b.op)
+	  return false;
+	if (idx != b.idx)
+	  return false;
+	return true;
+  }
+  inline bool operator!=(const Pos &b) const {
+	if (op != b.op)
+	  return true;
+	if (idx != b.idx)
+	  return true;
+	return false;
+  }
+  inline bool operator<(const Pos &b) const {
+	if (op != b.op)
+	  return op < b.op;
+	if (idx != b.idx)
+	  return idx < b.idx;
+	return false;
+  }
+  Pos &operator=(const Pos &pos) {
+	op = pos.op;
+	idx = pos.idx;
+	return *this;
+  }
   Pos(Op op_, int idx_) : op(op_), idx(idx_) {}
   Op op;
   int idx;
@@ -78,7 +108,7 @@ struct PosCompare {
 	  return a.op.ptr < b.op.ptr;
 
 	return a.idx < b.idx;
-  };
+  }
 };
 
 class Tensor {
@@ -150,8 +180,8 @@ private:
               std::unordered_set<Pos, PosCompare> &covered,
               std::unordered_map<int, Pos> &anchor_point,
               std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
-              std::unordered_set<int> &visited_qubits);
-  void remove();
+              std::queue<int> &todo_qubits);
+  void remove(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);

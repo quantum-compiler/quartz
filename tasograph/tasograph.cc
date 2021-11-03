@@ -520,23 +520,22 @@ void Graph::expand(Pos pos, bool left, GateType target_rotation,
                    std::unordered_set<Pos, PosCompare> &covered,
                    std::unordered_map<int, Pos> &anchor_point,
                    std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
-                   std::unordered_set<int> &visited_qubits) {
+                   std::queue<int> &todo_qubits) {
   covered.insert(pos);
   while (true) {
 	if (!move_forward(pos, left))
 	  return;
 	if (pos.op.ptr->tp == GateType::cx) {
-	  // Insert the other side of cnot to anchor_points;
-	  if (pos.idx == 0)
-		anchor_point[pos_to_qubits[Pos(pos.op, 1)]] = Pos(pos.op, 1);
-	  else
-		anchor_point[pos_to_qubits[Pos(pos.op, 0)]] = Pos(pos.op, 0);
+	  // Insert the other side of cnot to anchor_points
+	  if (anchor_point.find(pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]) ==
+	      anchor_point.end()) {
+		anchor_point[pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]] =
+		    Pos(pos.op, pos.idx ^ 1);
+		todo_qubits.push(pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]);
+	  }
 	}
 	else if (moveable(pos.op.ptr->tp)) {
-	  if (pos.op.ptr->tp == target_rotation) {
-		// Put target rotation pos into covered
-		covered.insert(pos);
-	  }
+	  covered.insert(pos);
 	  continue;
 	}
 	else {
@@ -591,7 +590,9 @@ void Graph::explore(Pos pos, bool left,
   while (true) {
 	if (covered.find(pos) == covered.end())
 	  return;
-	if (/*pos is the target qubit of a cnot*/) {
+	if (pos.op.ptr->tp == GateType::cx && pos.idx == 1 &&
+	    covered.find(Pos(pos.op, 0)) == covered.end()) {
+	  // pos is the target qubit of a cnot
 	  remove(pos, left, covered);
 	}
 	else {
@@ -600,22 +601,17 @@ void Graph::explore(Pos pos, bool left,
   }
 }
 
-void Graph::remove(std::pair<Op, int> pos, bool left,
-                   std::unordered_set<std::pair<Op, int>> &covered) {
+void Graph::remove(Pos pos, bool left,
+                   std::unordered_set<Pos, PosCompare> &covered) {
   if (covered.find(pos) == covered.end())
 	return;
-  covered.remove(pos);
-  if (/*pos is the control qubit of a cnot*/)
-	remove(target_pos, left, covered);
-  if (left) {
-	if (!move_left(pos))
-	  return;
-  }
-  else {
-	if (!move_right(pos))
-	  return;
-  }
-  remove(pos, covered);
+  covered.erase(pos);
+  if (pos.op.ptr->tp == GateType::cx &&
+      pos.idx == 0) /*pos is the control qubit of a cnot*/
+	remove(Pos(pos.op, 1), left, covered);
+  if (!move_forward(pos, left))
+	return;
+  remove(pos, left, covered);
 }
 
 bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
@@ -778,9 +774,9 @@ void Graph::rotation_merging(GateType target_rotation) {
 	  int qid = todo_qubits.front();
 	  todo_qubits.pop();
 	  expand(anchor_point[qid], true, target_rotation, covered, anchor_point,
-	         pos_to_qubits); // expand left
+	         pos_to_qubits, todo_qubits); // expand left
 	  expand(anchor_point[qid], false, target_rotation, covered, anchor_point,
-	         pos_to_qubits); // expand right
+	         pos_to_qubits, todo_qubits); // expand right
 	}
 
 	// Step 3: deal with partial cnot

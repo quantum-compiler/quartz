@@ -146,11 +146,15 @@ private:
                       int dst_idx);
   void explore(Pos pos, bool left,
                std::unordered_set<Pos, PosCompare> &covered);
-  void expand(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
+  void expand(Pos pos, bool left, GateType target_rotation,
+              std::unordered_set<Pos, PosCompare> &covered,
+              std::unordered_map<int, Pos> &anchor_point,
+              std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
+              std::unordered_set<int> &visited_qubits);
   void remove();
-  bool move_right();
-  bool move_left();
-  bool merge_2_rotation_op();
+  bool moveable(GateType tp);
+  bool move_forward(Pos &pos, bool left);
+  bool merge_2_rotation_op(Op op_0, Op op_1);
 };
 
 }; // namespace TASOGraph

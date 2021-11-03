@@ -6,7 +6,8 @@
 
 namespace TASOGraph {
 
-// TODO: GUID_PRESERVED depends on the
+// TODO: GUID_PRESERVED depends on the global guid in Context class, need to
+// modify
 enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
@@ -515,26 +516,86 @@ void Graph::constant_and_rotation_elimination() {
 }
 
 #ifdef DEADCODE
-void Graph::expand(Pos pos, bool left,
-                   std::unordered_set<Pos, PosCompare> &covered) {
+void Graph::expand(Pos pos, bool left, GateType target_rotation,
+                   std::unordered_set<Pos, PosCompare> &covered,
+                   std::unordered_map<int, Pos> &anchor_point,
+                   std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
+                   std::unordered_set<int> &visited_qubits) {
   covered.insert(pos);
   while (true) {
-	if (left) {
-	  if (!move_left(pos))
-		return;
-	}
-	else {
-	  if (!move_right(pos))
-		return;
-	}
-	if (pos.first.ptr->tp == GateType::cnot) {
+	if (!move_forward(pos, left))
+	  return;
+	if (pos.op.ptr->tp == GateType::cx) {
 	  // Insert the other side of cnot to anchor_points;
+	  if (pos.idx == 0)
+		anchor_point[pos_to_qubits[Pos(pos.op, 1)]] = Pos(pos.op, 1);
+	  else
+		anchor_point[pos_to_qubits[Pos(pos.op, 0)]] = Pos(pos.op, 0);
 	}
-	else if (moveable(pos.frist.ptr->tp)) {
+	else if (moveable(pos.op.ptr->tp)) {
+	  if (pos.op.ptr->tp == target_rotation) {
+		// Put target rotation pos into covered
+		covered.insert(pos);
+	  }
 	  continue;
 	}
 	else {
 	  break;
+	}
+  }
+}
+
+bool Graph::move_forward(Pos &pos, bool left) {
+  if (left) {
+	if (inEdges.find(pos.op) == inEdges.end())
+	  return false;
+	else {
+	  auto in_edges = inEdges[pos.op];
+	  for (const auto edge : in_edges) {
+		if (edge.dstIdx == pos.idx) {
+		  pos.op = edge.srcOp;
+		  pos.idx = edge.srcIdx;
+		  return true;
+		}
+	  }
+	}
+  }
+  else {
+	if (outEdges.find(pos.op) == outEdges.end()) {
+	  return false;
+	}
+	else {
+	  auto out_edges = outEdges[pos.op];
+	  for (const auto edge : out_edges) {
+		if (edge.srcIdx == pos.idx) {
+		  pos.op = edge.dstOp;
+		  pos.idx = edge.dstIdx;
+		  return true;
+		}
+	  }
+	}
+  }
+  assert(false); // Should not reach here
+  return false;
+}
+
+bool Graph::moveable(GateType tp) {
+  if (tp == GateType::cx || tp == GateType::x || tp == GateType::rz ||
+      tp == GateType::u1)
+	return true;
+  return false;
+}
+
+void Graph::explore(Pos pos, bool left,
+                    std::unordered_set<Pos, PosCompare> &covered) {
+  while (true) {
+	if (covered.find(pos) == covered.end())
+	  return;
+	if (/*pos is the target qubit of a cnot*/) {
+	  remove(pos, left, covered);
+	}
+	else {
+	  move_forward(pos, left);
 	}
   }
 }
@@ -557,430 +618,488 @@ void Graph::remove(std::pair<Op, int> pos, bool left,
   remove(pos, covered);
 }
 
-void Graph::explore(Pos pos, bool left,
-                    std::unordered_set<Pos, PosCompare> &covered) {
-  while (true) {
-	if (covered.find(pos) == covered.end())
-	  return;
-	if (/*pos is the target qubit of a cnot*/) {
-	  remove(pos, left, covered);
-	}
-	else {
-	  if (left) {
-		if (!move_left(pos))
-		  return;
-	  }
-	  else {
-		if (!move_right(pos))
-		  return;
-	  }
-	}
-  }
-}
-
-bool Graph::move_right() {}
-
-bool Graph::move_left() {}
-
-bool merge_2_rotation_op(Op op_0, Op op_1) {
+bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
   // Marge rotation op_1 to rotation op_0
   int num_qubits = op_0.ptr->get_num_qubits();
   int num_params = op_0.ptr->get_num_parameters();
 
   std::map<int, Op> param_idx_2_op_0;
   std::map<int, Op> param_idx_2_op_1;
-  assert(inEdges.find(pre_op) != inEdges.end());
-  auto pre_input_edges = inEdges[pre_op];
-  for (auto it = pre_input_edges.begin(); it != pre_input_edges.end(); ++it) {
-	auto pre_edge = *it;
-	if (pre_edge.dstIdx >= num_qubits) {
+
+  assert(inEdges.find(op_1) != inEdges.end());
+  auto input_edges_1 = inEdges[op_1];
+  for (auto it = input_edges_1.begin(); it != input_edges_1.end(); ++it) {
+	auto edge_1 = *it;
+	if (edge_1.dstIdx >= num_qubits) {
 	  // Which means that it is a parameter input
-	  pre_param_idx_2_op[pre_edge.dstIdx] = pre_edge.srcOp;
+	  param_idx_2_op_1[edge_1.dstIdx] = edge_1.srcOp;
 	}
   }
-  for (auto it = input_edges.begin(); it != input_edges.end(); ++it) {
-	auto edge = *it;
-	if (edge.dstIdx >= num_qubits) {
-	  param_idx_2_op[edge.dstIdx] = edge.srcOp;
+  auto input_edges_0 = inEdges[op_0];
+  for (auto it = input_edges_0.begin(); it != input_edges_0.end(); ++it) {
+	auto edge_0 = *it;
+	if (edge_0.dstIdx >= num_qubits) {
+	  param_idx_2_op_0[edge_0.dstIdx] = edge_0.srcOp;
+	}
+  }
+  for (int i = num_qubits; i < num_qubits + num_params; ++i) {
+	if (constant_param_values.find(param_idx_2_op_0[i]) !=
+	        constant_param_values.end() &&
+	    constant_param_values.find(param_idx_2_op_1[i]) !=
+	        constant_param_values.end()) {
+	  // Index i parameter at both Ops are constant
+	  ParamType sum = constant_param_values[param_idx_2_op_0[i]] +
+	                  constant_param_values[param_idx_2_op_1[i]];
+	  remove_node(param_idx_2_op_0[i]);
+	  remove_node(param_idx_2_op_1[i]);
+	  Op new_constant_op(get_next_special_op_guid(),
+	                     context->get_gate(GateType::input_param));
+	  add_edge(new_constant_op, op_0, 0, i);
+	  constant_param_values[new_constant_op] = sum;
+	}
+	else {
+	  // Add a add gate
+	  Op new_add_op(context->next_global_unique_id(),
+	                context->get_gate(GateType::add));
+	  add_edge(param_idx_2_op_0[i], new_add_op, 0, 0);
+	  add_edge(param_idx_2_op_1[i], new_add_op, 0, 1);
+	  add_edge(new_add_op, op_0, 0, i);
+	  remove_edge(param_idx_2_op_0[i], op_0);
+	  remove_edge(param_idx_2_op_1[i], op_1);
+	}
+  }
+  remove_node(op_1);
+}
+
+void Graph::rotation_merging(GateType target_rotation) {
+  // Step 1: calculate the bitmask of each operator
+  std::unordered_map<Pos, uint64_t, PosCompare> bitmasks;
+  std::unordered_map<Pos, int, PosCompare> pos_to_qubits;
+  std::queue<Op> todos;
+  /*
+  for (const auto &it : inEdges) {
+    if (it.second.size() == 0) {
+      todos.push(it.first);
+      bitmasks[Pos(it.first, 0)] = 1 << it.first.ptr->index;
+      op_to_qubits[Pos(it.first, 1)] = it.first.ptr->index;
+    }
+  }
+  */
+  int qubit_idx = 0;
+  for (const auto &it : outEdges) {
+	if (it.first.ptr->tp == GateType::input_qubit) {
+	  todos.push(it.first);
+	  bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
+	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
+	  qubit_idx++;
 	}
   }
 
-  void Graph::rotation_merging(GateType target_rotation) {
-	// Step 1: calculate the bitmask of each operator
-	std::unordered_map<Pos, uint64_t, PosCompare> bitmasks;
-	std::unordered_map<Pos, int, PosCompare> pos_to_qubits;
-	std::queue<Op> todos;
-	/*
-	for (const auto &it : inEdges) {
-	  if (it.second.size() == 0) {
-	    todos.push(it.first);
-	    bitmasks[Pos(it.first, 0)] = 1 << it.first.ptr->index;
-	    op_to_qubits[Pos(it.first, 1)] = it.first.ptr->index;
+  // Construct in-degree map
+  std::map<Op, size_t> op_in_edges_cnt;
+  for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
+	op_in_edges_cnt[it->first] = it->second.size();
+  }
+
+  // Traverse the graph with topological order
+  // Construct the bitmap for all position
+  while (!todos.empty()) {
+	auto op = todos.front();
+	todos.pop();
+	// TODO: explore the outEdges of op
+	//
+	if (op.ptr->tp == GateType::cx) {
+	  auto in_edge_list = inEdges[op];
+	  std::vector<Pos> pos_list(2); // Two inputs for cx gate
+	  for (const auto edge : in_edge_list) {
+		pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
 	  }
+	  bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
+	  bitmasks[Pos(op, 1)] =
+	      xor_bitmap(bitmasks[pos_list[0]], pos_to_qubits[pos_list[0]],
+	                 bitmasks[pos_list[1]], pos_to_qubits[pos_list[1]]);
+	  pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
+	  pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
+	}
+	/*
+	else if (op.ptr->tp == GateType::x) {
+	  bitmasks[std::makr_pair(op, 0)] = bitmasks[in0];
+	  op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
 	}
 	*/
-	int qubit_idx = 0;
-	for (const auto &it : outEdges) {
-	  if (it.first.ptr->tp == GateType::input_qubit) {
-		todos.push(it.first);
-		bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
-		pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
-		qubit_idx++;
-	  }
-	}
-
-	// Construct in-degree map
-	std::map<Op, size_t> op_in_edges_cnt;
-	for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
-	  op_in_edges_cnt[it->first] = it->second.size();
-	}
-
-	// Traverse the graph with topological order
-	// Construct the bitmap for all position
-	while (!todos.empty()) {
-	  auto op = todos.front();
-	  todos.pop();
-	  // TODO: explore the outEdges of op
-	  //
-	  if (op.ptr->tp == GateType::cx) {
-		auto in_edge_list = inEdges[op];
-		std::vector<Pos> pos_list(2); // Two inputs for cx gate
-		for (const auto edge : in_edge_list) {
+	else {
+	  auto in_edge_list = inEdges[op];
+	  int num_qubits = op.ptr->get_num_qubits();
+	  std::vector<Pos> pos_list(num_qubits);
+	  for (const auto edge : in_edge_list) {
+		if (edge.dstIdx < num_qubits) {
 		  pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
 		}
-		bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
-		bitmasks[Pos(op, 1)] =
-		    xor_bitmap(bitmasks[pos_list[0]], pos_to_qubits[pos_list[0]],
-		               bitmasks[pos_list[1]], pos_to_qubits[pos_list[1]]);
-		pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
-		pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
 	  }
-	  /*
-	  else if (op.ptr->tp == GateType::x) {
-	    bitmasks[std::makr_pair(op, 0)] = bitmasks[in0];
-	    op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
-	  }
-	  */
-	  else {
-		auto in_edge_list = inEdges[op];
-		int num_qubits = op.ptr->get_num_qubits();
-		std::vector<Pos> pos_list(num_qubits);
-		for (const auto edge : in_edge_list) {
-		  if (edge.dstIdx < num_qubits) {
-			pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
-		  }
-		}
-		for (int i = 0; i < num_qubits; ++i) {
-		  bitmasks[Pos(op, i)] = bitmasks[pos_list[i]];
-		  pos_to_qubits[Pos(op, i)] = pos_to_qubits[pos_list[i]];
-		}
-	  }
-
-	  if (outEdges.find(op) != outEdges.end()) {
-		std::set<Edge, EdgeCompare> list = outEdges[op];
-		std::set<Edge, EdgeCompare>::const_iterator it2;
-		for (it2 = list.begin(); it2 != list.end(); it2++) {
-		  auto e = *it2;
-		  op_in_edges_cnt[e.dstOp]--;
-		  if (op_in_edges_cnt[e.dstOp] == 0) {
-			todos.push(e.dstOp);
-		  }
-		}
+	  for (int i = 0; i < num_qubits; ++i) {
+		bitmasks[Pos(op, i)] = bitmasks[pos_list[i]];
+		pos_to_qubits[Pos(op, i)] = pos_to_qubits[pos_list[i]];
 	  }
 	}
 
-	// Step 2: Propagate all CNOTs
-	std::queue<Op> todo_cx;
-	std::unordered_set<Op, OpCompare> visited_cx;
-	for (const auto &it : inEdges)
-	  if (it.first.ptr->tp == GateType::cx) {
-		todo_cx.push(it.first);
-	  }
-	while (!todo_cx.empty()) {
-	  const auto cx = todo_cx.front();
-	  todo_cx.pop();
-	  if (visited_cx.find(cx) != visited_cx.end())
-		continue;
-	  std::unordered_map<int, Pos> anchor_point;
-	  std::queue<int> todo_qubits;
-	  std::unordered_set<Pos, PosCompare> covered;
-	  anchor_point[pos_to_qubits[Pos(cx, 0)]] = Pos(cx, 0);
-	  anchor_point[pos_to_qubits[Pos(cx, 1)]] = Pos(cx, 1);
-	  todo_qubits.push(pos_to_qubits[Pos(cx, 0)]);
-	  todo_qubits.push(pos_to_qubits[Pos(cx, 1)]);
-	  while (!todo_qubits.empty()) {
-		int qid = todo_qubits.front();
-		todo_qubits.pop();
-		expand(anchor_point[qid], true, covered);  // expand left
-		expand(anchor_point[qid], false, covered); // expand right
-	  }
-
-	  // Step 3: deal with partial cnot
-	  for (const auto &start_pos : anchor_point) {
-		auto pos = start_pos.second;
-		explore(pos, true, covered);
-		explore(pos, false, covered);
-	  }
-
-	  // Step 4: merge rotations with the same bitmasks
-	  std::unordered_map<uint64_t, Pos> bitmask_to_pos;
-	  for (const auto &pos : covered) {
-		if (pos.op.ptr->tp == target_rotation) {
-		  uint64_t bm = bitmasks[pos];
-		  if (bitmask_to_pos.find(bm) != bitmask_to_pos.end()) {
-			Pos other_pos = bitmask_to_pos[bm];
-
-			// TODO
-			// remove it from the graph
-			//
-			// change the degree of old_pos
-			old_pos.op.ptr->degree += it.op.ptr->degree;
-		  }
-		  else {
-			bitmask_to_pos[bm] = pos;
-		  }
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> list = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		auto e = *it2;
+		op_in_edges_cnt[e.dstOp]--;
+		if (op_in_edges_cnt[e.dstOp] == 0) {
+		  todos.push(e.dstOp);
 		}
 	  }
+	}
+  }
+
+  // Step 2: Propagate all CNOTs
+  std::queue<Op> todo_cx;
+  std::unordered_set<Op, OpCompare> visited_cx;
+  for (const auto &it : inEdges)
+	if (it.first.ptr->tp == GateType::cx) {
+	  todo_cx.push(it.first);
+	}
+  while (!todo_cx.empty()) {
+	const auto cx = todo_cx.front();
+	todo_cx.pop();
+	if (visited_cx.find(cx) != visited_cx.end())
+	  continue;
+	std::unordered_map<int, Pos> anchor_point;
+	std::queue<int> todo_qubits;
+	std::unordered_set<Pos, PosCompare> covered;
+	anchor_point[pos_to_qubits[Pos(cx, 0)]] = Pos(cx, 0);
+	anchor_point[pos_to_qubits[Pos(cx, 1)]] = Pos(cx, 1);
+	todo_qubits.push(pos_to_qubits[Pos(cx, 0)]);
+	todo_qubits.push(pos_to_qubits[Pos(cx, 1)]);
+	while (!todo_qubits.empty()) {
+	  int qid = todo_qubits.front();
+	  todo_qubits.pop();
+	  expand(anchor_point[qid], true, target_rotation, covered, anchor_point,
+	         pos_to_qubits); // expand left
+	  expand(anchor_point[qid], false, target_rotation, covered, anchor_point,
+	         pos_to_qubits); // expand right
 	}
 
 	// Step 3: deal with partial cnot
-	/*
-	for (const auto &start_pos : anchor_point) {
-	  pos = start_pos;
+	for (const auto &it : anchor_point) {
+	  auto pos = it.second;
 	  explore(pos, true, covered);
 	  explore(pos, false, covered);
 	}
-	*/
-	// Step 4: merge rotations with the same bitmasks
+
+	// Step 4: merge rotations with the same bitmasks on the same qubit
+	std::unordered_map<
+	    int, std::unordered_map<uint64_t, std::unordered_set<Pos, PosCompare>>>
+	    qubit_2_bm_2_pos;
+	for (const auto &pos : covered) {
+	  if (pos.op.ptr->tp == target_rotation) {
+		int qubit_idx = pos_to_qubits[pos];
+		auto bm = bitmasks[pos];
+		if (qubit_2_bm_2_pos.find(qubit_idx) == qubit_2_bm_2_pos.end()) {
+		  qubit_2_bm_2_pos[qubit_idx];
+		}
+		if (qubit_2_bm_2_pos[qubit_idx].find(bm) ==
+		    qubit_2_bm_2_pos[qubit_idx].end()) {
+		  qubit_2_bm_2_pos[qubit_idx][bm];
+		}
+		if (qubit_2_bm_2_pos[qubit_idx][bm].find(pos) ==
+		    qubit_2_bm_2_pos[qubit_idx][bm].end()) {
+		  qubit_2_bm_2_pos[qubit_idx][bm].insert(pos);
+		}
+	  }
+	}
+
+	for (const auto &it_0 : qubit_2_bm_2_pos) {
+	  for (const auto &it_1 : it_0.second) {
+		auto &pos_set = it_1.second;
+		assert(pos_set.size() >= 1);
+		Pos *first = nullptr;
+		bool is_first = true;
+		for (auto pos : pos_set) {
+		  if (is_first) {
+			first = &pos;
+			is_first = false;
+		  }
+		  else {
+			merge_2_rotation_op(first->op, pos.op);
+		  }
+		}
+	  }
+	}
 	/*
-	std::unordered_map<uint64_t, std::pair<Op, int>> bitmask_to_pos;
-	for (const auto &it : covered) {
-	  if (it.first.op.ptr->ty == GateType::rz) {
-	    uint64_t bm = bitmasks[it.first];
-	    if (bitmask_to_pos(bm) != bitmask_to_pos.end()) {
-	      std::pair<Op, int> old_pos = bitmask_to_pos[bm];
+	std::unordered_map<uint64_t, Pos> bitmask_to_pos;
+	std::unordered_set<Pos, PosCompare> merged_pos;
+	for (const auto &pos : covered) {
+	  // We cannot directly erase the merged rotation pos in covered in the
+	  // iteration, so we have to record it in merged_pos
+	  if (merged_pos.find(pos) != merged_pos.end()) {
+	    continue;
+	  }
+	  if (pos.op.ptr->tp == target_rotation) {
+	    uint64_t bm = bitmasks[pos];
+	    if (bitmask_to_pos.find(bm) != bitmask_to_pos.end()) {
+	      Pos other_pos = bitmask_to_pos[bm];
+	      if (merged_pos.find(other_pos) != merged_pos.end()) {
+	        // The pos recorded in bitmask_to_pos is already merged
+	        bitmask_to_pos[bm] = pos;
+	        continue;
+	      }
+	      merge_2_rotation_op(pos.op, other_pos.op);
+	      merged_pos.insert(other_pos);
+	      bitmask_to_pos[bm] = pos;
+	      // TODO
 	      // remove it from the graph
 	      //
 	      // change the degree of old_pos
-	      old_pos.first.ptr->degree += it.first.ptr->degree;
+	      //   old_pos.op.ptr->degree += it.op.ptr->degree;
 	    }
 	    else {
-	      bitmask_to_pos[bm] = it;
+	      bitmask_to_pos[bm] = pos;
 	    }
 	  }
 	}
 	*/
   }
+
+  // Step 3: deal with partial cnot
+  /*
+  for (const auto &start_pos : anchor_point) {
+    pos = start_pos;
+    explore(pos, true, covered);
+    explore(pos, false, covered);
+  }
+  */
+  // Step 4: merge rotations with the same bitmasks
+  /*
+  std::unordered_map<uint64_t, std::pair<Op, int>> bitmask_to_pos;
+  for (const auto &it : covered) {
+    if (it.first.op.ptr->ty == GateType::rz) {
+      uint64_t bm = bitmasks[it.first];
+      if (bitmask_to_pos(bm) != bitmask_to_pos.end()) {
+        std::pair<Op, int> old_pos = bitmask_to_pos[bm];
+        // remove it from the graph
+        //
+        // change the degree of old_pos
+        old_pos.first.ptr->degree += it.first.ptr->degree;
+      }
+      else {
+        bitmask_to_pos[bm] = it;
+      }
+    }
+  }
+  */
+}
 #endif
 
-  Graph *Graph::optimize(float alpha, int budget, bool print_subst,
-                         Context *ctx, const std::string &equiv_file_name,
-                         bool use_simulated_annealing) {
-	EquivalenceSet eqs;
-	// Load equivalent dags from file
-	auto start = std::chrono::steady_clock::now();
-	if (!eqs.load_json(ctx, equiv_file_name)) {
-	  std::cout << "Failed to load equivalence file." << std::endl;
-	  assert(false);
-	}
-	auto end = std::chrono::steady_clock::now();
-	std::cout << std::dec << eqs.num_equivalence_classes()
-	          << " classes of equivalences with " << eqs.num_total_dags()
-	          << " DAGs are loaded in "
-	          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-	                 end - start)
-	                     .count() /
-	                 1000.0
-	          << " seconds." << std::endl;
-
-	//   start = std::chrono::steady_clock::now();
-	//   auto num_equiv_class_inserted = eqs.simplify(ctx);
-	//   end = std::chrono::steady_clock::now();
-	//   std::cout << std::dec << eqs.num_equivalence_classes()
-	//             << " classes of equivalences remain after simplication after
-	//             "
-	//             <<
-	//             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-	//                    end - start)
-	//                        .count() /
-	//                    1000.0
-	//             << " seconds." << std::endl;
-
-	std::vector<GraphXfer *> xfers;
-	for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
-	  bool first = true;
-	  DAG *first_dag = nullptr;
-	  for (const auto &dag : equiv_set) {
-		if (first) {
-		  // Used raw pointer according to the GraphXfer API
-		  // May switch to smart pointer later
-		  first_dag = new DAG(*dag);
-		  first = false;
-		}
-		else {
-		  DAG *other_dag = new DAG(*dag);
-		  // first_dag is src, others are dst
-		  if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
-			std::cout << first_dag->get_num_gates() << " "
-			          << other_dag->get_num_gates() << "; ";
-		  }
-		  auto first_2_other =
-		      GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
-		  // first_dag is dst, others are src
-		  auto other_2_first =
-		      GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
-		  if (first_2_other != nullptr)
-			xfers.push_back(first_2_other);
-		  else
-			std::cout << "nullptr"
-			          << " ";
-		  if (other_2_first != nullptr)
-			xfers.push_back(other_2_first);
-		  else
-			std::cout << "nullptr"
-			          << " ";
-		  delete other_dag;
-		}
-	  }
-	  delete first_dag;
-	}
-
-	std::cout << "Number of different transfers is " << xfers.size() << "."
-	          << std::endl;
-
-	int counter = 0;
-	int maxNumOps = inEdges.size();
-
-	std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
-	std::set<size_t> hashmap;
-	candidates.push(this);
-	hashmap.insert(hash());
-	Graph *bestGraph = this;
-	float bestCost = total_cost();
-
-	printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
-	if (use_simulated_annealing) {
-	  const double kSABeginTemp = bestCost;
-	  const double kSAEndTemp = kSABeginTemp / 1e6;
-	  const double kSACoolingFactor = 1.0 - 1e-1;
-	  const int kNumKeepGraph = 50;
-	  // <cost, graph>
-	  std::vector<std::pair<float, Graph *>> sa_candidates;
-	  sa_candidates.reserve(kNumKeepGraph);
-	  sa_candidates.emplace_back(bestCost, this);
-	  int num_iteration = 0;
-	  std::cout << "Begin simulated annealing with " << xfers.size()
-	            << " xfers." << std::endl;
-	  for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
-		num_iteration++;
-		hashmap.clear();
-		std::vector<std::pair<float, Graph *>> new_candidates;
-		new_candidates.reserve(sa_candidates.size() * xfers.size());
-		int num_possible_new_candidates = 0;
-		for (auto &candidate : sa_candidates) {
-		  const auto current_cost = candidate.first;
-		  std::vector<Graph *> current_new_candidates;
-		  current_new_candidates.reserve(xfers.size());
-		  for (auto &xfer : xfers) {
-			xfer->run(0, candidate.second, current_new_candidates, hashmap,
-			          bestCost * alpha, 2 * maxNumOps);
-		  }
-		  num_possible_new_candidates += current_new_candidates.size();
-		  for (auto &new_candidate : current_new_candidates) {
-			const auto new_cost = new_candidate->total_cost();
-			if (new_cost < bestCost) {
-			  bestGraph = new_candidate;
-			  bestCost = new_cost;
-			}
-			// Apply the criteria of simulated annealing.
-			// Cost is the smaller the better here.
-			if (new_cost < current_cost ||
-			    ctx->random_number() <
-			        std::exp((current_cost - new_cost) / T)) {
-			  // Accept the new candidate.
-			  new_candidates.emplace_back(new_cost, new_candidate);
-			}
-			else {
-			  delete new_candidate;
-			}
-		  }
-		}
-
-		// Compute some statistical information to output, can be commented
-		// when verbose=false
-		const auto num_new_candidates = new_candidates.size();
-		assert(!new_candidates.empty());
-		auto min_cost = new_candidates[0].first;
-		auto max_cost = new_candidates[0].first;
-		for (const auto &new_candidate : new_candidates) {
-		  min_cost = std::min(min_cost, new_candidate.first);
-		  max_cost = std::max(max_cost, new_candidate.first);
-		}
-
-		if (new_candidates.size() > kNumKeepGraph) {
-		  // Prune some candidates.
-		  // TODO: make sure the candidates kept are far from each other
-		  // TODO: use hashmap to avoid keep searching for the same graphs
-		  std::partial_sort(new_candidates.begin(),
-		                    new_candidates.begin() + kNumKeepGraph,
-		                    new_candidates.end());
-		  for (int i = kNumKeepGraph; i < (int)new_candidates.size(); i++) {
-			if (new_candidates[i].second != this &&
-			    new_candidates[i].second != bestGraph) {
-			  delete new_candidates[i].second;
-			}
-		  }
-		  new_candidates.resize(kNumKeepGraph);
-		}
-		sa_candidates = std::move(new_candidates);
-
-		std::cout << "Iteration " << num_iteration << ": T = " << std::fixed
-		          << std::setprecision(2) << T << ", bestcost = " << bestCost
-		          << ", " << num_new_candidates << " out of "
-		          << num_possible_new_candidates
-		          << " possible new candidates accepted, cost ranging ["
-		          << min_cost << ", " << max_cost << "]" << std::endl;
-	  }
-	}
-	else {
-	  while (!candidates.empty()) {
-		Graph *subGraph = candidates.top();
-		candidates.pop();
-		if (subGraph->total_cost() < bestCost) {
-		  if (bestGraph != this)
-			delete bestGraph;
-		  bestCost = subGraph->total_cost();
-		  bestGraph = subGraph;
-		}
-		if (counter > budget) {
-		  // TODO: free all remaining candidates when budget exhausted
-		  //   break;
-		  ;
-		}
-		counter++;
-
-		std::cout << bestCost << " " << std::flush;
-
-		std::vector<Graph *> new_candidates;
-		for (auto &xfer : xfers) {
-		  xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,
-		            2 * maxNumOps);
-		}
-		for (auto &candidate : new_candidates) {
-		  candidates.push(candidate);
-		}
-		if (bestGraph != subGraph) {
-		  delete subGraph;
-		}
-	  }
-	}
-	printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
-	// Print results
-	std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::iterator it;
-	for (it = bestGraph->inEdges.begin(); it != bestGraph->inEdges.end();
-	     ++it) {
-	  std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
-	}
-	return bestGraph;
+Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
+                       const std::string &equiv_file_name,
+                       bool use_simulated_annealing) {
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  auto start = std::chrono::steady_clock::now();
+  if (!eqs.load_json(ctx, equiv_file_name)) {
+	std::cout << "Failed to load equivalence file." << std::endl;
+	assert(false);
   }
+  auto end = std::chrono::steady_clock::now();
+  std::cout << std::dec << eqs.num_equivalence_classes()
+            << " classes of equivalences with " << eqs.num_total_dags()
+            << " DAGs are loaded in "
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - start)
+                       .count() /
+                   1000.0
+            << " seconds." << std::endl;
+
+  //   start = std::chrono::steady_clock::now();
+  //   auto num_equiv_class_inserted = eqs.simplify(ctx);
+  //   end = std::chrono::steady_clock::now();
+  //   std::cout << std::dec << eqs.num_equivalence_classes()
+  //             << " classes of equivalences remain after simplication after
+  //             "
+  //             <<
+  //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+  //                    end - start)
+  //                        .count() /
+  //                    1000.0
+  //             << " seconds." << std::endl;
+
+  std::vector<GraphXfer *> xfers;
+  for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
+	bool first = true;
+	DAG *first_dag = nullptr;
+	for (const auto &dag : equiv_set) {
+	  if (first) {
+		// Used raw pointer according to the GraphXfer API
+		// May switch to smart pointer later
+		first_dag = new DAG(*dag);
+		first = false;
+	  }
+	  else {
+		DAG *other_dag = new DAG(*dag);
+		// first_dag is src, others are dst
+		if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
+		  std::cout << first_dag->get_num_gates() << " "
+		            << other_dag->get_num_gates() << "; ";
+		}
+		auto first_2_other =
+		    GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
+		// first_dag is dst, others are src
+		auto other_2_first =
+		    GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
+		if (first_2_other != nullptr)
+		  xfers.push_back(first_2_other);
+		else
+		  std::cout << "nullptr"
+		            << " ";
+		if (other_2_first != nullptr)
+		  xfers.push_back(other_2_first);
+		else
+		  std::cout << "nullptr"
+		            << " ";
+		delete other_dag;
+	  }
+	}
+	delete first_dag;
+  }
+
+  std::cout << "Number of different transfers is " << xfers.size() << "."
+            << std::endl;
+
+  int counter = 0;
+  int maxNumOps = inEdges.size();
+
+  std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
+  std::set<size_t> hashmap;
+  candidates.push(this);
+  hashmap.insert(hash());
+  Graph *bestGraph = this;
+  float bestCost = total_cost();
+
+  printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
+  if (use_simulated_annealing) {
+	const double kSABeginTemp = bestCost;
+	const double kSAEndTemp = kSABeginTemp / 1e6;
+	const double kSACoolingFactor = 1.0 - 1e-1;
+	const int kNumKeepGraph = 50;
+	// <cost, graph>
+	std::vector<std::pair<float, Graph *>> sa_candidates;
+	sa_candidates.reserve(kNumKeepGraph);
+	sa_candidates.emplace_back(bestCost, this);
+	int num_iteration = 0;
+	std::cout << "Begin simulated annealing with " << xfers.size() << " xfers."
+	          << std::endl;
+	for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
+	  num_iteration++;
+	  hashmap.clear();
+	  std::vector<std::pair<float, Graph *>> new_candidates;
+	  new_candidates.reserve(sa_candidates.size() * xfers.size());
+	  int num_possible_new_candidates = 0;
+	  for (auto &candidate : sa_candidates) {
+		const auto current_cost = candidate.first;
+		std::vector<Graph *> current_new_candidates;
+		current_new_candidates.reserve(xfers.size());
+		for (auto &xfer : xfers) {
+		  xfer->run(0, candidate.second, current_new_candidates, hashmap,
+		            bestCost * alpha, 2 * maxNumOps);
+		}
+		num_possible_new_candidates += current_new_candidates.size();
+		for (auto &new_candidate : current_new_candidates) {
+		  const auto new_cost = new_candidate->total_cost();
+		  if (new_cost < bestCost) {
+			bestGraph = new_candidate;
+			bestCost = new_cost;
+		  }
+		  // Apply the criteria of simulated annealing.
+		  // Cost is the smaller the better here.
+		  if (new_cost < current_cost ||
+		      ctx->random_number() < std::exp((current_cost - new_cost) / T)) {
+			// Accept the new candidate.
+			new_candidates.emplace_back(new_cost, new_candidate);
+		  }
+		  else {
+			delete new_candidate;
+		  }
+		}
+	  }
+
+	  // Compute some statistical information to output, can be commented
+	  // when verbose=false
+	  const auto num_new_candidates = new_candidates.size();
+	  assert(!new_candidates.empty());
+	  auto min_cost = new_candidates[0].first;
+	  auto max_cost = new_candidates[0].first;
+	  for (const auto &new_candidate : new_candidates) {
+		min_cost = std::min(min_cost, new_candidate.first);
+		max_cost = std::max(max_cost, new_candidate.first);
+	  }
+
+	  if (new_candidates.size() > kNumKeepGraph) {
+		// Prune some candidates.
+		// TODO: make sure the candidates kept are far from each other
+		// TODO: use hashmap to avoid keep searching for the same graphs
+		std::partial_sort(new_candidates.begin(),
+		                  new_candidates.begin() + kNumKeepGraph,
+		                  new_candidates.end());
+		for (int i = kNumKeepGraph; i < (int)new_candidates.size(); i++) {
+		  if (new_candidates[i].second != this &&
+		      new_candidates[i].second != bestGraph) {
+			delete new_candidates[i].second;
+		  }
+		}
+		new_candidates.resize(kNumKeepGraph);
+	  }
+	  sa_candidates = std::move(new_candidates);
+
+	  std::cout << "Iteration " << num_iteration << ": T = " << std::fixed
+	            << std::setprecision(2) << T << ", bestcost = " << bestCost
+	            << ", " << num_new_candidates << " out of "
+	            << num_possible_new_candidates
+	            << " possible new candidates accepted, cost ranging ["
+	            << min_cost << ", " << max_cost << "]" << std::endl;
+	}
+  }
+  else {
+	while (!candidates.empty()) {
+	  Graph *subGraph = candidates.top();
+	  candidates.pop();
+	  if (subGraph->total_cost() < bestCost) {
+		if (bestGraph != this)
+		  delete bestGraph;
+		bestCost = subGraph->total_cost();
+		bestGraph = subGraph;
+	  }
+	  if (counter > budget) {
+		// TODO: free all remaining candidates when budget exhausted
+		//   break;
+		;
+	  }
+	  counter++;
+
+	  std::cout << bestCost << " " << std::flush;
+
+	  std::vector<Graph *> new_candidates;
+	  for (auto &xfer : xfers) {
+		xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,
+		          2 * maxNumOps);
+	  }
+	  for (auto &candidate : new_candidates) {
+		candidates.push(candidate);
+	  }
+	  if (bestGraph != subGraph) {
+		delete subGraph;
+	  }
+	}
+  }
+  printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
+  // Print results
+  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::iterator it;
+  for (it = bestGraph->inEdges.begin(); it != bestGraph->inEdges.end(); ++it) {
+	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
+  }
+  return bestGraph;
+}
 }; // namespace TASOGraph

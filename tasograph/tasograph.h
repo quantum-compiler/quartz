@@ -55,12 +55,21 @@ public:
   Gate *ptr;
 };
 
-struct OpCompare {
+class OpCompare {
+public:
   bool operator()(const Op &a, const Op &b) const {
 	if (a.guid != b.guid)
 	  return a.guid < b.guid;
 	return a.ptr < b.ptr;
   };
+};
+
+class OpHash {
+public:
+  size_t operator()(const Op &a) const {
+	std::hash<size_t> hash_fn;
+	return hash_fn(a.guid) * 17 + hash_fn((size_t)(a.ptr));
+  }
 };
 
 class Pos {
@@ -69,19 +78,9 @@ public:
 	op = Op();
 	idx = 0;
   }
-  inline bool operator==(const Pos &b) const {
-	if (op != b.op)
-	  return false;
-	if (idx != b.idx)
-	  return false;
-	return true;
-  }
-  inline bool operator!=(const Pos &b) const {
-	if (op != b.op)
-	  return true;
-	if (idx != b.idx)
-	  return true;
-	return false;
+  Pos(const Pos &b) {
+	op = b.op;
+	idx = b.idx;
   }
   inline bool operator<(const Pos &b) const {
 	if (op != b.op)
@@ -100,13 +99,35 @@ public:
   int idx;
 };
 
-struct PosCompare {
-  bool operator()(const Pos &a, const Pos &b) const {
-	if (a.op.guid != b.op.guid)
-	  return a.op.guid < b.op.guid;
-	if (a.op.ptr != b.op.ptr)
-	  return a.op.ptr < b.op.ptr;
+inline bool operator==(const Pos &a, const Pos &b) {
+  if (a.op != b.op)
+	return false;
+  if (a.idx != b.idx)
+	return false;
+  return true;
+}
+inline bool operator!=(const Pos &a, const Pos &b) {
+  if (a.op != b.op)
+	return true;
+  if (a.idx != b.idx)
+	return true;
+  return false;
+}
 
+class PosHash {
+public:
+  size_t operator()(const Pos &a) const {
+	std::hash<size_t> hash_fn;
+	OpHash op_hash;
+	return op_hash(a.op) * 17 + hash_fn(a.idx);
+  }
+};
+
+class PosCompare {
+public:
+  bool operator()(const Pos &a, const Pos &b) const {
+	if (a.op != b.op)
+	  return a.op < b.op;
 	return a.idx < b.idx;
   }
 };
@@ -174,14 +195,13 @@ private:
   size_t special_op_guid;
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
                       int dst_idx);
-  void explore(Pos pos, bool left,
-               std::unordered_set<Pos, PosCompare> &covered);
+  void explore(Pos pos, bool left, std::unordered_set<Pos, PosHash> &covered);
   void expand(Pos pos, bool left, GateType target_rotation,
-              std::unordered_set<Pos, PosCompare> &covered,
+              std::unordered_set<Pos, PosHash> &covered,
               std::unordered_map<int, Pos> &anchor_point,
-              std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
+              std::unordered_map<Pos, int, PosHash> pos_to_qubits,
               std::queue<int> &todo_qubits);
-  void remove(Pos pos, bool left, std::unordered_set<Pos, PosCompare> &covered);
+  void remove(Pos pos, bool left, std::unordered_set<Pos, PosHash> &covered);
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);

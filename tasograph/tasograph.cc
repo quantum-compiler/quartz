@@ -515,11 +515,19 @@ void Graph::constant_and_rotation_elimination() {
   }
 }
 
-#ifdef DEADCODE
+uint64_t Graph::xor_bitmap(uint64_t src_bitmap, int src_idx,
+                           uint64_t dst_bitmap, int dst_idx) {
+  uint64_t dst_bit = 1 << dst_idx; // Get mask, only dst_idx is 1
+  dst_bit &= dst_bitmap;           // Get dst_idx bit
+  dst_bit >>= dst_idx;
+  dst_bit <<= src_idx;
+  return src_bitmap ^= dst_bit;
+}
+
 void Graph::expand(Pos pos, bool left, GateType target_rotation,
-                   std::unordered_set<Pos, PosCompare> &covered,
+                   std::unordered_set<Pos, PosHash> &covered,
                    std::unordered_map<int, Pos> &anchor_point,
-                   std::unordered_map<Pos, int, PosCompare> pos_to_qubits,
+                   std::unordered_map<Pos, int, PosHash> pos_to_qubits,
                    std::queue<int> &todo_qubits) {
   covered.insert(pos);
   while (true) {
@@ -586,7 +594,7 @@ bool Graph::moveable(GateType tp) {
 }
 
 void Graph::explore(Pos pos, bool left,
-                    std::unordered_set<Pos, PosCompare> &covered) {
+                    std::unordered_set<Pos, PosHash> &covered) {
   while (true) {
 	if (covered.find(pos) == covered.end())
 	  return;
@@ -596,13 +604,15 @@ void Graph::explore(Pos pos, bool left,
 	  remove(pos, left, covered);
 	}
 	else {
-	  move_forward(pos, left);
+	  if (!move_forward(pos, left)) {
+		return;
+	  }
 	}
   }
 }
 
 void Graph::remove(Pos pos, bool left,
-                   std::unordered_set<Pos, PosCompare> &covered) {
+                   std::unordered_set<Pos, PosHash> &covered) {
   if (covered.find(pos) == covered.end())
 	return;
   covered.erase(pos);
@@ -669,8 +679,8 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
 
 void Graph::rotation_merging(GateType target_rotation) {
   // Step 1: calculate the bitmask of each operator
-  std::unordered_map<Pos, uint64_t, PosCompare> bitmasks;
-  std::unordered_map<Pos, int, PosCompare> pos_to_qubits;
+  std::unordered_map<Pos, uint64_t, PosHash> bitmasks;
+  std::unordered_map<Pos, int, PosHash> pos_to_qubits;
   std::queue<Op> todos;
   /*
   for (const auto &it : inEdges) {
@@ -681,6 +691,8 @@ void Graph::rotation_merging(GateType target_rotation) {
     }
   }
   */
+
+  // For all input_qubits, initialize its bitmap, and assign it a idx
   int qubit_idx = 0;
   for (const auto &it : outEdges) {
 	if (it.first.ptr->tp == GateType::input_qubit) {
@@ -753,7 +765,7 @@ void Graph::rotation_merging(GateType target_rotation) {
 
   // Step 2: Propagate all CNOTs
   std::queue<Op> todo_cx;
-  std::unordered_set<Op, OpCompare> visited_cx;
+  std::unordered_set<Op, OpHash> visited_cx;
   for (const auto &it : inEdges)
 	if (it.first.ptr->tp == GateType::cx) {
 	  todo_cx.push(it.first);
@@ -765,7 +777,7 @@ void Graph::rotation_merging(GateType target_rotation) {
 	  continue;
 	std::unordered_map<int, Pos> anchor_point;
 	std::queue<int> todo_qubits;
-	std::unordered_set<Pos, PosCompare> covered;
+	std::unordered_set<Pos, PosHash> covered;
 	anchor_point[pos_to_qubits[Pos(cx, 0)]] = Pos(cx, 0);
 	anchor_point[pos_to_qubits[Pos(cx, 1)]] = Pos(cx, 1);
 	todo_qubits.push(pos_to_qubits[Pos(cx, 0)]);
@@ -788,9 +800,12 @@ void Graph::rotation_merging(GateType target_rotation) {
 
 	// Step 4: merge rotations with the same bitmasks on the same qubit
 	std::unordered_map<
-	    int, std::unordered_map<uint64_t, std::unordered_set<Pos, PosCompare>>>
+	    int, std::unordered_map<uint64_t, std::unordered_set<Pos, PosHash>>>
 	    qubit_2_bm_2_pos;
 	for (const auto &pos : covered) {
+	  if (pos.op.ptr->tp == GateType::cx) {
+		visited_cx.insert(pos.op);
+	  }
 	  if (pos.op.ptr->tp == target_rotation) {
 		int qubit_idx = pos_to_qubits[pos];
 		auto bm = bitmasks[pos];
@@ -888,6 +903,7 @@ void Graph::rotation_merging(GateType target_rotation) {
   }
   */
 }
+#ifdef DEADCODE
 #endif
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,

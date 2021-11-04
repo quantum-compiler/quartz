@@ -152,6 +152,7 @@ bool Graph::has_loop(void) {
 	std::set<Edge, EdgeCompare>::const_iterator it2;
 	for (it2 = inList.begin(); it2 != inList.end(); it2++) {
 	  if (it2->srcOp.guid > GUID_PRESERVED)
+		// Not input Ops
 		cnt++;
 	}
 	todos[it->first] = cnt;
@@ -161,12 +162,14 @@ bool Graph::has_loop(void) {
   size_t i = 0;
   while (i < opList.size()) {
 	Op op = opList[i++];
-	std::set<Edge, EdgeCompare> outList = outEdges[op];
-	std::set<Edge, EdgeCompare>::const_iterator it2;
-	for (it2 = outList.begin(); it2 != outList.end(); it2++) {
-	  todos[it2->dstOp]--;
-	  if (todos[it2->dstOp] == 0) {
-		opList.push_back(it2->dstOp);
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> outList = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = outList.begin(); it2 != outList.end(); it2++) {
+		todos[it2->dstOp]--;
+		if (todos[it2->dstOp] == 0) {
+		  opList.push_back(it2->dstOp);
+		}
 	  }
 	}
   }
@@ -580,10 +583,10 @@ bool Graph::move_forward(Pos &pos, bool left) {
 		  return true;
 		}
 	  }
+	  return false; // Output qubit
 	}
   }
   assert(false); // Should not reach here
-  return false;
 }
 
 bool Graph::moveable(GateType tp) {

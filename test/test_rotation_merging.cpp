@@ -1,20 +1,21 @@
-#include "test_optimization.h"
 #include "../gate/gate_utils.h"
+#include "../context/context.h"
+#include "../tasograph/tasograph.h"
+#include "../parser/qasm_parser.h"
 
 #include <iostream>
 
 int main() {
 
   Context src_ctx({GateType::input_param, GateType::input_qubit, GateType::t,
-                   GateType::tdg, GateType::h, GateType::cx});
+                   GateType::tdg, GateType::cx});
   Context dst_ctx({GateType::input_param, GateType::input_qubit, GateType::rz,
-                   GateType::h, GateType::cx});
+                   GateType::cx});
   Context union_ctx({GateType::input_param, GateType::input_qubit, GateType::t,
-                     GateType::tdg, GateType::h, GateType::cx, GateType::rz});
+                     GateType::tdg, GateType::cx, GateType::rz});
   QASMParser qasm_parser(&union_ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/example-circuits/barenco_tof_3.qasm",
-                             dag)) {
+  if (!qasm_parser.load_qasm("circuit/example-circuits/t_cx_tdg.qasm", dag)) {
 	std::cout << "Parser failed" << std::endl;
   }
 
@@ -23,6 +24,10 @@ int main() {
                           "tdg q0 = rz q0 -0.25pi"});
   TASOGraph::Graph *newGraph =
       graph.context_shift(&src_ctx, &dst_ctx, &union_ctx, &rule_parser);
+  for (auto it = newGraph->inEdges.begin(); it != newGraph->inEdges.end();
+       ++it) {
+	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
+  }
   newGraph->rotation_merging(GateType::cx);
   std::cout << newGraph->total_cost() << " gates in circuit before optimizing."
             << std::endl;

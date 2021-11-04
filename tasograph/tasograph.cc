@@ -682,17 +682,9 @@ void Graph::rotation_merging(GateType target_rotation) {
   std::unordered_map<Pos, uint64_t, PosHash> bitmasks;
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
   std::queue<Op> todos;
-  /*
-  for (const auto &it : inEdges) {
-    if (it.second.size() == 0) {
-      todos.push(it.first);
-      bitmasks[Pos(it.first, 0)] = 1 << it.first.ptr->index;
-      op_to_qubits[Pos(it.first, 1)] = it.first.ptr->index;
-    }
-  }
-  */
 
   // For all input_qubits, initialize its bitmap, and assign it a idx
+  // TODO: load qubit index from DAG
   int qubit_idx = 0;
   for (const auto &it : outEdges) {
 	if (it.first.ptr->tp == GateType::input_qubit) {
@@ -700,6 +692,9 @@ void Graph::rotation_merging(GateType target_rotation) {
 	  bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
 	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
 	  qubit_idx++;
+	}
+	else if (it.first.ptr->tp == GateType::input_param) {
+	  todos.push(it.first);
 	}
   }
 
@@ -714,8 +709,7 @@ void Graph::rotation_merging(GateType target_rotation) {
   while (!todos.empty()) {
 	auto op = todos.front();
 	todos.pop();
-	// TODO: explore the outEdges of op
-	//
+	// Explore the outEdges of op
 	if (op.ptr->tp == GateType::cx) {
 	  auto in_edge_list = inEdges[op];
 	  std::vector<Pos> pos_list(2); // Two inputs for cx gate
@@ -729,13 +723,8 @@ void Graph::rotation_merging(GateType target_rotation) {
 	  pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
 	  pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
 	}
-	/*
-	else if (op.ptr->tp == GateType::x) {
-	  bitmasks[std::makr_pair(op, 0)] = bitmasks[in0];
-	  op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
-	}
-	*/
-	else {
+	else if (op.ptr->tp != GateType::input_qubit &&
+	         op.ptr->tp != GateType::input_param) {
 	  auto in_edge_list = inEdges[op];
 	  int num_qubits = op.ptr->get_num_qubits();
 	  std::vector<Pos> pos_list(num_qubits);

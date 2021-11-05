@@ -28,11 +28,11 @@ def eq_matrix(A, B):
 def eq_vector(A, B):
     assert len(A) == len(B)
     assert all(len(ra) == len(rb) for ra, rb in zip(A, B))
-    return z3.And([
+    return [
         za == zb
         for ra, rb in zip(A, B)
         for za, zb in zip(ra, rb)
-    ])
+    ]
 
 
 def matmul(A, B):
@@ -171,23 +171,32 @@ def equivalent(dag1, dag2, check_phase_shift=False):
     solver = z3.Solver()
     num_qubits = dag1_meta[meta_index_num_qubits]
     equation_list = []
-    vec = input_distribution(num_qubits, equation_list)
-    num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
-    params = create_parameters(num_parameters, equation_list)
-    output_vec1 = evaluate(dag1, vec, params)
-    output_vec2 = evaluate(dag2, vec, params)
     if check_phase_shift:
+        # Let z3 check phase shift
+        num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+        params = create_parameters(num_parameters, equation_list)
         cosL = z3.Real('cosL')
         sinL = z3.Real('sinL')
-        variables = [item for value in vec + params for item in value]
-        output_vec2 = phase_shift(output_vec2, [cosL, sinL])
-        solver.add(z3.ForAll([cosL, sinL], z3.Implies(angle(cosL, sinL),
-                                                      z3.Exists(variables, z3.And(z3.And(equation_list),
-                                                                                     z3.Not(eq_vector(output_vec1, output_vec2)))))))
-    else:
+        matrix_equal_list = []
+        for S in range(1 << num_qubits):
+            # Construct a vector with only the S-th place being 1
+            vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
+            output_vec1_S = evaluate(dag1, vec_S, params)
+            output_vec2_S = evaluate(dag2, vec_S, params)
+            output_vec2_S_shifted = phase_shift(output_vec2_S, [cosL, sinL])
+            matrix_equal_list += eq_vector(output_vec1_S, output_vec2_S_shifted)
         solver.add(z3.And(equation_list))
-        solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
+        solver.add(z3.ForAll([cosL, sinL], z3.Implies(angle(cosL, sinL), z3.Not(z3.And(matrix_equal_list)))))
+    else:
+        vec = input_distribution(num_qubits, equation_list)
+        num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+        params = create_parameters(num_parameters, equation_list)
+        output_vec1 = evaluate(dag1, vec, params)
+        output_vec2 = evaluate(dag2, vec, params)
+        solver.add(z3.And(equation_list))
+        solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2))))
     result = solver.check()
+    assert result != z3.unknown
     return result == z3.unsat
 
 

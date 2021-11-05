@@ -91,7 +91,7 @@ public:
 	  std::string input;
 	  while (!iss1.eof()) {
 		getline(iss1, input, ';');
-		std::cout << input << std::endl;
+		// std::cout << input << std::endl;
 		if (!input.empty()) {
 		  cmds.push_back(Command(input));
 		}
@@ -142,9 +142,9 @@ public:
 	  if (!not_found) {
 		cmds = cmds_info.second.first;
 		src_cmd = cmds_info.first;
-		for (auto cmd : cmds) {
-		  cmd.print();
-		}
+		// for (auto cmd : cmds) {
+		//   cmd.print();
+		// }
 		return true;
 	  }
 	}

@@ -15,7 +15,7 @@ int main() {
                      GateType::tdg, GateType::cx, GateType::rz});
   QASMParser qasm_parser(&union_ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/example-circuits/t_cx_tdg.qasm", dag)) {
+  if (!qasm_parser.load_qasm("circuit/example-circuits/10_gates.qasm", dag)) {
 	std::cout << "Parser failed" << std::endl;
   }
 
@@ -28,7 +28,7 @@ int main() {
        ++it) {
 	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
   }
-  newGraph->rotation_merging(GateType::cx);
-  std::cout << newGraph->total_cost() << " gates in circuit before optimizing."
-            << std::endl;
+  newGraph->rotation_merging(GateType::rz);
+  std::cout << newGraph->total_cost()
+            << " gates in circuit after rotation merging." << std::endl;
 }

@@ -363,15 +363,21 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
 
 bool DAG::evaluate(const Vector &input_dis,
                    const std::vector<ParamType> &input_parameters,
-                   Vector &output_dis) const {
+                   Vector &output_dis,
+                   std::vector<ParamType> *parameter_values) const {
   // We should have 2**n entries for the distribution
   if (input_dis.size() != (1 << get_num_qubits()))
     return false;
   if (input_parameters.size() != get_num_input_parameters())
     return false;
   assert(get_num_input_parameters() <= get_num_total_parameters());
-  std::vector<ParamType> parameter_values = input_parameters;
-  parameter_values.resize(get_num_total_parameters());
+  bool output_parameter_values = true;
+  if (!parameter_values) {
+    parameter_values = new std::vector<ParamType>();
+    output_parameter_values = false;
+  }
+  *parameter_values = input_parameters;
+  parameter_values->resize(get_num_total_parameters());
 
   output_dis = input_dis;
 
@@ -384,20 +390,24 @@ bool DAG::evaluate(const Vector &input_dis,
       if (input_node->is_qubit()) {
         qubit_indices.push_back(input_node->index);
       } else {
-        params.push_back(parameter_values[input_node->index]);
+        params.push_back((*parameter_values)[input_node->index]);
       }
     }
     if (edges[i]->gate->is_parameter_gate()) {
       // A parameter gate. Compute the new parameter.
       assert(edges[i]->output_nodes.size() == 1);
       const auto &output_node = edges[i]->output_nodes[0];
-      parameter_values[output_node->index] = edges[i]->gate->compute(params);
+      (*parameter_values)[output_node->index] = edges[i]->gate->compute(params);
     } else {
       // A quantum gate. Update the distribution.
       assert(edges[i]->gate->is_quantum_gate());
       auto *mat = edges[i]->gate->get_matrix(params);
       output_dis.apply_matrix(mat, qubit_indices);
     }
+  }
+  if (!output_parameter_values) {
+    // Delete the temporary variable newed in this function.
+    delete parameter_values;
   }
   return true;
 }
@@ -432,28 +442,16 @@ bool DAG::input_param_used(int param_index) const {
   return !nodes[get_num_qubits() + param_index]->output_edges.empty();
 }
 
-DAGHashType DAG::hash(Context *ctx) {
-  if (hash_value_valid_) {
-    return hash_value_;
-  }
-  const Vector &input_dis = ctx->get_generated_input_dis(get_num_qubits());
-  Vector output_dis;
-  evaluate(input_dis,
-           ctx->get_generated_parameters(get_num_input_parameters()),
-           output_dis);
-  ComplexType dot_product =
-      output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
+void DAG::generate_hash_values(ComplexType hash_value,
+                               DAGHashType *main_hash,
+                               std::vector<DAGHashType> *other_hash) {
   constexpr int discard_bits = kDAGHashDiscardBits;
   assert(typeid(ComplexType::value_type) == typeid(double));
   assert(sizeof(DAGHashType) == sizeof(double));
-  auto val1 = dot_product.real(), val2 = dot_product.imag();
+  auto val1 = hash_value.real(), val2 = hash_value.imag();
   DAGHashType val1hash = *((DAGHashType *) (&val1));
   DAGHashType val2hash = *((DAGHashType *) (&val2));
-  DAGHashType
-      result = val1hash >> discard_bits << discard_bits;
-  result ^= val2hash >> discard_bits;
-  hash_value_ = result;
-  hash_value_valid_ = true;
+  *main_hash = val1hash >> discard_bits << discard_bits;
 
   // Besides rounding both values down, we might want to round them up to
   // account for floating point errors.
@@ -469,19 +467,51 @@ DAGHashType DAG::hash(Context *ctx) {
   // after discarding the last 10 bits.
   // Rounding the latter up can solve this issue.
   DAGHashType tmp;
-  other_hash_values_for_floating_point_error_.clear();
   tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
   tmp ^= val2hash >> discard_bits;
-  assert(tmp != hash_value_);
-  other_hash_values_for_floating_point_error_.push_back(tmp);
+  other_hash->push_back(tmp);
   tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
   tmp ^= (val2hash >> discard_bits) + 1;
-  assert(tmp != hash_value_);
-  other_hash_values_for_floating_point_error_.push_back(tmp);
+  other_hash->push_back(tmp);
   tmp = val1hash >> discard_bits << discard_bits;
   tmp ^= (val2hash >> discard_bits) + 1;
-  assert(tmp != hash_value_);
-  other_hash_values_for_floating_point_error_.push_back(tmp);
+  other_hash->push_back(tmp);
+}
+
+DAGHashType DAG::hash(Context *ctx) {
+  if (hash_value_valid_) {
+    return hash_value_;
+  }
+  const Vector &input_dis = ctx->get_generated_input_dis(get_num_qubits());
+  Vector output_dis;
+  auto input_parameters =
+      ctx->get_generated_parameters(get_num_input_parameters());
+  std::vector<ParamType> all_parameters;
+  evaluate(input_dis, input_parameters, output_dis, &all_parameters);
+  ComplexType dot_product =
+      output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
+
+  other_hash_values_.clear();
+  generate_hash_values(dot_product, &hash_value_, &other_hash_values_);
+  hash_value_valid_ = true;
+
+  // Account for phase shifts.
+  if (!all_parameters.empty()) {
+    // We try the simplest version first:
+    // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
+    // (either input or internal).
+    DAGHashType tmp;
+    for (auto &param : all_parameters) {
+      ComplexType
+          shifted = dot_product * ComplexType{std::cos(param), std::sin(param)};
+      generate_hash_values(shifted, &tmp, &other_hash_values_);
+      other_hash_values_.push_back(tmp);
+      shifted = dot_product * ComplexType{std::cos(param), -std::sin(param)};
+      generate_hash_values(shifted, &tmp, &other_hash_values_);
+      other_hash_values_.push_back(tmp);
+      // TODO: Let the verifier know about the phase shifted!
+    }
+  }
   return hash_value_;
 }
 
@@ -496,7 +526,7 @@ DAGHashType DAG::cached_hash_value() const {
 
 std::vector<DAGHashType> DAG::other_hash_values() const {
   assert(hash_value_valid_);
-  return other_hash_values_for_floating_point_error_;
+  return other_hash_values_;
 }
 
 bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
@@ -682,7 +712,7 @@ std::string DAG::to_json() const {
   result += "[";
   if (hash_value_valid_) {
     bool first_other_hash_value = true;
-    for (const auto &val : other_hash_values_for_floating_point_error_) {
+    for (const auto &val : other_hash_values_) {
       if (first_other_hash_value) {
         first_other_hash_value = false;
       } else {
@@ -1070,8 +1100,8 @@ void DAG::clone_from(const DAG &other,
   num_qubits = other.num_qubits;
   num_input_parameters = other.num_input_parameters;
   hash_value_ = other.hash_value_;
-  other_hash_values_for_floating_point_error_ =
-      other.other_hash_values_for_floating_point_error_;
+  other_hash_values_ =
+      other.other_hash_values_;
   hash_value_valid_ = other.hash_value_valid_;
   std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
   std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;

@@ -6,11 +6,13 @@
 
 namespace TASOGraph {
 
+// TODO: GUID_PRESERVED depends on the global guid in Context class, need to
+// modify
 enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 19,
+  GUID_PRESERVED = 80,
 };
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
@@ -98,10 +100,21 @@ Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
   totalCost = total_cost();
 }
 
+Graph::Graph(const Graph &graph) {
+  context = graph.context;
+  constant_param_values = graph.constant_param_values;
+  special_op_guid = graph.special_op_guid;
+}
+
 size_t Graph::get_next_special_op_guid() {
-  special_op_guid++;
-  assert(special_op_guid < 100);
-  return special_op_guid;
+  assert(special_op_guid < GUID_PRESERVED);
+  return special_op_guid++;
+}
+
+size_t Graph::get_special_op_guid() { return special_op_guid; }
+
+void Graph::set_special_op_guid(size_t _special_op_guid) {
+  special_op_guid = _special_op_guid;
 }
 
 void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
@@ -127,6 +140,7 @@ Edge::Edge(void)
 Edge::Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx)
     : srcOp(_srcOp), dstOp(_dstOp), srcIdx(_srcIdx), dstIdx(_dstIdx) {}
 
+// TODO: some problem with this implementation
 bool Graph::has_loop(void) {
   std::map<Op, int, OpCompare> todos;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
@@ -137,6 +151,7 @@ bool Graph::has_loop(void) {
 	std::set<Edge, EdgeCompare>::const_iterator it2;
 	for (it2 = inList.begin(); it2 != inList.end(); it2++) {
 	  if (it2->srcOp.guid > GUID_PRESERVED)
+		// Not input Ops
 		cnt++;
 	}
 	todos[it->first] = cnt;
@@ -146,12 +161,14 @@ bool Graph::has_loop(void) {
   size_t i = 0;
   while (i < opList.size()) {
 	Op op = opList[i++];
-	std::set<Edge, EdgeCompare> outList = outEdges[op];
-	std::set<Edge, EdgeCompare>::const_iterator it2;
-	for (it2 = outList.begin(); it2 != outList.end(); it2++) {
-	  todos[it2->dstOp]--;
-	  if (todos[it2->dstOp] == 0) {
-		opList.push_back(it2->dstOp);
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> outList = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = outList.begin(); it2 != outList.end(); it2++) {
+		todos[it2->dstOp]--;
+		if (todos[it2->dstOp] == 0) {
+		  opList.push_back(it2->dstOp);
+		}
 	  }
 	}
   }
@@ -231,7 +248,7 @@ size_t Graph::hash(void) {
 }
 
 Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
-                            RuleParser *rule_parser) {
+                            Context *union_ctx, RuleParser *rule_parser) {
   auto src_gates = src_ctx->get_supported_gates();
   auto dst_gate_set = std::set<GateType>(dst_ctx->get_supported_gates().begin(),
                                          dst_ctx->get_supported_gates().end());
@@ -244,7 +261,7 @@ Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
 	      rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
 
 	  tp_2_xfer[gate_tp] =
-	      GraphXfer::create_single_gate_GraphXfer(src_cmd, dst_ctx, cmds);
+	      GraphXfer::create_single_gate_GraphXfer(union_ctx, src_cmd, cmds);
 	}
   }
   Graph *src_graph = this;
@@ -270,19 +287,50 @@ float Graph::total_cost(void) const {
 
 void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);
-  // Add edges between the inputs and outputs of the to-be removed node
-  // Only add edges that connect qubits
-  if (inEdges.find(oldOp) != inEdges.end() &&
-      outEdges.find(oldOp) != outEdges.end()) {
-	auto input_edges = inEdges[oldOp];
-	auto output_edges = outEdges[oldOp];
-	int num_qubits = oldOp.ptr->get_num_qubits();
-	for (auto in_edge : input_edges) {
-	  for (auto out_edge : output_edges) {
-		if (in_edge.dstIdx == out_edge.srcIdx) {
-		  if (in_edge.dstIdx < num_qubits) {
-			add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
-			         out_edge.dstIdx);
+  int num_qubits = oldOp.ptr->get_num_qubits();
+  if (inEdges.find(oldOp) != inEdges.end()) {
+	auto in_edges = inEdges[oldOp];
+	for (auto edge : in_edges) {
+	  auto src_op = edge.srcOp;
+	  assert(outEdges.find(src_op) != outEdges.end());
+	  auto out_edges = outEdges[src_op];
+	  for (auto out_edge : out_edges) {
+		if (out_edge.dstOp == oldOp) {
+		  outEdges[src_op].erase(out_edge);
+		  break;
+		}
+	  }
+	}
+  }
+  if (outEdges.find(oldOp) != outEdges.end()) {
+	auto out_edges = outEdges[oldOp];
+	for (auto out_edge : out_edges) {
+	  auto dst_op = out_edge.dstOp;
+	  assert(inEdges.find(dst_op) != inEdges.end());
+	  auto in_edges = inEdges[dst_op];
+	  for (auto in_edge : in_edges) {
+		if (in_edge.srcOp == oldOp) {
+		  inEdges[dst_op].erase(in_edge);
+		  break;
+		}
+	  }
+	}
+  }
+  if (num_qubits != 0) {
+	// Add edges between the inputs and outputs of the to-be removed node
+	// Only add edges that connect qubits
+	if (inEdges.find(oldOp) != inEdges.end() &&
+	    outEdges.find(oldOp) != outEdges.end()) {
+	  auto input_edges = inEdges[oldOp];
+	  auto output_edges = outEdges[oldOp];
+	  int num_qubits = oldOp.ptr->get_num_qubits();
+	  for (auto in_edge : input_edges) {
+		for (auto out_edge : output_edges) {
+		  if (in_edge.dstIdx == out_edge.srcIdx) {
+			if (in_edge.dstIdx < num_qubits) {
+			  add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
+			           out_edge.dstIdx);
+			}
 		  }
 		}
 	  }
@@ -291,6 +339,27 @@ void Graph::remove_node(Op oldOp) {
   inEdges.erase(oldOp);
   outEdges.erase(oldOp);
   constant_param_values.erase(oldOp);
+}
+
+void Graph::remove_edge(Op srcOp, Op dstOp) {
+  if (inEdges.find(dstOp) != inEdges.end()) {
+	auto &edge_list = inEdges[dstOp];
+	for (auto edge : edge_list) {
+	  if (edge.srcOp == srcOp) {
+		edge_list.erase(edge);
+		break;
+	  }
+	}
+  }
+  if (outEdges.find(srcOp) != outEdges.end()) {
+	auto &edge_list = outEdges[srcOp];
+	for (auto edge : edge_list) {
+	  if (edge.dstOp == dstOp) {
+		edge_list.erase(edge);
+		break;
+	  }
+	}
+  }
 }
 
 // Merge constant parameters
@@ -384,17 +453,18 @@ void Graph::constant_and_rotation_elimination() {
 		  // Same rotation found, merge them
 		  int num_qubits = op.ptr->get_num_qubits();
 		  int num_params = op.ptr->get_num_parameters();
-		  auto pre_rotation_op = edge.srcOp;
+		  auto pre_op = edge.srcOp;
+
 		  std::map<int, Op> pre_param_idx_2_op;
 		  std::map<int, Op> param_idx_2_op;
-		  assert(inEdges.find(pre_rotation_op) != inEdges.end());
-		  auto pre_rotation_input_edges = inEdges[pre_rotation_op];
-		  for (auto it = pre_rotation_input_edges.begin();
-		       it != pre_rotation_input_edges.end(); ++it) {
-			auto pre_rotation_edge = *it;
-			if (pre_rotation_edge.dstIdx >= num_qubits) {
-			  pre_param_idx_2_op[pre_rotation_edge.dstIdx] =
-			      pre_rotation_edge.srcOp;
+		  assert(inEdges.find(pre_op) != inEdges.end());
+		  auto pre_input_edges = inEdges[pre_op];
+		  for (auto it = pre_input_edges.begin(); it != pre_input_edges.end();
+		       ++it) {
+			auto pre_edge = *it;
+			if (pre_edge.dstIdx >= num_qubits) {
+			  // Which means that it is a parameter input
+			  pre_param_idx_2_op[pre_edge.dstIdx] = pre_edge.srcOp;
 			}
 		  }
 		  for (auto it = input_edges.begin(); it != input_edges.end(); ++it) {
@@ -408,6 +478,7 @@ void Graph::constant_and_rotation_elimination() {
 			        constant_param_values.end() &&
 			    constant_param_values.find(param_idx_2_op[i]) !=
 			        constant_param_values.end()) {
+			  // Index i parameter at both Ops are constant
 			  ParamType sum = constant_param_values[pre_param_idx_2_op[i]] +
 			                  constant_param_values[param_idx_2_op[i]];
 			  remove_node(pre_param_idx_2_op[i]);
@@ -415,18 +486,24 @@ void Graph::constant_and_rotation_elimination() {
 			  Op new_constant_op(get_next_special_op_guid(),
 			                     context->get_gate(GateType::input_param));
 			  add_edge(new_constant_op, op, 0, i);
+			  constant_param_values[new_constant_op] = sum;
 			}
 			else {
+			  // Add a add gate
 			  Op new_add_op(context->next_global_unique_id(),
 			                context->get_gate(GateType::add));
 			  add_edge(pre_param_idx_2_op[i], new_add_op, 0, 0);
 			  add_edge(param_idx_2_op[i], new_add_op, 0, 1);
+			  add_edge(new_add_op, op, 0, i);
+			  remove_edge(pre_param_idx_2_op[i], pre_op);
+			  remove_edge(param_idx_2_op[i], op);
 			}
 		  }
+		  remove_node(pre_op);
 		}
 	  }
 
-	  // Rotation gate
+	  // Eliminate 0 rotation gates
 	  bool all_parameter_is_0 = true;
 	  int num_qubits = op.ptr->get_num_qubits();
 	  int num_params = op.ptr->get_num_parameters();
@@ -471,23 +548,36 @@ void Graph::constant_and_rotation_elimination() {
   }
 }
 
-#ifdef DEADCODE
-void Graph::expand(std::pair<Op, int> pos, bool left,
-                   std::unordered_set<std::pair<Op, int>> &covered) {
+uint64_t Graph::xor_bitmap(uint64_t src_bitmap, int src_idx,
+                           uint64_t dst_bitmap, int dst_idx) {
+  uint64_t dst_bit = 1 << dst_idx; // Get mask, only dst_idx is 1
+  dst_bit &= dst_bitmap;           // Get dst_idx bit
+  dst_bit >>= dst_idx;
+  dst_bit <<= src_idx;
+  return src_bitmap ^= dst_bit;
+}
+
+void Graph::expand(Pos pos, bool left, GateType target_rotation,
+                   std::unordered_set<Pos, PosHash> &covered,
+                   std::unordered_map<int, Pos> &anchor_point,
+                   std::unordered_map<Pos, int, PosHash> pos_to_qubits,
+                   std::queue<int> &todo_qubits) {
   covered.insert(pos);
   while (true) {
-	if (left) {
-	  if (!move_left(pos))
-		return;
+	if (!move_forward(pos, left))
+	  return;
+	if (pos.op.ptr->tp == GateType::cx) {
+	  // Insert the other side of cnot to anchor_points
+	  if (anchor_point.find(pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]) ==
+	      anchor_point.end()) {
+		anchor_point[pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]] =
+		    Pos(pos.op, pos.idx ^ 1);
+		todo_qubits.push(pos_to_qubits[Pos(pos.op, pos.idx ^ 1)]);
+	  }
+	  covered.insert(pos);
 	}
-	else {
-	  if (!move_right(pos))
-		return;
-	}
-	if (pos.first.ptr->tp == GateType::cnot) {
-	  // Insert the other side of cnot to anchor_points;
-	}
-	else if (moveable(pos.frist.ptr->tp)) {
+	else if (moveable(pos.op.ptr->tp)) {
+	  covered.insert(pos);
 	  continue;
 	}
 	else {
@@ -496,130 +586,310 @@ void Graph::expand(std::pair<Op, int> pos, bool left,
   }
 }
 
-void Graph::remove(std::pair<Op, int> pos, bool left,
-                   std::unordered_set<std::pair<Op, int>> &covered) {
-  if (covered.find(pos) == covered.end())
-	return;
-  covered.remove(pos);
-  if (/*pos is the control qubit of a cnot*/)
-	remove(target_pos, left, covered);
+bool Graph::move_forward(Pos &pos, bool left) {
   if (left) {
-	if (!move_left(pos))
-	  return;
+	if (inEdges.find(pos.op) == inEdges.end())
+	  return false;
+	else {
+	  auto in_edges = inEdges[pos.op];
+	  for (const auto edge : in_edges) {
+		if (edge.dstIdx == pos.idx) {
+		  pos.op = edge.srcOp;
+		  pos.idx = edge.srcIdx;
+		  return true;
+		}
+	  }
+	}
   }
   else {
-	if (!move_right(pos))
-	  return;
+	if (outEdges.find(pos.op) == outEdges.end()) {
+	  return false;
+	}
+	else {
+	  auto out_edges = outEdges[pos.op];
+	  for (const auto edge : out_edges) {
+		if (edge.srcIdx == pos.idx) {
+		  pos.op = edge.dstOp;
+		  pos.idx = edge.dstIdx;
+		  return true;
+		}
+	  }
+	  return false; // Output qubit
+	}
   }
-  remove(pos, covered);
+  assert(false); // Should not reach here
 }
 
-void Graph::explore(std::pair<Op, int> pos, bool left,
-                    std::unordered_set<std::pair<Op, int>> &covered) {
+bool Graph::moveable(GateType tp) {
+  if (tp == GateType::cx || tp == GateType::x || tp == GateType::rz ||
+      tp == GateType::u1)
+	return true;
+  return false;
+}
+
+void Graph::explore(Pos pos, bool left,
+                    std::unordered_set<Pos, PosHash> &covered) {
   while (true) {
 	if (covered.find(pos) == covered.end())
 	  return;
-	if (/*pos is the target qubit of a cnot*/) {
+	if (pos.op.ptr->tp == GateType::cx && pos.idx == 1 &&
+	    covered.find(Pos(pos.op, 0)) == covered.end()) {
+	  // pos is the target qubit of a cnot
 	  remove(pos, left, covered);
 	}
 	else {
-	  if (left) {
-		if (!move_left(pos))
-		  return;
-	  }
-	  else {
-		if (!move_right(pos))
-		  return;
+	  if (!move_forward(pos, left)) {
+		return;
 	  }
 	}
   }
 }
 
-bool Graph::rotation_merging(void) {
-  std::unordered_set<Op> visited_cnot;
-  // Step 1: calculate the bitmask of each operator
-  std::unordered_map<std::pair<Op, int>, uint_128t> bitmasks;
-  std::unordered_map<std::pair<Op, int>, int> op_to_qubits;
-  std::queue<Op> todos;
-  for (const auto &it : inEdges) {
-	if (it.second.size() == 0) {
-	  todos.push(it.first);
-	  bitmasks[std::make_pair(it.first, 0)] = 1 << it.first.ptr->index;
-	  op_to_qubits[std::make_pair(it.first, 0)] = it.first.ptr->index;
+void Graph::remove(Pos pos, bool left,
+                   std::unordered_set<Pos, PosHash> &covered) {
+  if (covered.find(pos) == covered.end())
+	return;
+  covered.erase(pos);
+  if (pos.op.ptr->tp == GateType::cx &&
+      pos.idx == 0) /*pos is the control qubit of a cnot*/
+	remove(Pos(pos.op, 1), left, covered);
+  if (!move_forward(pos, left))
+	return;
+  remove(pos, left, covered);
+}
+
+bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
+  // Marge rotation op_1 to rotation op_0
+  int num_qubits = op_0.ptr->get_num_qubits();
+  int num_params = op_0.ptr->get_num_parameters();
+
+  std::map<int, Op> param_idx_2_op_0;
+  std::map<int, Op> param_idx_2_op_1;
+
+  assert(inEdges.find(op_0) != inEdges.end());
+  assert(inEdges.find(op_1) != inEdges.end());
+  auto input_edges_0 = inEdges[op_0];
+  for (auto it = input_edges_0.begin(); it != input_edges_0.end(); ++it) {
+	auto edge_0 = *it;
+	if (edge_0.dstIdx >= num_qubits) {
+	  param_idx_2_op_0[edge_0.dstIdx] = edge_0.srcOp;
 	}
   }
-  while (todos.size() > 0) {
-	auto op = todos.front();
-	todos.pop();
-	// TODO: explore the outEdges of op
-	//
-	if (op.ptr->tp == GateType::cnot) {
-	  bitmasks[std::make_pair(op, 0)] = bitmasks[in0];
-	  bitmasks[std::make_pair(op, 1)] = bitmasks[in0] xor bitmasks[in1];
-	  op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
-	  op_to_qubits[std::make_pair(op, 1)] = op_to_qubits[in1];
+  auto input_edges_1 = inEdges[op_1];
+  for (auto it = input_edges_1.begin(); it != input_edges_1.end(); ++it) {
+	auto edge_1 = *it;
+	if (edge_1.dstIdx >= num_qubits) {
+	  // Which means that it is a parameter input
+	  param_idx_2_op_1[edge_1.dstIdx] = edge_1.srcOp;
 	}
-	else if (op.ptr->tp == GateType::x) {
-	  bitmasks[std::makr_pair(op, 0)] = bitmasks[in0];
-	  op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
+  }
+  for (int i = num_qubits; i < num_qubits + num_params; ++i) {
+	if (constant_param_values.find(param_idx_2_op_0[i]) !=
+	        constant_param_values.end() &&
+	    constant_param_values.find(param_idx_2_op_1[i]) !=
+	        constant_param_values.end()) {
+	  // Index i parameter at both Ops are constant
+	  ParamType sum = constant_param_values[param_idx_2_op_0[i]] +
+	                  constant_param_values[param_idx_2_op_1[i]];
+	  remove_node(param_idx_2_op_0[i]);
+	  remove_node(param_idx_2_op_1[i]);
+	  Op new_constant_op(get_next_special_op_guid(),
+	                     context->get_gate(GateType::input_param));
+	  add_edge(new_constant_op, op_0, 0, i);
+	  constant_param_values[new_constant_op] = sum;
 	}
 	else {
-	  bitmasks[std::make_pair(op, 0)] = bitmasks[in0];
-	  op_to_qubits[std::make_pair(op, 0)] = op_to_qubits[in0];
+	  // Add a add gate
+	  Op new_add_op(context->next_global_unique_id(),
+	                context->get_gate(GateType::add));
+	  add_edge(param_idx_2_op_0[i], new_add_op, 0, 0);
+	  add_edge(param_idx_2_op_1[i], new_add_op, 0, 1);
+	  add_edge(new_add_op, op_0, 0, i);
+	  remove_edge(param_idx_2_op_0[i], op_0);
+	  remove_edge(param_idx_2_op_1[i], op_1);
+	}
+  }
+  remove_node(op_1);
+}
+
+void Graph::rotation_merging(GateType target_rotation) {
+  // Step 1: calculate the bitmask of each operator
+  std::unordered_map<Pos, uint64_t, PosHash> bitmasks;
+  std::unordered_map<Pos, int, PosHash> pos_to_qubits;
+  std::queue<Op> todos;
+
+  // For all input_qubits, initialize its bitmap, and assign it a idx
+  // TODO: load qubit index from DAG
+  int qubit_idx = 0;
+  for (const auto &it : outEdges) {
+	if (it.first.ptr->tp == GateType::input_qubit) {
+	  todos.push(it.first);
+	  bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
+	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
+	  qubit_idx++;
+	}
+	else if (it.first.ptr->tp == GateType::input_param) {
+	  todos.push(it.first);
+	}
+  }
+
+  // Construct in-degree map
+  std::map<Op, size_t> op_in_edges_cnt;
+  for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
+	op_in_edges_cnt[it->first] = it->second.size();
+  }
+
+  // Traverse the graph with topological order
+  // Construct the bitmap for all position
+  while (!todos.empty()) {
+	auto op = todos.front();
+	todos.pop();
+	// Explore the outEdges of op
+	if (op.ptr->tp == GateType::cx) {
+	  auto in_edge_list = inEdges[op];
+	  std::vector<Pos> pos_list(2); // Two inputs for cx gate
+	  for (const auto edge : in_edge_list) {
+		pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
+	  }
+	  bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
+	  bitmasks[Pos(op, 1)] =
+	      xor_bitmap(bitmasks[pos_list[1]], pos_to_qubits[pos_list[1]],
+	                 bitmasks[pos_list[0]], pos_to_qubits[pos_list[0]]);
+	  pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
+	  pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
+	}
+	else if (op.ptr->tp != GateType::input_qubit &&
+	         op.ptr->tp != GateType::input_param) {
+	  auto in_edge_list = inEdges[op];
+	  int num_qubits = op.ptr->get_num_qubits();
+	  std::vector<Pos> pos_list(num_qubits);
+	  for (const auto edge : in_edge_list) {
+		if (edge.dstIdx < num_qubits) {
+		  pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
+		}
+	  }
+	  for (int i = 0; i < num_qubits; ++i) {
+		bitmasks[Pos(op, i)] = bitmasks[pos_list[i]];
+		pos_to_qubits[Pos(op, i)] = pos_to_qubits[pos_list[i]];
+	  }
+	}
+
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> list = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		auto e = *it2;
+		op_in_edges_cnt[e.dstOp]--;
+		if (op_in_edges_cnt[e.dstOp] == 0) {
+		  todos.push(e.dstOp);
+		}
+	  }
 	}
   }
 
   // Step 2: Propagate all CNOTs
-  std::queue<Op> todo_cnot;
+  std::queue<Op> todo_cx;
+  std::unordered_set<Op, OpHash> visited_cx;
   for (const auto &it : inEdges)
-	if (it.first.ptr->tp == GateType::cnot) {
-	  todo_cnot.push(it.first);
+	if (it.first.ptr->tp == GateType::cx) {
+	  todo_cx.push(it.first);
 	}
-  while (todo_cnot.size() != 0) {
-	const auto cnot = todo_cnot.front();
-	todo_cnot.pop();
-	if (visited_cnot.find(cnot) != visited_cnot.end())
+  while (!todo_cx.empty()) {
+	const auto cx = todo_cx.front();
+	todo_cx.pop();
+	if (visited_cx.find(cx) != visited_cx.end())
 	  continue;
-	std::unordered_map<int, std::pair<Op, int>> anchor_point;
-	anchor_point[op_to_qubits[std::make_pair(cnot, 0)]] =
-	    std::make_pair(cnot, 0);
-	anchor_point[op_to_qubits[std::make_pair(cnot, 1)]] =
-	    std::make_pair(cnot, 1);
+	std::unordered_map<int, Pos> anchor_point;
 	std::queue<int> todo_qubits;
-	todo_qubits.push(op_to_qubits[std::make_pair(cnot, 0)]);
-	todo_qubits.push(op_to_qubits[std::make_pair(cnot, 1)]);
-	std::unordered_set<std::pair<Op, int>> covered;
-	while (todo_qubits.size() > 0) {
+	std::unordered_set<Pos, PosHash> covered;
+	anchor_point[pos_to_qubits[Pos(cx, 0)]] = Pos(cx, 0);
+	anchor_point[pos_to_qubits[Pos(cx, 1)]] = Pos(cx, 1);
+	todo_qubits.push(pos_to_qubits[Pos(cx, 0)]);
+	todo_qubits.push(pos_to_qubits[Pos(cx, 1)]);
+	while (!todo_qubits.empty()) {
 	  int qid = todo_qubits.front();
 	  todo_qubits.pop();
-	  expand(anchor_point[qid], true, covered);
-	  expand(anchor_point[qid], false, covered);
+	  expand(anchor_point[qid], true, target_rotation, covered, anchor_point,
+	         pos_to_qubits, todo_qubits); // expand left
+	  expand(anchor_point[qid], false, target_rotation, covered, anchor_point,
+	         pos_to_qubits, todo_qubits); // expand right
 	}
-  }
-  // Step 3: deal with partial cnot
-  for (const auto &start_pos : anchor_point) {
-	pos = start_pos;
-	explore(pos, true, covered);
-	explore(pos, false, covered);
-  }
-  // Step 4: merge rotations with the same bitmasks
-  std::unordered_map<uint128_t, std::pair<Op, int>> bitmask_to_pos;
-  for (const auto &it : covered) {
-	if (it.first.op.ptr->ty == GateType::rz) {
-	  uint128_t bm = bitmasks[it.first];
-	  if (bitmask_to_pos(bm) != bitmask_to_pos.end()) {
-		std::pair<Op, int> old_pos = bitmask_to_pos[bm];
-		// remove it from the graph
-		//
-		// change the degree of old_pos
-		old_pos.first.ptr->degree += it.first.ptr->degree;
+
+	// Step 3: deal with partial cnot
+	for (const auto &it : anchor_point) {
+	  auto pos = it.second;
+	  explore(pos, true, covered);
+	  explore(pos, false, covered);
+	}
+
+	// Step 4: merge rotations with the same bitmasks on the same qubit
+	std::unordered_map<
+	    int, std::unordered_map<uint64_t, std::unordered_set<Pos, PosHash>>>
+	    qubit_2_bm_2_pos;
+	for (const auto &pos : covered) {
+	  if (pos.op.ptr->tp == GateType::cx) {
+		visited_cx.insert(pos.op);
 	  }
-	  else {
-		bitmask_to_pos[bm] = it;
+	  if (pos.op.ptr->tp == target_rotation) {
+		int qubit_idx = pos_to_qubits[pos];
+		auto bm = bitmasks[pos];
+		if (qubit_2_bm_2_pos.find(qubit_idx) == qubit_2_bm_2_pos.end()) {
+		  qubit_2_bm_2_pos[qubit_idx];
+		}
+		if (qubit_2_bm_2_pos[qubit_idx].find(bm) ==
+		    qubit_2_bm_2_pos[qubit_idx].end()) {
+		  qubit_2_bm_2_pos[qubit_idx][bm];
+		}
+		if (qubit_2_bm_2_pos[qubit_idx][bm].find(pos) ==
+		    qubit_2_bm_2_pos[qubit_idx][bm].end()) {
+		  qubit_2_bm_2_pos[qubit_idx][bm].insert(pos);
+		}
+	  }
+	}
+
+	for (const auto &it_0 : qubit_2_bm_2_pos) {
+	  for (const auto &it_1 : it_0.second) {
+		auto &pos_set = it_1.second;
+		assert(pos_set.size() >= 1);
+		Pos first;
+		bool is_first = true;
+		for (auto pos : pos_set) {
+		  if (is_first) {
+			first = pos;
+			is_first = false;
+		  }
+		  else {
+			merge_2_rotation_op(first.op, pos.op);
+		  }
+		}
+
+		auto op = first.op;
+		auto in_edges = inEdges[op];
+		int num_qubits = op.ptr->get_num_qubits();
+		bool all_param_is_0 = true;
+		for (auto edge : in_edges) {
+		  if (edge.dstIdx >= num_qubits) {
+			if (constant_param_values.find(edge.srcOp) ==
+			        constant_param_values.end() ||
+			    std::abs(constant_param_values[edge.srcOp]) > eps) {
+			  all_param_is_0 = false;
+			  break;
+			}
+		  }
+		}
+		if (all_param_is_0) {
+		  for (auto edge : in_edges) {
+			if (edge.dstIdx >= num_qubits) {
+			  remove_node(edge.srcOp);
+			}
+		  }
+		  remove_node(op);
+		}
 	  }
 	}
   }
 }
+#ifdef DEADCODE
 #endif
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
@@ -646,7 +916,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   //   auto num_equiv_class_inserted = eqs.simplify(ctx);
   //   end = std::chrono::steady_clock::now();
   //   std::cout << std::dec << eqs.num_equivalence_classes()
-  //             << " classes of equivalences remain after simplication after "
+  //             << " classes of equivalences remain after simplication after
+  //             "
   //             <<
   //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
   //                    end - start)

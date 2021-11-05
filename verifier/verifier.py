@@ -94,25 +94,25 @@ def apply_matrix(vec, mat, qubit_indices):
     return result_vec
 
 
-def input_distribution(num_qubits, solver):
+def input_distribution(num_qubits, equation_list):
     vec_size = 1 << num_qubits
     real_part = z3.RealVector('r', vec_size)
     imag_part = z3.RealVector('i', vec_size)
     # A quantum state requires the sum of modulus of all numbers to be 1.
     sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
-    solver.add(sum_modulus == 1)
+    equation_list.append(sum_modulus == 1)
     return list(zip(real_part, imag_part))
 
 
-def angle(s, c):
+def angle(c, s):
     return s * s + c * c == 1
 
 
-def create_parameters(num_parameters, solver):
+def create_parameters(num_parameters, equation_list):
     param_cos = z3.RealVector('c', num_parameters)
     param_sin = z3.RealVector('s', num_parameters)
     for i in range(num_parameters):
-        solver.add(angle(param_cos[i], param_sin[i]))
+        equation_list.append(angle(param_cos[i], param_sin[i]))
     return list(zip(param_cos, param_sin))
 
 
@@ -148,7 +148,19 @@ def evaluate(dag, input_dis, input_parameters):
     return output_dis
 
 
-def equivalent(dag1, dag2):
+def phase_shift(vec, lam):
+    # shift |vec| by exp(i * lam)
+    import copy
+    assert len(lam) == 2  # cos, sin
+    shifted_vec = copy.deepcopy(vec)
+    for i in range(len(shifted_vec)):
+        assert len(shifted_vec[i]) == 2
+        shifted_vec[i] = (shifted_vec[i][0] * lam[0] - shifted_vec[i][1] * lam[1],
+                          shifted_vec[i][1] * lam[0] + shifted_vec[i][0] * lam[1])
+    return shifted_vec
+
+
+def equivalent(dag1, dag2, check_phase_shift=False):
     dag1_meta = dag1[0]
     dag2_meta = dag2[0]
     for index in [meta_index_num_qubits]:
@@ -158,12 +170,23 @@ def equivalent(dag1, dag2):
 
     solver = z3.Solver()
     num_qubits = dag1_meta[meta_index_num_qubits]
-    vec = input_distribution(num_qubits, solver)
+    equation_list = []
+    vec = input_distribution(num_qubits, equation_list)
     num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
-    params = create_parameters(num_parameters, solver)
+    params = create_parameters(num_parameters, equation_list)
     output_vec1 = evaluate(dag1, vec, params)
     output_vec2 = evaluate(dag2, vec, params)
-    solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
+    if check_phase_shift:
+        cosL = z3.Real('cosL')
+        sinL = z3.Real('sinL')
+        variables = [item for value in vec + params for item in value]
+        output_vec2 = phase_shift(output_vec2, [cosL, sinL])
+        solver.add(z3.ForAll([cosL, sinL], z3.Implies(angle(cosL, sinL),
+                                                      z3.Exists(variables, z3.And(z3.And(equation_list),
+                                                                                     z3.Not(eq_vector(output_vec1, output_vec2)))))))
+    else:
+        solver.add(z3.And(equation_list))
+        solver.add(z3.Not(eq_vector(output_vec1, output_vec2)))
     result = solver.check()
     return result == z3.unsat
 
@@ -182,7 +205,7 @@ def dump_json(data, file_name):
 
 
 def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
-                      check_equivalence_with_different_hash=True):
+                      check_equivalence_with_different_hash=True, check_phase_shift=False):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -205,7 +228,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
             for i in range(len(different_dags_with_same_hash)):
                 other_dag = different_dags_with_same_hash[i]
                 equivalent_called += 1
-                if equivalent(dag, other_dag):
+                if equivalent(dag, other_dag, check_phase_shift):
                     current_tag = hashtag + '_' + str(i)
                     assert current_tag in output_dict.keys()
                     output_dict[current_tag].append(dag)
@@ -248,7 +271,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                       f' with hash value {hashtag} and {len(other_hashtags)} other hash values...')
             for other_dag in possible_equivalent_dags:
                 equivalent_called_2 += 1
-                if equivalent(dags[0], other_dag[0]):
+                if equivalent(dags[0], other_dag[0], check_phase_shift):
                     more_equivalences.append((hashtag, other_dag[1]))
                     hashtags_in_more_equivalences.update(hashtag)
                     hashtags_in_more_equivalences.update(other_dag[1])

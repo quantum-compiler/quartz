@@ -55,12 +55,81 @@ public:
   Gate *ptr;
 };
 
-struct OpCompare {
+class OpCompare {
+public:
   bool operator()(const Op &a, const Op &b) const {
 	if (a.guid != b.guid)
 	  return a.guid < b.guid;
 	return a.ptr < b.ptr;
   };
+};
+
+class OpHash {
+public:
+  size_t operator()(const Op &a) const {
+	std::hash<size_t> hash_fn;
+	return hash_fn(a.guid) * 17 + hash_fn((size_t)(a.ptr));
+  }
+};
+
+class Pos {
+public:
+  Pos() {
+	op = Op();
+	idx = 0;
+  }
+  Pos(const Pos &b) {
+	op = b.op;
+	idx = b.idx;
+  }
+  inline bool operator<(const Pos &b) const {
+	if (op != b.op)
+	  return op < b.op;
+	if (idx != b.idx)
+	  return idx < b.idx;
+	return false;
+  }
+  Pos &operator=(const Pos &pos) {
+	op = pos.op;
+	idx = pos.idx;
+	return *this;
+  }
+  Pos(Op op_, int idx_) : op(op_), idx(idx_) {}
+  Op op;
+  int idx;
+};
+
+inline bool operator==(const Pos &a, const Pos &b) {
+  if (a.op != b.op)
+	return false;
+  if (a.idx != b.idx)
+	return false;
+  return true;
+}
+inline bool operator!=(const Pos &a, const Pos &b) {
+  if (a.op != b.op)
+	return true;
+  if (a.idx != b.idx)
+	return true;
+  return false;
+}
+
+class PosHash {
+public:
+  size_t operator()(const Pos &a) const {
+	std::hash<size_t> hash_fn;
+	OpHash op_hash;
+	return op_hash(a.op) * 17 + hash_fn(a.idx);
+  }
+};
+
+class PosCompare {
+public:
+  bool operator()(const Pos &a, const Pos &b) const {
+	if (a.op != b.op)
+	  return a.op < b.op;
+	return a.idx < b.idx;
+  }
 };
 
 class Tensor {
@@ -95,6 +164,7 @@ class Graph {
 public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG &dag);
+  Graph(const Graph &graph);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_loop();
@@ -105,22 +175,37 @@ public:
   void remove_edge(Op srcOp, Op dstOp);
   float total_cost() const;
   size_t get_next_special_op_guid();
-  Graph *context_shift(Context *src_ctx, Context *dst_ctx,
+  size_t get_special_op_guid();
+  void set_special_op_guid(size_t _special_op_guid);
+  Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
-  void rotation_propagation();
+  void rotation_merging(GateType target_rotation);
+
+private:
+  size_t special_op_guid;
+  uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
+                      int dst_idx);
+  void explore(Pos pos, bool left, std::unordered_set<Pos, PosHash> &covered);
+  void expand(Pos pos, bool left, GateType target_rotation,
+              std::unordered_set<Pos, PosHash> &covered,
+              std::unordered_map<int, Pos> &anchor_point,
+              std::unordered_map<Pos, int, PosHash> pos_to_qubits,
+              std::queue<int> &todo_qubits);
+  void remove(Pos pos, bool left, std::unordered_set<Pos, PosHash> &covered);
+  bool moveable(GateType tp);
+  bool move_forward(Pos &pos, bool left);
+  bool merge_2_rotation_op(Op op_0, Op op_1);
 
 public:
   Context *context;
   float totalCost;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
-
-private:
-  size_t special_op_guid;
+  std::unordered_map<Op, int, OpHash> qubit_idx;
 };
 
 }; // namespace TASOGraph

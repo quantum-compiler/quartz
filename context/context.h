@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <algorithm>
+#include <set>
 
 class DAG;
 
@@ -53,3 +55,5 @@ private:
   std::vector<std::unique_ptr<DAG>> representative_dags_;
   std::unordered_map<DAGHashType, DAG *> representatives_;
 };
+
+Context union_contexts(Context *ctx_0, Context *ctx_1);

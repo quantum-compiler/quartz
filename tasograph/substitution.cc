@@ -116,18 +116,15 @@ GraphXfer *GraphXfer::create_GraphXfer(::Context *_context,
 }
 
 GraphXfer *
-GraphXfer::create_single_gate_GraphXfer(Command src_cmd, Context *dst_ctx,
+GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
                                         std::vector<Command> dst_cmds) {
   // Currently only support source command with no constant parameters
   // Assume the only added parameters are constant parameters
   // Assume the number of non constant parameters are equal
   GateType src_tp = src_cmd.get_gate_type();
-  std::vector temp_gate_set(dst_ctx->get_supported_gates());
-  temp_gate_set.push_back(src_tp);
-  Context *ctx = new Context(temp_gate_set);
-  GraphXfer *graphXfer = new GraphXfer(ctx);
+  GraphXfer *graphXfer = new GraphXfer(union_ctx);
 
-  Gate *gate = ctx->get_gate(src_tp);
+  Gate *gate = union_ctx->get_gate(src_tp);
   auto num_qubit = gate->get_num_qubits();
   auto num_non_constant_params = gate->get_num_parameters();
 
@@ -488,7 +485,7 @@ void GraphXfer::run(int depth, Graph *graph,
 	    (int)newGraph->inEdges.size() < maxNumOps) {
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
-        new_candidates.push_back(newGraph);
+		new_candidates.push_back(newGraph);
 		// std::cout << newGraph->total_cost() << " ";
 	  }
 	}
@@ -523,7 +520,7 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 }
 
 Graph *GraphXfer::create_new_graph(Graph *graph) {
-  Graph *newGraph = new Graph(context);
+  Graph *newGraph = new Graph(*graph);
   // Step 1: map dst ops
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
   std::vector<OpX *>::const_iterator dstIt;
@@ -542,15 +539,17 @@ Graph *GraphXfer::create_new_graph(Graph *graph) {
 		  assert(mappedOutputs.find(srcTen) != mappedOutputs.end());
 		  TensorX dstTen = mappedOutputs[srcTen];
 		  if (dstTen.op == NULL) {
-		    // mappedOutput is an input --- this indicates an empty target graph
-	            std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
-		        mappedInputs.find(dstTen.idx);
-		    assert(it2 != mappedInputs.end());
-		    std::pair<Op, int> srcEdge = it2->second;
-		    newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second, it->dstIdx);
-		  } else {
-		    newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
-		                       it->dstIdx);
+			// mappedOutput is an input --- this indicates an empty target graph
+			std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
+			    mappedInputs.find(dstTen.idx);
+			assert(it2 != mappedInputs.end());
+			std::pair<Op, int> srcEdge = it2->second;
+			newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second,
+			                   it->dstIdx);
+		  }
+		  else {
+			newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
+			                   it->dstIdx);
 		  }
 		}
 		else {

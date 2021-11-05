@@ -879,7 +879,7 @@ void Graph::rotation_merging(GateType target_rotation) {
 		}
 		if (all_param_is_0) {
 		  for (auto edge : in_edges) {
-			if (edge.dstIdx > num_qubits) {
+			if (edge.dstIdx >= num_qubits) {
 			  remove_node(edge.srcOp);
 			}
 		  }

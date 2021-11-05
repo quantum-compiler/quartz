@@ -185,12 +185,6 @@ public:
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
 
-public:
-  Context *context;
-  float totalCost;
-  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
-  std::map<Op, ParamType> constant_param_values;
-
 private:
   size_t special_op_guid;
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
@@ -205,6 +199,13 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
+
+public:
+  Context *context;
+  float totalCost;
+  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
+  std::map<Op, ParamType> constant_param_values;
+  std::unordered_map<Op, int, OpHash> qubit_idx;
 };
 
 }; // namespace TASOGraph

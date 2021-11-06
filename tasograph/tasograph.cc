@@ -882,6 +882,10 @@ void Graph::rotation_merging(GateType target_rotation) {
 		  }
 		  else {
 			merge_2_rotation_op(first.op, pos.op);
+			std::cout << "merging op " << gate_type_name(first.op.ptr->tp)
+			          << "(" << first.op.guid << ")"
+			          << " and " << gate_type_name(pos.op.ptr->tp) << "("
+			          << pos.op.guid << ")" << std::endl;
 		  }
 		}
 
@@ -906,6 +910,8 @@ void Graph::rotation_merging(GateType target_rotation) {
 			}
 		  }
 		  remove_node(op);
+		  std::cout << "eliminating op " << gate_type_name(op.ptr->tp) << "("
+		            << op.guid << ")" << std::endl;
 		}
 	  }
 	}

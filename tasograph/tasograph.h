@@ -189,6 +189,7 @@ public:
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits();
+  void print_qubit_ops();
 
 private:
   size_t special_op_guid;

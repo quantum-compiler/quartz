@@ -32,12 +32,26 @@ Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
   std::vector<Op> input_params_op;
   input_qubits_op.reserve(num_input_qubits);
   input_params_op.reserve(num_input_params);
-  for (int i = 0; i < num_input_qubits; ++i)
-	input_qubits_op.push_back(
-	    Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit)));
-  for (int i = 0; i < num_input_params; ++i)
-	input_params_op.push_back(
-	    Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
+  //   for (int i = 0; i < num_input_qubits; ++i)
+  // 	input_qubits_op.push_back(
+  // 	    Op(get_next_special_op_guid(),
+  // ctx->get_gate(GateType::input_qubit)));
+  //   for (int i = 0; i < num_input_params; ++i)
+  // 	input_params_op.push_back(
+  // 	    Op(get_next_special_op_guid(),
+  // ctx->get_gate(GateType::input_param)));
+  for (auto &node : dag.nodes) {
+	if (node->type == DAGNode::input_qubit) {
+	  auto input_qubit_op =
+	      Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit));
+	  input_qubits_op.push_back(input_qubit_op);
+	  qubit_2_idx[input_qubit_op] = node->index;
+	}
+	else if (node->type == DAGNode::input_param) {
+	  input_params_op.push_back(
+	      Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
+	}
+  }
 
   // Map all edges in dag to Op
   std::map<DAGHyperEdge *, Op> edge_2_op;
@@ -104,6 +118,7 @@ Graph::Graph(const Graph &graph) {
   context = graph.context;
   constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
+  qubit_2_idx = graph.qubit_2_idx;
 }
 
 size_t Graph::get_next_special_op_guid() {
@@ -297,6 +312,8 @@ void Graph::remove_node(Op oldOp) {
 	  for (auto out_edge : out_edges) {
 		if (out_edge.dstOp == oldOp) {
 		  outEdges[src_op].erase(out_edge);
+		  if (outEdges[src_op].empty())
+			outEdges.erase(src_op);
 		  break;
 		}
 	  }
@@ -311,6 +328,8 @@ void Graph::remove_node(Op oldOp) {
 	  for (auto in_edge : in_edges) {
 		if (in_edge.srcOp == oldOp) {
 		  inEdges[dst_op].erase(in_edge);
+		  if (inEdges[dst_op].empty())
+			inEdges.erase(dst_op);
 		  break;
 		}
 	  }
@@ -350,6 +369,8 @@ void Graph::remove_edge(Op srcOp, Op dstOp) {
 		break;
 	  }
 	}
+	if (inEdges[dstOp].empty())
+	  inEdges.erase(dstOp);
   }
   if (outEdges.find(srcOp) != outEdges.end()) {
 	auto &edge_list = outEdges[srcOp];
@@ -359,6 +380,8 @@ void Graph::remove_edge(Op srcOp, Op dstOp) {
 		break;
 	  }
 	}
+	if (outEdges[srcOp].empty())
+	  outEdges.erase(srcOp);
   }
 }
 
@@ -719,14 +742,12 @@ void Graph::rotation_merging(GateType target_rotation) {
   std::queue<Op> todos;
 
   // For all input_qubits, initialize its bitmap, and assign it a idx
-  // TODO: load qubit index from DAG
-  int qubit_idx = 0;
   for (const auto &it : outEdges) {
 	if (it.first.ptr->tp == GateType::input_qubit) {
 	  todos.push(it.first);
+	  int qubit_idx = qubit_2_idx[it.first];
 	  bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
 	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
-	  qubit_idx++;
 	}
 	else if (it.first.ptr->tp == GateType::input_param) {
 	  todos.push(it.first);
@@ -889,8 +910,140 @@ void Graph::rotation_merging(GateType target_rotation) {
 	}
   }
 }
-#ifdef DEADCODE
-#endif
+
+size_t Graph::get_num_qubits() { return qubit_2_idx.size(); }
+
+void Graph::to_qasm(const std::string &save_filename, bool print_result) {
+  std::ofstream ofs(save_filename);
+  std::ostringstream o;
+  std::map<float, std::string> constant_2_pi;
+  std::vector<float> multiples;
+  for (int i = 1; i <= 8; ++i) {
+	multiples.push_back(i * 0.25);
+	multiples.push_back(-i * 0.25);
+  }
+  multiples.push_back(0);
+  for (auto f : multiples) {
+	constant_2_pi[f * PI] = "pi*" + std::to_string(f);
+  }
+
+  o << "OPENQASM 2.0;" << std::endl;
+  o << "include \"qelib1.inc\";" << std::endl;
+  o << "qreg q[" << get_num_qubits() << "];" << std::endl;
+
+  std::unordered_map<Pos, int, PosHash> pos_to_qubits;
+  std::queue<Op> todos;
+  for (const auto &it : outEdges) {
+	if (it.first.ptr->tp == GateType::input_qubit) {
+	  todos.push(it.first);
+	  int qubit_idx = qubit_2_idx[it.first];
+	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
+	}
+	else if (it.first.ptr->tp == GateType::input_param) {
+	  todos.push(it.first);
+	}
+  }
+
+  // Construct in-degree map
+  std::map<Op, size_t> op_in_edges_cnt;
+  for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
+	op_in_edges_cnt[it->first] = it->second.size();
+  }
+
+  while (!todos.empty()) {
+	auto op = todos.front();
+	todos.pop();
+
+	if (op.ptr->tp != GateType::input_qubit &&
+	    op.ptr->tp != GateType::input_param) {
+	  assert(op.ptr->is_quantum_gate()); // Should not have any arithmetic gates
+	  std::ostringstream iss;
+	  iss << gate_type_name(op.ptr->tp);
+	  int num_qubits = op.ptr->get_num_qubits();
+	  auto in_edges = inEdges[op];
+	  // Maintain pos_to_qubits
+	  if (op.ptr->is_parametrized_gate()) {
+		iss << '(';
+		assert(inEdges.find(op) != inEdges.end());
+		int num_params = op.ptr->get_num_parameters();
+		std::vector<ParamType> param_values(num_params);
+		for (auto edge : in_edges) {
+		  // Print parameters
+		  if (edge.dstIdx >= num_qubits) {
+			// Parameter inputs
+			assert(constant_param_values.find(edge.srcOp) !=
+			       constant_param_values
+			           .end()); // All parameters should be constant
+			param_values[edge.dstIdx - num_qubits] =
+			    constant_param_values[edge.srcOp];
+		  }
+		}
+		bool first = true;
+		for (auto f : param_values) {
+		  if (first) {
+			first = false;
+		  }
+		  else
+			iss << ',';
+		  bool found = false;
+		  for (auto it : constant_2_pi) {
+			if (std::abs(f - it.first) < eps) {
+			  iss << it.second;
+			  found = true;
+			}
+		  }
+		  if (!found) {
+			iss << f;
+		  }
+		}
+		iss << ')';
+	  }
+	  iss << ' ';
+	  std::vector<int> q_idx(num_qubits);
+	  for (auto edge : in_edges) {
+		if (edge.dstIdx < num_qubits) {
+		  assert(pos_to_qubits.find(Pos(edge.srcOp, edge.srcIdx)) !=
+		         pos_to_qubits.end());
+		  q_idx[edge.dstIdx] = pos_to_qubits[Pos(edge.srcOp, edge.srcIdx)];
+		  pos_to_qubits[Pos(op, edge.dstIdx)] =
+		      pos_to_qubits[Pos(edge.srcOp, edge.srcIdx)];
+		}
+	  }
+	  bool first = true;
+	  for (auto idx : q_idx) {
+		if (first)
+		  first = false;
+		else
+		  iss << ',';
+		iss << "q[" << idx << ']';
+	  }
+	  iss << ';' << std::endl;
+	  o << iss.str();
+	}
+
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> list = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		auto e = *it2;
+		op_in_edges_cnt[e.dstOp]--;
+		if (op_in_edges_cnt[e.dstOp] == 0) {
+		  todos.push(e.dstOp);
+		}
+	  }
+	}
+  }
+  ofs << o.str();
+  if (print_result)
+	std::cout << o.str();
+}
+
+void Graph::draw_circuit(const std::string &src_file_name,
+                         const std::string &save_filename) {
+
+  system(("python python/draw_graph.py " + src_file_name + " " + save_filename)
+             .c_str());
+}
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,

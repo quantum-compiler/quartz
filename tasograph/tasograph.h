@@ -13,10 +13,11 @@
 #include <chrono>
 #include <iostream>
 #include <queue>
+#include <fstream>
 
 namespace TASOGraph {
 
-#define eps 1e-8
+#define eps 1e-6
 
 class Op {
 public:
@@ -184,6 +185,10 @@ public:
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
+  void to_qasm(const std::string &save_filename, bool print_result);
+  void draw_circuit(const std::string &qasm_str,
+                    const std::string &save_filename);
+  size_t get_num_qubits();
 
 private:
   size_t special_op_guid;
@@ -205,7 +210,7 @@ public:
   float totalCost;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
-  std::unordered_map<Op, int, OpHash> qubit_idx;
+  std::unordered_map<Op, int, OpHash> qubit_2_idx;
 };
 
 }; // namespace TASOGraph

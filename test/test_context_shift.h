@@ -15,12 +15,12 @@ void test_context_shift(const std::string &filename, Context *src_ctx,
   }
 
   TASOGraph::Graph graph(src_ctx, *dag);
-  TASOGraph::Graph *graph_new_ctx =
-      graph.context_shift(src_ctx, dst_ctx, rule_parser);
-  graph_new_ctx->constant_eliminate();
-  for (auto it = graph_new_ctx->inEdges.begin();
-       it != graph_new_ctx->inEdges.end(); ++it) {
-	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
-  }
-  std::cout << graph_new_ctx->total_cost() << std::endl;
+  //TASOGraph::Graph *graph_new_ctx =
+  //    graph.context_shift(src_ctx, dst_ctx, rule_parser);
+  //graph_new_ctx->constant_eliminate();
+  //for (auto it = graph_new_ctx->inEdges.begin();
+  //     it != graph_new_ctx->inEdges.end(); ++it) {
+  //	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
+  //}
+  //std::cout << graph_new_ctx->total_cost() << std::endl;
 }

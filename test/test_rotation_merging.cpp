@@ -30,6 +30,6 @@ int main() {
   newGraph->rotation_merging(GateType::rz);
   std::cout << newGraph->total_cost()
             << " gates in circuit after rotation merging." << std::endl;
-  newGraph->to_qasm("temp.qasm", /*print_result=*/true);
+  newGraph->to_qasm("temp.qasm", /*print_result=*/true, false);
   //   newGraph->draw_circuit("temp.qasm", "temp.png");
 }

@@ -774,9 +774,9 @@ void Graph::rotation_merging(GateType target_rotation) {
 		pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
 	  }
 	  bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
-	  bitmasks[Pos(op, 1)] =
-	      xor_bitmap(bitmasks[pos_list[1]], pos_to_qubits[pos_list[1]],
-	                 bitmasks[pos_list[0]], pos_to_qubits[pos_list[0]]);
+	  bitmasks[Pos(op, 1)] = bitmasks[pos_list[0]] ^ bitmasks[pos_list[1]];
+	  //    xor_bitmap(bitmasks[pos_list[1]], pos_to_qubits[pos_list[1]],
+	  //               bitmasks[pos_list[0]], pos_to_qubits[pos_list[0]]);
 	  pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
 	  pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
 	}
@@ -914,7 +914,7 @@ void Graph::rotation_merging(GateType target_rotation) {
 
 size_t Graph::get_num_qubits() { return qubit_2_idx.size(); }
 
-void Graph::to_qasm(const std::string &save_filename, bool print_result) {
+void Graph::to_qasm(const std::string &save_filename, bool print_result, bool print_guid) {
   std::ofstream ofs(save_filename);
   std::ostringstream o;
   std::map<float, std::string> constant_2_pi;
@@ -1018,7 +1018,10 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result) {
 		  iss << ',';
 		iss << "q[" << idx << ']';
 	  }
-	  iss << ';' << std::endl;
+	  if (print_guid)
+	    iss << "; # guid = " << op.guid << std::endl;
+	  else
+	    iss << ';' << std::endl;
 	  o << iss.str();
 	}
 

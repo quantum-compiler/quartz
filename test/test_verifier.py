@@ -18,7 +18,7 @@ def test_apply_matrix():
     vec = input_distribution(1, slv)
     output_vec1 = apply_matrix(apply_matrix(vec, rx((c1, s1)), [0]), rx((c2, s2)), [0])
     output_vec2 = apply_matrix(vec, rx(add((c1, s1), (c2, s2))), [0])
-    slv.add(z3.Not(eq_vector(output_vec1, output_vec2)))
+    slv.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2))))
     print(slv.check())
 
 

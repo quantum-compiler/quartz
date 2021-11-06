@@ -733,6 +733,7 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
 	}
   }
   remove_node(op_1);
+  return true;
 }
 
 void Graph::rotation_merging(GateType target_rotation) {

@@ -31,9 +31,13 @@ class DAG {
   // The time complexity is O((number of gates removed) *
   // ((total number of nodes) + (total number of edges))).
   int remove_gate(DAGHyperEdge *edge);
+  // Evaluate the output distribution given input distribution and
+  // input parameters. Also output all parameter values (including input
+  // and internal parameters) when |parameter_values| is not nullptr.
   bool evaluate(const Vector &input_dis,
                 const std::vector<ParamType> &input_parameters,
-                Vector &output_dis) const;
+                Vector &output_dis,
+                std::vector<ParamType> *parameter_values = nullptr) const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
@@ -106,6 +110,11 @@ class DAG {
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
 
+  // A helper function used by |DAGHashType hash(Context *ctx)|.
+  static void generate_hash_values(ComplexType hash_value,
+                                   DAGHashType *main_hash,
+                                   std::vector<DAGHashType> *other_hash);
+
  public:
   std::vector<std::unique_ptr<DAGNode>> nodes;
   std::vector<std::unique_ptr<DAGHyperEdge>> edges;
@@ -116,7 +125,9 @@ class DAG {
  private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
-  std::vector<DAGHashType> other_hash_values_for_floating_point_error_;
+  // For both floating-point error tolerance
+  // and equivalences under a phase shift.
+  std::vector<DAGHashType> other_hash_values_;
   bool hash_value_valid_;
 };
 

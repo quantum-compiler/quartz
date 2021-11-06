@@ -27,6 +27,7 @@ int main() {
                           "tdg q0 = rz q0 -0.25pi"});
   TASOGraph::Graph *newGraph =
       graph.context_shift(&src_ctx, &dst_ctx, &union_ctx, &rule_parser);
+  newGraph->print_qubit_ops();
   //   newGraph->to_qasm("temp.qasm", /*print_result=*/true);
   newGraph->rotation_merging(GateType::rz);
   std::cout << newGraph->total_cost()

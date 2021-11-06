@@ -920,7 +920,73 @@ void Graph::rotation_merging(GateType target_rotation) {
 
 size_t Graph::get_num_qubits() { return qubit_2_idx.size(); }
 
-void Graph::to_qasm(const std::string &save_filename, bool print_result, bool print_guid) {
+void Graph::print_qubit_ops() {
+  std::unordered_map<Pos, int, PosHash> pos_to_qubits;
+  std::queue<Op> todos;
+  for (const auto &it : outEdges) {
+	if (it.first.ptr->tp == GateType::input_qubit) {
+	  todos.push(it.first);
+	  int qubit_idx = qubit_2_idx[it.first];
+	  pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
+	}
+	else if (it.first.ptr->tp == GateType::input_param) {
+	  todos.push(it.first);
+	}
+  }
+  // Construct in-degree map
+  std::map<Op, size_t> op_in_edges_cnt;
+  for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
+	op_in_edges_cnt[it->first] = it->second.size();
+  }
+
+  std::map<int, std::vector<int>> qubit_2_op_list;
+  int circuit_qubit_num = get_num_qubits();
+  for (int i = 0; i < circuit_qubit_num; ++i) {
+	qubit_2_op_list[i];
+  }
+
+  while (!todos.empty()) {
+	auto op = todos.front();
+	todos.pop();
+
+	if (op.ptr->tp != GateType::input_qubit &&
+	    op.ptr->tp != GateType::input_param) {
+	  int num_qubits = op.ptr->get_num_qubits();
+	  assert(inEdges.find(op) != inEdges.end());
+	  auto in_edges = inEdges[op];
+	  for (auto edge : in_edges) {
+		if (edge.dstIdx < num_qubits) {
+		  int qid = pos_to_qubits[Pos(edge.srcOp, edge.srcIdx)];
+		  pos_to_qubits[Pos(op, edge.dstIdx)] = qid;
+		  qubit_2_op_list[qid].push_back(op.guid);
+		}
+	  }
+	}
+
+	if (outEdges.find(op) != outEdges.end()) {
+	  std::set<Edge, EdgeCompare> list = outEdges[op];
+	  std::set<Edge, EdgeCompare>::const_iterator it2;
+	  for (it2 = list.begin(); it2 != list.end(); it2++) {
+		auto e = *it2;
+		op_in_edges_cnt[e.dstOp]--;
+		if (op_in_edges_cnt[e.dstOp] == 0) {
+		  todos.push(e.dstOp);
+		}
+	  }
+	}
+  }
+  for (auto it : qubit_2_op_list) {
+	int qid = it.first;
+	std::cout << qid << ":\t";
+	for (auto op_guid : qubit_2_op_list[qid]) {
+	  std::cout << op_guid << " ";
+	}
+	std::cout << std::endl;
+  }
+}
+
+void Graph::to_qasm(const std::string &save_filename, bool print_result,
+                    bool print_guid) {
   std::ofstream ofs(save_filename);
   std::ostringstream o;
   std::map<float, std::string> constant_2_pi;
@@ -1025,9 +1091,9 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result, bool pr
 		iss << "q[" << idx << ']';
 	  }
 	  if (print_guid)
-	    iss << "; # guid = " << op.guid << std::endl;
+		iss << "; # guid = " << op.guid << std::endl;
 	  else
-	    iss << ';' << std::endl;
+		iss << ';' << std::endl;
 	  o << iss.str();
 	}
 

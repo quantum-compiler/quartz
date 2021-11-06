@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../context/context.h"
 #include "../generator/generator.h"
 
 #include <chrono>

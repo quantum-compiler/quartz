@@ -496,7 +496,7 @@ DAGHashType DAG::hash(Context *ctx) {
   hash_value_valid_ = true;
 
   // Account for phase shifts.
-  if (!all_parameters.empty()) {
+  /*if (!all_parameters.empty()) {
     // We try the simplest version first:
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).
@@ -511,7 +511,7 @@ DAGHashType DAG::hash(Context *ctx) {
       other_hash_values_.push_back(tmp);
       // TODO: Let the verifier know about the phase shifted!
     }
-  }
+  }*/
   return hash_value_;
 }
 

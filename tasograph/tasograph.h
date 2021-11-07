@@ -19,6 +19,8 @@ namespace TASOGraph {
 
 #define eps 1e-6
 
+bool equal_to_2k_pi(double d);
+
 class Op {
 public:
   Op(void);

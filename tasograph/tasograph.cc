@@ -15,6 +15,14 @@ enum {
   GUID_PRESERVED = 500,
 };
 
+bool equal_to_2k_pi(double d) {
+  d = std::abs(d);
+  int m = d / (2 * PI);
+  if (std::abs(d - m * 2 * PI) > eps && std::abs(d - (m + 1) * 2 * PI) > eps)
+	return false;
+  return true;
+}
+
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
@@ -545,8 +553,8 @@ void Graph::constant_and_rotation_elimination() {
 		  }
 		  else {
 			// A constant parameter
-			if (std::abs(constant_param_values[in_edge.srcOp]) > eps) {
-			  // The constant parameter is not 0
+			if (!equal_to_2k_pi(constant_param_values[in_edge.srcOp])) {
+			  // The constant parameter is not 2kpi
 			  all_parameter_is_0 = false;
 			  break;
 			}
@@ -897,7 +905,7 @@ void Graph::rotation_merging(GateType target_rotation) {
 		  if (edge.dstIdx >= num_qubits) {
 			if (constant_param_values.find(edge.srcOp) ==
 			        constant_param_values.end() ||
-			    std::abs(constant_param_values[edge.srcOp]) > eps) {
+			    !equal_to_2k_pi(constant_param_values[edge.srcOp])) {
 			  all_param_is_0 = false;
 			  break;
 			}

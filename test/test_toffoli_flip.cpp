@@ -31,12 +31,13 @@ int main() {
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/example-circuits/barenco_tof_3_ccz.qasm",
+  if (!qasm_parser.load_qasm("circuit/voqc-benchmarks/barenco_tof_10.qasm",
                              dag)) {
 	std::cout << "Parser failed" << std::endl;
   }
   TASOGraph::Graph graph(&src_ctx, *dag);
   TASOGraph::Graph *new_graph =
       graph.toffoli_flip_greedy(GateType::rz, xfer, xfer_inverse);
-  std::cout << new_graph->total_cost() << std::endl;
+  std::cout << "gate count after toffoli flip: " << new_graph->total_cost()
+            << std::endl;
 }

@@ -323,6 +323,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         more_equivalences = []
         equivalent_called_2 = 0
         num_equivalences_under_phase_shift = 0
+        possible_num_equivalences_under_phase_shift = 0
         for hashtag, dags in output_dict.items():
             other_hashtags = {}  # A map from other hashtags to corresponding phase shifts.
             assert len(dags) > 0
@@ -363,6 +364,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                     # |phase_shift_id[0]| is the DAG generating this phase shift id.
                     current_result = equivalent(phase_shift_id[0], other_dag[0], check_phase_shift_in_smt_solver,
                                                 phase_shift_id[1])
+                    possible_num_equivalences_under_phase_shift += 1
                 if current_result:
                     more_equivalences.append((hashtag, other_dag[1]))
                     hashtags_in_more_equivalences.update(hashtag)
@@ -378,7 +380,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         if print_basic_info:
             print(f'Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences'
                   f' with different hash,'
-                  f' including {num_equivalences_under_phase_shift} equivalences under phase shift.')
+                  f' including {num_equivalences_under_phase_shift} out of'
+                  f' {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift.')
     else:
         # Add a placeholder here
         output_dict = [[], output_dict]

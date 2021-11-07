@@ -6,6 +6,7 @@ is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
+import multiprocessing as mp
 import z3
 from .gates import get_matrix, compute
 from utils.utils import *
@@ -213,8 +214,34 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
+def find_equivalences_helper(hashtag, dags, check_phase_shift, verbose):
+    output_dict = {}
+    equivalent_called = 0
+    total_equivalence_found = 0
+    different_dags_with_same_hash = []
+    if verbose:
+        print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+    for dag in dags:
+        for i, other_dag in enumerate(different_dags_with_same_hash):
+            equivalent_called += 1
+            if equivalent(dag, other_dag, check_phase_shift):
+                current_tag = hashtag + '_' + str(i)
+                assert current_tag in output_dict.keys()
+                output_dict[current_tag].append(dag)
+                total_equivalence_found += 1
+                break
+        else:
+            # dag is not equivalent do any of different_dags_with_same_hash
+            different_dags_with_same_hash.append(dag)
+            # Insert |dag| eagerly
+            current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+            output_dict[current_tag] = [dag]
+    return hashtag, output_dict, equivalent_called, total_equivalence_found
+
+
 def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
                       check_equivalence_with_different_hash=True, check_phase_shift=False):
+    check_phase_shift = False
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -225,31 +252,49 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     import time
     t_start = time.monotonic()
     num_different_dags_with_same_hash = {}
-    for hashtag, dags in data.items():
-        num_hashtags += 1
-        num_dags += len(dags)
-        num_potential_equivalences += len(dags) - 1
-        different_dags_with_same_hash = []
-        if verbose:
-            print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
-        for dag in dags:
-            equivalence_found = False
-            for i in range(len(different_dags_with_same_hash)):
-                other_dag = different_dags_with_same_hash[i]
-                equivalent_called += 1
-                if equivalent(dag, other_dag, check_phase_shift):
-                    current_tag = hashtag + '_' + str(i)
-                    assert current_tag in output_dict.keys()
-                    output_dict[current_tag].append(dag)
-                    equivalence_found = True
-                    total_equivalence_found += 1
-                    break
-            if not equivalence_found:
-                different_dags_with_same_hash.append(dag)
-                # Insert |dag| eagerly
-                current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
-                output_dict[current_tag] = [dag]
-        num_different_dags_with_same_hash[hashtag] = len(different_dags_with_same_hash)
+    print(f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...')
+
+    if False:
+        # sequential version
+        for hashtag, dags in data.items():
+            num_hashtags += 1
+            num_dags += len(dags)
+            num_potential_equivalences += len(dags) - 1
+            different_dags_with_same_hash = []
+            if verbose:
+                print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+            for dag in dags:
+                equivalence_found = False
+                for i in range(len(different_dags_with_same_hash)):
+                    other_dag = different_dags_with_same_hash[i]
+                    equivalent_called += 1
+                    if equivalent(dag, other_dag, check_phase_shift):
+                        current_tag = hashtag + '_' + str(i)
+                        assert current_tag in output_dict.keys()
+                        output_dict[current_tag].append(dag)
+                        equivalence_found = True
+                        total_equivalence_found += 1
+                        break
+                if not equivalence_found:
+                    different_dags_with_same_hash.append(dag)
+                    # Insert |dag| eagerly
+                    current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+                    output_dict[current_tag] = [dag]
+            num_different_dags_with_same_hash[hashtag] = len(different_dags_with_same_hash)
+
+    else:
+        # parallel version
+        num_hashtags = len(data)
+        num_dags = sum(len(dags) for dags in data.values())
+        num_potential_equivalences = num_dags - num_hashtags
+        data = {hashtag: dags for hashtag, dags in data.items() if len(dags) > 1} # filter out hash values with only one DAG
+        # TODO: do we actually need to process hash values with only one DAG? if so we should do it sequentially here before invoking parallelism
+        with mp.Pool() as pool:
+            for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(find_equivalences_helper, ((hashtag, dags, check_phase_shift, verbose) for hashtag, dags in data.items())):
+                output_dict.update(output_dict_)
+                equivalent_called += equivalent_called_
+                total_equivalence_found += total_equivalence_found_
+                num_different_dags_with_same_hash[hashtag] = len(output_dict_)
 
     hashtags_in_more_equivalences = set()
     if check_equivalence_with_different_hash:

@@ -1130,10 +1130,12 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
+                       GateType target_rotation,
                        const std::string &equiv_file_name,
-                       bool use_simulated_annealing/*,
+                       bool use_simulated_annealing,
                        bool use_greedy_toffoli_flip,
-                       bool rotation_merging_in_searching*/) {
+                       std::pair<GraphXfer *, GraphXfer *> toffoli_xfers,
+                       bool rotation_merging_in_searching) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1198,19 +1200,22 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
   std::set<size_t> hashmap;
-  //   if (use_greedy_toffoli_flip) {
-  //       Graph *new_graph = toffoli_flip_greedy();
-  //   }
-  //   else {
-  // 	candidates.push(this);
-  // 	hashmap.insert(hash());
-  // 	Graph *bestGraph = this;
-  // 	float bestCost = total_cost();
-  //   }
-  candidates.push(this);
-  hashmap.insert(hash());
-  Graph *bestGraph = this;
-  float bestCost = total_cost();
+  float bestCost = 0;
+  Graph *bestGraph = nullptr;
+  if (use_greedy_toffoli_flip) {
+	Graph *new_graph = toffoli_flip_greedy(target_rotation, toffoli_xfers.first,
+	                                       toffoli_xfers.second);
+	candidates.push(new_graph);
+	hashmap.insert(new_graph->hash());
+	bestGraph = new_graph;
+	bestCost = new_graph->total_cost();
+  }
+  else {
+	candidates.push(this);
+	hashmap.insert(hash());
+	bestGraph = this;
+	bestCost = total_cost();
+  }
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
   if (use_simulated_annealing) {

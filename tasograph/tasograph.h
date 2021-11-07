@@ -182,9 +182,10 @@ public:
   Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
                        RuleParser *rule_parser);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                  const std::string &equiv_file_name,
-                  bool use_simulated_annealing/*, bool use_greedy_toffoli_flip,
-                  bool rotation_merging_in_searching*/);
+                  GateType target_rotation, const std::string &equiv_file_name,
+                  bool use_simulated_annealing, bool use_greedy_toffoli_flip,
+                  std::pair<GraphXfer *, GraphXfer *> toffoli_xfers,
+                  bool rotation_merging_in_searching);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   void to_qasm(const std::string &save_filename, bool print_result,

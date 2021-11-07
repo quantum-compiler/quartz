@@ -53,7 +53,7 @@ def rz(theta):
 def u1(theta):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(1, 1), (0, 0)],
+    return [[(1, 0), (0, 0)],
             [(0, 0), (cos_theta, sin_theta)]]
 
 

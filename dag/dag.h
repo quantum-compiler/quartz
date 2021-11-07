@@ -134,7 +134,7 @@ class DAG {
   // The first component of the pair is the hash value,
   // and the second component is the id of the phase shifted.
   // For now, the id is hard-coded as follows:
-  //   - -1: no shift
+  //   - |kNoPhaseShift|: no shift
   //   - p \in [0, get_num_total_parameters()):
   //       shifted by e^(i * (p-th parameter))
   //   - p \in [get_num_total_parameters(), 2 * get_num_total_parameters()):

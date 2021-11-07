@@ -494,8 +494,8 @@ DAGHashType DAG::hash(Context *ctx) {
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
 
   other_hash_values_.clear();
-  generate_hash_values(dot_product, /*phase_shift_id=*/
-                       -1,
+  generate_hash_values(dot_product,
+                       kNoPhaseShift,
                        &hash_value_,
                        &other_hash_values_);
   hash_value_valid_ = true;
@@ -520,7 +520,6 @@ DAGHashType DAG::hash(Context *ctx) {
                            &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
-      // TODO: Let the verifier know about the phase shifted!
     }
   }
   return hash_value_;
@@ -733,7 +732,7 @@ std::string DAG::to_json() const {
   result += "[";
   if (hash_value_valid_) {
     bool first_other_hash_value = true;
-    for (const auto &val : other_hash_values()) {
+    for (const auto &val : other_hash_values_with_phase_shift_id()) {
       if (first_other_hash_value) {
         first_other_hash_value = false;
       } else {
@@ -742,10 +741,17 @@ std::string DAG::to_json() const {
       static char buffer[64];
       auto[ptr, ec] = std::to_chars(buffer,
                                     buffer + sizeof(buffer),
-                                    val, /*base=*/
+                                    val.first, /*base=*/
                                     16);
       assert(ec == std::errc());
-      result += "\"" + std::string(buffer, ptr) + "\"";
+      auto hash_value = std::string(buffer, ptr);
+      if (kCheckPhaseShiftInGenerator && val.second != kNoPhaseShift) {
+        // hash value and phase shift id
+        result += "[\"" + hash_value + "\"," + std::to_string(val.second) + "]";
+      } else {
+        // hash value only
+        result += "\"" + hash_value + "\"";
+      }
     }
   }
   result += "]";
@@ -799,7 +805,20 @@ std::unique_ptr<DAG> DAG::read_json(Context *ctx, std::istream &fin) {
 
   // ignore other hash values
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+  while (true) {
+    char ch;
+    fin.get(ch);
+    while (ch != '[' && ch != ']') {
+      fin.get(ch);
+    }
+    if (ch == '[') {
+      // A hash value with a phase shift id.
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+    } else {
+      // ch == ']'
+      break;
+    }
+  }
 
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');

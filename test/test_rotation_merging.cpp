@@ -6,7 +6,10 @@
 #include <iostream>
 
 int main() {
-
+  std::string benchmark_filename =
+      "circuit/voqc-benchmarks/barenco_tof_10.qasm";
+  std::string result_qasm_filename =
+      "circuit/voqc-benchmarks/barenco_tof_10_rotation_merging.qasm";
   Context src_ctx({GateType::input_param, GateType::input_qubit, GateType::ccz,
                    GateType::h});
   Context dst_ctx({GateType::input_param, GateType::input_qubit, GateType::h,
@@ -17,8 +20,7 @@ int main() {
   Context union_ctx = union_contexts(&src_ctx, &dst_ctx);
   QASMParser qasm_parser(&union_ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/voqc-benchmarks/barenco_tof_10.qasm",
-                             dag)) {
+  if (!qasm_parser.load_qasm(benchmark_filename, dag)) {
 	std::cout << "Parser failed" << std::endl;
   }
 
@@ -37,6 +39,5 @@ int main() {
   newGraph->rotation_merging(GateType::rz);
   std::cout << newGraph->total_cost()
             << " gates in circuit after rotation merging." << std::endl;
-  //   newGraph->to_qasm("temp.qasm", /*print_result=*/true, false);
-  //   newGraph->draw_circuit("temp.qasm", "temp.png");
+  newGraph->to_qasm(result_qasm_filename, /*print_result=*/false, false);
 }

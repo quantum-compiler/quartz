@@ -1131,7 +1131,9 @@ void Graph::draw_circuit(const std::string &src_file_name,
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,
-                       bool use_simulated_annealing) {
+                       bool use_simulated_annealing/*,
+                       bool use_greedy_toffoli_flip,
+                       bool rotation_merging_in_searching*/) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1148,19 +1150,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        .count() /
                    1000.0
             << " seconds." << std::endl;
-
-  //   start = std::chrono::steady_clock::now();
-  //   auto num_equiv_class_inserted = eqs.simplify(ctx);
-  //   end = std::chrono::steady_clock::now();
-  //   std::cout << std::dec << eqs.num_equivalence_classes()
-  //             << " classes of equivalences remain after simplication after
-  //             "
-  //             <<
-  //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-  //                    end - start)
-  //                        .count() /
-  //                    1000.0
-  //             << " seconds." << std::endl;
 
   std::vector<GraphXfer *> xfers;
   for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
@@ -1209,6 +1198,15 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
   std::set<size_t> hashmap;
+  //   if (use_greedy_toffoli_flip) {
+  //       Graph *new_graph = toffoli_flip_greedy();
+  //   }
+  //   else {
+  // 	candidates.push(this);
+  // 	hashmap.insert(hash());
+  // 	Graph *bestGraph = this;
+  // 	float bestCost = total_cost();
+  //   }
   candidates.push(this);
   hashmap.insert(hash());
   Graph *bestGraph = this;

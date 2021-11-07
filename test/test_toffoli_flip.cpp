@@ -3,6 +3,10 @@
 #include "../parser/qasm_parser.h"
 
 int main() {
+  std::string benchmark_filename =
+      "circuit/voqc-benchmarks/barenco_tof_10.qasm";
+  std::string result_qasm_filename =
+      "circuit/voqc-benchmarks/barenco_tof_10_toffoli_flip.qasm";
   // Construct rules
   RuleParser toffoli_0({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
                         "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "
@@ -31,8 +35,7 @@ int main() {
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/voqc-benchmarks/barenco_tof_10.qasm",
-                             dag)) {
+  if (!qasm_parser.load_qasm(benchmark_filename, dag)) {
 	std::cout << "Parser failed" << std::endl;
   }
   TASOGraph::Graph graph(&src_ctx, *dag);
@@ -40,4 +43,5 @@ int main() {
       graph.toffoli_flip_greedy(GateType::rz, xfer, xfer_inverse);
   std::cout << "gate count after toffoli flip: " << new_graph->total_cost()
             << std::endl;
+  new_graph->to_qasm(result_qasm_filename, false, false);
 }

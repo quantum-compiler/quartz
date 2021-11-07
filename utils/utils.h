@@ -4,11 +4,13 @@
 using ParamType = double;
 using ComplexType = std::complex<double>;
 using DAGHashType = unsigned long long;
+using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair<unsigned long long, int>;
 
 using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 constexpr int kDAGHashDiscardBits = 10;  // a parameter for DAG::hash()
+constexpr bool kCheckPhaseShiftInGenerator = false; // a switch for DAG::hash()
 
 struct PairHash {
  public:

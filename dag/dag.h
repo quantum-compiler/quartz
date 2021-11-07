@@ -49,6 +49,8 @@ class DAG {
   [[nodiscard]] bool hash_value_valid() const;
   [[nodiscard]] DAGHashType cached_hash_value() const;
   [[nodiscard]] std::vector<DAGHashType> other_hash_values() const;
+  [[nodiscard]] std::vector<std::pair<DAGHashType,
+                                      PhaseShiftIdType>> other_hash_values_with_phase_shift_id() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
   // Returns false iff an error occurs.
@@ -111,9 +113,11 @@ class DAG {
                   const std::vector<int> &param_permutation);
 
   // A helper function used by |DAGHashType hash(Context *ctx)|.
-  static void generate_hash_values(ComplexType hash_value,
+  static void generate_hash_values(const ComplexType &hash_value,
+                                   const PhaseShiftIdType &phase_shift_id,
                                    DAGHashType *main_hash,
-                                   std::vector<DAGHashType> *other_hash);
+                                   std::vector<std::pair<DAGHashType,
+                                                         PhaseShiftIdType>> *other_hash);
 
  public:
   std::vector<std::unique_ptr<DAGNode>> nodes;
@@ -127,7 +131,15 @@ class DAG {
   DAGHashType hash_value_;
   // For both floating-point error tolerance
   // and equivalences under a phase shift.
-  std::vector<DAGHashType> other_hash_values_;
+  // The first component of the pair is the hash value,
+  // and the second component is the id of the phase shifted.
+  // For now, the id is hard-coded as follows:
+  //   - -1: no shift
+  //   - p \in [0, get_num_total_parameters()):
+  //       shifted by e^(i * (p-th parameter))
+  //   - p \in [get_num_total_parameters(), 2 * get_num_total_parameters()):
+  //       shifted by e^(-i * ((p - get_num_total_parameters())-th parameter))
+  std::vector<std::pair<DAGHashType, PhaseShiftIdType>> other_hash_values_;
   bool hash_value_valid_;
 };
 

@@ -2,12 +2,13 @@
 
 int main() {
   Context ctx
-      ({GateType::rx, GateType::rz, GateType::cx, GateType::add});
+      ({GateType::h, GateType::rz, GateType::p, GateType::pdg, GateType::cx,
+        GateType::add});
   Generator gen(&ctx);
 
   const int num_qubits = 3;
   const int num_input_parameters = 1;
-  const int max_num_gates = 5;
+  const int max_num_gates = 4;
   const int max_num_param_gates = 1;
   const bool run_dfs = false;
   const bool run_bfs_unverified = false;

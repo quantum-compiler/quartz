@@ -165,12 +165,14 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     # Warning: If DAG::hash() is modified, this function should be modified correspondingly.
     dag_meta = dag[0]
     num_total_params = dag_meta[meta_index_num_total_parameters]
+    if phase_shift_id >= 2 * num_total_params:
+        print(dag, phase_shift_id)
+    assert phase_shift_id < 2 * num_total_params
     if phase_shift_id < num_total_params:
-        # Seems different with DAG::hash, but works?
         phase_shift_lambda = all_parameters[phase_shift_id]
-        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
     else:
         phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
+        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
     return phase_shift(vec, phase_shift_lambda)
 
 
@@ -334,7 +336,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                         # phase shift id is item[1]
                         assert isinstance(item, list)
                         assert len(item) == 2
-                        other_hashtags[item[0]] = item[1]
+                        # We need the exact parameter in |dag|, so we cannot use the representative DAG |dags[0]|.
+                        other_hashtags[item[0]] = (dag, item[1])
             assert hashtag.split('_')[0] not in other_hashtags
             if len(other_hashtags) == 0:
                 print(f'Warning: other hash values unspecified for hash value {hashtag}.'
@@ -354,7 +357,13 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                       f' with hash value {hashtag} and {len(other_hashtags)} other hash values...')
             for other_dag in possible_equivalent_dags:
                 equivalent_called_2 += 1
-                if equivalent(dags[0], other_dag[0], check_phase_shift_in_smt_solver, phase_shift_id):
+                if phase_shift_id is None:
+                    current_result = equivalent(dags[0], other_dag[0], check_phase_shift_in_smt_solver, None)
+                else:
+                    # |phase_shift_id[0]| is the DAG generating this phase shift id.
+                    current_result = equivalent(phase_shift_id[0], other_dag[0], check_phase_shift_in_smt_solver,
+                                                phase_shift_id[1])
+                if current_result:
                     more_equivalences.append((hashtag, other_dag[1]))
                     hashtags_in_more_equivalences.update(hashtag)
                     hashtags_in_more_equivalences.update(other_dag[1])

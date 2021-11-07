@@ -7,7 +7,7 @@
 #include <random>
 
 Context::Context(const std::vector<GateType> &supported_gates)
-    : supported_gates_(supported_gates), global_unique_id(100) {
+    : supported_gates_(supported_gates), global_unique_id(256) {
   gates_.reserve(supported_gates.size());
   for (const auto &gate : supported_gates) {
 	insert_gate(gate);

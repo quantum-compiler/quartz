@@ -12,7 +12,7 @@ enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 80,
+  GUID_PRESERVED = 200,
 };
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
@@ -27,7 +27,7 @@ Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
   int num_input_qubits = dag.get_num_qubits();
   int num_input_params = dag.get_num_input_parameters();
   // Currently only 100 vacant guid
-  assert(num_input_qubits + num_input_params <= 100);
+  assert(num_input_qubits + num_input_params <= GUID_PRESERVED);
   std::vector<Op> input_qubits_op;
   std::vector<Op> input_params_op;
   input_qubits_op.reserve(num_input_qubits);

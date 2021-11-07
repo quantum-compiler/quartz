@@ -166,10 +166,11 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     dag_meta = dag[0]
     num_total_params = dag_meta[meta_index_num_total_parameters]
     if phase_shift_id < num_total_params:
+        # Seems different with DAG::hash, but works?
         phase_shift_lambda = all_parameters[phase_shift_id]
+        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
     else:
         phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
-        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
     return phase_shift(vec, phase_shift_lambda)
 
 

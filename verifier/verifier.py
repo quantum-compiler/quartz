@@ -146,7 +146,7 @@ def evaluate(dag, input_dis, input_parameters):
             assert (gate[1][0].startswith('Q'))
             # quantum gate
             output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
-    return output_dis
+    return output_dis, parameters
 
 
 def phase_shift(vec, lam):
@@ -161,7 +161,19 @@ def phase_shift(vec, lam):
     return shifted_vec
 
 
-def equivalent(dag1, dag2, check_phase_shift=False):
+def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
+    # Warning: If DAG::hash() is modified, this function should be modified correspondingly.
+    dag_meta = dag[0]
+    num_total_params = dag_meta[meta_index_num_total_parameters]
+    if phase_shift_id < num_total_params:
+        phase_shift_lambda = all_parameters[phase_shift_id]
+    else:
+        phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
+        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
+    return phase_shift(vec, phase_shift_lambda)
+
+
+def equivalent(dag1, dag2, check_phase_shift_in_smt_solver=False, phase_shift_id=None):
     dag1_meta = dag1[0]
     dag2_meta = dag2[0]
     for index in [meta_index_num_qubits]:
@@ -172,7 +184,7 @@ def equivalent(dag1, dag2, check_phase_shift=False):
     solver = z3.Solver()
     num_qubits = dag1_meta[meta_index_num_qubits]
     equation_list = []
-    if check_phase_shift:
+    if check_phase_shift_in_smt_solver:
         # Let z3 check phase shift
         num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
         params = create_parameters(num_parameters, equation_list)
@@ -182,8 +194,8 @@ def equivalent(dag1, dag2, check_phase_shift=False):
         for S in range(1 << num_qubits):
             # Construct a vector with only the S-th place being 1
             vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
-            output_vec1_S = evaluate(dag1, vec_S, params)
-            output_vec2_S = evaluate(dag2, vec_S, params)
+            output_vec1_S = evaluate(dag1, vec_S, params)[0]
+            output_vec2_S = evaluate(dag2, vec_S, params)[0]
             output_vec2_S_shifted = phase_shift(output_vec2_S, [cosL, sinL])
             matrix_equal_list += eq_vector(output_vec1_S, output_vec2_S_shifted)
         solver.add(z3.And(equation_list))
@@ -192,8 +204,11 @@ def equivalent(dag1, dag2, check_phase_shift=False):
         vec = input_distribution(num_qubits, equation_list)
         num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
         params = create_parameters(num_parameters, equation_list)
-        output_vec1 = evaluate(dag1, vec, params)
-        output_vec2 = evaluate(dag2, vec, params)
+        output_vec1, all_parameters = evaluate(dag1, vec, params)
+        output_vec2 = evaluate(dag2, vec, params)[0]
+        if phase_shift_id is not None:
+            # We shift dag1 here
+            output_vec1 = phase_shift_by_id(output_vec1, dag1, phase_shift_id, all_parameters)
         solver.add(z3.And(equation_list))
         solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2))))
     result = solver.check()
@@ -214,7 +229,7 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-def find_equivalences_helper(hashtag, dags, check_phase_shift, verbose):
+def find_equivalences_helper(hashtag, dags, check_phase_shift_in_smt_solver, verbose):
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0
@@ -224,7 +239,7 @@ def find_equivalences_helper(hashtag, dags, check_phase_shift, verbose):
     for dag in dags:
         for i, other_dag in enumerate(different_dags_with_same_hash):
             equivalent_called += 1
-            if equivalent(dag, other_dag, check_phase_shift):
+            if equivalent(dag, other_dag, check_phase_shift_in_smt_solver):
                 current_tag = hashtag + '_' + str(i)
                 assert current_tag in output_dict.keys()
                 output_dict[current_tag].append(dag)
@@ -240,8 +255,7 @@ def find_equivalences_helper(hashtag, dags, check_phase_shift, verbose):
 
 
 def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
-                      check_equivalence_with_different_hash=True, check_phase_shift=False):
-    check_phase_shift = False
+                      check_equivalence_with_different_hash=True, check_phase_shift_in_smt_solver=False):
     data = load_json(input_file)
     output_dict = {}
     equivalent_called = 0
@@ -268,7 +282,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 for i in range(len(different_dags_with_same_hash)):
                     other_dag = different_dags_with_same_hash[i]
                     equivalent_called += 1
-                    if equivalent(dag, other_dag, check_phase_shift):
+                    if equivalent(dag, other_dag, check_phase_shift_in_smt_solver):
                         current_tag = hashtag + '_' + str(i)
                         assert current_tag in output_dict.keys()
                         output_dict[current_tag].append(dag)
@@ -295,7 +309,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         print(f'Processed {len(output_dict)} hash values that had only 1 DAG, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more DAGs...')
         # now process hashtags with >1 DAGs
         with mp.Pool() as pool:
-            for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(find_equivalences_helper, ((hashtag, dags, check_phase_shift, verbose) for hashtag, dags in data.items() if len(dags) > 1)):
+            for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(find_equivalences_helper, ((hashtag, dags, check_phase_shift_in_smt_solver, verbose) for hashtag, dags in data.items() if len(dags) > 1)):
                 output_dict.update(output_dict_)
                 equivalent_called += equivalent_called_
                 total_equivalence_found += total_equivalence_found_
@@ -305,18 +319,27 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     if check_equivalence_with_different_hash:
         more_equivalences = []
         equivalent_called_2 = 0
+        num_equivalences_under_phase_shift = 0
         for hashtag, dags in output_dict.items():
-            other_hashtags = set()
+            other_hashtags = {}  # A map from other hashtags to corresponding phase shifts.
             assert len(dags) > 0
             for dag in dags:
                 dag_meta = dag[0]
-                other_hashtags.update(dag_meta[meta_index_other_hash_values])
+                for item in dag_meta[meta_index_other_hash_values]:
+                    if isinstance(item, str):
+                        # no phase shift
+                        other_hashtags[item] = None
+                    else:
+                        # phase shift id is item[1]
+                        assert isinstance(item, list)
+                        assert len(item) == 2
+                        other_hashtags[item[0]] = item[1]
             assert hashtag.split('_')[0] not in other_hashtags
             if len(other_hashtags) == 0:
                 print(f'Warning: other hash values unspecified for hash value {hashtag}.'
                       f' Cannot guarantee there are no missing equivalences.')
             possible_equivalent_dags = []
-            for other_hashtag in other_hashtags:
+            for other_hashtag, phase_shift_id in other_hashtags.items():
                 if other_hashtag not in data.keys():
                     # Not equivalent to any other ones
                     continue
@@ -324,24 +347,28 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 i_range = num_different_dags_with_same_hash[other_hashtag]
                 for i in range(i_range):
                     current_tag = other_hashtag + '_' + str(i)
-                    possible_equivalent_dags.append((output_dict[current_tag][0], current_tag))
+                    possible_equivalent_dags.append((output_dict[current_tag][0], current_tag, phase_shift_id))
             if verbose and len(possible_equivalent_dags) > 0:
                 print(f'Verifying {len(possible_equivalent_dags)} possible missing equivalences'
                       f' with hash value {hashtag} and {len(other_hashtags)} other hash values...')
             for other_dag in possible_equivalent_dags:
                 equivalent_called_2 += 1
-                if equivalent(dags[0], other_dag[0], check_phase_shift):
+                if equivalent(dags[0], other_dag[0], check_phase_shift_in_smt_solver, phase_shift_id):
                     more_equivalences.append((hashtag, other_dag[1]))
                     hashtags_in_more_equivalences.update(hashtag)
                     hashtags_in_more_equivalences.update(other_dag[1])
+                    if phase_shift_id is not None:
+                        num_equivalences_under_phase_shift += 1
                     if verbose:
-                        print(f'Equivalence with hash value {hashtag} and {other_dag[1]}:\n'
+                        print(f'Equivalence with hash value {hashtag} and {other_dag[1]}'
+                              f' with phase shift id = {phase_shift_id}:\n'
                               f'{dags[0]}\n'
                               f'{other_dag[0]}')
         output_dict = [more_equivalences, output_dict]
         if print_basic_info:
             print(f'Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences'
-                  f' with different hash.')
+                  f' with different hash,'
+                  f' including {num_equivalences_under_phase_shift} equivalences under phase shift.')
     else:
         # Add a placeholder here
         output_dict = [[], output_dict]

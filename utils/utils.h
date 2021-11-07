@@ -9,8 +9,10 @@ using EquivalenceHashType = std::pair<unsigned long long, int>;
 
 using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
-constexpr int kDAGHashDiscardBits = 10;  // a parameter for DAG::hash()
-constexpr bool kCheckPhaseShiftInGenerator = false; // a switch for DAG::hash()
+// Constants for DAG::hash()
+constexpr int kDAGHashDiscardBits = 10;
+constexpr bool kCheckPhaseShiftInGenerator = true;
+constexpr PhaseShiftIdType kNoPhaseShift = -1;
 
 struct PairHash {
  public:

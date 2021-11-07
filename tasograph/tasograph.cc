@@ -12,7 +12,7 @@ enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 200,
+  GUID_PRESERVED = 500,
 };
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}

@@ -442,9 +442,11 @@ bool DAG::input_param_used(int param_index) const {
   return !nodes[get_num_qubits() + param_index]->output_edges.empty();
 }
 
-void DAG::generate_hash_values(ComplexType hash_value,
+void DAG::generate_hash_values(const ComplexType &hash_value,
+                               const PhaseShiftIdType &phase_shift_id,
                                DAGHashType *main_hash,
-                               std::vector<DAGHashType> *other_hash) {
+                               std::vector<std::pair<DAGHashType,
+                                                     PhaseShiftIdType>> *other_hash) {
   constexpr int discard_bits = kDAGHashDiscardBits;
   assert(typeid(ComplexType::value_type) == typeid(double));
   assert(sizeof(DAGHashType) == sizeof(double));
@@ -469,13 +471,13 @@ void DAG::generate_hash_values(ComplexType hash_value,
   DAGHashType tmp;
   tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
   tmp ^= val2hash >> discard_bits;
-  other_hash->push_back(tmp);
+  other_hash->emplace_back(tmp, phase_shift_id);
   tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
   tmp ^= (val2hash >> discard_bits) + 1;
-  other_hash->push_back(tmp);
+  other_hash->emplace_back(tmp, phase_shift_id);
   tmp = val1hash >> discard_bits << discard_bits;
   tmp ^= (val2hash >> discard_bits) + 1;
-  other_hash->push_back(tmp);
+  other_hash->emplace_back(tmp, phase_shift_id);
 }
 
 DAGHashType DAG::hash(Context *ctx) {
@@ -492,26 +494,35 @@ DAGHashType DAG::hash(Context *ctx) {
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
 
   other_hash_values_.clear();
-  generate_hash_values(dot_product, &hash_value_, &other_hash_values_);
+  generate_hash_values(dot_product, /*phase_shift_id=*/
+                       -1,
+                       &hash_value_,
+                       &other_hash_values_);
   hash_value_valid_ = true;
 
   // Account for phase shifts.
-  /*if (!all_parameters.empty()) {
+  if (kCheckPhaseShiftInGenerator && !all_parameters.empty()) {
     // We try the simplest version first:
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).
     DAGHashType tmp;
-    for (auto &param : all_parameters) {
+    assert(all_parameters.size() == get_num_total_parameters());
+    const int num_total_params = get_num_total_parameters();
+    for (int i = 0; i < num_total_params; i++) {
+      const auto &param = all_parameters[i];
       ComplexType
           shifted = dot_product * ComplexType{std::cos(param), std::sin(param)};
-      generate_hash_values(shifted, &tmp, &other_hash_values_);
-      other_hash_values_.push_back(tmp);
+      generate_hash_values(shifted, i, &tmp, &other_hash_values_);
+      other_hash_values_.emplace_back(tmp, i);
       shifted = dot_product * ComplexType{std::cos(param), -std::sin(param)};
-      generate_hash_values(shifted, &tmp, &other_hash_values_);
-      other_hash_values_.push_back(tmp);
+      generate_hash_values(shifted,
+                           i + num_total_params,
+                           &tmp,
+                           &other_hash_values_);
+      other_hash_values_.emplace_back(tmp, i + num_total_params);
       // TODO: Let the verifier know about the phase shifted!
     }
-  }*/
+  }
   return hash_value_;
 }
 
@@ -525,6 +536,16 @@ DAGHashType DAG::cached_hash_value() const {
 }
 
 std::vector<DAGHashType> DAG::other_hash_values() const {
+  assert(hash_value_valid_);
+  std::vector<DAGHashType> result(other_hash_values_.size());
+  for (int i = 0; i < (int) other_hash_values_.size(); i++) {
+    result[i] = other_hash_values_[i].first;
+  }
+  return result;
+}
+
+std::vector<std::pair<DAGHashType,
+                      PhaseShiftIdType>> DAG::other_hash_values_with_phase_shift_id() const {
   assert(hash_value_valid_);
   return other_hash_values_;
 }
@@ -712,7 +733,7 @@ std::string DAG::to_json() const {
   result += "[";
   if (hash_value_valid_) {
     bool first_other_hash_value = true;
-    for (const auto &val : other_hash_values_) {
+    for (const auto &val : other_hash_values()) {
       if (first_other_hash_value) {
         first_other_hash_value = false;
       } else {

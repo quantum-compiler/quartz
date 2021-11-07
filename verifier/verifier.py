@@ -287,10 +287,15 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         num_hashtags = len(data)
         num_dags = sum(len(dags) for dags in data.values())
         num_potential_equivalences = num_dags - num_hashtags
-        data = {hashtag: dags for hashtag, dags in data.items() if len(dags) > 1} # filter out hash values with only one DAG
-        # TODO: do we actually need to process hash values with only one DAG? if so we should do it sequentially here before invoking parallelism
+        # first process hashtags with only 1 DAG
+        for hashtag, dags in data.items():
+            if len(dags) == 1:
+                output_dict[hashtag + '_0'] = [dags[0]]
+                num_different_dags_with_same_hash[hashtag] = 1
+        print(f'Processed {len(output_dict)} hash values that had only 1 DAG, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more DAGs...')
+        # now process hashtags with >1 DAGs
         with mp.Pool() as pool:
-            for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(find_equivalences_helper, ((hashtag, dags, check_phase_shift, verbose) for hashtag, dags in data.items())):
+            for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(find_equivalences_helper, ((hashtag, dags, check_phase_shift, verbose) for hashtag, dags in data.items() if len(dags) > 1)):
                 output_dict.update(output_dict_)
                 equivalent_called += equivalent_called_
                 total_equivalence_found += total_equivalence_found_

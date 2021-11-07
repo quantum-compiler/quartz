@@ -1329,4 +1329,30 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   }
   return bestGraph;
 }
+
+Graph *Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
+                                  GraphXfer *inverse_xfer) {
+  Graph *graph = this;
+  while (true) {
+	Graph *new_graph_0 = xfer->run_1_time(0, graph);
+	Graph *new_graph_1 = inverse_xfer->run_1_time(0, graph);
+	if (new_graph_0 == nullptr) {
+	  assert(new_graph_1 == nullptr);
+	  return graph;
+	}
+	new_graph_0->rotation_merging(target_rotation);
+	new_graph_1->rotation_merging(target_rotation);
+	if (graph != this)
+	  delete graph;
+	if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
+	  delete new_graph_1;
+	  graph = new_graph_0;
+	}
+	else {
+	  delete new_graph_0;
+	  graph = new_graph_1;
+	}
+  }
+  assert(false); // Should never reach here
+}
 }; // namespace TASOGraph

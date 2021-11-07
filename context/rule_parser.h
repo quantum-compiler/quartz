@@ -15,6 +15,12 @@
 class Command {
 public:
   Command() {}
+  Command(const Command &cmd) {
+	tp = cmd.tp;
+	qubit_idx = cmd.qubit_idx;
+	param_idx = cmd.param_idx;
+	constant_params = cmd.constant_params;
+  }
   Command(const std::string &str_command) {
 	std::istringstream iss(str_command);
 	std::string gate_tp;

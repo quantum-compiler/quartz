@@ -161,6 +161,8 @@ struct EdgeCompare {
   };
 };
 
+class GraphXfer;
+
 class Graph {
 public:
   Graph(Context *ctx);
@@ -171,9 +173,6 @@ public:
   bool has_loop();
   size_t hash();
   bool check_correctness();
-  void replace_node(Op oldOp, Op newOp);
-  void remove_node(Op oldOp);
-  void remove_edge(Op srcOp, Op dstOp);
   float total_cost() const;
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
@@ -185,14 +184,19 @@ public:
                   bool use_simulated_annealing);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  void to_qasm(const std::string &save_filename, bool print_result, bool print_id);
+  void to_qasm(const std::string &save_filename, bool print_result,
+               bool print_id);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits();
   void print_qubit_ops();
+  Graph *toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
+                             GraphXfer *inverse_xfer);
 
 private:
-  size_t special_op_guid;
+  void replace_node(Op oldOp, Op newOp);
+  void remove_node(Op oldOp);
+  void remove_edge(Op srcOp, Op dstOp);
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
                       int dst_idx);
   void explore(Pos pos, bool left, std::unordered_set<Pos, PosHash> &covered);
@@ -205,6 +209,9 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
+
+private:
+  size_t special_op_guid;
 
 public:
   Context *context;

@@ -501,7 +501,7 @@ DAGHashType DAG::hash(Context *ctx) {
   hash_value_valid_ = true;
 
   // Account for phase shifts.
-  if (kCheckPhaseShiftInGenerator && !all_parameters.empty()) {
+  if (kCheckPhaseShiftInGenerator) {
     // We try the simplest version first:
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).

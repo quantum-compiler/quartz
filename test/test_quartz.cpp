@@ -61,5 +61,7 @@ int main(int argc, char **argv) {
   TASOGraph::Graph *graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing,
       /*rotation_merging_in_searching*/ true, GateType::rz);
+  std::cout << "gate count after optimization: "
+            << graph_after_search->total_cost() << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);
 }

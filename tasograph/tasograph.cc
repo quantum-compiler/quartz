@@ -1132,7 +1132,7 @@ void Graph::draw_circuit(const std::string &src_file_name,
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing,
-                       bool rotation_merging_in_searching,
+                       bool use_rotation_merging_in_searching,
                        GateType target_rotation) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
@@ -1165,10 +1165,10 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  else {
 		DAG *other_dag = new DAG(*dag);
 		// first_dag is src, others are dst
-		if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
-		  std::cout << first_dag->get_num_gates() << " "
-		            << other_dag->get_num_gates() << "; ";
-		}
+		// if (first_dag->get_num_gates() != other_dag->get_num_gates()) {
+		//   std::cout << first_dag->get_num_gates() << " "
+		//             << other_dag->get_num_gates() << "; ";
+		// }
 		auto first_2_other =
 		    GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
 		// first_dag is dst, others are src
@@ -1176,14 +1176,14 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		    GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
 		if (first_2_other != nullptr)
 		  xfers.push_back(first_2_other);
-		else
-		  std::cout << "nullptr"
-		            << " ";
+		// else
+		//   std::cout << "nullptr"
+		//             << " ";
 		if (other_2_first != nullptr)
 		  xfers.push_back(other_2_first);
-		else
-		  std::cout << "nullptr"
-		            << " ";
+		// else
+		//   std::cout << "nullptr"
+		//             << " ";
 		delete other_dag;
 	  }
 	}
@@ -1236,6 +1236,9 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		}
 		num_possible_new_candidates += current_new_candidates.size();
 		for (auto &new_candidate : current_new_candidates) {
+		  if (use_rotation_merging_in_searching) {
+			new_candidate->rotation_merging(target_rotation);
+		  }
 		  const auto new_cost = new_candidate->total_cost();
 		  if (new_cost < bestCost) {
 			bestGraph = new_candidate;
@@ -1293,7 +1296,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   else {
 	while (!candidates.empty()) {
 	  Graph *subGraph = candidates.top();
-	  if (rotation_merging_in_searching) {
+	  if (use_rotation_merging_in_searching) {
 		subGraph->rotation_merging(target_rotation);
 	  }
 	  candidates.pop();
@@ -1332,10 +1335,11 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   }
   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results
-  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::iterator it;
-  for (it = bestGraph->inEdges.begin(); it != bestGraph->inEdges.end(); ++it) {
-	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
-  }
+  //   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::iterator it;
+  //   for (it = bestGraph->inEdges.begin(); it != bestGraph->inEdges.end();
+  //   ++it) {
+  // 	std::cout << gate_type_name(it->first.ptr->tp) << std::endl;
+  //   }
   return bestGraph;
 }
 

@@ -165,10 +165,12 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     # Warning: If DAG::hash() is modified, this function should be modified correspondingly.
     dag_meta = dag[0]
     num_total_params = dag_meta[meta_index_num_total_parameters]
-    if phase_shift_id >= 2 * num_total_params:
-        print(dag, phase_shift_id)
-    assert phase_shift_id < 2 * num_total_params
-    if phase_shift_id < num_total_params:
+    if kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8:
+        k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index
+        cosk_table = [1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2)]
+        sink_table = [0, 1.0 / z3.Sqrt(2), 1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2)]
+        phase_shift_lambda = (cosk_table[k], sink_table[k])
+    elif phase_shift_id < num_total_params:
         phase_shift_lambda = all_parameters[phase_shift_id]
     else:
         phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
@@ -379,12 +381,13 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                         input_param_tried = False
                         for dag in dag_list:
                             # Warning: If DAG::hash() is modified,
-                            # the expression |is_input_param| should be modified correspondingly.
-                            is_input_param = 0 <= phase_shift_id < dag[0][meta_index_num_input_parameters] or \
-                                             dag[0][meta_index_num_total_parameters] <= phase_shift_id < dag[0][
-                                                 meta_index_num_total_parameters] + dag[0][
-                                                 meta_index_num_input_parameters]
-                            if is_input_param:
+                            # the expression |is_fixed_for_all_dags| should be modified correspondingly.
+                            is_fixed_for_all_dags = 0 <= phase_shift_id < dag[0][meta_index_num_input_parameters] or \
+                                                    dag[0][meta_index_num_total_parameters] <= phase_shift_id < dag[0][
+                                                        meta_index_num_total_parameters] + dag[0][
+                                                        meta_index_num_input_parameters] or \
+                                                    kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8
+                            if is_fixed_for_all_dags:
                                 if input_param_tried:
                                     continue
                                 else:

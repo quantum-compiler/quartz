@@ -521,6 +521,18 @@ DAGHashType DAG::hash(Context *ctx) {
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
     }
+    if (kCheckPhaseShiftOfPiOver4) {
+      // Check phase shift of pi/4, 2pi/4, ..., 7pi/4.
+      for (int i = 1; i < 8; i++) {
+        const double pi = std::acos(-1.0);
+        ComplexType
+            shifted = dot_product
+            * ComplexType{std::cos(pi / 4 * i), std::sin(pi / 4 * i)};
+        generate_hash_values(shifted, i, &tmp, &other_hash_values_);
+        other_hash_values_.emplace_back(tmp,
+                                        kCheckPhaseShiftOfPiOver4Index + i);
+      }
+    }
   }
   return hash_value_;
 }

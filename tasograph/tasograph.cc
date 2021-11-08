@@ -1204,6 +1204,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   hashmap.insert(hash());
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
+  // TODO: add optional rotation merging in sa
   if (use_simulated_annealing) {
 	const double kSABeginTemp = bestCost;
 	const double kSAEndTemp = kSABeginTemp / 1e6;
@@ -1292,6 +1293,9 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   else {
 	while (!candidates.empty()) {
 	  Graph *subGraph = candidates.top();
+	  if (rotation_merging_in_searching) {
+		subGraph->rotation_merging(target_rotation);
+	  }
 	  candidates.pop();
 	  if (subGraph->total_cost() < bestCost) {
 		if (bestGraph != this)

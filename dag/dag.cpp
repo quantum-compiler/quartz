@@ -501,7 +501,7 @@ DAGHashType DAG::hash(Context *ctx) {
   hash_value_valid_ = true;
 
   // Account for phase shifts.
-  if (kCheckPhaseShiftInGenerator && !all_parameters.empty()) {
+  if (kCheckPhaseShiftInGenerator) {
     // We try the simplest version first:
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).
@@ -520,6 +520,18 @@ DAGHashType DAG::hash(Context *ctx) {
                            &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
+    }
+    if (kCheckPhaseShiftOfPiOver4) {
+      // Check phase shift of pi/4, 2pi/4, ..., 7pi/4.
+      for (int i = 1; i < 8; i++) {
+        const double pi = std::acos(-1.0);
+        ComplexType
+            shifted = dot_product
+            * ComplexType{std::cos(pi / 4 * i), std::sin(pi / 4 * i)};
+        generate_hash_values(shifted, i, &tmp, &other_hash_values_);
+        other_hash_values_.emplace_back(tmp,
+                                        kCheckPhaseShiftOfPiOver4Index + i);
+      }
     }
   }
   return hash_value_;

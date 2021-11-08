@@ -158,6 +158,36 @@ public:
 	return false;
   }
 
+public:
+  static std::pair<RuleParser *, RuleParser *> ccz_cx_rz_rules() {
+	RuleParser *rule_0 =
+	    new RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
+	                    "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "
+	                    "q0 q2; cx q0 q1; rz q1 -0.25pi; cx q0 q1; rz q0 "
+	                    "0.25pi; rz q1 0.25pi; rz q2 0.25pi;"});
+	RuleParser *rule_1 =
+	    new RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 0.25pi; cx q0 q2; rz "
+	                    "q2 -0.25pi; cx q1 q2; rz q2 0.25pi; cx "
+	                    "q0 q2; cx q0 q1; rz q1 0.25pi; cx q0 q1; rz q0 "
+	                    "-0.25pi; rz q1 -0.25pi; rz q2 -0.25pi;"});
+	return std::make_pair(rule_0, rule_1);
+  }
+
+  // TODO: change all rz to u1
+  static std::pair<RuleParser *, RuleParser *> ccz_cx_u1_rules() {
+	RuleParser *rule_0 =
+	    new RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
+	                    "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "
+	                    "q0 q2; cx q0 q1; rz q1 -0.25pi; cx q0 q1; rz q0 "
+	                    "0.25pi; rz q1 0.25pi; rz q2 0.25pi;"});
+	RuleParser *rule_1 =
+	    new RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 0.25pi; cx q0 q2; rz "
+	                    "q2 -0.25pi; cx q1 q2; rz q2 0.25pi; cx "
+	                    "q0 q2; cx q0 q1; rz q1 0.25pi; cx q0 q1; rz q0 "
+	                    "-0.25pi; rz q1 -0.25pi; rz q2 -0.25pi;"});
+	return std::make_pair(rule_0, rule_1);
+  }
+
 private:
   std::map<GateType,
            std::vector<std::pair<

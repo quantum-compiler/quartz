@@ -14,6 +14,7 @@
 #include "neg.h"
 #include "z.h"
 #include "s.h"
+#include "sdg.h"
 #include "t.h"
 #include "tdg.h"
 #include "swap.h"

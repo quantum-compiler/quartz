@@ -325,57 +325,90 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         num_equivalences_under_phase_shift = 0
         possible_num_equivalences_under_phase_shift = 0
         for hashtag, dags in output_dict.items():
-            other_hashtags = {}  # A map from other hashtags to corresponding phase shifts.
+            from collections import defaultdict
+            other_hashtags = defaultdict(dict)  # A map from other hashtags to corresponding phase shifts.
+            # |other_hashtags[other_hash][None]| indicates that if it's possible that a DAG with |other_hash|
+            #    is equivalent with a DAG with |hashtag| without phase shifts.
+            # |other_hashtags[other_hash][phase_shift_id]| is a list of DAGs with |hashtag| that can be equivalent
+            #    to a DAG with |other_hash| under phase shift |phase_shift_id|.
             assert len(dags) > 0
             for dag in dags:
                 dag_meta = dag[0]
                 for item in dag_meta[meta_index_other_hash_values]:
                     if isinstance(item, str):
                         # no phase shift
-                        other_hashtags[item] = None
+                        other_hashtags[item][None] = None
                     else:
                         # phase shift id is item[1]
                         assert isinstance(item, list)
                         assert len(item) == 2
                         # We need the exact parameter in |dag|, so we cannot use the representative DAG |dags[0]|.
-                        other_hashtags[item[0]] = (dag, item[1])
+                        other_hashtags[item[0]][item[1]] = other_hashtags[item[0]].get(item[1], []) + [dag]
             assert hashtag.split('_')[0] not in other_hashtags
             if len(other_hashtags) == 0:
                 print(f'Warning: other hash values unspecified for hash value {hashtag}.'
                       f' Cannot guarantee there are no missing equivalences.')
             possible_equivalent_dags = []
-            for other_hashtag, phase_shift_id in other_hashtags.items():
+            for other_hashtag, phase_shift_ids in other_hashtags.items():
                 if other_hashtag not in data.keys():
                     # Not equivalent to any other ones
                     continue
                 assert other_hashtag in num_different_dags_with_same_hash.keys()
                 i_range = num_different_dags_with_same_hash[other_hashtag]
                 for i in range(i_range):
-                    current_tag = other_hashtag + '_' + str(i)
-                    possible_equivalent_dags.append((output_dict[current_tag][0], current_tag, phase_shift_id))
+                    other_hashtag_full = other_hashtag + '_' + str(i)
+                    possible_equivalent_dags.append(
+                        (output_dict[other_hashtag_full][0], other_hashtag_full, phase_shift_ids))
             if verbose and len(possible_equivalent_dags) > 0:
                 print(f'Verifying {len(possible_equivalent_dags)} possible missing equivalences'
                       f' with hash value {hashtag} and {len(other_hashtags)} other hash values...')
-            for other_dag in possible_equivalent_dags:
-                equivalent_called_2 += 1
-                if phase_shift_id is None:
-                    current_result = equivalent(dags[0], other_dag[0], check_phase_shift_in_smt_solver, None)
-                else:
-                    # |phase_shift_id[0]| is the DAG generating this phase shift id.
-                    current_result = equivalent(phase_shift_id[0], other_dag[0], check_phase_shift_in_smt_solver,
-                                                phase_shift_id[1])
-                    possible_num_equivalences_under_phase_shift += 1
-                if current_result:
-                    more_equivalences.append((hashtag, other_dag[1]))
+            for item in possible_equivalent_dags:
+                other_dag = item[0]
+                other_hashtag_full = item[1]
+                phase_shift_ids = item[2]
+                equivalence_verified = False
+                phase_shift_id_when_equivalence_verified = None
+                dag_when_equivalence_verified = dags[0]
+                if None in phase_shift_ids:
+                    equivalent_called_2 += 1
+                    if equivalent(dags[0], other_dag, check_phase_shift_in_smt_solver, None):
+                        equivalence_verified = True
+                if not equivalence_verified:
+                    for phase_shift_id, dag_list in phase_shift_ids.items():
+                        # Pruning: we only need to try each input parameter once.
+                        input_param_tried = False
+                        for dag in dag_list:
+                            # Warning: If DAG::hash() is modified,
+                            # the expression |is_input_param| should be modified correspondingly.
+                            is_input_param = 0 <= phase_shift_id < dag[0][meta_index_num_input_parameters] or \
+                                             dag[0][meta_index_num_total_parameters] <= phase_shift_id < dag[0][
+                                                 meta_index_num_total_parameters] + dag[0][
+                                                 meta_index_num_input_parameters]
+                            if is_input_param:
+                                if input_param_tried:
+                                    continue
+                                else:
+                                    input_param_tried = True
+                            equivalent_called_2 += 1
+                            possible_num_equivalences_under_phase_shift += 1
+                            # |phase_shift_id[0]| is the DAG generating this phase shift id.
+                            if equivalent(dag, other_dag, check_phase_shift_in_smt_solver, phase_shift_id):
+                                equivalence_verified = True
+                                num_equivalences_under_phase_shift += 1
+                                phase_shift_id_when_equivalence_verified = phase_shift_id
+                                dag_when_equivalence_verified = dag
+                                break
+                        if equivalence_verified:
+                            break
+                if equivalence_verified:
+                    more_equivalences.append((hashtag, other_hashtag_full))
                     hashtags_in_more_equivalences.update(hashtag)
-                    hashtags_in_more_equivalences.update(other_dag[1])
-                    if phase_shift_id is not None:
-                        num_equivalences_under_phase_shift += 1
+                    hashtags_in_more_equivalences.update(other_hashtag_full)
                     if verbose:
-                        print(f'Equivalence with hash value {hashtag} and {other_dag[1]}'
-                              f' with phase shift id = {phase_shift_id}:\n'
-                              f'{dags[0]}\n'
-                              f'{other_dag[0]}')
+                        print(f'Equivalence with hash value {hashtag} and {other_hashtag_full}'
+                              f' with phase shift id = {phase_shift_id_when_equivalence_verified}:\n'
+                              f'{dag_when_equivalence_verified}\n'
+                              f'{other_dag}')
         output_dict = [more_equivalences, output_dict]
         if print_basic_info:
             print(f'Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences'

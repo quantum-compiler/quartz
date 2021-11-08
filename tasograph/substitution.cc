@@ -186,6 +186,42 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
   return graphXfer;
 }
 
+std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_rz_xfer(Context *ctx) {
+  Context dst_ctx({GateType::rz, GateType::cx, GateType::input_qubit,
+                   GateType::input_param});
+  std::pair<RuleParser *, RuleParser *> toffoli_rules =
+      RuleParser::ccz_cx_rz_rules();
+  std::vector<Command> cmds;
+  Command cmd;
+  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                             cmds);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                              cmds);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  delete toffoli_rules.first;
+  delete toffoli_rules.second;
+  return std::make_pair(xfer_0, xfer_1);
+}
+
+std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_u1_xfer(Context *ctx) {
+  Context dst_ctx({GateType::u1, GateType::cx, GateType::input_qubit,
+                   GateType::input_param});
+  std::pair<RuleParser *, RuleParser *> toffoli_rules =
+      RuleParser::ccz_cx_u1_rules();
+  std::vector<Command> cmds;
+  Command cmd;
+  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                             cmds);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                              cmds);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  delete toffoli_rules.first;
+  delete toffoli_rules.second;
+  return std::make_pair(xfer_0, xfer_1);
+}
+
 GraphXfer::GraphXfer(::Context *_context, const ::DAG *src_graph,
                      const ::DAG *dst_graph)
     : context(_context), tensorId(10) {
@@ -440,13 +476,10 @@ Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
 
 void GraphXfer::run(int depth, Graph *graph,
                     std::vector<Graph *> &new_candidates,
-                    std::set<size_t> &hashmap,
-                    float threshold, int maxNumOps,
-                    bool &enable_early_stop,
-                    bool &stop_search)
-{
+                    std::set<size_t> &hashmap, float threshold, int maxNumOps,
+                    bool &enable_early_stop, bool &stop_search) {
   if (stop_search)
-    return;
+	return;
   // printf("run: depth(%d) srcOps.size(%zu) graph.size(%zu) candidates(%zu)\n",
   // depth, srcOps.size(), graph->inEdges.size(), candidates.size());
   if (depth >= (int)srcOps.size()) {
@@ -492,8 +525,8 @@ void GraphXfer::run(int depth, Graph *graph,
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
 		new_candidates.push_back(newGraph);
-                if (enable_early_stop)
-                  stop_search = true;
+		if (enable_early_stop)
+		  stop_search = true;
 		// std::cout << newGraph->total_cost() << " ";
 	  }
 	}
@@ -511,7 +544,8 @@ void GraphXfer::run(int depth, Graph *graph,
 		Op op = it->first;
 		// Check mapOutput
 		match(srcOp, op, graph);
-		run(depth + 1, graph, new_candidates, hashmap, threshold, maxNumOps, enable_early_stop, stop_search);
+		run(depth + 1, graph, new_candidates, hashmap, threshold, maxNumOps,
+		    enable_early_stop, stop_search);
 		unmatch(srcOp, op, graph);
 	  }
 	}

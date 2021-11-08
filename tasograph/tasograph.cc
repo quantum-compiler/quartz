@@ -1130,12 +1130,10 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                       GateType target_rotation,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing,
-                       bool use_greedy_toffoli_flip,
-                       std::pair<GraphXfer *, GraphXfer *> toffoli_xfers,
-                       bool rotation_merging_in_searching) {
+                       bool rotation_merging_in_searching,
+                       GateType target_rotation) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1200,22 +1198,10 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 
   std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
   std::set<size_t> hashmap;
-  float bestCost = 0;
-  Graph *bestGraph = nullptr;
-  if (use_greedy_toffoli_flip) {
-	Graph *new_graph = toffoli_flip_greedy(target_rotation, toffoli_xfers.first,
-	                                       toffoli_xfers.second);
-	candidates.push(new_graph);
-	hashmap.insert(new_graph->hash());
-	bestGraph = new_graph;
-	bestCost = new_graph->total_cost();
-  }
-  else {
-	candidates.push(this);
-	hashmap.insert(hash());
-	bestGraph = this;
-	bestCost = total_cost();
-  }
+  Graph *bestGraph = this;
+  float bestCost = total_cost();
+  candidates.push(this);
+  hashmap.insert(hash());
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
   if (use_simulated_annealing) {
@@ -1244,7 +1230,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		bool stop_search = false;
 		for (auto &xfer : xfers) {
 		  xfer->run(0, candidate.second, current_new_candidates, hashmap,
-		            bestCost * alpha, 2 * maxNumOps, enable_early_stop, stop_search);
+		            bestCost * alpha, 2 * maxNumOps, enable_early_stop,
+		            stop_search);
 		}
 		num_possible_new_candidates += current_new_candidates.size();
 		for (auto &new_candidate : current_new_candidates) {
@@ -1319,12 +1306,13 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		;
 	  }
 	  counter++;
-	  fprintf(stderr, "bestCost(%.4lf) candidates(%zu)\n", bestCost, candidates.size());
+	  fprintf(stderr, "bestCost(%.4lf) candidates(%zu)\n", bestCost,
+	          candidates.size());
 
 	  std::vector<Graph *> new_candidates;
 	  bool enable_early_stop = false;
-	  if (alpha < 1.0f) 
-	    enable_early_stop = true;
+	  if (alpha < 1.0f)
+		enable_early_stop = true;
 	  bool stop_search = false;
 	  for (auto &xfer : xfers) {
 		xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,

@@ -1235,9 +1235,11 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		const auto current_cost = candidate.first;
 		std::vector<Graph *> current_new_candidates;
 		current_new_candidates.reserve(xfers.size());
+		bool enable_early_stop = false;
+		bool stop_search = false;
 		for (auto &xfer : xfers) {
 		  xfer->run(0, candidate.second, current_new_candidates, hashmap,
-		            bestCost * alpha, 2 * maxNumOps);
+		            bestCost * alpha, 2 * maxNumOps, enable_early_stop, stop_search);
 		}
 		num_possible_new_candidates += current_new_candidates.size();
 		for (auto &new_candidate : current_new_candidates) {
@@ -1304,6 +1306,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		  delete bestGraph;
 		bestCost = subGraph->total_cost();
 		bestGraph = subGraph;
+		bestGraph->to_qasm("current_best.qasm", false, false);
 	  }
 	  if (counter > budget) {
 		// TODO: free all remaining candidates when budget exhausted
@@ -1311,13 +1314,16 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		;
 	  }
 	  counter++;
-
-	  std::cout << bestCost << " " << std::flush;
+	  fprintf(stderr, "bestCost(%.4lf) candidates(%zu)\n", bestCost, candidates.size());
 
 	  std::vector<Graph *> new_candidates;
+	  bool enable_early_stop = false;
+	  if (alpha < 1.0f) 
+	    enable_early_stop = true;
+	  bool stop_search = false;
 	  for (auto &xfer : xfers) {
 		xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,
-		          2 * maxNumOps);
+		          2 * maxNumOps, enable_early_stop, stop_search);
 	  }
 	  for (auto &candidate : new_candidates) {
 		candidates.push(candidate);

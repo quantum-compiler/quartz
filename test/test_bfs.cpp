@@ -2,7 +2,7 @@
 
 int main() {
   Context ctx
-      ({GateType::rx, GateType::rz, GateType::cx, GateType::add});
+      ({GateType::h, GateType::rz, GateType::cx, GateType::add});
   Generator gen(&ctx);
 
   const int num_qubits = 3;

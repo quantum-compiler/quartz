@@ -440,7 +440,13 @@ Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
 
 void GraphXfer::run(int depth, Graph *graph,
                     std::vector<Graph *> &new_candidates,
-                    std::set<size_t> &hashmap, float threshold, int maxNumOps) {
+                    std::set<size_t> &hashmap,
+                    float threshold, int maxNumOps,
+                    bool &enable_early_stop,
+                    bool &stop_search)
+{
+  if (stop_search)
+    return;
   // printf("run: depth(%d) srcOps.size(%zu) graph.size(%zu) candidates(%zu)\n",
   // depth, srcOps.size(), graph->inEdges.size(), candidates.size());
   if (depth >= (int)srcOps.size()) {
@@ -486,6 +492,8 @@ void GraphXfer::run(int depth, Graph *graph,
 	  if (hashmap.find(newGraph->hash()) == hashmap.end()) {
 		hashmap.insert(newGraph->hash());
 		new_candidates.push_back(newGraph);
+                if (enable_early_stop)
+                  stop_search = true;
 		// std::cout << newGraph->total_cost() << " ";
 	  }
 	}
@@ -503,7 +511,7 @@ void GraphXfer::run(int depth, Graph *graph,
 		Op op = it->first;
 		// Check mapOutput
 		match(srcOp, op, graph);
-		run(depth + 1, graph, new_candidates, hashmap, threshold, maxNumOps);
+		run(depth + 1, graph, new_candidates, hashmap, threshold, maxNumOps, enable_early_stop, stop_search);
 		unmatch(srcOp, op, graph);
 	  }
 	}

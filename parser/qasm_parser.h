@@ -48,7 +48,7 @@ public:
 	dag = NULL;
 	std::ifstream fin;
 	fin.open(file_name, std::ifstream::in);
-	assert(fin.is_open());
+	fin.is_open();
 	std::string line;
 	GateType gate_type;
 	while (std::getline(fin, line)) {
@@ -93,7 +93,8 @@ public:
 		  }
 		}
 		assert(dag != NULL);
-		assert(dag->add_gate(qubit_indices, parameter_indices, gate, NULL));
+		bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
+		assert(ret == true);
 	  }
 	  else {
 		std::cout << "Unknown gate: " << command << std::endl;

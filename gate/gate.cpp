@@ -35,3 +35,8 @@ bool Gate::is_quantum_gate() const { return num_qubits > 0; }
 bool Gate::is_parametrized_gate() const {
   return num_qubits > 0 && num_parameters > 0;
 }
+
+bool Gate::is_toffoli_gate() const {
+  // TODO: add other toffoli gates
+  return tp == GateType::ccz;
+}

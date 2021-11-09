@@ -180,7 +180,7 @@ public:
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
   Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
-                       RuleParser *rule_parser);
+                       RuleParser *rule_parser, bool ignore_toffoli = false);
   Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
                   bool use_simulated_annealing,

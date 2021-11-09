@@ -271,12 +271,15 @@ size_t Graph::hash(void) {
 }
 
 Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
-                            Context *union_ctx, RuleParser *rule_parser) {
+                            Context *union_ctx, RuleParser *rule_parser,
+                            bool ignore_toffoli) {
   auto src_gates = src_ctx->get_supported_gates();
   auto dst_gate_set = std::set<GateType>(dst_ctx->get_supported_gates().begin(),
                                          dst_ctx->get_supported_gates().end());
   std::map<GateType, GraphXfer *> tp_2_xfer;
   for (auto gate_tp : src_gates) {
+	if (ignore_toffoli && src_ctx->get_gate(gate_tp)->is_toffoli_gate())
+	  continue;
 	if (dst_gate_set.find(gate_tp) == dst_gate_set.end()) {
 	  std::vector<Command> cmds;
 	  Command src_cmd;

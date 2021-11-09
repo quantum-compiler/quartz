@@ -34,18 +34,19 @@ int main(int argc, char **argv) {
   bool simulated_annealing = false;
   parse_args(argv, argc, simulated_annealing, input_fn, output_fn, eqset_fn);
   fprintf(stderr, "Input qasm file: %s\n", input_fn.c_str());
+
   // Construct contexts
   Context src_ctx({GateType::h, GateType::ccz, GateType::input_qubit,
                    GateType::input_param});
-  Context dst_ctx({GateType::rz, GateType::cx, GateType::h, GateType::add,
+  Context dst_ctx({GateType::u1, GateType::u2, GateType::cx, GateType::add,
                    GateType::input_qubit, GateType::input_param});
-  Context union_ctx({GateType::ccz, GateType::rz, GateType::cx, GateType::h,
-                     GateType::input_qubit, GateType::input_param});
-  // Construct GraphXfers
+  auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+
+  // Construct GraphXfers for toffoli flip
   // Use this for voqc gate set(h, rz, x, cx)
-  auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  //   auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
   // Use this for ibmq gate set(u1, u2, u3, cx)
-  //   auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_u1_xfer(&union_ctx);
+  auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_u1_xfer(&union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   DAG *dag = nullptr;
@@ -53,14 +54,23 @@ int main(int argc, char **argv) {
 	std::cout << "Parser failed" << std::endl;
   }
   TASOGraph::Graph graph(&src_ctx, *dag);
-  TASOGraph::Graph *graph_before_search = graph.toffoli_flip_greedy(
-      GateType::rz, xfer_pair.first, xfer_pair.second);
+
+  // Context shift
+  RuleParser rule_parser({"h q0 = u2 q0 0 0.5pi;"});
+  TASOGraph::Graph *graph_new_ctx = graph.context_shift(
+      &src_ctx, &dst_ctx, &union_ctx, &rule_parser, /*ignore_toffoli*/ true);
+
+  // Greedy toffoli flip
+  TASOGraph::Graph *graph_before_search = graph_new_ctx->toffoli_flip_greedy(
+      GateType::u1, xfer_pair.first, xfer_pair.second);
   std::cout << "gate count after toffoli flip: "
             << graph_before_search->total_cost() << std::endl;
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
+
+  // Optimization
   TASOGraph::Graph *graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing,
-      /*rotation_merging_in_searching*/ true, GateType::rz);
+      /*rotation_merging_in_searching*/ true, GateType::u1);
   std::cout << "gate count after optimization: "
             << graph_after_search->total_cost() << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);

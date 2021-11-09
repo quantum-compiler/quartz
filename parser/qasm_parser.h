@@ -48,7 +48,9 @@ public:
 	dag = NULL;
 	std::ifstream fin;
 	fin.open(file_name, std::ifstream::in);
-	fin.is_open();
+	if (!fin.is_open()) {
+	  return false;
+	}
 	std::string line;
 	GateType gate_type;
 	while (std::getline(fin, line)) {

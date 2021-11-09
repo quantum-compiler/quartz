@@ -31,6 +31,7 @@ Graph::Graph(Context *ctx)
     : context(ctx), special_op_guid(0), totalCost(0.0f) {}
 
 Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
+  assert(dag);
   // Guid for input qubit and input parameter nodes
   int num_input_qubits = dag.get_num_qubits();
   int num_input_params = dag.get_num_input_parameters();

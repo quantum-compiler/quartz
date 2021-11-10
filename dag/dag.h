@@ -113,11 +113,13 @@ class DAG {
                   const std::vector<int> &param_permutation);
 
   // A helper function used by |DAGHashType hash(Context *ctx)|.
-  static void generate_hash_values(const ComplexType &hash_value,
-                                   const PhaseShiftIdType &phase_shift_id,
-                                   DAGHashType *main_hash,
-                                   std::vector<std::pair<DAGHashType,
-                                                         PhaseShiftIdType>> *other_hash);
+  void generate_hash_values(Context *ctx,
+                            const ComplexType &hash_value,
+                            const PhaseShiftIdType &phase_shift_id,
+                            const std::vector<ParamType> &param_values,
+                            DAGHashType *main_hash,
+                            std::vector<std::pair<DAGHashType,
+                                                  PhaseShiftIdType>> *other_hash);
 
  public:
   std::vector<std::unique_ptr<DAGNode>> nodes;

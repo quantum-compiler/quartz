@@ -147,20 +147,20 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
   if (gate->is_parameter_gate() && output_para_index == nullptr)
     return false;
   // qubit indices must stay in range
-  for (auto qubit_idx : qubit_indices)
+  for (auto qubit_idx: qubit_indices)
     if ((qubit_idx < 0) || (qubit_idx >= get_num_qubits()))
       return false;
   // parameter indices must stay in range
-  for (auto para_idx : parameter_indices)
+  for (auto para_idx: parameter_indices)
     if ((para_idx < 0) || (para_idx >= parameters.size()))
       return false;
   auto edge = std::make_unique<DAGHyperEdge>();
   edge->gate = gate;
-  for (auto qubit_idx : qubit_indices) {
+  for (auto qubit_idx: qubit_indices) {
     edge->input_nodes.push_back(outputs[qubit_idx]);
     outputs[qubit_idx]->output_edges.push_back(edge.get());
   }
-  for (auto para_idx : parameter_indices) {
+  for (auto para_idx: parameter_indices) {
     edge->input_nodes.push_back(parameters[para_idx]);
     parameters[para_idx]->output_edges.push_back(edge.get());
   }
@@ -174,7 +174,7 @@ bool DAG::add_gate(const std::vector<int> &qubit_indices,
     nodes.push_back(std::move(node));
   } else {
     assert(gate->is_quantum_gate());
-    for (auto qubit_idx : qubit_indices) {
+    for (auto qubit_idx: qubit_indices) {
       auto node = std::make_unique<DAGNode>();
       node->type = DAGNode::internal_qubit;
       node->index = qubit_idx;
@@ -199,7 +199,7 @@ void DAG::add_input_parameter() {
   num_input_parameters++;
 
   // Update internal parameters' indices
-  for (auto &it : nodes) {
+  for (auto &it: nodes) {
     if (it->type == DAGNode::internal_param) {
       it->index++;
     }
@@ -216,7 +216,7 @@ bool DAG::remove_last_gate() {
   auto *edge = edges.back().get();
   auto *gate = edge->gate;
   // Remove edges from input nodes.
-  for (auto *input_node : edge->input_nodes) {
+  for (auto *input_node: edge->input_nodes) {
     assert(!input_node->output_edges.empty());
     assert(input_node->output_edges.back() == edge);
     input_node->output_edges.pop_back();
@@ -232,7 +232,7 @@ bool DAG::remove_last_gate() {
   } else {
     assert(gate->is_quantum_gate());
     // Restore the outputs.
-    for (auto *input_node : edge->input_nodes) {
+    for (auto *input_node: edge->input_nodes) {
       if (input_node->is_qubit()) {
         outputs[input_node->index] = input_node;
       }
@@ -263,7 +263,7 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
 
   auto *gate = edge->gate;
   // Remove edges from input nodes.
-  for (auto *input_node : edge->input_nodes) {
+  for (auto *input_node: edge->input_nodes) {
     assert(!input_node->output_edges.empty());
     auto it = std::find(input_node->output_edges.begin(),
                         input_node->output_edges.end(),
@@ -296,7 +296,7 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
     nodes.erase(it);
     parameters.erase(parameters.begin() + idx);
     // Update the parameter indices.
-    for (auto &j : nodes) {
+    for (auto &j: nodes) {
       if (j->is_parameter() && j->index > idx) {
         j->index--;
       }
@@ -328,7 +328,7 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
         nodes.erase(it);
       } else {
         // Merge the adjacent qubit wires.
-        for (auto &e : edge->output_nodes[i]->output_edges) {
+        for (auto &e: edge->output_nodes[i]->output_edges) {
           auto it = std::find(e->input_nodes.begin(),
                               e->input_nodes.end(),
                               edge->output_nodes[i]);
@@ -386,7 +386,7 @@ bool DAG::evaluate(const Vector &input_dis,
   for (int i = 0; i < num_edges; i++) {
     std::vector<int> qubit_indices;
     std::vector<ParamType> params;
-    for (const auto &input_node : edges[i]->input_nodes) {
+    for (const auto &input_node: edges[i]->input_nodes) {
       if (input_node->is_qubit()) {
         qubit_indices.push_back(input_node->index);
       } else {
@@ -442,8 +442,10 @@ bool DAG::input_param_used(int param_index) const {
   return !nodes[get_num_qubits() + param_index]->output_edges.empty();
 }
 
-void DAG::generate_hash_values(const ComplexType &hash_value,
+void DAG::generate_hash_values(Context *ctx,
+                               const ComplexType &hash_value,
                                const PhaseShiftIdType &phase_shift_id,
+                               const std::vector<ParamType> &param_values,
                                DAGHashType *main_hash,
                                std::vector<std::pair<DAGHashType,
                                                      PhaseShiftIdType>> *other_hash) {
@@ -452,11 +454,72 @@ void DAG::generate_hash_values(const ComplexType &hash_value,
   assert(sizeof(DAGHashType) == sizeof(double));
 
   if (kFingerprintInvariantUnderPhaseShift) {
-    auto val = std::norm(hash_value);
+    ComplexType empty_phase =
+        ctx->get_generated_input_dis(get_num_qubits()).dot(ctx->get_generated_hashing_dis(
+            get_num_qubits()));
+    empty_phase /= std::abs(empty_phase);
+    auto val = std::abs(hash_value);
     DAGHashType valhash = *((DAGHashType *) (&val));
     *main_hash = valhash >> discard_bits;
     other_hash->emplace_back((valhash + (1 << discard_bits)) >> discard_bits,
                              phase_shift_id);
+    if (kCheckPhaseShiftInGenerator) {
+      auto search_phase_factor = [&](auto &search_phase_factor_ref,
+                                     int param_id,
+                                     int current_phase_shift_id,
+                                     double current_phase_factor) {
+        if (param_id == param_values.size()) {
+          // Check if |current_phase_factor| is the phase factor we want
+          auto diff = hash_value * ComplexType{std::cos(current_phase_factor),
+                                               std::sin(current_phase_factor)}
+              - val * empty_phase;
+          if (std::norm(diff) <= kCheckPhaseShiftEps) {
+            // Found the correct phase factor
+            other_hash->back().second = current_phase_shift_id;
+            return true;
+          }
+          return false;
+        }
+        for (int coeff = kCheckPhaseShiftMinCoeff;
+             coeff <= kCheckPhaseShiftMaxCoeff; coeff++) {
+          auto new_phase_shift_id = current_phase_shift_id
+              * (kCheckPhaseShiftMaxCoeff - kCheckPhaseShiftMinCoeff + 1)
+              + (coeff - kCheckPhaseShiftMinCoeff);
+          auto new_phase_factor =
+              current_phase_factor + param_values[param_id] * coeff;
+          bool found = search_phase_factor_ref(search_phase_factor_ref,
+                                               param_id + 1,
+                                               new_phase_shift_id,
+                                               new_phase_factor);
+          if (found) {
+            return true;
+          }
+        }
+        return false;
+      };
+      bool found = false;
+      if (kCheckPhaseShiftOfPiOver4) {
+        const ParamType pi = std::acos((ParamType) -1.0);
+        for (int k = 0; k < 8; k++) {
+          found = search_phase_factor(search_phase_factor, 0, k, pi / 4.0 * k);
+          if (found) {
+            break;
+          }
+        }
+      } else {
+        found = search_phase_factor(search_phase_factor, 0, 0, 0);
+      }
+      if (!found) {
+        std::cout
+            << "Cannot find phase factor for the following circuit with hash value "
+            << hash_value << " " << std::hex << *main_hash
+            << " (expected phase is " << hash_value / val / empty_phase << "): "
+            << std::endl;
+        std::cout << to_string() << std::endl;
+        exit(1);
+        assert(false);
+      }
+    }
     return;
   }
 
@@ -505,14 +568,18 @@ DAGHashType DAG::hash(Context *ctx) {
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
 
   other_hash_values_.clear();
-  generate_hash_values(dot_product,
+  generate_hash_values(ctx,
+                       dot_product,
                        kNoPhaseShift,
+                       all_parameters,
                        &hash_value_,
                        &other_hash_values_);
   hash_value_valid_ = true;
 
   // Account for phase shifts.
-  if (kCheckPhaseShiftInGenerator) {
+  // If |kFingerprintInvariantUnderPhaseShift| is true,
+  // this was already handled above in |generate_hash_values|.
+  if (!kFingerprintInvariantUnderPhaseShift && kCheckPhaseShiftInGenerator) {
     // We try the simplest version first:
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).
@@ -523,11 +590,18 @@ DAGHashType DAG::hash(Context *ctx) {
       const auto &param = all_parameters[i];
       ComplexType
           shifted = dot_product * ComplexType{std::cos(param), std::sin(param)};
-      generate_hash_values(shifted, i, &tmp, &other_hash_values_);
+      generate_hash_values(ctx,
+                           shifted,
+                           i,
+                           all_parameters,
+                           &tmp,
+                           &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i);
       shifted = dot_product * ComplexType{std::cos(param), -std::sin(param)};
-      generate_hash_values(shifted,
+      generate_hash_values(ctx,
+                           shifted,
                            i + num_total_params,
+                           all_parameters,
                            &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
@@ -539,7 +613,12 @@ DAGHashType DAG::hash(Context *ctx) {
         ComplexType
             shifted = dot_product
             * ComplexType{std::cos(pi / 4 * i), std::sin(pi / 4 * i)};
-        generate_hash_values(shifted, i, &tmp, &other_hash_values_);
+        generate_hash_values(ctx,
+                             shifted,
+                             i,
+                             all_parameters,
+                             &tmp,
+                             &other_hash_values_);
         other_hash_values_.emplace_back(tmp,
                                         kCheckPhaseShiftOfPiOver4Index + i);
       }
@@ -577,7 +656,7 @@ bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
     return true;
   }
   std::sort(unused_qubits.begin(), unused_qubits.end(), std::greater<>());
-  for (auto &id : unused_qubits) {
+  for (auto &id: unused_qubits) {
     if (id >= get_num_qubits()) {
       return false;
     }
@@ -594,7 +673,7 @@ bool DAG::remove_unused_qubits(std::vector<int> unused_qubits) {
     nodes.erase(nodes.begin() + id);
     outputs.erase(outputs.begin() + id);
     num_qubits--;
-    for (auto &node : nodes) {
+    for (auto &node: nodes) {
       if (node->is_qubit() && node->index > id) {
         node->index--;
       }
@@ -611,7 +690,7 @@ bool DAG::remove_unused_input_params(std::vector<int> unused_input_params) {
   std::sort(unused_input_params.begin(),
             unused_input_params.end(),
             std::greater<>());
-  for (auto &id : unused_input_params) {
+  for (auto &id: unused_input_params) {
     if (id >= get_num_input_parameters()) {
       return false;
     }
@@ -628,7 +707,7 @@ bool DAG::remove_unused_input_params(std::vector<int> unused_input_params) {
     nodes.erase(nodes.begin() + get_num_qubits() + id);
     parameters.erase(parameters.begin() + id);
     num_input_parameters--;
-    for (auto &node : nodes) {
+    for (auto &node: nodes) {
       if (node->is_parameter() && node->index > id) {
         node->index--;
       }
@@ -664,7 +743,7 @@ DAG &DAG::shrink_unused_input_parameters() {
               nodes.begin() + get_num_qubits() + get_num_input_parameters());
 
   // Update the parameter indices
-  for (auto &node : nodes) {
+  for (auto &node: nodes) {
     if (node->is_parameter() && node->index >= get_num_input_parameters()) {
       // An internal parameter
       node->index -= num_parameters_shrinked;
@@ -683,7 +762,7 @@ std::unique_ptr<DAG> DAG::clone_and_shrink_unused_input_parameters() const {
 }
 
 bool DAG::has_unused_parameter() const {
-  for (auto &node : nodes) {
+  for (auto &node: nodes) {
     if (node->is_parameter() && node->output_edges.empty()) {
       return true;
     }
@@ -755,7 +834,7 @@ std::string DAG::to_json() const {
   result += "[";
   if (hash_value_valid_) {
     bool first_other_hash_value = true;
-    for (const auto &val : other_hash_values_with_phase_shift_id()) {
+    for (const auto &val: other_hash_values_with_phase_shift_id()) {
       if (first_other_hash_value) {
         first_other_hash_value = false;
       } else {
@@ -1008,13 +1087,13 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
   // Construct the |free_nodes| vector with the input nodes.
   std::vector<int> node_in_degree(nodes.size(), 0);
   std::vector<int> edge_in_degree(edges.size(), 0);
-  for (auto &node : nodes) {
+  for (auto &node: nodes) {
     node_in_degree[node_id[node.get()]] = (int) node->input_edges.size();
     if (!node_in_degree[node_id[node.get()]]) {
       free_nodes.push_back(node.get());
     }
   }
-  for (auto &edge : edges) {
+  for (auto &edge: edges) {
     edge_in_degree[edge_id[edge.get()]] = (int) edge->input_nodes.size();
   }
 
@@ -1023,8 +1102,8 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
 
   while (!free_nodes.empty() || !free_edges.empty()) {
     // Remove the nodes in |free_nodes|.
-    for (auto &node : free_nodes) {
-      for (auto &output_edge : node->output_edges) {
+    for (auto &node: free_nodes) {
+      for (auto &output_edge: node->output_edges) {
         if (!--edge_in_degree[edge_id[output_edge]]) {
           free_edges.push_back(output_edge);
           std::push_heap(free_edges.begin(), free_edges.end(), compare_edge);
@@ -1040,7 +1119,7 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
 
       // Map the current edge (gate).
       bool has_nodes_mapped = false;
-      for (auto &input_node : current_edge->input_nodes) {
+      for (auto &input_node: current_edge->input_nodes) {
         if (input_node->is_qubit()) {
           if (qubit_index_map[input_node->index] == -1) {
             qubit_index_map[input_node->index] = num_qubits_mapped++;
@@ -1066,7 +1145,7 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
       }
 
       if (current_edge->gate->is_parameter_gate()) {
-        for (auto &output_node : current_edge->output_nodes) {
+        for (auto &output_node: current_edge->output_nodes) {
           if (output_node->is_parameter()) {
             assert (param_index_map[output_node->index] == -1);
             param_index_map[output_node->index] =
@@ -1077,7 +1156,7 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
 
       if (output) {
         std::vector<int> qubit_indices, param_indices;
-        for (auto &input_node : current_edge->input_nodes) {
+        for (auto &input_node: current_edge->input_nodes) {
           if (input_node->is_qubit()) {
             qubit_indices.push_back(qubit_index_map[input_node->index]);
           } else {
@@ -1101,7 +1180,7 @@ bool DAG::minimal_representation(std::unique_ptr<DAG> *output_dag,
       num_gates_mapped++;
 
       // Update the free nodes.
-      for (auto &output_node : current_edge->output_nodes) {
+      for (auto &output_node: current_edge->output_nodes) {
         if (!--node_in_degree[node_id[output_node]]) {
           free_nodes.push_back(output_node);
         }
@@ -1221,26 +1300,26 @@ void DAG::clone_from(const DAG &other,
     assert(edges[i].get() != other.edges[i].get());
     edges_mapping[other.edges[i].get()] = edges[i].get();
   }
-  for (auto &node : nodes) {
-    for (auto &edge : node->input_edges) {
+  for (auto &node: nodes) {
+    for (auto &edge: node->input_edges) {
       edge = edges_mapping[edge];
     }
-    for (auto &edge : node->output_edges) {
+    for (auto &edge: node->output_edges) {
       edge = edges_mapping[edge];
     }
   }
-  for (auto &edge : edges) {
-    for (auto &node : edge->input_nodes) {
+  for (auto &edge: edges) {
+    for (auto &node: edge->input_nodes) {
       node = nodes_mapping[node];
     }
-    for (auto &node : edge->output_nodes) {
+    for (auto &node: edge->output_nodes) {
       node = nodes_mapping[node];
     }
   }
-  for (auto &node : other.outputs) {
+  for (auto &node: other.outputs) {
     outputs.emplace_back(nodes_mapping[node]);
   }
-  for (auto &node : other.parameters) {
+  for (auto &node: other.parameters) {
     parameters.emplace_back(nodes_mapping[node]);
   }
 }
@@ -1249,15 +1328,15 @@ std::vector<DAGHyperEdge *> DAG::first_quantum_gates() const {
   std::vector<DAGHyperEdge *> result;
   std::unordered_set<DAGHyperEdge *> depend_on_other_gates;
   depend_on_other_gates.reserve(edges.size());
-  for (const auto &edge : edges) {
+  for (const auto &edge: edges) {
     if (edge->gate->is_parameter_gate()) {
       continue;
     }
     if (depend_on_other_gates.find(edge.get()) == depend_on_other_gates.end()) {
       result.push_back(edge.get());
     }
-    for (const auto &output_node : edge->output_nodes) {
-      for (const auto &output_edge : output_node->output_edges) {
+    for (const auto &output_node: edge->output_nodes) {
+      for (const auto &output_edge: output_node->output_edges) {
         depend_on_other_gates.insert(output_edge);
       }
     }
@@ -1267,12 +1346,12 @@ std::vector<DAGHyperEdge *> DAG::first_quantum_gates() const {
 
 std::vector<DAGHyperEdge *> DAG::last_quantum_gates() const {
   std::vector<DAGHyperEdge *> result;
-  for (const auto &edge : edges) {
+  for (const auto &edge: edges) {
     if (edge->gate->is_parameter_gate()) {
       continue;
     }
     bool all_output = true;
-    for (const auto &output_node : edge->output_nodes) {
+    for (const auto &output_node: edge->output_nodes) {
       if (outputs[output_node->index] != output_node) {
         all_output = false;
         break;

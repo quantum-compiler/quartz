@@ -14,7 +14,7 @@ int Dataset::num_total_dags() const {
   return ret;
 }
 
-bool Dataset::save_json(const std::string &file_name) const {
+bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
   std::ofstream fout;
   fout.open(file_name, std::ofstream::out);
   if (!fout.is_open()) {

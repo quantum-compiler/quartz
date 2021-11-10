@@ -7,7 +7,7 @@
 
 class Dataset {
  public:
-  bool save_json(const std::string &file_name) const;
+  bool save_json(Context *ctx, const std::string &file_name) const;
 
   // This function runs in O(1).
   [[nodiscard]] int num_hash_values() const;

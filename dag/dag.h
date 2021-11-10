@@ -113,13 +113,13 @@ class DAG {
                   const std::vector<int> &param_permutation);
 
   // A helper function used by |DAGHashType hash(Context *ctx)|.
-  void generate_hash_values(Context *ctx,
-                            const ComplexType &hash_value,
-                            const PhaseShiftIdType &phase_shift_id,
-                            const std::vector<ParamType> &param_values,
-                            DAGHashType *main_hash,
-                            std::vector<std::pair<DAGHashType,
-                                                  PhaseShiftIdType>> *other_hash);
+  static void generate_hash_values(Context *ctx,
+                                   const ComplexType &hash_value,
+                                   const PhaseShiftIdType &phase_shift_id,
+                                   const std::vector<ParamType> &param_values,
+                                   DAGHashType *main_hash,
+                                   std::vector<std::pair<DAGHashType,
+                                                         PhaseShiftIdType>> *other_hash);
 
  public:
   std::vector<std::unique_ptr<DAGNode>> nodes;
@@ -142,6 +142,7 @@ class DAG {
   //   - p \in [get_num_total_parameters(), 2 * get_num_total_parameters()):
   //       shifted by e^(-i * ((p - get_num_total_parameters())-th parameter))
   std::vector<std::pair<DAGHashType, PhaseShiftIdType>> other_hash_values_;
+  ComplexType original_fingerprint_;
   bool hash_value_valid_;
 };
 

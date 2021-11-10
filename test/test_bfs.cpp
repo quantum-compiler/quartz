@@ -34,7 +34,7 @@ int main() {
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
-    dataset1.save_json("dfs_restricted.json");
+    dataset1.save_json(&ctx, "dfs_restricted.json");
 
     start = std::chrono::steady_clock::now();
     equiv_set.clear();
@@ -69,7 +69,7 @@ int main() {
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
-    dataset1.save_json("dfs_all.json");
+    dataset1.save_json(&ctx, "dfs_all.json");
 
     start = std::chrono::steady_clock::now();
     equiv_set.clear();
@@ -107,7 +107,7 @@ int main() {
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
-    dataset2.save_json("bfs_unverified.json");
+    dataset2.save_json(&ctx, "bfs_unverified.json");
 
     start = std::chrono::steady_clock::now();
     equiv_set.clear();
@@ -145,7 +145,7 @@ int main() {
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
-    dataset3.save_json("tmp_before_verify.json");
+    dataset3.save_json(&ctx, "tmp_before_verify.json");
 
     start = std::chrono::steady_clock::now();
     equiv_set.clear();

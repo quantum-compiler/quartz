@@ -40,7 +40,7 @@ void test_generator(const std::vector<GateType> &support_gates,
             << std::endl;
   if (!save_file_name.empty()) {
     start = std::chrono::steady_clock::now();
-    dataset.save_json(save_file_name);
+    dataset.save_json(&ctx, save_file_name);
     end = std::chrono::steady_clock::now();
     std::cout << "Json saved in "
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(

@@ -6,6 +6,7 @@
 #include <cassert>
 #include <charconv>
 #include <unordered_set>
+#include <utility>
 
 DAG::DAG(int num_qubits, int num_input_parameters)
     : num_qubits(num_qubits),
@@ -454,72 +455,11 @@ void DAG::generate_hash_values(Context *ctx,
   assert(sizeof(DAGHashType) == sizeof(double));
 
   if (kFingerprintInvariantUnderPhaseShift) {
-    ComplexType empty_phase =
-        ctx->get_generated_input_dis(get_num_qubits()).dot(ctx->get_generated_hashing_dis(
-            get_num_qubits()));
-    empty_phase /= std::abs(empty_phase);
     auto val = std::abs(hash_value);
     DAGHashType valhash = *((DAGHashType *) (&val));
     *main_hash = valhash >> discard_bits;
     other_hash->emplace_back((valhash + (1 << discard_bits)) >> discard_bits,
                              phase_shift_id);
-    if (kCheckPhaseShiftInGenerator) {
-      auto search_phase_factor = [&](auto &search_phase_factor_ref,
-                                     int param_id,
-                                     int current_phase_shift_id,
-                                     double current_phase_factor) {
-        if (param_id == param_values.size()) {
-          // Check if |current_phase_factor| is the phase factor we want
-          auto diff = hash_value * ComplexType{std::cos(current_phase_factor),
-                                               std::sin(current_phase_factor)}
-              - val * empty_phase;
-          if (std::norm(diff) <= kCheckPhaseShiftEps) {
-            // Found the correct phase factor
-            other_hash->back().second = current_phase_shift_id;
-            return true;
-          }
-          return false;
-        }
-        for (int coeff = kCheckPhaseShiftMinCoeff;
-             coeff <= kCheckPhaseShiftMaxCoeff; coeff++) {
-          auto new_phase_shift_id = current_phase_shift_id
-              * (kCheckPhaseShiftMaxCoeff - kCheckPhaseShiftMinCoeff + 1)
-              + (coeff - kCheckPhaseShiftMinCoeff);
-          auto new_phase_factor =
-              current_phase_factor + param_values[param_id] * coeff;
-          bool found = search_phase_factor_ref(search_phase_factor_ref,
-                                               param_id + 1,
-                                               new_phase_shift_id,
-                                               new_phase_factor);
-          if (found) {
-            return true;
-          }
-        }
-        return false;
-      };
-      bool found = false;
-      if (kCheckPhaseShiftOfPiOver4) {
-        const ParamType pi = std::acos((ParamType) -1.0);
-        for (int k = 0; k < 8; k++) {
-          found = search_phase_factor(search_phase_factor, 0, k, pi / 4.0 * k);
-          if (found) {
-            break;
-          }
-        }
-      } else {
-        found = search_phase_factor(search_phase_factor, 0, 0, 0);
-      }
-      if (!found) {
-        std::cout
-            << "Cannot find phase factor for the following circuit with hash value "
-            << hash_value << " " << std::hex << *main_hash
-            << " (expected phase is " << hash_value / val / empty_phase << "): "
-            << std::endl;
-        std::cout << to_string() << std::endl;
-        exit(1);
-        assert(false);
-      }
-    }
     return;
   }
 
@@ -566,6 +506,8 @@ DAGHashType DAG::hash(Context *ctx) {
   evaluate(input_dis, input_parameters, output_dis, &all_parameters);
   ComplexType dot_product =
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
+
+  original_fingerprint_ = dot_product;
 
   other_hash_values_.clear();
   generate_hash_values(ctx,
@@ -856,6 +798,17 @@ std::string DAG::to_json() const {
       }
     }
   }
+  result += "]";
+
+  result += ",";
+  result += "[";
+  // std::to_chars for floating-point numbers is not supported by some
+  // compilers, including GCC with version < 11.
+  result += to_string_with_precision(original_fingerprint_.real(),
+      /*precision=*/17);
+  result += ",";
+  result += to_string_with_precision(original_fingerprint_.imag(),
+      /*precision=*/17);
   result += "]";
 
   result += "],";
@@ -1245,6 +1198,7 @@ void DAG::clone_from(const DAG &other,
   other_hash_values_ =
       other.other_hash_values_;
   hash_value_valid_ = other.hash_value_valid_;
+  original_fingerprint_ = other.original_fingerprint_;
   std::unordered_map<DAGNode *, DAGNode *> nodes_mapping;
   std::unordered_map<DAGHyperEdge *, DAGHyperEdge *> edges_mapping;
   nodes.reserve(other.nodes.size());

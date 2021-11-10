@@ -77,7 +77,7 @@ void Generator::generate(int num_qubits,
       if (num_gates == max_num_gates) {
         break;
       }
-      bool ret = dataset->save_json("tmp_before_verify.json");
+      bool ret = dataset->save_json(context, "tmp_before_verify.json");
       assert(ret);
 
       // Assume working directory is cmake-build-debug/ here.

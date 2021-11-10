@@ -35,7 +35,7 @@ int main() {
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                 end - start).count() / 1000.0 << " seconds."
             << std::endl;
-  dataset.save_json("phase_shift_before_verify.json");
+  dataset.save_json(&ctx, "phase_shift_before_verify.json");
 
   start = std::chrono::steady_clock::now();
   equiv_set.clear();

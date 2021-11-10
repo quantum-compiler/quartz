@@ -261,7 +261,9 @@ def find_equivalences_helper(hashtag, dags, check_phase_shift_in_smt_solver, ver
 
 def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
                       check_equivalence_with_different_hash=True, check_phase_shift_in_smt_solver=False):
-    data = load_json(input_file)
+    input_file_data = load_json(input_file)
+    data = input_file_data[1]
+    meta_data = input_file_data[0]  # parameters generated for random testing
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0

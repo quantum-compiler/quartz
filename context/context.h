@@ -25,6 +25,7 @@ public:
   const Vector &get_generated_input_dis(int num_qubits);
   const Vector &get_generated_hashing_dis(int num_qubits);
   std::vector<ParamType> get_generated_parameters(int num_params);
+  std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 
   // This function assumes that two DAGs are equivalent iff they share the same

@@ -1,6 +1,7 @@
 #include "dataset.h"
 
 #include <fstream>
+#include <iomanip>
 
 int Dataset::num_hash_values() const {
   return (int) dataset.size();
@@ -20,8 +21,25 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
   if (!fout.is_open()) {
     return false;
   }
-  fout << "{" << std::endl;
+
+  fout << "[" << std::endl;
+
+  // The generated parameters for random testing.
+  auto all_parameters = ctx->get_all_generated_parameters();
+  fout << "[";
   bool start0 = true;
+  for (auto &param : all_parameters) {
+    if (start0) {
+      start0 = false;
+    } else {
+      fout << ", ";
+    }
+    fout << std::scientific << std::setprecision(17) << param;
+  }
+  fout << "]," << std::endl;
+
+  fout << "{" << std::endl;
+  start0 = true;
   for (const auto &it : dataset) {
     if (start0) {
       start0 = false;
@@ -41,6 +59,8 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
     fout << "]" << std::endl;
   }
   fout << "}" << std::endl;
+
+  fout << "]" << std::endl;
   return true;
 }
 

@@ -96,6 +96,10 @@ std::vector<ParamType> Context::get_generated_parameters(int num_params) {
                                 random_parameters_.begin() + num_params);
 }
 
+std::vector<ParamType> Context::get_all_generated_parameters() const {
+  return random_parameters_;
+}
+
 DAG *Context::get_possible_representative(DAG *dag) {
   return representatives_[dag->hash(this)];
 }

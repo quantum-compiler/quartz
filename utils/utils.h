@@ -11,8 +11,11 @@ using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 // Constants for DAG::hash()
 constexpr int kDAGHashDiscardBits = 10;
+constexpr bool kFingerprintInvariantUnderPhaseShift = false;
 constexpr bool kCheckPhaseShiftInGenerator = true;
 constexpr PhaseShiftIdType kNoPhaseShift = -1;
+constexpr int kCheckPhaseShiftMinCoeff = -1;
+constexpr int kCheckPhaseShiftMaxCoeff = 1;
 constexpr bool kCheckPhaseShiftOfPiOver4 = true;
 constexpr int kCheckPhaseShiftOfPiOver4Index = 10000;
 

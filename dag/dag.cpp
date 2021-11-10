@@ -450,10 +450,21 @@ void DAG::generate_hash_values(const ComplexType &hash_value,
   constexpr int discard_bits = kDAGHashDiscardBits;
   assert(typeid(ComplexType::value_type) == typeid(double));
   assert(sizeof(DAGHashType) == sizeof(double));
+
+  if (kFingerprintInvariantUnderPhaseShift) {
+    auto val = std::norm(hash_value);
+    DAGHashType valhash = *((DAGHashType *) (&val));
+    *main_hash = valhash >> discard_bits;
+    other_hash->emplace_back((valhash + (1 << discard_bits)) >> discard_bits,
+                             phase_shift_id);
+    return;
+  }
+
   auto val1 = hash_value.real(), val2 = hash_value.imag();
   DAGHashType val1hash = *((DAGHashType *) (&val1));
   DAGHashType val2hash = *((DAGHashType *) (&val2));
   *main_hash = val1hash >> discard_bits << discard_bits;
+  *main_hash ^= val2hash >> discard_bits;
 
   // Besides rounding both values down, we might want to round them up to
   // account for floating point errors.
@@ -469,14 +480,14 @@ void DAG::generate_hash_values(const ComplexType &hash_value,
   // after discarding the last 10 bits.
   // Rounding the latter up can solve this issue.
   DAGHashType tmp;
-  tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
+  tmp = ((val1hash + (1 << discard_bits)) >> discard_bits) << discard_bits;
   tmp ^= val2hash >> discard_bits;
   other_hash->emplace_back(tmp, phase_shift_id);
-  tmp = ((val1hash >> discard_bits) + 1) << discard_bits;
-  tmp ^= (val2hash >> discard_bits) + 1;
+  tmp = ((val1hash + (1 << discard_bits)) >> discard_bits) << discard_bits;
+  tmp ^= ((val2hash + (1 << discard_bits)) >> discard_bits);
   other_hash->emplace_back(tmp, phase_shift_id);
   tmp = val1hash >> discard_bits << discard_bits;
-  tmp ^= (val2hash >> discard_bits) + 1;
+  tmp ^= ((val2hash + (1 << discard_bits)) >> discard_bits);
   other_hash->emplace_back(tmp, phase_shift_id);
 }
 

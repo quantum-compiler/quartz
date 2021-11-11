@@ -31,7 +31,7 @@ Graph::Graph(Context *ctx)
     : context(ctx), special_op_guid(0), totalCost(0.0f) {}
 
 Graph::Graph(Context *ctx, const DAG &dag) : context(ctx), special_op_guid(0) {
-  //   assert(dag);
+  // assert(dag);
   // Guid for input qubit and input parameter nodes
   int num_input_qubits = dag.get_num_qubits();
   int num_input_params = dag.get_num_input_parameters();
@@ -1079,6 +1079,7 @@ void Graph::draw_circuit(const std::string &src_file_name,
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing,
+		       bool enable_early_stop,
                        bool use_rotation_merging_in_searching,
                        GateType target_rotation) {
   EquivalenceSet eqs;
@@ -1174,7 +1175,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		const auto current_cost = candidate.first;
 		std::vector<Graph *> current_new_candidates;
 		current_new_candidates.reserve(xfers.size());
-		bool enable_early_stop = false;
 		bool stop_search = false;
 		for (auto &xfer : xfers) {
 		  xfer->run(0, candidate.second, current_new_candidates, hashmap,
@@ -1264,9 +1264,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	          candidates.size());
 
 	  std::vector<Graph *> new_candidates;
-	  bool enable_early_stop = false;
-	  if (alpha < 1.0f)
-		enable_early_stop = true;
 	  bool stop_search = false;
 	  for (auto &xfer : xfers) {
 		xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,

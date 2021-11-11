@@ -2,7 +2,7 @@
 #include "../tasograph/substitution.h"
 #include "../parser/qasm_parser.h"
 
-void parse_args(char **argv, int argc, bool &simulated_annealing,
+void parse_args(char **argv, int argc, bool &simulated_annealing, bool &early_stop,
                 std::string &input_filename, std::string &output_filename,
                 std::string &eqset_filename) {
   assert(argv[1] != nullptr);
@@ -25,6 +25,10 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
 	  eqset_filename = std::string(argv[++i]);
 	  continue;
 	}
+	if (!std::strcmp(argv[i], "--early-stop")) {
+	  early_stop = true;
+	  continue;
+	}
   }
 }
 
@@ -32,7 +36,8 @@ int main(int argc, char **argv) {
   std::string input_fn, output_fn;
   std::string eqset_fn = "bfs_verified_simplified.json";
   bool simulated_annealing = false;
-  parse_args(argv, argc, simulated_annealing, input_fn, output_fn, eqset_fn);
+  bool early_stop = false;
+  parse_args(argv, argc, simulated_annealing, early_stop, input_fn, output_fn, eqset_fn);
   fprintf(stderr, "Input qasm file: %s\n", input_fn.c_str());
 
   // Construct contexts
@@ -69,7 +74,7 @@ int main(int argc, char **argv) {
 
   // Optimization
   TASOGraph::Graph *graph_after_search = graph_before_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing,
+      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ true, GateType::u1);
   std::cout << "gate count after optimization: "
             << graph_after_search->total_cost() << std::endl;

@@ -1207,6 +1207,10 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  // Compute some statistical information to output, can be commented
 	  // when verbose=false
 	  const auto num_new_candidates = new_candidates.size();
+      if (new_candidates.empty()) {
+        std::cout << "No new candidates. Early stopping." << std::endl;
+        break;
+      }
 	  assert(!new_candidates.empty());
 	  auto min_cost = new_candidates[0].first;
 	  auto max_cost = new_candidates[0].first;
@@ -1238,10 +1242,6 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	            << num_possible_new_candidates
 	            << " possible new candidates accepted, cost ranging ["
 	            << min_cost << ", " << max_cost << "]" << std::endl;
-      if (sa_candidates.empty()) {
-        std::cout << "No new candidates. Early stopping." << std::endl;
-        break;
-      }
 	}
   }
   else {

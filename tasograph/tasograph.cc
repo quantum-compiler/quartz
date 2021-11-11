@@ -1157,7 +1157,11 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	const double kSABeginTemp = bestCost;
 	const double kSAEndTemp = kSABeginTemp / 1e6;
 	const double kSACoolingFactor = 1.0 - 1e-1;
-	const int kNumKeepGraph = 50;
+	const int kNumKeepGraph = 20;
+    constexpr bool always_run_rotation_merging = true;
+    const double kRunRotationMergingRate = -1;
+    constexpr bool always_delete_original_circuit = true;
+    const double kDeleteOriginalCircuitRate = -1;
 	// <cost, graph>
 	std::vector<std::pair<float, Graph *>> sa_candidates;
 	sa_candidates.reserve(kNumKeepGraph);
@@ -1171,6 +1175,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  std::vector<std::pair<float, Graph *>> new_candidates;
 	  new_candidates.reserve(sa_candidates.size() * xfers.size());
 	  int num_possible_new_candidates = 0;
+      int num_candidates_kept = 0;
 	  for (auto &candidate : sa_candidates) {
 		const auto current_cost = candidate.first;
 		std::vector<Graph *> current_new_candidates;
@@ -1183,9 +1188,12 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 		}
 		num_possible_new_candidates += current_new_candidates.size();
 		for (auto &new_candidate : current_new_candidates) {
-		  if (use_rotation_merging_in_searching) {
-			new_candidate->rotation_merging(target_rotation);
-		  }
+          if (use_rotation_merging_in_searching
+              && (always_run_rotation_merging
+                  || ctx->random_number()
+                      < 1 - std::exp(kRunRotationMergingRate / T))) {
+            new_candidate->rotation_merging(target_rotation);
+          }
 		  const auto new_cost = new_candidate->total_cost();
 		  if (new_cost < bestCost) {
 			bestGraph = new_candidate;
@@ -1202,6 +1210,19 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 			delete new_candidate;
 		  }
 		}
+        if (!always_delete_original_circuit
+            && ctx->random_number()
+                < std::exp(kDeleteOriginalCircuitRate / T)
+            && hashmap.find(candidate.second->hash()) == hashmap.end()) {
+          // Keep the original candidate.
+          new_candidates.emplace_back(candidate);
+          hashmap.insert(candidate.second->hash());
+          num_candidates_kept++;
+        } else {
+          if (candidate.second != bestGraph && candidate.second != this) {
+            delete candidate.second;
+          }
+        }
 	  }
 
 	  // Compute some statistical information to output, can be commented
@@ -1236,12 +1257,13 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	  }
 	  sa_candidates = std::move(new_candidates);
 
-	  std::cout << "Iteration " << num_iteration << ": T = " << std::fixed
-	            << std::setprecision(2) << T << ", bestcost = " << bestCost
-	            << ", " << num_new_candidates << " out of "
-	            << num_possible_new_candidates
-	            << " possible new candidates accepted, cost ranging ["
-	            << min_cost << ", " << max_cost << "]" << std::endl;
+      std::cout << "Iteration " << num_iteration << ": T = " << std::fixed
+                << std::setprecision(2) << T << ", bestcost = " << bestCost
+                << ", " << num_candidates_kept << " candidates kept, "
+                << num_new_candidates - num_candidates_kept << " out of "
+                << num_possible_new_candidates
+                << " possible new candidates accepted, cost ranging ["
+                << min_cost << ", " << max_cost << "]" << std::endl;
 	}
   }
   else {

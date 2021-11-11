@@ -24,7 +24,8 @@ void test_optimization(Context *ctx, const std::string &file_name,
             << std::endl;
   auto start = std::chrono::steady_clock::now();
   auto new_graph = graph.optimize(1.1, 0, false, ctx, equivalent_file_name,
-                                  use_simulated_annealing, false,
+                                  use_simulated_annealing, false/*early_stop*/,
+				  false/*rotation_merging*/,
                                   GateType::rz /*Just a placeholder*/);
   auto end = std::chrono::steady_clock::now();
   std::cout << "After optimizing graph in "

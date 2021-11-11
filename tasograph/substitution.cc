@@ -477,7 +477,7 @@ Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
 void GraphXfer::run(int depth, Graph *graph,
                     std::vector<Graph *> &new_candidates,
                     std::set<size_t> &hashmap, float threshold, int maxNumOps,
-                    bool &enable_early_stop, bool &stop_search) {
+                    bool enable_early_stop, bool &stop_search) {
   if (stop_search)
 	return;
   // printf("run: depth(%d) srcOps.size(%zu) graph.size(%zu) candidates(%zu)\n",

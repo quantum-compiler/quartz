@@ -1079,7 +1079,7 @@ void Graph::draw_circuit(const std::string &src_file_name,
 Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name,
                        bool use_simulated_annealing,
-		       bool enable_early_stop,
+		               bool enable_early_stop,
                        bool use_rotation_merging_in_searching,
                        GateType target_rotation) {
   EquivalenceSet eqs;
@@ -1238,6 +1238,10 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
 	            << num_possible_new_candidates
 	            << " possible new candidates accepted, cost ranging ["
 	            << min_cost << ", " << max_cost << "]" << std::endl;
+      if (sa_candidates.empty()) {
+        std::cout << "No new candidates. Early stopping." << std::endl;
+        break;
+      }
 	}
   }
   else {

@@ -744,7 +744,6 @@ int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx) {
 }
 
 int EquivalenceSet::remove_parameter_permutations(Context *ctx) {
-  int num_classes_removed = 0;
   std::vector<EquivalenceClass *> classes_to_remove;
   for (auto &item : classes_) {
     if (item->size() == 0) {
@@ -778,6 +777,7 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx) {
       // Check all permutations except for the identity.
       EquivalenceClass *permuted_class = nullptr;
       std::vector<std::unique_ptr<DAG>> permuted_dags;
+      permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
         permuted_dags.emplace_back(dag->get_permuted_dag(qubit_permutation,
                                                          param_permutation));

@@ -24,5 +24,6 @@
 #include "u1.h"
 #include "u2.h"
 #include "u3.h"
+#include "cz.h"
 #include "input_qubit.h"
 #include "input_param.h"

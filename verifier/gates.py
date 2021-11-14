@@ -67,13 +67,13 @@ def u2(phi, l):
              (1/z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi), 1/z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
 
 
-def u3(phi, l, theta):
+def u3(theta, phi, l):
+    assert len(theta) == 2
     assert len(phi) == 2
     assert len(l) == 2
-    assert len(theta) == 2
+    cos_theta, sin_theta = theta
     cos_phi, sin_phi = phi
     cos_l, sin_l = l
-    cos_theta, sin_theta = theta
     return [[(cos_theta, 0), (-sin_theta * cos_l, -sin_theta * sin_l)],
             [(sin_theta * cos_phi, sin_theta * sin_phi),
              (cos_theta * (cos_phi * cos_l - sin_phi * sin_l), cos_theta * (sin_phi * cos_l + sin_l * cos_phi))]]

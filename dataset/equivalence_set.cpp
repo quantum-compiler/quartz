@@ -63,7 +63,8 @@ bool EquivalenceClass::set_as_representative(const DAG &dag) {
 }
 
 int EquivalenceClass::remove_common_first_or_last_gates(Context *ctx,
-                                                        std::unordered_set<DAGHashType> &hash_values_to_remove) {
+                                                        std::unordered_set<
+                                                            DAGHashType> &hash_values_to_remove) {
   assert(hash_values_to_remove.empty());
   std::vector<DAGHyperEdge *> all_first_gates, all_last_gates;
   std::vector<int> removing_ids;
@@ -100,7 +101,9 @@ int EquivalenceClass::remove_common_first_or_last_gates(Context *ctx,
         hash_values_to_remove.insert(other_hash);
       }
     } else {
-      all_first_gates.insert(all_first_gates.end(), first_gates.begin(), first_gates.end());
+      all_first_gates.insert(all_first_gates.end(),
+                             first_gates.begin(),
+                             first_gates.end());
       all_last_gates.insert(all_last_gates.end(), last_gates.begin(),
                             last_gates.end());
     }
@@ -492,7 +495,7 @@ void EquivalenceSet::clear() {
 bool EquivalenceSet::simplify(Context *ctx) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 2;
+  constexpr int kNumOptimizationsToPerform = 3;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
@@ -503,6 +506,12 @@ bool EquivalenceSet::simplify(Context *ctx) {
       break;
     }
     if (remove_unused_qubits_and_input_params(ctx)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (remove_parameter_permutations(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -698,7 +707,8 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
   std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
   std::swap(prev_classes, classes_);
   // Now |classes_| is empty.
-  assert(prev_classes.size() + classes_to_insert.size() >= classes_to_remove.size());
+  assert(prev_classes.size() + classes_to_insert.size()
+             >= classes_to_remove.size());
   classes_.reserve(prev_classes.size() + classes_to_insert.size()
                        - classes_to_remove.size());
   auto remove_it = classes_to_remove.begin();
@@ -731,6 +741,98 @@ int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx) {
     }
   }
   return num_classes_modified;
+}
+
+int EquivalenceSet::remove_parameter_permutations(Context *ctx) {
+  std::vector<EquivalenceClass *> classes_to_remove;
+  for (auto &item : classes_) {
+    if (item->size() == 0) {
+      continue;
+    }
+    const auto &dags = item->get_all_dags();
+    int min_num_input_param = dags[0]->get_num_input_parameters();
+    for (auto &dag : dags) {
+      min_num_input_param =
+          std::min(min_num_input_param, dag->get_num_input_parameters());
+      if (min_num_input_param <= 1) {
+        break;
+      }
+    }
+    if (min_num_input_param <= 1) {
+      // No way to permute the parameters.
+      continue;
+    }
+    // |qubit_permutation| is always the identity.
+    std::vector<int> qubit_permutation(dags[0]->get_num_qubits());
+    for (int i = 0; i < (int) qubit_permutation.size(); i++) {
+      qubit_permutation[i] = i;
+    }
+    std::vector<int> param_permutation(min_num_input_param);
+    for (int i = 0; i < min_num_input_param; i++) {
+      param_permutation[i] = i;
+    }
+    bool found_permuted_equivalence = false;
+    while (std::next_permutation(param_permutation.begin(),
+                                 param_permutation.end())) {
+      // Check all permutations except for the identity.
+      EquivalenceClass *permuted_class = nullptr;
+      std::vector<std::unique_ptr<DAG>> permuted_dags;
+      permuted_dags.reserve(dags.size());
+      for (auto &dag : dags) {
+        permuted_dags.emplace_back(dag->get_permuted_dag(qubit_permutation,
+                                                         param_permutation));
+      }
+      for (auto &permuted_dag : permuted_dags) {
+        permuted_class = get_containing_class(ctx, permuted_dag.get());
+        if (permuted_class) {
+          // Found the permuted class.
+          break;
+        }
+      }
+      if (permuted_class) {
+        found_permuted_equivalence = true;
+        // Update the permuted class using this class.
+        for (auto &permuted_dag : permuted_dags) {
+          if (!permuted_class->contains(*permuted_dag)) {
+            insert(ctx, permuted_class, std::move(permuted_dag));
+          }
+        }
+        break;
+      }
+    }
+    if (found_permuted_equivalence) {
+      // Remove this equivalence class.
+      classes_to_remove.push_back(item.get());
+      for (auto &dag : dags) {
+        remove_possible_class(dag->hash(ctx), item.get());
+        for (const auto &other_hash : dag->other_hash_values()) {
+          remove_possible_class(other_hash, item.get());
+        }
+      }
+    }
+  }
+
+  if (classes_to_remove.empty()) {
+    return 0;
+  }
+
+  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
+  std::swap(prev_classes, classes_);
+  // Now |classes_| is empty.
+  assert(prev_classes.size() >= classes_to_remove.size());
+  classes_.reserve(prev_classes.size() - classes_to_remove.size());
+  auto remove_it = classes_to_remove.begin();
+  for (auto &item : prev_classes) {
+    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
+      // Remove the equivalence class.
+      remove_it++;
+    } else {
+      assert(item->size() > 0);
+      classes_.push_back(std::move(item));
+    }
+  }
+
+  return (int) classes_to_remove.size();
 }
 
 int EquivalenceSet::num_equivalence_classes() const {
@@ -815,7 +917,8 @@ std::vector<EquivalenceClass *> EquivalenceSet::get_possible_classes(const DAGHa
                                          it->second.end());
 }
 
-void EquivalenceSet::insert_class(Context *ctx, std::unique_ptr<EquivalenceClass> equiv_class) {
+void EquivalenceSet::insert_class(Context *ctx,
+                                  std::unique_ptr<EquivalenceClass> equiv_class) {
   // Add pointers to the new class.
   for (auto &dag : equiv_class->get_all_dags()) {
     assert(dag);
@@ -828,14 +931,28 @@ void EquivalenceSet::insert_class(Context *ctx, std::unique_ptr<EquivalenceClass
   classes_.push_back(std::move(equiv_class));
 }
 
-bool EquivalenceSet::contains(Context *ctx, DAG *dag) const {
+void EquivalenceSet::insert(Context *ctx,
+                            EquivalenceClass *equiv_class,
+                            std::unique_ptr<DAG> dag) {
+  DAG *dag_backup = dag.get();
+  equiv_class->insert(std::move(dag));
+  set_possible_class(dag_backup->hash(ctx), equiv_class);
+  for (const auto &other_hash : dag_backup->other_hash_values()) {
+    set_possible_class(other_hash, equiv_class);
+  }
+}
+
+EquivalenceClass *EquivalenceSet::get_containing_class(Context *ctx,
+                                                       DAG *dag) const {
   auto possible_classes = get_possible_classes(dag->hash(ctx));
   for (auto &equiv_class : possible_classes) {
     if (equiv_class->contains(*dag)) {
-      return true;
+      return equiv_class;
     }
   }
-  auto possible_class_set = std::unordered_set<EquivalenceClass *>(possible_classes.begin(), possible_classes.end());
+  auto possible_class_set = std::unordered_set<EquivalenceClass *>(
+      possible_classes.begin(),
+      possible_classes.end());
   for (const auto &other_hash : dag->other_hash_values()) {
     possible_classes = get_possible_classes(other_hash);
     for (auto &equiv_class : possible_classes) {
@@ -843,12 +960,12 @@ bool EquivalenceSet::contains(Context *ctx, DAG *dag) const {
         // not cached
         possible_class_set.insert(equiv_class);
         if (equiv_class->contains(*dag)) {
-          return true;
+          return equiv_class;
         }
       }
     }
   }
-  return false;
+  return nullptr;
 }
 
 void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,

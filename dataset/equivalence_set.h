@@ -94,6 +94,11 @@ class EquivalenceSet {
   // Return the number of equivalent classes modified.
   int remove_common_first_or_last_gates(Context *ctx);
 
+  // If there are two equivalence classes that are equivalent under
+  // permutation of parameters, remove one of them.
+  // Return the number of equivalent classes removed.
+  int remove_parameter_permutations(Context *ctx);
+
   // This function runs in O(1).
   [[nodiscard]] int num_equivalence_classes() const;
 
@@ -115,8 +120,16 @@ class EquivalenceSet {
   void insert_class(Context *ctx,
                     std::unique_ptr<EquivalenceClass> equiv_class);
 
-  // Returns whether the whole equivalence set contains a DAG fully equivalent to |dag|.
-  [[nodiscard]] bool contains(Context *ctx, DAG *dag) const;
+  // Calls |equiv_class->insert(dag)| and updates |possible_classes_|.
+  void insert(Context *ctx,
+              EquivalenceClass *equiv_class,
+              std::unique_ptr<DAG> dag);
+
+  // If the whole equivalence set contains a DAG fully equivalent to |dag|,
+  // return the equivalence class containing it.
+  // Otherwise, return nullptr.
+  [[nodiscard]] EquivalenceClass *get_containing_class(Context *ctx,
+                                                       DAG *dag) const;
 
  private:
   void set_possible_class(const DAGHashType &hash_value,

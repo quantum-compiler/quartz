@@ -34,7 +34,7 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
 
 int main(int argc, char **argv) {
   std::string input_fn, output_fn;
-  std::string eqset_fn = "bfs_verified_simplified.json";
+  std::string eqset_fn = "build/bfs_verified_simplified.json";
   bool simulated_annealing = false;
   bool early_stop = false;
   parse_args(argv, argc, simulated_annealing, early_stop, input_fn, output_fn,
@@ -42,17 +42,17 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Input qasm file: %s\n", input_fn.c_str());
 
   // Construct contexts
-  Context src_ctx({GateType::h, GateType::ccz, GateType::input_qubit,
-                   GateType::input_param});
-  Context dst_ctx({GateType::rz, GateType::h, GateType::cx, GateType::add,
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
                    GateType::input_qubit, GateType::input_param});
+  Context dst_ctx({GateType::u1, GateType::u2, GateType::u3, GateType::add,
+                   GateType::cx, GateType::input_qubit, GateType::input_param});
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   // Construct GraphXfers for toffoli flip
   // Use this for voqc gate set(h, rz, x, cx)
   //   auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
   // Use this for ibmq gate set(u1, u2, u3, cx)
-  auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_u1_xfer(&union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   DAG *dag = nullptr;
@@ -62,14 +62,14 @@ int main(int argc, char **argv) {
   TASOGraph::Graph graph(&src_ctx, *dag);
 
   // Context shift
-  //   RuleParser rule_parser({});
-  //   TASOGraph::Graph *graph_new_ctx = graph.context_shift(
-  //       &src_ctx, &dst_ctx, &union_ctx, &rule_parser, /*ignore_toffoli*/
-  //       true);
+  RuleParser rule_parser({"h q0 = u2 q0 0 pi", "x q0 = u3 q0 0.5pi, 0, -pi"});
+  TASOGraph::Graph *graph_new_ctx = graph.context_shift(
+      &src_ctx, &dst_ctx, &union_ctx, &rule_parser, /*ignore_toffoli*/
+      true);
 
   // Greedy toffoli flip
   TASOGraph::Graph *graph_before_search = graph.toffoli_flip_greedy(
-      GateType::rz, xfer_pair.first, xfer_pair.second);
+      GateType::u1, xfer_pair.first, xfer_pair.second);
   std::cout << "gate count after toffoli flip: "
             << graph_before_search->total_cost() << std::endl;
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);

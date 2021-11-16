@@ -789,7 +789,7 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx) {
           break;
         }
       }
-      if (permuted_class) {
+      if (permuted_class && permuted_class != item.get()) {
         found_permuted_equivalence = true;
         // Update the permuted class using this class.
         for (auto &permuted_dag : permuted_dags) {

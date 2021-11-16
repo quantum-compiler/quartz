@@ -32,6 +32,7 @@ bool Verifier::redundant(Context *ctx, DAG *dag) {
 }
 
 bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag) {
+  // Representative pruning.
   // Check if any suffix already exists.
   auto subgraph = std::make_unique<DAG>(*dag);
   while (subgraph->get_num_gates() > 0) {

@@ -27,6 +27,10 @@ class DAG {
   void add_input_parameter();
   bool remove_last_gate();
 
+  // Generate all possible parameter gates at the beginning.
+  // TODO: Currently we only support |max_recursion_depth == 1|.
+  void generate_parameter_gates(Context *ctx, int max_recursion_depth = 1);
+
   // Return the total number of gates removed.
   // The time complexity is O((number of gates removed) *
   // ((total number of nodes) + (total number of edges))).

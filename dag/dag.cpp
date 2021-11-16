@@ -252,6 +252,49 @@ bool DAG::remove_last_gate() {
   return true;
 }
 
+void DAG::generate_parameter_gates(Context *ctx, int max_recursion_depth) {
+  assert(max_recursion_depth == 1);
+  for (const auto &idx : ctx->get_supported_parameter_gates()) {
+    Gate *gate = ctx->get_gate(idx);
+    if (gate->get_num_parameters() == 1) {
+      std::vector<int> param_indices(1);
+      for (param_indices[0] = 0;
+           param_indices[0] < get_num_input_parameters();
+           param_indices[0]++) {
+        int output_param_index;
+        bool ret = add_gate({},
+                            param_indices,
+                            gate,
+                            &output_param_index);
+        assert(ret);
+      }
+    } else if (gate->get_num_parameters() == 2) {
+      // Case: 0-qubit operators with 2 parameters
+      std::vector<int> param_indices(2);
+      for (param_indices[0] = 0;
+           param_indices[0] < get_num_input_parameters();
+           param_indices[0]++) {
+        for (param_indices[1] = 0;
+             param_indices[1] < get_num_input_parameters();
+             param_indices[1]++) {
+          if (gate->is_commutative() && param_indices[0] > param_indices[1]) {
+            // For commutative gates, enforce param_indices[0] <= param_indices[1]
+            continue;
+          }
+          int output_param_index;
+          bool ret = add_gate({},
+                              param_indices,
+                              gate,
+                              &output_param_index);
+          assert(ret);
+        }
+      }
+    } else {
+      assert(false && "Unsupported gate type");
+    }
+  }
+}
+
 int DAG::remove_gate(DAGHyperEdge *edge) {
   auto edge_pos = std::find_if(edges.begin(),
                                edges.end(),

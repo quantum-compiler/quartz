@@ -31,6 +31,9 @@ void Generator::generate(int num_qubits,
                          EquivalenceSet *equiv_set,
                          bool verbose) {
   auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
+  // Generate all possible parameter gates at the beginning.
+  assert(max_num_param_gates == 1);
+  empty_dag->generate_parameter_gates(context);
   std::vector<DAG *> dags_to_search(1, empty_dag.get());
   if (verify_equivalences) {
     assert(equiv_set);
@@ -367,126 +370,71 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
     }
   };
-  int current_max_num_gates = (int) dags.size() - 1;
-  std::vector<int> params_used_times;
-  int min_num_gates = 0;
-  if (current_max_num_gates - max_num_param_gates > 0) {
-    min_num_gates = current_max_num_gates - max_num_param_gates;
-  }
-  for (int num_gates = min_num_gates; num_gates <= current_max_num_gates;
-       num_gates++) {
-    for (auto &dag : dags[num_gates]) {
-      // Add (current_max_num_gates - num_gates) parameter gates.
-      if (current_max_num_gates - num_gates + dag->get_num_internal_parameters()
-          > max_num_param_gates) {
-        // Too many parameter gates.
-        continue;
-      }
-      std::vector<std::unique_ptr<DAG>> dags_to_search;
-      // Assume all parameters are used in the current dag now.
-      params_used_times.assign(dag->get_num_total_parameters(), 1);
-      params_used_times.resize(
-          dag->get_num_total_parameters() + (current_max_num_gates - num_gates)
-              + 1);
-      dfs_parameter_gates(std::make_unique<DAG>(*dag),
-                          current_max_num_gates
-                              - num_gates, /*max_unused_params=*/
-                          kMaxParamInputPerQuantumGate, /*current_unused_params=*/
-                          0,
-                          params_used_times,
-                          dags_to_search);
-
-      std::vector<int> qubit_indices, parameter_indices;
-      // Add 1 quantum gate.
-      // So the last gate must be a quantum gate.
-      for (const auto &idx : context->get_supported_quantum_gates()) {
-        Gate *gate = context->get_gate(idx);
-        if (gate->get_num_qubits() == 1) {
-
-          if (gate->get_num_parameters() == 0) {
-            // Case: 1-qubit operators without parameters
-            if (num_gates != current_max_num_gates) {
-              // We could only have added 0 new parameter gates to get here.
-              continue;
+  for (auto &dag : dags.back()) {
+    std::vector<int> qubit_indices, parameter_indices;
+    // Add 1 quantum gate.
+    for (const auto &idx : context->get_supported_quantum_gates()) {
+      Gate *gate = context->get_gate(idx);
+      if (gate->get_num_qubits() == 1) {
+        // Case: 1-qubit operators
+        for (int i = 0; i < dag->get_num_qubits(); i++) {
+          qubit_indices.push_back(i);
+          auto search_parameters = [&](int num_remaining_parameters,
+                                       auto &search_parameters_ref/*feed in the lambda implementation to itself as a parameter*/) {
+            if (num_remaining_parameters == 0) {
+              bool
+                  ret =
+                  dag->add_gate(qubit_indices,
+                                parameter_indices,
+                                gate,
+                                nullptr);
+              assert(ret);
+              try_to_add_to_result(dag);
+              ret = dag->remove_last_gate();
+              assert(ret);
+              return;
             }
-          }
 
-          for (auto &dag_to_search : dags_to_search) {
-            for (int i = 0; i < dag_to_search->get_num_qubits(); i++) {
-              qubit_indices.push_back(i);
-              auto search_parameters = [&](int num_remaining_parameters,
-                                           auto &search_parameters_ref/*feed in the lambda implementation to itself as a parameter*/) {
-                if (num_remaining_parameters == 0) {
-                  bool
-                      ret =
-                      dag_to_search->add_gate(qubit_indices,
-                                              parameter_indices,
-                                              gate,
-                                              nullptr);
-                  assert(ret);
-                  try_to_add_to_result(dag_to_search.get());
-                  ret = dag_to_search->remove_last_gate();
-                  assert(ret);
-                  return;
-                }
+            for (int p1 = 0;
+                 p1 < dag->get_num_total_parameters(); p1++) {
+              parameter_indices.push_back(p1);
+              search_parameters_ref(num_remaining_parameters - 1,
+                                    search_parameters_ref);
+              parameter_indices.pop_back();
+            }
+          };
+          search_parameters(gate->get_num_parameters(), search_parameters);
 
-                // We must use the new parameter when |num_gates| <
-                // |current_max_num_gates| and there is only 1 new parameter
-                // to be used.
-                int p1_start = 0;
-                if (num_gates < current_max_num_gates
-                    && gate->get_num_parameters() == 1) {
-                  p1_start = dag_to_search->get_num_total_parameters() - 1;
-                  assert(p1_start >= 0);
-                }
-                for (int p1 = p1_start;
-                     p1 < dag_to_search->get_num_total_parameters(); p1++) {
-                  parameter_indices.push_back(p1);
-                  search_parameters_ref(num_remaining_parameters - 1,
-                                        search_parameters_ref);
-                  parameter_indices.pop_back();
-                }
-              };
-              search_parameters(gate->get_num_parameters(), search_parameters);
-
+          qubit_indices.pop_back();
+        }
+      } else if (gate->get_num_qubits() == 2) {
+        if (gate->get_num_parameters() == 0) {
+          // Case: 2-qubit operators without parameters
+          for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
+            qubit_indices.push_back(q1);
+            for (int q2 = 0; q2 < dag->get_num_qubits(); q2++) {
+              if (q1 == q2)
+                continue;
+              qubit_indices.push_back(q2);
+              bool ret =
+                  dag->add_gate(qubit_indices,
+                                parameter_indices,
+                                gate,
+                                nullptr);
+              assert(ret);
+              try_to_add_to_result(dag);
+              ret = dag->remove_last_gate();
+              assert(ret);
               qubit_indices.pop_back();
             }
-          }
-        } else if (gate->get_num_qubits() == 2) {
-          if (gate->get_num_parameters() == 0) {
-            // Case: 2-qubit operators without parameters
-            if (num_gates != current_max_num_gates) {
-              // We could only have added 0 new parameter gates to get here.
-              continue;
-            }
-            for (auto &dag_to_search : dags_to_search) {
-              for (int q1 = 0; q1 < dag_to_search->get_num_qubits(); q1++) {
-                qubit_indices.push_back(q1);
-                for (int q2 = 0; q2 < dag_to_search->get_num_qubits(); q2++) {
-                  if (q1 == q2)
-                    continue;
-                  qubit_indices.push_back(q2);
-                  bool ret =
-                      dag_to_search->add_gate(qubit_indices,
-                                              parameter_indices,
-                                              gate,
-                                              nullptr);
-                  assert(ret);
-                  try_to_add_to_result(dag_to_search.get());
-                  ret = dag_to_search->remove_last_gate();
-                  assert(ret);
-                  qubit_indices.pop_back();
-                }
-                qubit_indices.pop_back();
-              }
-            }
-          } else {
-            assert(false && "To be implemented...");
+            qubit_indices.pop_back();
           }
         } else {
-          // Current only support 1- and 2-qubit gates
-          assert(false && "Unsupported gate");
+          assert(false && "To be implemented...");
         }
+      } else {
+        // Current only support 1- and 2-qubit gates
+        assert(false && "Unsupported gate");
       }
     }
   }

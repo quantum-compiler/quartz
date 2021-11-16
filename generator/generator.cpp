@@ -442,6 +442,7 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
         assert(false && "Unsupported gate");
       }
     }
+    dag->hash(context);  // restore hash value
   }
 }
 

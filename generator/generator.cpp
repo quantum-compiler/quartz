@@ -5,15 +5,18 @@
 
 void Generator::generate_dfs(int num_qubits,
                              int max_num_input_parameters,
-                             int max_num_gates,
+                             int max_num_quantum_gates,
                              int max_num_param_gates,
                              Dataset &dataset,
                              bool restrict_search_space) {
   DAG *dag = new DAG(num_qubits, max_num_input_parameters);
+  // Generate all possible parameter gates at the beginning.
+  assert(max_num_param_gates == 1);
+  dag->generate_parameter_gates(context);
   // We need a large vector for both input and internal parameters.
-  std::vector<int> used_parameters(max_num_input_parameters + max_num_gates, 0);
+  std::vector<int> used_parameters(max_num_input_parameters + max_num_quantum_gates, 0);
   dfs(0,
-      max_num_gates,
+      max_num_quantum_gates,
       max_num_param_gates,
       dag,
       used_parameters,
@@ -24,7 +27,7 @@ void Generator::generate_dfs(int num_qubits,
 
 void Generator::generate(int num_qubits,
                          int num_input_parameters,
-                         int max_num_gates,
+                         int max_num_quantum_gates,
                          int max_num_param_gates,
                          Dataset *dataset,
                          bool verify_equivalences,
@@ -50,7 +53,7 @@ void Generator::generate(int num_qubits,
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling clear().
   std::vector<std::unique_ptr<DAG>> dag_holder;
 
-  for (int num_gates = 1; num_gates <= max_num_gates; num_gates++) {
+  for (int num_gates = 1; num_gates <= max_num_quantum_gates; num_gates++) {
     if (verbose) {
       std::cout << "BFS: " << dags_to_search.size()
                 << " representative DAGs to search with "
@@ -75,10 +78,10 @@ void Generator::generate(int num_qubits,
           nullptr,
           verify_equivalences,
           equiv_set);
-      // Do not verify when |num_gates == max_num_gates|.
+      // Do not verify when |num_gates == max_num_quantum_gates|.
       // This is to make the behavior the same when |verify_equivalences| is
       // true or false.
-      if (num_gates == max_num_gates) {
+      if (num_gates == max_num_quantum_gates) {
         break;
       }
       bool ret = dataset->save_json(context, "tmp_before_verify.json");
@@ -170,9 +173,10 @@ void Generator::dfs(int gate_idx,
     return;
   std::vector<int> qubit_indices;
   std::vector<int> parameter_indices;
-  for (const auto &idx : context->get_supported_gates()) {
+  for (const auto &idx : context->get_supported_quantum_gates()) {
     Gate *gate = context->get_gate(idx);
     if (gate->get_num_qubits() == 0) {
+      assert(false);  // We only search for quantum gates here.
       if (!max_remaining_param_gates) {
         // We can't add more parameter gates.
         continue;

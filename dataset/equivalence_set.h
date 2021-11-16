@@ -48,7 +48,7 @@ class EquivalenceClass {
                                         std::unordered_set<DAGHashType> &hash_values_to_remove);
 
   // Return the number of circuits modified.
-  int remove_unused_internal_parameters();
+  int remove_unused_internal_parameters(Context *ctx);
 
  private:
   std::vector<std::unique_ptr<DAG>> dags_;

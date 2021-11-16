@@ -146,11 +146,14 @@ int EquivalenceClass::remove_common_first_or_last_gates(Context *ctx,
   return (int) removing_ids.size();
 }
 
-int EquivalenceClass::remove_unused_internal_parameters() {
+int EquivalenceClass::remove_unused_internal_parameters(Context *ctx) {
   int num_dag_modified = 0;
   for (auto &dag : dags_) {
     if (dag->remove_unused_internal_parameters()) {
       num_dag_modified++;
+      // Restore the hash value.
+      // (probably |dag->hash_value_valid_ = true;| also works)
+      dag->hash(ctx);
     }
   }
   return num_dag_modified;
@@ -583,7 +586,7 @@ int EquivalenceSet::remove_singletons(Context *ctx) {
 int EquivalenceSet::remove_unused_internal_params(Context *ctx) {
   int num_class_modified = 0;
   for (auto &item : classes_) {
-    if (item->remove_unused_internal_parameters()) {
+    if (item->remove_unused_internal_parameters(ctx)) {
       num_class_modified++;
     }
   }

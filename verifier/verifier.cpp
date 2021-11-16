@@ -36,7 +36,10 @@ bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag) {
   // Check if any suffix already exists.
   auto subgraph = std::make_unique<DAG>(*dag);
   while (subgraph->get_num_gates() > 0) {
-    subgraph->remove_gate(subgraph->edges[0].get());
+    if (subgraph->remove_first_quantum_gate() == 0) {
+      // Already no quantum gates
+      break;
+    }
     if (subgraph->get_num_gates() == 0) {
       break;
     }

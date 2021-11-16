@@ -34,6 +34,7 @@ void Generator::generate(int num_qubits,
   // Generate all possible parameter gates at the beginning.
   assert(max_num_param_gates == 1);
   empty_dag->generate_parameter_gates(context);
+  empty_dag->hash(context);  // generate other hash values
   std::vector<DAG *> dags_to_search(1, empty_dag.get());
   if (verify_equivalences) {
     assert(equiv_set);

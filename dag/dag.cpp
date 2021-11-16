@@ -405,6 +405,15 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
   return ret;
 }
 
+int DAG::remove_first_quantum_gate() {
+  for (auto &edge : edges) {
+    if (edge->gate->is_quantum_gate()) {
+      return remove_gate(edge.get());
+    }
+  }
+  return 0;  // nothing removed
+}
+
 bool DAG::evaluate(const Vector &input_dis,
                    const std::vector<ParamType> &input_parameters,
                    Vector &output_dis,

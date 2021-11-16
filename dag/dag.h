@@ -35,6 +35,7 @@ class DAG {
   // The time complexity is O((number of gates removed) *
   // ((total number of nodes) + (total number of edges))).
   int remove_gate(DAGHyperEdge *edge);
+  int remove_first_quantum_gate();
   // Evaluate the output distribution given input distribution and
   // input parameters. Also output all parameter values (including input
   // and internal parameters) when |parameter_values| is not nullptr.

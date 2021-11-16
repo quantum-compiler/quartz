@@ -764,6 +764,22 @@ bool DAG::has_unused_parameter() const {
   return false;
 }
 
+int DAG::remove_unused_internal_parameters() {
+  int num_removed = 0;
+  int edge_id = 0;
+  while (edge_id < (int) edges.size()) {
+    if (edges[edge_id]->gate->is_parameter_gate()) {
+      assert(edges[edge_id]->output_nodes.size() == 1);
+      if (edges[edge_id]->output_nodes[0]->output_edges.empty()) {
+        num_removed += remove_gate(edges[edge_id].get());
+        continue;
+      }
+    }
+    edge_id++;
+  }
+  return num_removed;
+}
+
 void DAG::print(Context *ctx) const {
   for (size_t i = 0; i < edges.size(); i++) {
     DAGHyperEdge *edge = edges[i].get();

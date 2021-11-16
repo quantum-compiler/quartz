@@ -70,6 +70,8 @@ class DAG {
   DAG &shrink_unused_input_parameters();
   [[nodiscard]] std::unique_ptr<DAG> clone_and_shrink_unused_input_parameters() const;
   [[nodiscard]] bool has_unused_parameter() const;
+  // Returns the number of internal parameters removed.
+  int remove_unused_internal_parameters();
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;

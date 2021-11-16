@@ -47,6 +47,9 @@ class EquivalenceClass {
   int remove_common_first_or_last_gates(Context *ctx,
                                         std::unordered_set<DAGHashType> &hash_values_to_remove);
 
+  // Return the number of circuits modified.
+  int remove_unused_internal_parameters();
+
  private:
   std::vector<std::unique_ptr<DAG>> dags_;
 };
@@ -79,6 +82,10 @@ class EquivalenceSet {
   // Remove equivalence classes with only one DAG.
   // Return the number of equivalent classes removed.
   int remove_singletons(Context *ctx);
+
+  // Remove unused internal parameters.
+  // Return the number of equivalent classes modified.
+  int remove_unused_internal_params(Context *ctx);
 
   // Remove unused qubits and input parameters if they are unused in
   // each DAG of an equivalent class.

@@ -505,38 +505,40 @@ void EquivalenceSet::clear() {
   classes_.clear();
 }
 
-bool EquivalenceSet::simplify(Context *ctx) {
+bool EquivalenceSet::simplify(Context *ctx,
+                              bool common_subcircuit_pruning,
+                              bool other_simplification) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
   constexpr int kNumOptimizationsToPerform = 4;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
-    if (remove_singletons(ctx)) {
+    if (other_simplification && remove_singletons(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (remove_unused_internal_params(ctx)) {
+    if (other_simplification && remove_unused_internal_params(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (remove_unused_qubits_and_input_params(ctx)) {
+    if (other_simplification && remove_unused_qubits_and_input_params(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (remove_parameter_permutations(ctx)) {
+    if (other_simplification && remove_parameter_permutations(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (remove_common_first_or_last_gates(ctx)) {
+    if (common_subcircuit_pruning && remove_common_first_or_last_gates(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {

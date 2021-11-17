@@ -77,7 +77,9 @@ class EquivalenceSet {
   // A final pass of simplification before feeding the equivalences
   // to the optimizer.
   // Returns if the pass does some simplification or not.
-  bool simplify(Context *ctx);
+  bool simplify(Context *ctx,
+                bool common_subcircuit_pruning = true,
+                bool other_simplification = true);
 
   // Remove equivalence classes with only one DAG.
   // Return the number of equivalent classes removed.

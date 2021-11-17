@@ -14,7 +14,8 @@ void Generator::generate_dfs(int num_qubits,
   assert(max_num_param_gates == 1);
   dag->generate_parameter_gates(context);
   // We need a large vector for both input and internal parameters.
-  std::vector<int> used_parameters(max_num_input_parameters + max_num_quantum_gates, 0);
+  // std::vector<int> used_parameters(max_num_input_parameters + max_num_param_gates, 0);
+  std::vector<int> used_parameters(dag->get_num_total_parameters(), 0);
   dfs(0,
       max_num_quantum_gates,
       max_num_param_gates,
@@ -145,7 +146,7 @@ void Generator::dfs(int gate_idx,
       return;
   }
 
-  int num_unused_internal_parameter = 0;
+  /*int num_unused_internal_parameter = 0;
   for (int i = dag->get_num_input_parameters();
        i < dag->get_num_total_parameters(); i++) {
     if (used_parameters[i] == 0)
@@ -156,7 +157,8 @@ void Generator::dfs(int gate_idx,
   if (save_into_dataset) {
     // save a clone of dag to |dataset|
     dataset.insert(context, dag->clone_and_shrink_unused_input_parameters());
-  }
+  }*/
+  dataset.insert(context, dag->clone());
 
   // Check that this circuit is different with any other circuits in the
   // |dataset|.

@@ -43,7 +43,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     start = std::chrono::steady_clock::now();
     dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
     end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "Original: json saved in "
+    std::cout << std::dec << "Representative pruning: json saved in "
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;

@@ -27,10 +27,15 @@ class DAG {
   void add_input_parameter();
   bool remove_last_gate();
 
+  // Generate all possible parameter gates at the beginning.
+  // TODO: Currently we only support |max_recursion_depth == 1|.
+  void generate_parameter_gates(Context *ctx, int max_recursion_depth = 1);
+
   // Return the total number of gates removed.
   // The time complexity is O((number of gates removed) *
   // ((total number of nodes) + (total number of edges))).
   int remove_gate(DAGHyperEdge *edge);
+  int remove_first_quantum_gate();
   // Evaluate the output distribution given input distribution and
   // input parameters. Also output all parameter values (including input
   // and internal parameters) when |parameter_values| is not nullptr.
@@ -65,6 +70,8 @@ class DAG {
   DAG &shrink_unused_input_parameters();
   [[nodiscard]] std::unique_ptr<DAG> clone_and_shrink_unused_input_parameters() const;
   [[nodiscard]] bool has_unused_parameter() const;
+  // Returns the number of internal parameters removed.
+  int remove_unused_internal_parameters();
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;

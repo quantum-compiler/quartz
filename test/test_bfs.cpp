@@ -7,7 +7,7 @@ int main() {
 
   const int num_qubits = 3;
   const int num_input_parameters = 2;
-  const int max_num_gates = 5;
+  const int max_num_quantum_gates = 4;
   const int max_num_param_gates = 1;
   const bool run_dfs = false;
   const bool run_bfs_unverified = false;
@@ -23,7 +23,7 @@ int main() {
     start = std::chrono::steady_clock::now();
     gen.generate_dfs(num_qubits,
                      num_input_parameters,
-                     max_num_gates, max_num_param_gates,
+                     max_num_quantum_gates, max_num_param_gates,
                      dataset1, /*restrict_search_space=*/
                      true);
     end = std::chrono::steady_clock::now();
@@ -58,7 +58,7 @@ int main() {
     start = std::chrono::steady_clock::now();
     gen.generate_dfs(num_qubits,
                      num_input_parameters,
-                     max_num_gates, max_num_param_gates,
+                     max_num_quantum_gates, max_num_param_gates,
                      dataset1, /*restrict_search_space=*/
                      false);
     end = std::chrono::steady_clock::now();
@@ -95,7 +95,7 @@ int main() {
     start = std::chrono::steady_clock::now();
     gen.generate(num_qubits,
                  num_input_parameters,
-                 max_num_gates, max_num_param_gates,
+                 max_num_quantum_gates, max_num_param_gates,
                  &dataset2, /*verify_equivalences=*/
                  false,
                  nullptr, /*verbose=*/
@@ -133,7 +133,7 @@ int main() {
     start = std::chrono::steady_clock::now();
     gen.generate(num_qubits,
                  num_input_parameters,
-                 max_num_gates, max_num_param_gates,
+                 max_num_quantum_gates, max_num_param_gates,
                  &dataset3, /*verify_equivalences=*/
                  true,
                  &equiv_set, /*verbose=*/

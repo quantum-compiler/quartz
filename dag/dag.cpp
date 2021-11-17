@@ -252,6 +252,49 @@ bool DAG::remove_last_gate() {
   return true;
 }
 
+void DAG::generate_parameter_gates(Context *ctx, int max_recursion_depth) {
+  assert(max_recursion_depth == 1);
+  for (const auto &idx : ctx->get_supported_parameter_gates()) {
+    Gate *gate = ctx->get_gate(idx);
+    if (gate->get_num_parameters() == 1) {
+      std::vector<int> param_indices(1);
+      for (param_indices[0] = 0;
+           param_indices[0] < get_num_input_parameters();
+           param_indices[0]++) {
+        int output_param_index;
+        bool ret = add_gate({},
+                            param_indices,
+                            gate,
+                            &output_param_index);
+        assert(ret);
+      }
+    } else if (gate->get_num_parameters() == 2) {
+      // Case: 0-qubit operators with 2 parameters
+      std::vector<int> param_indices(2);
+      for (param_indices[0] = 0;
+           param_indices[0] < get_num_input_parameters();
+           param_indices[0]++) {
+        for (param_indices[1] = 0;
+             param_indices[1] < get_num_input_parameters();
+             param_indices[1]++) {
+          if (gate->is_commutative() && param_indices[0] > param_indices[1]) {
+            // For commutative gates, enforce param_indices[0] <= param_indices[1]
+            continue;
+          }
+          int output_param_index;
+          bool ret = add_gate({},
+                              param_indices,
+                              gate,
+                              &output_param_index);
+          assert(ret);
+        }
+      }
+    } else {
+      assert(false && "Unsupported gate type");
+    }
+  }
+}
+
 int DAG::remove_gate(DAGHyperEdge *edge) {
   auto edge_pos = std::find_if(edges.begin(),
                                edges.end(),
@@ -360,6 +403,15 @@ int DAG::remove_gate(DAGHyperEdge *edge) {
 
   hash_value_valid_ = false;
   return ret;
+}
+
+int DAG::remove_first_quantum_gate() {
+  for (auto &edge : edges) {
+    if (edge->gate->is_quantum_gate()) {
+      return remove_gate(edge.get());
+    }
+  }
+  return 0;  // nothing removed
 }
 
 bool DAG::evaluate(const Vector &input_dis,
@@ -710,6 +762,21 @@ bool DAG::has_unused_parameter() const {
     }
   }
   return false;
+}
+
+int DAG::remove_unused_internal_parameters() {
+  int num_removed = 0;
+  int edge_id = (int) edges.size() - 1;
+  while (edge_id >= 0) {
+    if (edges[edge_id]->gate->is_parameter_gate()) {
+      assert(edges[edge_id]->output_nodes.size() == 1);
+      if (edges[edge_id]->output_nodes[0]->output_edges.empty()) {
+        num_removed += remove_gate(edges[edge_id].get());
+      }
+    }
+    edge_id--;
+  }
+  return num_removed;
 }
 
 void DAG::print(Context *ctx) const {

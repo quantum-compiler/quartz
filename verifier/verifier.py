@@ -168,7 +168,7 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     num_total_params = dag_meta[meta_index_num_total_parameters]
     if kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8:
         k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index
-        cosk_table = [1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2)]
+        cosk_table = [1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2), 0, 1.0 / z3.Sqrt(2)]
         sink_table = [0, 1.0 / z3.Sqrt(2), 1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2)]
         phase_shift_lambda = (cosk_table[k], sink_table[k])
     elif phase_shift_id < num_total_params:

@@ -9,7 +9,8 @@
 
 int main() {
   std::cout << "Hello, World!" << std::endl;
-  Context ctx({GateType::x, GateType::y});
+  Context ctx
+      ({GateType::x, GateType::y, GateType::add, GateType::u2, GateType::cx});
 
   auto y = ctx.get_gate(GateType::y);
   y->get_matrix()->print();
@@ -23,6 +24,30 @@ int main() {
   input_dis.print();
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
+
+  DAG dag1(2, 2);
+  DAG dag2(2, 2);
+  int tmp;
+  dag1.add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
+  dag1.add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
+  dag1.add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
+  dag1.add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
+  dag1.add_gate({1}, {3, 4}, ctx.get_gate(GateType::u2), &tmp);
+  dag1.add_gate({0, 1}, {}, ctx.get_gate(GateType::cx), &tmp);
+  dag1.add_gate({1}, {2, 4}, ctx.get_gate(GateType::u2), &tmp);
+
+  dag2.add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
+  dag2.add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
+  dag2.add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
+  dag2.add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
+  dag2.add_gate({1}, {0, 4}, ctx.get_gate(GateType::u2), &tmp);
+  dag2.add_gate({1, 0}, {}, ctx.get_gate(GateType::cx), &tmp);
+  dag2.add_gate({0}, {0, 3}, ctx.get_gate(GateType::u2), &tmp);
+
+  std::cout << std::hex << "dag1.hash() = " << dag1.hash(&ctx) << std::endl;
+  std::cout << std::hex << "dag2.hash() = " << dag2.hash(&ctx) << std::endl;
+  std::cout << dag1.to_json() << std::endl;
+  std::cout << dag2.to_json() << std::endl;
 
   test_generator(/*support_gates=*/{GateType::x, GateType::rx,
                                     GateType::cx, GateType::add},

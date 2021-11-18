@@ -6,6 +6,11 @@ sys.path.append("..")
 from verifier.verifier import *
 
 if __name__ == '__main__':
+    # Usage example: python verify_equivalences.py input.json output.json -n
+    # Do not invoke verify solver and assume we can verify it
+    if len(sys.argv) == 4 and str(sys.argv[3]) == '-n':
+        find_equivalences(sys.argv[1], sys.argv[2], keep_classes_with_1_dag=True, do_not_invoke_smt_solver=True)
+        exit(0)
     # Usage example: python verify_equivalences.py input.json output.json True True True True
     # The third parameter is printing basic information or not
     # The fourth parameter is verbose or not

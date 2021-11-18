@@ -160,10 +160,18 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     dataset1.clear();
 
     start = std::chrono::steady_clock::now();
-    system(
-        ("python ../python/verify_equivalences.py " + file_prefix
-            + "original_unverified.json " + file_prefix
-            + "original.json").c_str());
+    if (num_qubits == 5) {
+      // Do not invoke SMT solver to save time
+      system(
+          ("python ../python/verify_equivalences.py " + file_prefix
+              + "original_unverified.json " + file_prefix
+              + "original.json -n").c_str());
+    } else {
+      system(
+          ("python ../python/verify_equivalences.py " + file_prefix
+              + "original_unverified.json " + file_prefix
+              + "original.json").c_str());
+    }
     equiv_set.clear();
     equiv_set.load_json(&ctx, file_prefix + "original.json");
     end = std::chrono::steady_clock::now();

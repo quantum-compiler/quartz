@@ -7,6 +7,7 @@ Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
 import multiprocessing as mp
+import math
 import z3
 from .gates import get_matrix, compute
 from .gates import add, neg  # for searching phase factors
@@ -93,6 +94,7 @@ def apply_matrix(vec, mat, qubit_indices):
                 val_real += mat[r][k][0] * vec[current_indices[k]][0] - mat[r][k][1] * vec[current_indices[k]][1]
                 val_imag += mat[r][k][0] * vec[current_indices[k]][1] + mat[r][k][1] * vec[current_indices[k]][0]
             result_vec[current_indices[r]] = (val_real, val_imag)
+    assert len(result_vec[0]) == 2
     return result_vec
 
 
@@ -103,6 +105,18 @@ def input_distribution(num_qubits, equation_list):
     # A quantum state requires the sum of modulus of all numbers to be 1.
     sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
     equation_list.append(sum_modulus == 1)
+    return list(zip(real_part, imag_part))
+
+
+def random_input_distribution(num_qubits):
+    vec_size = 1 << num_qubits
+    import random
+    real_part = [random.random() * 2 - 1 for _ in range(vec_size)]
+    imag_part = [random.random() * 2 - 1 for _ in range(vec_size)]
+    # A quantum state requires the sum of modulus of all numbers to be 1.
+    sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
+    real_part = [x / math.sqrt(sum_modulus) for x in real_part]
+    imag_part = [x / math.sqrt(sum_modulus) for x in imag_part]
     return list(zip(real_part, imag_part))
 
 
@@ -118,7 +132,18 @@ def create_parameters(num_parameters, equation_list):
     return list(zip(param_cos, param_sin))
 
 
-def evaluate(dag, input_dis, input_parameters):
+def random_parameters(num_parameters):
+    import random
+    param_cos = [random.random() * 2 - 1 for _ in range(num_parameters)]
+    param_sin = [0 for _ in range(num_parameters)]
+    for i in range(num_parameters):
+        param_sin[i] = math.sqrt(1 - param_cos[i] * param_cos[i])
+        if random.random() > 0.5:
+            param_sin[i] = -param_sin[i]
+    return list(zip(param_cos, param_sin))
+
+
+def evaluate(dag, input_dis, input_parameters, use_z3=True):
     dag_meta = dag[0]
     num_input_parameters = dag_meta[meta_index_num_input_parameters]
     num_total_parameters = dag_meta[meta_index_num_total_parameters]
@@ -146,7 +171,10 @@ def evaluate(dag, input_dis, input_parameters):
         else:
             assert (gate[1][0].startswith('Q'))
             # quantum gate
-            output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
+            if use_z3:
+                output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
+            else:
+                output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values, False), qubit_indices)
     return output_dis, parameters
 
 
@@ -179,7 +207,7 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     return phase_shift(vec, phase_shift_lambda)
 
 
-def search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2, parameters_symbolic,
+def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, parameters_symbolic,
                                              parameters_for_fingerprint, num_parameters, goal_phase_factor,
                                              current_param_id, current_phase_factor_symbolic,
                                              current_phase_factor_for_fingerprint):
@@ -190,7 +218,7 @@ def search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2
             new_phase_factor_for_fingerprint = current_phase_factor_for_fingerprint + const_val
             new_phase_factor_symbolic = add(current_phase_factor_symbolic, (
                 kPhaseFactorConstantCosTable[const_coeff], kPhaseFactorConstantSinTable[const_coeff]))
-            if search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2, parameters_symbolic,
+            if search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, parameters_symbolic,
                                                         parameters_for_fingerprint, num_parameters, goal_phase_factor,
                                                         current_param_id + 1, new_phase_factor_symbolic,
                                                         new_phase_factor_for_fingerprint):
@@ -203,6 +231,22 @@ def search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2
         difference = complex(*phase_factor_for_fingerprint) - goal_phase_factor
         if abs(difference) > kPhaseFactorEpsilon:
             return False
+        if do_not_invoke_smt_solver:
+            # Generate a random test to verify it.
+            dag1_meta = dag1[0]
+            dag2_meta = dag2[0]
+            num_qubits = dag1_meta[meta_index_num_qubits]
+            vec = random_input_distribution(num_qubits)
+            num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+            params = random_parameters(num_parameters)
+            output_vec1 = evaluate(dag1, vec, params, use_z3=False)[0]
+            output_vec2 = evaluate(dag2, vec, params, use_z3=False)[0]
+            for i in range(1 << num_qubits):
+                a = output_vec1[i]
+                b = output_vec2[i]
+                if abs(complex(*a) - complex(*b)) > kPhaseFactorEpsilon:
+                    return False
+            return True
         # Found a possible phase factor
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         solver = z3.Solver()
@@ -242,7 +286,7 @@ def search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2
                                                         parameters_symbolic[current_param_id])))
             else:
                 raise Exception(f'Unsupported phase factor coefficient {coeff}')
-        if search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2, parameters_symbolic,
+        if search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, parameters_symbolic,
                                                     parameters_for_fingerprint, num_parameters, goal_phase_factor,
                                                     current_param_id + 1, new_phase_factor_symbolic,
                                                     new_phase_factor_for_fingerprint):
@@ -250,7 +294,7 @@ def search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2
     return False
 
 
-def equivalent(dag1, dag2, parameters_for_fingerprint, check_phase_shift_in_smt_solver=False, phase_shift_id=None):
+def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=False, check_phase_shift_in_smt_solver=False, phase_shift_id=None):
     dag1_meta = dag1[0]
     dag2_meta = dag2[0]
     for index in [meta_index_num_qubits]:
@@ -293,7 +337,7 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, check_phase_shift_in_smt_
             goal_phase_factor = complex(*dag1_meta[meta_index_original_fingerprint]) / complex(
                 *dag2_meta[meta_index_original_fingerprint])
             equations = z3.And(equation_list)
-            result = search_phase_factor_to_check_equivalence(equations, output_vec1, output_vec2, params,
+            result = search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, params,
                                                               parameters_for_fingerprint, num_parameters,
                                                               goal_phase_factor,
                                                               current_param_id=0, current_phase_factor_symbolic=(1, 0),
@@ -326,7 +370,7 @@ def dump_json(data, file_name):
 # total_circuits_verified = 0
 
 
-def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_phase_shift_in_smt_solver, verbose):
+def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_phase_shift_in_smt_solver, verbose, do_not_invoke_smt_solver):
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0
@@ -345,7 +389,7 @@ def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_ph
     for dag in dags:
         for i, other_dag in enumerate(different_dags_with_same_hash):
             equivalent_called += 1
-            if equivalent(dag, other_dag, parameters_for_fingerprint, check_phase_shift_in_smt_solver):
+            if equivalent(dag, other_dag, parameters_for_fingerprint, do_not_invoke_smt_solver, check_phase_shift_in_smt_solver):
                 current_tag = hashtag + '_' + str(i)
                 assert current_tag in output_dict.keys()
                 output_dict[current_tag].append(dag)
@@ -361,7 +405,8 @@ def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_ph
 
 
 def find_equivalences(input_file, output_file, print_basic_info=True, verbose=False, keep_classes_with_1_dag=False,
-                      check_equivalence_with_different_hash=True, check_phase_shift_in_smt_solver=False):
+                      check_equivalence_with_different_hash=True, check_phase_shift_in_smt_solver=False,
+                      do_not_invoke_smt_solver=False):
     input_file_data = load_json(input_file)
     data = input_file_data[1]
     parameters_for_fingerprint = input_file_data[0]  # parameters generated for random testing
@@ -376,7 +421,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     num_different_dags_with_same_hash = {}
     print(f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...')
 
-    if False:
+    if True:
         # sequential version
         for hashtag, dags in data.items():
             num_hashtags += 1
@@ -390,7 +435,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 for i in range(len(different_dags_with_same_hash)):
                     other_dag = different_dags_with_same_hash[i]
                     equivalent_called += 1
-                    if equivalent(dag, other_dag, parameters_for_fingerprint, check_phase_shift_in_smt_solver):
+                    if equivalent(dag, other_dag, parameters_for_fingerprint, do_not_invoke_smt_solver, check_phase_shift_in_smt_solver):
                         current_tag = hashtag + '_' + str(i)
                         assert current_tag in output_dict.keys()
                         output_dict[current_tag].append(dag)
@@ -420,7 +465,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         with mp.Pool() as pool:
             for hashtag, output_dict_, equivalent_called_, total_equivalence_found_ in pool.starmap(
                     find_equivalences_helper,
-                    ((hashtag, dags, parameters_for_fingerprint, check_phase_shift_in_smt_solver, verbose) for
+                    ((hashtag, dags, parameters_for_fingerprint, check_phase_shift_in_smt_solver, verbose, do_not_invoke_smt_solver) for
                      hashtag, dags in data.items() if len(dags) > 1)):
                 output_dict.update(output_dict_)
                 equivalent_called += equivalent_called_
@@ -433,6 +478,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         equivalent_called_2 = 0
         num_equivalences_under_phase_shift = 0
         possible_num_equivalences_under_phase_shift = 0
+        print('Start checking equivalence with different hash...')
         for hashtag, dags in output_dict.items():
             from collections import defaultdict
             other_hashtags = defaultdict(dict)  # A map from other hashtags to corresponding phase shifts.
@@ -480,7 +526,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 dag_when_equivalence_verified = dags[0]
                 if None in phase_shift_ids:
                     equivalent_called_2 += 1
-                    if equivalent(dags[0], other_dag, parameters_for_fingerprint, check_phase_shift_in_smt_solver,
+                    if equivalent(dags[0], other_dag, parameters_for_fingerprint, do_not_invoke_smt_solver, check_phase_shift_in_smt_solver,
                                   None):
                         equivalence_verified = True
                 if not equivalence_verified:
@@ -505,7 +551,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                             equivalent_called_2 += 1
                             possible_num_equivalences_under_phase_shift += 1
                             # |phase_shift_id[0]| is the DAG generating this phase shift id.
-                            if equivalent(dag, other_dag, parameters_for_fingerprint, check_phase_shift_in_smt_solver,
+                            if equivalent(dag, other_dag, parameters_for_fingerprint, do_not_invoke_smt_solver, check_phase_shift_in_smt_solver,
                                           phase_shift_id):
                                 equivalence_verified = True
                                 num_equivalences_under_phase_shift += 1

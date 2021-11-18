@@ -146,6 +146,12 @@ void Generator::dfs(int gate_idx,
       return;
   }
 
+  static int tmp = 0;
+  tmp++;
+  if (tmp == (tmp & (-tmp))) {
+    std::cout << "DFS " << tmp << " " << dataset.num_hash_values() << std::endl;
+  }
+
   /*int num_unused_internal_parameter = 0;
   for (int i = dag->get_num_input_parameters();
        i < dag->get_num_total_parameters(); i++) {

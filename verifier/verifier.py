@@ -321,9 +321,9 @@ def dump_json(data, file_name):
         json.dump(data, f)
 
 
-find_equivalence_helper_called_bar = 0
-find_equivalence_helper_called = 0
-total_circuits_verified = 0
+# find_equivalence_helper_called_bar = 0
+# find_equivalence_helper_called = 0
+# total_circuits_verified = 0
 
 
 def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_phase_shift_in_smt_solver, verbose):
@@ -331,17 +331,17 @@ def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_ph
     equivalent_called = 0
     total_equivalence_found = 0
     different_dags_with_same_hash = []
-    if verbose:
-        print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
-    global find_equivalence_helper_called
-    global find_equivalence_helper_called_bar
-    global total_circuits_verified
-    find_equivalence_helper_called += 1
-    total_circuits_verified += len(dags)
-    if find_equivalence_helper_called >= find_equivalence_helper_called_bar:
-        print(f'{find_equivalence_helper_called} find_equivalences_helper() called, '
-              f'{total_circuits_verified} circuits verified', flush=True)
-        find_equivalence_helper_called_bar += 100
+    # if verbose:
+    print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+    # global find_equivalence_helper_called
+    # global find_equivalence_helper_called_bar
+    # global total_circuits_verified
+    # find_equivalence_helper_called += 1
+    # total_circuits_verified += len(dags)
+    # if find_equivalence_helper_called >= find_equivalence_helper_called_bar:
+    #     print(f'{find_equivalence_helper_called} find_equivalences_helper() called, '
+    #           f'{total_circuits_verified} circuits verified', flush=True)
+    #     find_equivalence_helper_called_bar += 100
     for dag in dags:
         for i, other_dag in enumerate(different_dags_with_same_hash):
             equivalent_called += 1

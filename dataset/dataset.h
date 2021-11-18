@@ -9,6 +9,9 @@ class Dataset {
  public:
   bool save_json(Context *ctx, const std::string &file_name) const;
 
+  // Return the number of DAGs removed.
+  int remove_singletons(Context *ctx);
+
   // This function runs in O(1).
   [[nodiscard]] int num_hash_values() const;
 

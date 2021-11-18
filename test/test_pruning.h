@@ -40,6 +40,9 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
 
+    std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
+              << std::endl;
+
     start = std::chrono::steady_clock::now();
     dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
     end = std::chrono::steady_clock::now();
@@ -52,7 +55,9 @@ void test_pruning(const std::vector<GateType> &supported_gates,
 
     start = std::chrono::steady_clock::now();
     system(
-        ("python ../python/verify_equivalences.py " + file_prefix + "pruning_unverified.json " + file_prefix + "pruning.json").c_str());
+        ("python ../python/verify_equivalences.py " + file_prefix
+            + "pruning_unverified.json " + file_prefix
+            + "pruning.json").c_str());
     equiv_set.clear();
     equiv_set.load_json(&ctx, file_prefix + "pruning.json");
     end = std::chrono::steady_clock::now();
@@ -123,6 +128,9 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                   end - start).count() / 1000.0 << " seconds."
               << std::endl;
 
+    std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
+              << std::endl;
+
     start = std::chrono::steady_clock::now();
     dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
     end = std::chrono::steady_clock::now();
@@ -136,7 +144,9 @@ void test_pruning(const std::vector<GateType> &supported_gates,
 
     start = std::chrono::steady_clock::now();
     system(
-        ("python ../python/verify_equivalences.py " + file_prefix + "original_unverified.json " + file_prefix + "original.json").c_str());
+        ("python ../python/verify_equivalences.py " + file_prefix
+            + "original_unverified.json " + file_prefix
+            + "original.json").c_str());
     equiv_set.clear();
     equiv_set.load_json(&ctx, file_prefix + "original.json");
     end = std::chrono::steady_clock::now();

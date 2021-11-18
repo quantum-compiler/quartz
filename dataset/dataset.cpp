@@ -64,6 +64,35 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
   return true;
 }
 
+int Dataset::remove_singletons(Context *ctx) {
+  int num_removed = 0;
+  for (auto it = dataset.begin(); it != dataset.end(); ) {
+    if (it->second.size() != 1) {
+      it++;
+      continue;
+    }
+    auto &dag = it->second[0];
+    dag->hash(ctx);
+    bool found_possible_equivalence = false;
+    for (auto &hash_value : dag->other_hash_values()) {
+      if (dataset.count(hash_value) > 0) {
+        found_possible_equivalence = true;
+        break;
+      }
+    }
+    if (found_possible_equivalence) {
+      it++;
+      continue;
+    }
+    // Remove |it|.
+    auto remove_it = it;
+    it++;
+    dataset.erase(remove_it);
+    num_removed++;
+  }
+  return num_removed;
+}
+
 bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
   const auto hash_value = dag->hash(ctx);
   bool ret = dataset.count(hash_value) == 0;

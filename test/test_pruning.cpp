@@ -10,6 +10,12 @@ int main() {
 //  test_pruning({GateType::u1, GateType::u2, GateType::cx,
 //                GateType::add}, "ibmq_no_u3_223_", 2, 2, 3, 1, true, true);
   test_pruning({GateType::u1, GateType::u2, GateType::cx,
-                GateType::add}, "ibmq_no_u3_224_", 2, 2, 4, 1, true, true);
+                GateType::add}, "ibmq_no_u3_224_", 2, 2, 4, 1, false, true);
+  test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
+                GateType::add}, "rzhcxx_323", 3, 2, 3, 1, true, true);
+  test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
+                GateType::add}, "rzhcxx_324", 3, 2, 4, 1, true, true);
+  test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
+                GateType::add}, "rzhcxx_325", 3, 2, 5, 1, true, true);
   return 0;
 }

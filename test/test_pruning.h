@@ -4,6 +4,7 @@
 #include "../generator/generator.h"
 
 #include <chrono>
+#include <fstream>
 
 void test_pruning(const std::vector<GateType> &supported_gates,
                   const std::string &file_prefix,
@@ -23,35 +24,43 @@ void test_pruning(const std::vector<GateType> &supported_gates,
   auto end = std::chrono::steady_clock::now();
 
   if (run_representative_pruning) {
-    start = std::chrono::steady_clock::now();
-    gen.generate(num_qubits,
-                 num_input_parameters,
-                 max_num_quantum_gates, max_num_param_gates,
-                 &dataset1, /*verify_equivalences=*/
-                 true,
-                 &equiv_set, /*verbose=*/
-                 true);
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "Representative pruning: "
-              << dataset1.num_total_dags()
-              << " circuits with " << dataset1.num_hash_values()
-              << " different hash values are found in "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start).count() / 1000.0 << " seconds."
-              << std::endl;
+    std::ifstream fin(file_prefix + "pruning_unverified.json");
+    if (fin.is_open()) {
+      std::cout << "Representative pruning: use generated file." << std::endl;
+      fin.close();
+    } else {
+      start = std::chrono::steady_clock::now();
+      gen.generate(num_qubits,
+                   num_input_parameters,
+                   max_num_quantum_gates, max_num_param_gates,
+                   &dataset1, /*verify_equivalences=*/
+                   true,
+                   &equiv_set, /*verbose=*/
+                   true);
+      end = std::chrono::steady_clock::now();
+      std::cout << std::dec << "Representative pruning: "
+                << dataset1.num_total_dags()
+                << " circuits with " << dataset1.num_hash_values()
+                << " different hash values are found in "
+                <<
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start).count() / 1000.0 << " seconds."
+                << std::endl;
 
-    std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
-              << std::endl;
+      std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
+                << std::endl;
 
-    start = std::chrono::steady_clock::now();
-    dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "Representative pruning: json saved in "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start).count() / 1000.0 << " seconds."
-              << std::endl;
+      start = std::chrono::steady_clock::now();
+      dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
+      end = std::chrono::steady_clock::now();
+      std::cout << std::dec << "Representative pruning: json saved in "
+                <<
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start).count() / 1000.0 << " seconds."
+                << std::endl;
 
-    dataset1.clear();
+      dataset1.clear();
+    }
 
     start = std::chrono::steady_clock::now();
     system(
@@ -113,31 +122,39 @@ void test_pruning(const std::vector<GateType> &supported_gates,
   }
 
   if (run_original) {
-    start = std::chrono::steady_clock::now();
-    gen.generate_dfs(num_qubits,
-                     num_input_parameters,
-                     max_num_quantum_gates, max_num_param_gates,
-                     dataset1, /*restrict_search_space=*/
-                     false);
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "Original: "
-              << dataset1.num_total_dags()
-              << " circuits with " << dataset1.num_hash_values()
-              << " different hash values are found in "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start).count() / 1000.0 << " seconds."
-              << std::endl;
+    std::ifstream fin(file_prefix + "original_unverified.json");
+    if (fin.is_open()) {
+      std::cout << "Original: use generated file." << std::endl;
+      fin.close();
+    } else {
+      start = std::chrono::steady_clock::now();
+      gen.generate_dfs(num_qubits,
+                       num_input_parameters,
+                       max_num_quantum_gates, max_num_param_gates,
+                       dataset1, /*restrict_search_space=*/
+                       false);
+      end = std::chrono::steady_clock::now();
+      std::cout << std::dec << "Original: "
+                << dataset1.num_total_dags()
+                << " circuits with " << dataset1.num_hash_values()
+                << " different hash values are found in "
+                <<
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start).count() / 1000.0 << " seconds."
+                << std::endl;
 
-    std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
-              << std::endl;
+      std::cout << dataset1.remove_singletons(&ctx) << " singletons removed."
+                << std::endl;
 
-    start = std::chrono::steady_clock::now();
-    dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "Original: json saved in "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start).count() / 1000.0 << " seconds."
-              << std::endl;
+      start = std::chrono::steady_clock::now();
+      dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
+      end = std::chrono::steady_clock::now();
+      std::cout << std::dec << "Original: json saved in "
+                <<
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start).count() / 1000.0 << " seconds."
+                << std::endl;
+    }
 
     ctx.clear_representatives();
     dataset1.clear();

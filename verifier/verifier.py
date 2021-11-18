@@ -471,6 +471,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                         equivalence_verified = True
                 if not equivalence_verified:
                     for phase_shift_id, dag_list in phase_shift_ids.items():
+                        if phase_shift_id is None:
+                            continue
                         # Pruning: we only need to try each input parameter once.
                         input_param_tried = False
                         for dag in dag_list:

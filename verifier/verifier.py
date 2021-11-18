@@ -421,7 +421,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     num_different_dags_with_same_hash = {}
     print(f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...')
 
-    if True:
+    if False:
         # sequential version
         for hashtag, dags in data.items():
             num_hashtags += 1

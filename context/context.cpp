@@ -22,6 +22,11 @@ Context::Context(const std::vector<GateType> &supported_gates)
 
 size_t Context::next_global_unique_id(void) { return global_unique_id++; }
 
+void Context::set_generated_parameter(int id, ParamType param) {
+  get_generated_parameters(id);
+  random_parameters_[id] = param;
+}
+
 Gate *Context::get_gate(GateType tp) { return gates_[tp].get(); }
 
 bool Context::insert_gate(GateType tp) {

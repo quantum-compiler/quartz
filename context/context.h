@@ -28,6 +28,9 @@ public:
   std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 
+  // A hacky function: set a generated parameter.
+  void set_generated_parameter(int id, ParamType param);
+
   // This function assumes that two DAGs are equivalent iff they share the same
   // hash value.
   DAG *get_possible_representative(DAG *dag);

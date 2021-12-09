@@ -127,6 +127,8 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       std::cout << "Original: use generated file." << std::endl;
       fin.close();
     } else {
+      std::cout << (file_prefix + "original_unverified.json")
+                << " not found. Generating..." << std::endl;
       start = std::chrono::steady_clock::now();
       gen.generate_dfs(num_qubits,
                        num_input_parameters,
@@ -160,18 +162,18 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     dataset1.clear();
 
     start = std::chrono::steady_clock::now();
-    if (num_qubits == 5) {
-      // Do not invoke SMT solver to save time
-      system(
-          ("python ../python/verify_equivalences.py " + file_prefix
-              + "original_unverified.json " + file_prefix
-              + "original.json -n").c_str());
-    } else {
-      system(
-          ("python ../python/verify_equivalences.py " + file_prefix
-              + "original_unverified.json " + file_prefix
-              + "original.json").c_str());
-    }
+//    if (num_qubits == 5) {
+//      // Do not invoke SMT solver to save time
+    system(
+        ("python ../python/verify_equivalences.py " + file_prefix
+            + "original_unverified.json " + file_prefix
+            + "original.json -n").c_str());
+//    } else {
+//      system(
+//          ("python ../python/verify_equivalences.py " + file_prefix
+//              + "original_unverified.json " + file_prefix
+//              + "original.json").c_str());
+//    }
     equiv_set.clear();
     equiv_set.load_json(&ctx, file_prefix + "original.json");
     end = std::chrono::steady_clock::now();
@@ -218,6 +220,65 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     equiv_set.save_json(file_prefix + "original_only_common_subcircuit.json");
     end = std::chrono::steady_clock::now();
     std::cout << std::dec << "Original: there are "
+              << equiv_set.num_total_dags()
+              << " circuits in " << equiv_set.num_equivalence_classes()
+              << " equivalence classes after only common subcircuit pruning in "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start).count() / 1000.0 << " seconds."
+              << std::endl;
+
+    system(
+        ("python ../python/verify_equivalences.py " + file_prefix
+            + "original_unverified.json " + file_prefix
+            + "original_verified.json").c_str());
+    equiv_set.clear();
+    equiv_set.load_json(&ctx, file_prefix + "original_verified.json");
+    end = std::chrono::steady_clock::now();
+    std::cout << std::dec << "Original verified: there are "
+              << equiv_set.num_total_dags()
+              << " circuits in " << equiv_set.num_equivalence_classes()
+              << " equivalence classes after verification in "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start).count() / 1000.0 << " seconds."
+              << std::endl;
+
+    start = std::chrono::steady_clock::now();
+    equiv_set.simplify(&ctx, /*common_subcircuit_pruning=*/
+                       false, /*other_simplification=*/
+                       true);
+    equiv_set.save_json(
+        file_prefix + "original_verified_other_simplification.json");
+    end = std::chrono::steady_clock::now();
+    std::cout << std::dec << "Original verified: there are "
+              << equiv_set.num_total_dags()
+              << " circuits in " << equiv_set.num_equivalence_classes()
+              << " equivalence classes after other simplification in "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start).count() / 1000.0 << " seconds."
+              << std::endl;
+
+    start = std::chrono::steady_clock::now();
+    equiv_set.simplify(&ctx);
+    equiv_set.save_json(file_prefix + "original_verified_simplified.json");
+    end = std::chrono::steady_clock::now();
+    std::cout << std::dec << "Original verified: there are "
+              << equiv_set.num_total_dags()
+              << " circuits in " << equiv_set.num_equivalence_classes()
+              << " equivalence classes after all simplification in "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start).count() / 1000.0 << " seconds."
+              << std::endl;
+
+    start = std::chrono::steady_clock::now();
+    equiv_set.clear();
+    equiv_set.load_json(&ctx, file_prefix + "original.json");
+    equiv_set.simplify(&ctx, /*common_subcircuit_pruning=*/
+                       true, /*other_simplification=*/
+                       false);
+    equiv_set.save_json(
+        file_prefix + "original_verified_only_common_subcircuit.json");
+    end = std::chrono::steady_clock::now();
+    std::cout << std::dec << "Original verified: there are "
               << equiv_set.num_total_dags()
               << " circuits in " << equiv_set.num_equivalence_classes()
               << " equivalence classes after only common subcircuit pruning in "

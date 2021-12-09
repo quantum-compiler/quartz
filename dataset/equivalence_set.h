@@ -68,7 +68,7 @@ class EquivalenceSet {
 
   // Normalize each clause of equivalent DAGs to have the minimum
   // (according to DAG::less_than) minimal representation.
-  // Warning: see comments in DAG::minimal_representation().
+  // Warning: see comments in DAG::minimal_circuit_representation().
   // TODO: adapt to the new equivalence set format
   void normalize_to_minimal_representations(Context *ctx);
 

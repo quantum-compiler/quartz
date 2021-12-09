@@ -77,26 +77,27 @@ class DAG {
   [[nodiscard]] std::string to_json() const;
   static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
 
-  // Returns true iff the DAG is already under the minimal representation.
-  // If |output| is true, store the minimal representation into |output_dag|,
-  // and store the permutation of qubits and parameters into |qubit_permutation|
-  // and |param_permutation|.
+  // Returns true iff the DAG is already under the minimal circuit
+  // representation.
+  // Minimal circuit representation is a sequence representation of a circuit
+  // such that:
+  // 1. The gates are ordered column by column. If we see each circuit as
+  //    a grid of gates such that each row represents a qubit, and put each
+  //    gate at the leftmost possible position, gate A is placed before gate B
+  //    iff A is in a column before B or they are in the same column and
+  //    the smallest qubit index of A is smaller than the smallest qubit index
+  //    of B.
+  // 2. The parameter "gates" are placed at the beginning.
+  // If |output| is true, store the minimal circuit representation into
+  // |output_dag|.
   // The parameter |output_dag| should be a pointer containing nullptr
-  // (otherwise its content will be deleted),
-  // and the parameters |qubit_permutation| and |param_permutation| being
-  // nullptr means that the permutation is not required to store.
-  // |qubit_permutation[0] == 1| means that the qubit Q0 in this DAG maps to
-  // the qubit Q1 in the minimal representation.
-  // FIXME: The implementation is wrong: it can't decide which gate should be
-  //  ordered first when >= two gates' inputs are not mapped yet.
-  // Nevertheless, the current implementation guarantees that if two circuits
-  // share the same "minimal_representation", they can have their qubits and
-  // parameters permuted to be equivalent.
-  bool minimal_representation(std::unique_ptr<DAG> *output_dag,
-                              std::vector<int> *qubit_permutation = nullptr,
-                              std::vector<int> *param_permutation = nullptr,
-                              bool output = true) const;
-  [[nodiscard]] bool is_minimal_representation() const;
+  // (otherwise its content will be deleted).
+  // This functions guarantees that if two sequence representations
+  // share the same "minimal_circuit_representation", they have the same
+  // circuit representation.
+  bool minimal_circuit_representation(std::unique_ptr<DAG> *output_dag,
+                                      bool output = true) const;
+  [[nodiscard]] bool is_minimal_circuit_representation() const;
   [[nodiscard]] std::unique_ptr<DAG> get_permuted_dag(const std::vector<int> &qubit_permutation,
                                                       const std::vector<int> &param_permutation) const;
 

@@ -53,7 +53,7 @@ void test_generator(const std::vector<GateType> &support_gates,
     for (auto &it : dataset.dataset) {
       bool has_minimal_representation = false;
       for (auto &dag : it.second) {
-        bool result = dag->minimal_representation(&tmp_dag);
+        bool result = dag->minimal_circuit_representation(&tmp_dag);
         if (result) {
           has_minimal_representation = true;
         } else {
@@ -67,7 +67,7 @@ void test_generator(const std::vector<GateType> &support_gates,
       }
     }
     std::cout << "Found DAGs with " << num_different_minrep
-              << " minimal representations with different hash values, among which "
+              << " minimal circuit representations with different hash values, among which "
               << num_missing_minrep << " minimal DAGs are missing."
               << std::endl;
   }

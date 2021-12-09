@@ -488,7 +488,7 @@ void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
 //        // Optimization: if |dag|'s minimal-representation is already in the
 //        // set, erase |dag|.
 //        auto &dag = *it;
-//        bool is_minimal = dag->minimal_representation(&dag_minrep);
+//        bool is_minimal = dag->minimal_circuit_representation(&dag_minrep);
 //        if (!is_minimal && new_equiv_set.count(dag_minrep) > 0) {
 //          new_equiv_set.erase(it++);
 //        } else {

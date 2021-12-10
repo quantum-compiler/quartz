@@ -66,12 +66,6 @@ class EquivalenceSet {
 
   bool save_json(const std::string &file_name) const;
 
-  // Normalize each clause of equivalent DAGs to have the minimum
-  // (according to DAG::less_than) minimal representation.
-  // Warning: see comments in DAG::minimal_circuit_representation().
-  // TODO: adapt to the new equivalence set format
-  void normalize_to_minimal_representations(Context *ctx);
-
   void clear();
 
   // A final pass of simplification before feeding the equivalences
@@ -84,6 +78,10 @@ class EquivalenceSet {
   // Remove equivalence classes with only one DAG.
   // Return the number of equivalent classes removed.
   int remove_singletons(Context *ctx);
+
+  // Normalize each DAG to have the minimal circuit representation.
+  // Return the number of equivalent classes modified.
+  int normalize_to_minimal_circuit_representations(Context *ctx);
 
   // Remove unused internal parameters.
   // Return the number of equivalent classes modified.

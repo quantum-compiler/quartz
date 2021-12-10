@@ -394,112 +394,6 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
   return true;
 }
 
-void EquivalenceSet::normalize_to_minimal_representations(Context *ctx) {
-  assert(false);  // TODO
-  /*
-  // TODO: why is the result different for each run?
-  auto old_dataset = std::move(dataset_prev);
-  dataset_prev = std::unordered_map<DAGHashType,
-                                    std::list<std::set<std::unique_ptr<DAG>,
-                                                       UniquePtrDAGComparator>>>();
-  for (auto &item : old_dataset) {
-    const auto &hash_tag = item.first;
-    auto &equivalence_list = item.second;
-    for (auto &equiv_set : equivalence_list) {
-      // Compute the minimal minimal-representation in the set.
-      DAG *set_minrep_pos = nullptr;
-      std::unique_ptr<DAG> set_minrep = nullptr;
-      std::vector<int> set_qubit_perm, set_param_perm;
-      std::unique_ptr<DAG> dag_minrep = nullptr;  // temporary variables
-      std::vector<int> dag_qubit_perm, dag_param_perm;
-      bool trivial_equivalence = true;
-      for (auto &dag : equiv_set) {
-        dag->minimal_representation(&dag_minrep,
-                                    &dag_qubit_perm,
-                                    &dag_param_perm);
-        if (!set_minrep || dag_minrep->less_than(*set_minrep)) {
-          if (set_minrep) {
-            // We found two DAGs with different minimal-representations in the
-            // set.
-            trivial_equivalence = false;
-          }
-          // destroying the previous content of |set_minrep|
-          set_minrep = std::move(dag_minrep);
-          set_qubit_perm = std::move(dag_qubit_perm);
-          set_param_perm = std::move(dag_param_perm);
-          set_minrep_pos = dag.get();
-        } else if (!dag_minrep->fully_equivalent(*set_minrep)) {
-          // We found two DAGs with different minimal-representations in the
-          // set.
-          trivial_equivalence = false;
-        }
-      }
-      if (trivial_equivalence) {
-        continue;
-      }
-      assert (set_minrep);
-      const auto new_hash_tag = set_minrep->hash(ctx);
-
-      // Find this equivalence in the new equivalence set.
-      bool equiv_found = false;
-      std::set<std::unique_ptr<DAG>, UniquePtrDAGComparator>
-          *new_equiv_set_pos = nullptr;
-      for (auto &new_equiv_set : dataset_prev[new_hash_tag]) {
-        // Compare by the content of the DAG.
-        if (new_equiv_set.count(set_minrep) > 0) {
-          equiv_found = true;
-          new_equiv_set_pos = &new_equiv_set;
-          break;
-        }
-      }
-
-      if (!equiv_found) {
-        // If not found, insert a new equivalence set.
-        dataset_prev[new_hash_tag].emplace_back();
-        new_equiv_set_pos = &dataset_prev[new_hash_tag].back();
-      }
-
-      // Insert the permuted DAGs into the new equivalence set.
-      auto &new_equiv_set = *new_equiv_set_pos;
-      for (auto &dag : equiv_set) {
-        if (dag.get() == set_minrep_pos) {
-          // Optimization: if |dag| is the DAG with the minimal
-          // minimal-representation in the set, do not re-compute the
-          // permuted DAG.
-          if (equiv_found) {
-            // Already in |new_equiv_set|.
-            continue;
-          }
-          new_equiv_set.insert(std::move(set_minrep));
-          // Note that |set_minrep| is not usable anymore after std::move.
-        } else {
-          // Optimization: if |dag|'s minimal-representation is already in the
-          // set, do not insert it again.
-          dag->minimal_representation(&dag_minrep);
-          if (new_equiv_set.count(dag_minrep) > 0) {
-            continue;
-          }
-          new_equiv_set.insert(dag->get_permuted_dag(set_qubit_perm,
-                                                     set_param_perm));
-        }
-      }
-      // TODO: why does this increase the number of equivalence classes?
-//      for (auto it = new_equiv_set.begin(); it != new_equiv_set.end(); ) {
-//        // Optimization: if |dag|'s minimal-representation is already in the
-//        // set, erase |dag|.
-//        auto &dag = *it;
-//        bool is_minimal = dag->minimal_circuit_representation(&dag_minrep);
-//        if (!is_minimal && new_equiv_set.count(dag_minrep) > 0) {
-//          new_equiv_set.erase(it++);
-//        } else {
-//          it++;
-//        }
-//      }
-    }
-  }
-  */
-}
-
 void EquivalenceSet::clear() {
   possible_classes_.clear();
   classes_.clear();
@@ -510,11 +404,17 @@ bool EquivalenceSet::simplify(Context *ctx,
                               bool other_simplification) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 4;
+  constexpr int kNumOptimizationsToPerform = 5;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
     if (other_simplification && remove_singletons(ctx)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (other_simplification && normalize_to_minimal_circuit_representations(ctx)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -583,6 +483,42 @@ int EquivalenceSet::remove_singletons(Context *ctx) {
   }
   assert(num_removed > 0);
   return num_removed;
+}
+
+int EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx) {
+  int num_class_modified = 0;
+  for (auto &item : classes_) {
+    auto dags = item->extract();
+    std::vector<std::unique_ptr<DAG>> new_dags;
+    std::unique_ptr<DAG> new_dag;
+    bool class_modified = false;
+    for (auto &dag : dags) {
+      bool is_minimal = dag->minimal_circuit_representation(&new_dag);
+      if (!is_minimal) {
+        class_modified = true;
+        new_dags.push_back(std::move(new_dag));
+        dag = nullptr;  // delete the DAG
+      }
+    }
+    if (!class_modified) {
+      item->set_dags(std::move(dags));
+      continue;
+    }
+    num_class_modified++;
+    item->set_dags({});  // insert the DAGs one by one
+    for (auto &dag : dags) {
+      if (dag) {
+        item->insert(std::move(dag));
+      }
+    }
+    for (auto &dag : new_dags) {
+      // New DAGs can be identical to some DAGs in the ECC.
+      if (!item->contains(*dag)) {
+        item->insert(std::move(dag));
+      }
+    }
+  }
+  return num_class_modified;
 }
 
 int EquivalenceSet::remove_unused_internal_params(Context *ctx) {

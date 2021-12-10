@@ -491,12 +491,17 @@ int EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx) {
     auto dags = item->extract();
     std::vector<std::unique_ptr<DAG>> new_dags;
     std::unique_ptr<DAG> new_dag;
+    std::unordered_set<DAGHashType> hash_values_to_remove;
     bool class_modified = false;
     for (auto &dag : dags) {
       bool is_minimal = dag->minimal_circuit_representation(&new_dag);
       if (!is_minimal) {
         class_modified = true;
         new_dags.push_back(std::move(new_dag));
+        hash_values_to_remove.insert(dag->hash(ctx));
+        for (const auto &other_hash : dag->other_hash_values()) {
+          hash_values_to_remove.insert(other_hash);
+        }
         dag = nullptr;  // delete the DAG
       }
     }
@@ -504,12 +509,21 @@ int EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx) {
       item->set_dags(std::move(dags));
       continue;
     }
+    std::unordered_set<DAGHashType> existing_hash_values;
+    std::unordered_set<DAGHashType> hash_values_to_insert;
     num_class_modified++;
     item->set_dags({});  // insert the DAGs one by one
     for (auto &dag : dags) {
       if (dag) {
+        existing_hash_values.insert(dag->hash(ctx));
+        for (const auto &other_hash : dag->other_hash_values()) {
+          existing_hash_values.insert(other_hash);
+        }
         item->insert(std::move(dag));
       }
+    }
+    for (auto &hash_value : existing_hash_values) {
+      hash_values_to_remove.erase(hash_value);
     }
     for (auto &dag : new_dags) {
       // New DAGs can be identical to some DAGs in the ECC.

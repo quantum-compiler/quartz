@@ -528,7 +528,26 @@ int EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx) {
     for (auto &dag : new_dags) {
       // New DAGs can be identical to some DAGs in the ECC.
       if (!item->contains(*dag)) {
+        hash_values_to_insert.insert(dag->hash(ctx));
+        for (const auto &other_hash : dag->other_hash_values()) {
+          hash_values_to_insert.insert(other_hash);
+        }
         item->insert(std::move(dag));
+      }
+    }
+    // Update the hash values.
+    for (auto &hash_value : hash_values_to_remove) {
+      if (hash_values_to_insert.count(hash_value) > 0) {
+        hash_values_to_insert.erase(hash_value);
+      } else {
+        // Remove the hash value.
+        remove_possible_class(hash_value, item.get());
+      }
+    }
+    for (auto &hash_value : hash_values_to_insert) {
+      if (existing_hash_values.count(hash_value) == 0) {
+        // Add the hash value.
+        set_possible_class(hash_value, item.get());
       }
     }
   }

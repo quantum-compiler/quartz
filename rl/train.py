@@ -91,7 +91,7 @@ val_dataset = Dataset(X_val_tokenized, y_val)
 def PairwiseAccuracy(A,B):
     assert(len(A)==len(B))
     n = len(A)
-    c = 0.0
+    c = 0.01
     p = 0
     equal = 0
     for i in range(n):
@@ -107,7 +107,7 @@ def PairwiseAccuracy(A,B):
 def PairwiseAccuracyGroup(A,B):
     assert(len(A)==len(B))
     n = len(A)
-    c = 0.0
+    c = 0.01
     p = 0
     equal = 0
     for i in range(n):

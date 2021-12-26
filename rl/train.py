@@ -22,8 +22,29 @@ class RegressionTrainer(Trainer):
         loss = loss_f(logits.view(-1, self.model.config.num_labels),
                         labels.float().view(-1, self.model.config.num_labels))
         if DEBUG: print(f"loss: {loss}")
+        label_diff = pairwise_matrix(labels)
+        logits = torch.squeeze(logits)
+        logits_diff = pairwise_matrix(logits)
+        loss_pw = pairwise_loss(label_diff, logits_diff)
+        if DEBUG: print(f"loss_pw: {loss_pw}")
+        pairwise_weight = 0.3
+        loss += loss_pw * pairwise_weight
         return (loss, outputs) if return_outputs else loss
 
+
+def pairwise_matrix(a):
+    n = len(a)
+    A = a.repeat(n, 1)
+    B = a.reshape([n, 1]).repeat(1, n)
+    C = A - B
+    return C
+
+def pairwise_loss(A, B):
+    relu = nn.ReLU()
+    diff = -(A * B)
+    r = relu(diff)
+    loss = torch.mean(torch.mean(r))
+    return loss 
 
 ### Data
 df = pd.read_csv('searched_graphs.tsv', sep = '\t',error_bad_lines=False, names=['text','label'],encoding='utf-8')

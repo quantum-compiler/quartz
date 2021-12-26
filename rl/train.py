@@ -88,6 +88,21 @@ class Dataset(torch.utils.data.Dataset):
 train_dataset = Dataset(X_train_tokenized, y_train)
 val_dataset = Dataset(X_val_tokenized, y_val)
 
+def PairwiseAccuracy(A,B):
+    assert(len(A)==len(B))
+    n = len(A)
+    c = 0.0
+    p = 0
+    equal = 0
+    for i in range(n):
+        for j in range(i):
+            if (abs(A[i]-A[j]) < 0.0005) and (abs(B[i]-B[j])<0.0005):
+                equal += 1
+                continue
+            c += 1
+            if (A[i] > A[j])^(B[i] <= B[j]):
+                p += 1
+    return   p/c, equal/c
 
 def compute_metrics(p):
     pred, labels = p

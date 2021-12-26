@@ -104,13 +104,31 @@ def PairwiseAccuracy(A,B):
                 p += 1
     return   p/c, equal/c
 
+def PairwiseAccuracyGroup(A,B):
+    assert(len(A)==len(B))
+    n = len(A)
+    c = 0.0
+    p = 0
+    equal = 0
+    for i in range(n):
+        for j in range(i):
+            if (abs(A[i]-A[j]) < 0.01):
+                
+                if (abs(A[i]-A[j])<0.0005):
+                    equal += 1
+                    continue
+                c += 1
+                if (A[i] > A[j])^(B[i] <= B[j]):
+                    p += 1
+    return   p/c, equal/c
+
 def compute_metrics(p):
     pred, labels = p
     pred = np.squeeze(pred)
     #pred = np.argmax(pred, axis=1)
     print(f"labls:{labels}")
     print(f"pred:{pred}")
-    a, e = PairwiseAccuracy(labels,pred) #metrics.mean_squared_error(y_true=labels, y_pred=pred)
+    a, e = PairwiseAccuracyGroup(labels,pred) #metrics.mean_squared_error(y_true=labels, y_pred=pred)
     return {'accuracy': a, 'equal': e}
 
     

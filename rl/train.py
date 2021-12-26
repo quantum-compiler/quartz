@@ -51,9 +51,9 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1)
 #y_train = y
 #X_train = X
 
-word_dict = {'[PAD]': 0, 'x': 1, 't': 2, 'tdg': 3, 'h':4, ';':5, 'cx':6}
-for i in range(10):
-    word_dict[str(i)] = i + 7
+word_dict = {'[CLS]':0, '[PAD]':1, 't':2, 'tdg':3, 'h':4, ';':5, 'x': 6, 'cx':7}
+for i in range(20):
+    word_dict[str(i)] = i + 8
 def QToken(data, padding=True, truncation=True, max_length=512 ):    
     input_ids = []
     for line in data:

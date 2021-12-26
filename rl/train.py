@@ -58,9 +58,14 @@ def QToken(data, padding=True, truncation=True, max_length=512 ):
     input_ids = []
     for line in data:
         words = line.split()
-        cur = [word_dict[x] for x in words]   
-        pad_n = max_length - len(cur)
-        cur.extend([0] * pad_n) 
+        cur = [word_dict[x] for x in words] 
+        if max_length > len(cur):
+            if padding:
+                pad_n = max_length - len(cur)
+                cur.extend([0] * pad_n) 
+        else:
+            if truncation:
+                cur = cur[:max_length]
         input_ids.append(cur)
     #number_dict = {i: w for i, w in enumerate(word_dict)}
     print(len(input_ids[0]))

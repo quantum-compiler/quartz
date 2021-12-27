@@ -62,7 +62,7 @@ print(data[:10])
 
 ### pretrained model
 model_name = "google/bert_uncased_L-2_H-128_A-2"#"bert-base-uncased"
-model = BertForSequenceClassification.from_pretrained(model_name, num_labels=1)
+model = QBertForSequenceClassification.from_pretrained(model_name, num_labels=1)
 
 
 # Preprocess data
@@ -92,8 +92,47 @@ def QToken(data, padding=True, truncation=True, max_length=512 ):
     print(len(input_ids[0]))
     return {'input_ids':input_ids}
 
-X_train_tokenized = QToken(X_train, padding=True, truncation=True, max_length=512)
-X_val_tokenized = QToken(X_val, padding=True, truncation=True, max_length=512)
+def QTokenCat(data, padding=True, truncation=True, max_length=512 ):    
+    input_ids,qubit_ids,qubit2_ids = [],[],[]
+    for line in data:
+        nodes = line.split(';')[:-1]
+        
+        gates = [x.strip().split() for x in nodes] 
+        #print([len(x) for x in gates])
+        gate_tuple = [(x[0],x[1],x[2] if len(x)>2 else -2) for x in gates]
+        gate, qubit, qubit2 = list(zip(*gate_tuple))
+        #print(gate)
+        #print(qubit2)
+        gate_id = [1] + [word_dict[x] for x in list(gate)]
+        qubit_id = [1] + [int(x) + 2 for x in list(qubit)]
+        qubit2_id = [1] + [int(x) + 2 for x in list(qubit2)]
+        
+        if max_length > len(gate_id):
+            if padding:
+                pad_n = max_length - len(gate_id)
+                gate_id.extend([0] * pad_n) 
+                qubit_id.extend([0] * pad_n) 
+                qubit2_id.extend([0] * pad_n) 
+        else:
+            if truncation:
+                gate_id = gate_id[:max_length]
+                qubit_id = qubit_id[:max_length]
+                qubit2_id = qubit2_id[:max_length]
+                
+        input_ids.append(gate_id)
+        qubit_ids.append(qubit_id)
+        qubit2_ids.append(qubit2_id)
+        
+    #number_dict = {i: w for i, w in enumerate(word_dict)}
+    print(len(input_ids[0]))
+    return {'input_ids':input_ids, 'token_type_ids': qubit_ids, 'position_ids': qubit2_ids}
+
+
+X_train_tokenized = QTokenCat(X_train, padding=True, truncation=True, max_length=512)
+X_val_tokenized = QTokenCat(X_val, padding=True, truncation=True, max_length=512)
+
+#X_train_tokenized = QToken(X_train, padding=True, truncation=True, max_length=512)
+#X_val_tokenized = QToken(X_val, padding=True, truncation=True, max_length=512)
 #print(X_train_tokenized)
 
 class Dataset(torch.utils.data.Dataset):

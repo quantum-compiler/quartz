@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score
+from sklearn.metrics import mean_absolute_error, accuracy_score, recall_score, precision_score, f1_score
 import torch
 import torch.nn as nn
 from transformers import TrainingArguments, Trainer
@@ -155,7 +155,8 @@ def compute_metrics(p):
     print(f"labls:{labels}")
     print(f"pred:{pred}")
     a, e = PairwiseAccuracyGroup(labels,pred) #metrics.mean_squared_error(y_true=labels, y_pred=pred)
-    return {'accuracy': a, 'equal': e}
+    l1 = mean_absolute_error(labels,pred)
+    return {'accuracy': a, 'equal': e, 'l1': l1}
 
     
 ### Trainer

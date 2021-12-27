@@ -4,14 +4,15 @@ import torch.nn as nn
 from torch import Tensor
 from transformers import TrainingArguments, Trainer
 from transformers import BertTokenizer, BertForSequenceClassification, BertModel
+from transformers.models.bert.modeling_bert import BertEncoder, BertPooler
 
 
 class QBertEmbeddings(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.gate_embeddings = nn.Embedding(config.gate_size, config.hidden_size/2, padding_idx=config.pad_token_id)
-        self.qubit_embeddings = nn.Embedding(config.max_qubit_embeddings, config.hidden_size/4)
+        self.gate_embeddings = nn.Embedding(config.vocab_size, int(config.hidden_size/2), padding_idx=config.pad_token_id)
+        self.qubit_embeddings = nn.Embedding(config.max_position_embeddings, int(config.hidden_size/4))
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
@@ -54,9 +55,7 @@ class QBertModel(BertModel):
         self.embeddings = QBertEmbeddings(config)
         self.encoder = BertEncoder(config)
         self.pooler = BertPooler(config) if add_pooling_layer else None
-
-        # Initialize weights and apply final processing
-        self.post_init()
+        self.init_weights()
         
 class QBertForSequenceClassification(BertForSequenceClassification):
     def __init__(self, config):
@@ -65,11 +64,8 @@ class QBertForSequenceClassification(BertForSequenceClassification):
         self.config = config
 
         self.bert = QBertModel(config)
-        classifier_dropout = (
-            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
-        )
-        self.dropout = nn.Dropout(classifier_dropout)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
-        # Initialize weights and apply final processing
-        self.post_init()
+        self.init_weights()
+        

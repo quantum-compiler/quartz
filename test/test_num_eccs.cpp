@@ -9,9 +9,9 @@ int main() {
   const int num_input_parameters = 2;
   const int max_num_quantum_gates = 4;
   const int max_num_param_gates = 1;
-  const bool run_dfs = false;
+  const bool run_dfs = false;  // original (without pruning)
   const bool run_bfs_unverified = false;
-  const bool run_bfs_verified = true;
+  const bool run_bfs_verified = true;  // with representative pruning
 
   EquivalenceSet equiv_set;
 

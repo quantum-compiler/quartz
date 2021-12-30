@@ -127,6 +127,14 @@ def QTokenCat(data, padding=True, truncation=True, max_length=512 ):
     print(len(input_ids[0]))
     return {'input_ids':input_ids, 'token_type_ids': qubit_ids, 'position_ids': qubit2_ids}
 
+def GetPair(data):
+    data = data.sort_values(by = 'label')
+    data['count'] = data['text'].apply(lambda x : len(x.split(';')))
+    #data['count'].value_counts()
+    k = pd.merge(data, data, on=['count'])
+    k = k[k.label_x != k.label_y]
+    k['label'] = k['label_x']>k['label_y']
+    return k
 
 X_train_tokenized = QTokenCat(X_train, padding=True, truncation=True, max_length=512)
 X_val_tokenized = QTokenCat(X_val, padding=True, truncation=True, max_length=512)

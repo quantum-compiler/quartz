@@ -93,6 +93,49 @@ int Dataset::remove_singletons(Context *ctx) {
   return num_removed;
 }
 
+int Dataset::normalize_to_minimal_circuit_representations(Context *ctx) {
+  int num_removed = 0;
+  for (auto &item : dataset) {
+    auto &dags = item.second;
+    auto size_before = dags.size();
+    std::vector<std::unique_ptr<DAG>> new_dags;
+    std::unique_ptr<DAG> new_dag;
+    auto dag_already_exists_in_new_dags = [&] (const DAG &dag) {
+      for (auto &other_dag : new_dags) {
+        if (dag.fully_equivalent(*other_dag)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    for (auto &dag : dags) {
+      bool is_minimal = dag->minimal_circuit_representation(&new_dag);
+      if (!is_minimal) {
+        if (!dag_already_exists_in_new_dags(*new_dag)) {
+          new_dags.push_back(std::move(new_dag));
+        }
+        dag = nullptr;  // delete the original DAG
+      }
+    }
+    if (!new_dags.empty()) {
+      // |item| is modified.
+      for (auto &dag : dags) {
+        // Put all dags into |new_dags|.
+        if (dag != nullptr) {
+          if (!dag_already_exists_in_new_dags(*dag)) {
+            new_dags.push_back(std::move(dag));
+          }
+        }
+      }
+      dags = std::move(new_dags);  // update |dags|.
+      auto size_after = dags.size();
+      num_removed += (int) (size_before - size_after);
+    }
+  }
+  return num_removed;
+}
+
 bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
   const auto hash_value = dag->hash(ctx);
   bool ret = dataset.count(hash_value) == 0;

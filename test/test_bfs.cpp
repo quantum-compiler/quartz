@@ -9,7 +9,8 @@ int main() {
   const int num_input_parameters = 2;
   const int max_num_quantum_gates = 4;
   const int max_num_param_gates = 1;
-  const bool run_dfs = false;  // original (without pruning)
+  const bool run_dfs = false;  // original (without pruning) and
+  // restricting search space (which may miss some transformations)
   const bool run_bfs_unverified = false;
   const bool run_bfs_verified = true;  // with representative pruning
 

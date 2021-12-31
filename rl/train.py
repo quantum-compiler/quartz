@@ -136,6 +136,44 @@ def GetPair(data):
     k['label'] = k['label_x']>k['label_y']
     return k
 
+def QTokenPW(data, data2, padding=True, truncation=True, max_length=512 ):    
+    input_ids = []
+    data = list(data)
+    data2 = list(data)
+    print(len(data))
+    print(len(data2))
+    assert len(data) == len(data2)
+    for i in range(len(data)):
+        words = data[i].split()
+        cur = [word_dict[x] for x in words]
+
+        cur = [1] + cur    
+        if max_length > len(cur):
+            if padding:
+                pad_n = max_length - len(cur)
+                cur.extend([0] * pad_n) 
+        else:
+            if truncation:
+                cur = cur[:max_length]
+        line = cur
+        print(line)
+        words = data2[i].split()
+        cur = [word_dict[x] for x in words] 
+        cur = [1] + cur    
+        if max_length > len(cur):
+            if padding:
+                pad_n = max_length - len(cur)
+                cur.extend([0] * pad_n) 
+        else:
+            if truncation:
+                cur = cur[:max_length]
+        line += cur
+        print(cur)
+        input_ids.append(line)
+    #number_dict = {i: w for i, w in enumerate(word_dict)}
+    print(len(input_ids[0]))
+    return {'input_ids':input_ids} 
+
 X_train_tokenized = QTokenCat(X_train, padding=True, truncation=True, max_length=512)
 X_val_tokenized = QTokenCat(X_val, padding=True, truncation=True, max_length=512)
 

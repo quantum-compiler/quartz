@@ -375,8 +375,8 @@ def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_ph
     equivalent_called = 0
     total_equivalence_found = 0
     different_dags_with_same_hash = []
-    # if verbose:
-    print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+    if verbose:
+        print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
     # global find_equivalence_helper_called
     # global find_equivalence_helper_called_bar
     # global total_circuits_verified

@@ -95,24 +95,28 @@ int Dataset::remove_singletons(Context *ctx) {
 
 int Dataset::normalize_to_minimal_circuit_representations(Context *ctx) {
   int num_removed = 0;
+  std::vector<std::unique_ptr<DAG>> dags_to_insert_afterwards;
+  auto dag_already_exists =
+      [](const DAG &dag, const std::vector<std::unique_ptr<DAG>> &new_dags) {
+        for (auto &other_dag : new_dags) {
+          if (dag.fully_equivalent(*other_dag)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
   for (auto &item : dataset) {
+    auto &current_hash_value = item.first;
     auto &dags = item.second;
     auto size_before = dags.size();
     std::vector<std::unique_ptr<DAG>> new_dags;
     std::unique_ptr<DAG> new_dag;
-    auto dag_already_exists_in_new_dags = [&] (const DAG &dag) {
-      for (auto &other_dag : new_dags) {
-        if (dag.fully_equivalent(*other_dag)) {
-          return true;
-        }
-      }
-      return false;
-    };
 
     for (auto &dag : dags) {
       bool is_minimal = dag->minimal_circuit_representation(&new_dag);
       if (!is_minimal) {
-        if (!dag_already_exists_in_new_dags(*new_dag)) {
+        if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));
         }
         dag = nullptr;  // delete the original DAG
@@ -123,14 +127,32 @@ int Dataset::normalize_to_minimal_circuit_representations(Context *ctx) {
       for (auto &dag : dags) {
         // Put all dags into |new_dags|.
         if (dag != nullptr) {
-          if (!dag_already_exists_in_new_dags(*dag)) {
+          if (!dag_already_exists(*dag, new_dags)) {
             new_dags.push_back(std::move(dag));
           }
         }
       }
-      dags = std::move(new_dags);  // update |dags|.
+      // Update |dags|.
+      dags.clear();
+      for (auto &dag : new_dags) {
+        const auto hash_value = dag->hash(ctx);
+        if (hash_value == current_hash_value) {
+          dags.push_back(std::move(dag));
+        } else {
+          // The hash value changed due to floating-point errors.
+          // Insert |dag| later to avoid corrupting the iterator of |dataset|.
+          dags_to_insert_afterwards.push_back(std::move(dag));
+        }
+      }
       auto size_after = dags.size();
       num_removed += (int) (size_before - size_after);
+    }
+  }
+  for (auto &dag : dags_to_insert_afterwards) {
+    const auto hash_value = dag->hash(ctx);
+    if (!dag_already_exists(*dag, dataset[hash_value])) {
+      num_removed--;  // Insert |dag| back.
+      dataset[hash_value].push_back(std::move(dag));
     }
   }
   return num_removed;

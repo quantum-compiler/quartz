@@ -139,7 +139,7 @@ def GetPair(data):
 def QTokenPW(data, data2, padding=True, truncation=True, max_length=512 ):    
     input_ids = []
     data = list(data)
-    data2 = list(data)
+    data2 = list(data2)
     print(len(data))
     print(len(data2))
     assert len(data) == len(data2)

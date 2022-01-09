@@ -4,7 +4,18 @@ project(quantum-superoptimization)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE "Debug")
 
-set(USE_ARBLIB FALSE)
+set(USE_ARBLIB TRUE)
+
+if(USE_ARBLIB)
+    macro (add_executable _name)
+        # invoke built-in add_executable
+        _add_executable(${ARGV})
+        if (TARGET ${_name})
+            target_link_libraries(${_name} flint flint-arb)
+        endif()
+    endmacro()
+    add_compile_definitions(USE_ARBLIB)
+endif()
 
 file(GLOB_RECURSE TEST_ALL "test/test_all.cpp")
 file(GLOB_RECURSE TEST_ARB "test/test_arb.cpp")
@@ -37,8 +48,3 @@ add_executable(test_quartz ${TEST_QUARTZ} ${SOURCE})
 add_executable(test_rigetti ${TEST_RIGETTI} ${SOURCE})
 add_executable(test_rotation_merging ${TEST_ROTATION_MERGING} ${SOURCE})
 add_executable(test_toffoli_flip ${TEST_TOFFOLI_FLIP} ${SOURCE})
-
-if(USE_ARBLIB)
-    target_link_libraries(test_arb flint flint-arb)
-    add_compile_definitions(USE_ARBLIB)
-endif()

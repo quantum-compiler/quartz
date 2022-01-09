@@ -28,6 +28,14 @@ class Matrix : public MatrixBase {
       std::copy(row.begin(), row.end(), data_[counter++]);
     }
   }
+#ifdef USE_ARBLIB
+  Matrix(std::initializer_list<std::initializer_list<std::complex<double>>> data) {
+    int counter = 0;
+    for (auto &row : data) {
+      std::copy(row.begin(), row.end(), data_[counter++]);
+    }
+  }
+#endif
   static Matrix identity() {
     Matrix I;
     for (int i = 0; i < kSize; i++)
@@ -55,8 +63,14 @@ class Matrix : public MatrixBase {
   }
   void print() const {
     for (int i = 0; i < kSize; i++) {
-      for (int j = 0; j < kSize; j++)
-        std::cout << data_[i][j] << " ";
+      for (int j = 0; j < kSize; j++) {
+#ifdef USE_ARBLIB
+        data_[i][j].print(/*digits=*/4);
+#else
+        std::cout << data_[i][j];
+#endif
+        std::cout << " ";
+      }
       std::cout << std::endl;
     }
   }

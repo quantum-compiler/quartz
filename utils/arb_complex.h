@@ -1,11 +1,13 @@
 #pragma once
 
-static_assert(USE_ARBLIB);
+#ifdef USE_ARBLIB
 #include "arb.h"
 
 #include <cmath>
 #include <complex>
 #include <iostream>
+
+constexpr slong kArbPrec = 64;
 
 class ArbComplex {
  public:
@@ -71,8 +73,7 @@ class ArbComplex {
 };
 
 namespace std {
-double abs(const ArbComplex &val) {
-  double re = val.real(), im = val.imag();
-  return std::sqrt(re * re + im * im);
+double abs(const ArbComplex &val);
 }
-}
+
+#endif

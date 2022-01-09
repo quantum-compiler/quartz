@@ -11,8 +11,10 @@ class RZGate : public Gate {
     ParamType theta = params[0];
     if (cached_matrices.find(theta) == cached_matrices.end()) {
       // e ^ {i * theta} = cos theta + i sin theta
-      auto mat = std::make_unique<Matrix<2>>(Matrix<2>({{cos(theta) - 1.0i
-          * sin(theta), 0}, {0, cos(theta) + 1.0i * sin(theta)}}));
+      auto mat =
+          std::make_unique<Matrix<2>>(Matrix<2>({{ComplexType(cos(theta) - 1.0i
+              * sin(theta)), ComplexType(0)}, {ComplexType(0), ComplexType(
+              cos(theta) + 1.0i * sin(theta))}}));
       cached_matrices[theta] = std::move(mat);
     }
     return cached_matrices[theta].get();

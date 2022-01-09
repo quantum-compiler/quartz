@@ -3,8 +3,6 @@
 #include <complex>
 using ParamType = double;
 #ifdef USE_ARBLIB
-#include "arb.h"
-constexpr slong kArbPrec = 64;
 #include "arb_complex.h"
 using ComplexType = ArbComplex;
 #else

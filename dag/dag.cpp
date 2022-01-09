@@ -503,8 +503,8 @@ void DAG::generate_hash_values(Context *ctx,
                                std::vector<std::pair<DAGHashType,
                                                      PhaseShiftIdType>> *other_hash) {
   constexpr int discard_bits = kDAGHashDiscardBits;
-  assert(typeid(ComplexType::value_type) == typeid(double));
-  assert(sizeof(DAGHashType) == sizeof(double));
+  // assert(typeid(ComplexType::value_type) == typeid(double));
+  // assert(sizeof(DAGHashType) == sizeof(double));
 
   if (kFingerprintInvariantUnderPhaseShift) {
     auto val = std::abs(hash_value);

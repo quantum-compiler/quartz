@@ -2,7 +2,14 @@
 
 #include <complex>
 using ParamType = double;
+#ifdef USE_ARBLIB
+#include "arb.h"
+constexpr slong kArbPrec = 64;
+#include "arb_complex.h"
+using ComplexType = ArbComplex;
+#else
 using ComplexType = std::complex<double>;
+#endif
 using DAGHashType = unsigned long long;
 using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair<unsigned long long, int>;

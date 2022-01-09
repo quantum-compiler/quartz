@@ -26,8 +26,9 @@ bool Vector::apply_matrix(MatrixBase *mat,
     if (already_applied)
       continue;
 
-    for (auto &val : buffer)
-      val = 0;
+    for (auto &val : buffer) {
+      val = ComplexType(0);
+    }
 
     // matrix * vector
     for (int j = 0; j < (1 << n0); j++) {
@@ -58,7 +59,11 @@ bool Vector::apply_matrix(MatrixBase *mat,
 void Vector::print() const {
   std::cout << "[" << std::setprecision(4);
   for (int i = 0; i < size(); i++) {
+#ifdef USE_ARBLIB
+    data_[i].print(4);
+#else
     std::cout << data_[i];
+#endif
     if (i != size() - 1)
       std::cout << " ";
   }
@@ -67,12 +72,17 @@ void Vector::print() const {
 
 Vector Vector::random_generate(int num_qubits) {
   // Standard mersenne_twister_engine seeded with 0
+#ifdef USE_ARBLIB
+  using generator_value_type = double;
+#else
+  using generator_value_type = ComplexType::value_type;
+#endif
   static std::mt19937 gen(0);
-  static std::uniform_real_distribution<ComplexType::value_type> dis_real(0, 1);
+  static std::uniform_real_distribution<generator_value_type> dis_real(0, 1);
   static std::uniform_int_distribution<int> dis_int(0, 1);
 
   Vector result(1 << num_qubits);
-  ComplexType::value_type remaining_norm = 1;
+  generator_value_type remaining_norm = 1;
   int remaining_numbers = (2 << num_qubits);
 
   auto generate = [&] () {
@@ -99,7 +109,7 @@ Vector Vector::random_generate(int num_qubits) {
 
 ComplexType Vector::dot(const Vector &other) const {
   assert(size() == other.size());
-  ComplexType result = 0;
+  ComplexType result(0);
   for (int i = 0; i < size(); i++) {
     result += data_[i] * other[i];
   }

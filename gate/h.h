@@ -5,7 +5,9 @@
 class HGate : public Gate {
  public:
   HGate() : Gate(GateType::h, 1/*num_qubits*/, 0/*num_parameters*/),
-            mat({{1/std::sqrt(2), 1/std::sqrt(2)}, {1/std::sqrt(2), -1/std::sqrt(2)}}) {}
+            mat({{ComplexType(1 / std::sqrt(2)), ComplexType(1 / std::sqrt(2))},
+                 {ComplexType(1 / std::sqrt(2)),
+                  ComplexType(-1 / std::sqrt(2))}}) {}
 
   MatrixBase *get_matrix() override {
     return &mat;

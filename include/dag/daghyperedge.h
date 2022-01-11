@@ -5,13 +5,16 @@
 
 #include <vector>
 
-class DAGNode;
+namespace quartz {
 
-// A hyperedge in DAG corresponds to a gate in the circuit.
-class DAGHyperEdge {
- public:
-  std::vector<DAGNode *> input_nodes;  // Nodes including parameters!
-  std::vector<DAGNode *> output_nodes;
+	class DAGNode;
 
-  Gate* gate;
-};
+	// A hyperedge in DAG corresponds to a gate in the circuit.
+	class DAGHyperEdge {
+	public:
+		std::vector< DAGNode * > input_nodes; // Nodes including parameters!
+		std::vector< DAGNode * > output_nodes;
+
+		Gate *gate;
+	};
+} // namespace quartz

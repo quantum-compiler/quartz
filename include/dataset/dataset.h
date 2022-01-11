@@ -5,32 +5,33 @@
 
 #include <unordered_set>
 
-class Dataset {
- public:
-  bool save_json(Context *ctx, const std::string &file_name) const;
+namespace quartz {
 
-  // Return the number of DAGs removed.
-  int remove_singletons(Context *ctx);
+	class Dataset {
+	public:
+		bool save_json(Context *ctx, const std::string &file_name) const;
 
-  // Normalize each DAG to have the minimal circuit representation.
-  // Return the number of DAGs removed.
-  int normalize_to_minimal_circuit_representations(Context *ctx);
+		// Return the number of DAGs removed.
+		int remove_singletons(Context *ctx);
 
-  // This function runs in O(1).
-  [[nodiscard]] int num_hash_values() const;
+		// Normalize each DAG to have the minimal circuit representation.
+		// Return the number of DAGs removed.
+		int normalize_to_minimal_circuit_representations(Context *ctx);
 
-  // This function runs in O(num_hash_values()).
-  [[nodiscard]] int num_total_dags() const;
+		// This function runs in O(1).
+		[[nodiscard]] int num_hash_values() const;
 
-  auto &operator[](const DAGHashType &val) {
-    return dataset[val];
-  }
+		// This function runs in O(num_hash_values()).
+		[[nodiscard]] int num_total_dags() const;
 
-  // Returns true iff the hash value is new to the |dataset|.
-  bool insert(Context *ctx, std::unique_ptr<DAG> dag);
+		auto &operator[](const DAGHashType &val) { return dataset[val]; }
 
-  void clear();
+		// Returns true iff the hash value is new to the |dataset|.
+		bool insert(Context *ctx, std::unique_ptr< DAG > dag);
 
-  std::unordered_map<DAGHashType,
-                     std::vector<std::unique_ptr<DAG>>> dataset;
-};
+		void clear();
+
+		std::unordered_map< DAGHashType, std::vector< std::unique_ptr< DAG > > >
+		    dataset;
+	};
+} // namespace quartz

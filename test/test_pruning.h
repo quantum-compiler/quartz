@@ -26,7 +26,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
 
   if (run_representative_pruning) {
     std::ifstream fin(file_prefix + "pruning_unverified.json");
-    if (fin.is_open()) {
+    if (false) {  // TODO: debugging
       std::cout << "Representative pruning: use generated file." << std::endl;
       fin.close();
     } else {

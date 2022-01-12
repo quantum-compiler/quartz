@@ -32,6 +32,10 @@ class ArbComplex {
     this->re[0] = re[0];
     this->im[0] = im[0];
   }
+  ~ArbComplex() {
+    arb_clear(re);
+    arb_clear(im);
+  }
   ArbComplex operator+(const ArbComplex &other) const {
     ArbComplex result;
     arb_add(result.re, re, other.re, kArbPrec);
@@ -54,6 +58,12 @@ class ArbComplex {
   }
   [[nodiscard]] double imag() const {
     return arf_get_d(&im->mid, ARF_RND_NEAR);
+  }
+  void real(arb_t new_re) {
+    arb_set(re, new_re);
+  }
+  void imag(arb_t new_im) {
+    arb_set(im, new_im);
   }
   void real(double new_re) {
     arb_set_d(re, new_re);

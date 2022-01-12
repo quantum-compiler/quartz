@@ -4,14 +4,14 @@ project(quantum-superoptimization)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE "Debug")
 
-set(USE_ARBLIB FALSE)
+set(USE_ARBLIB TRUE)
 
 if(USE_ARBLIB)
     macro (add_executable _name)
         # invoke built-in add_executable
         _add_executable(${ARGV})
         if (TARGET ${_name})
-            target_link_libraries(${_name} flint flint-arb)
+            target_link_libraries(${_name} flint flint-arb gmp)
         endif()
     endmacro()
     add_compile_definitions(USE_ARBLIB)

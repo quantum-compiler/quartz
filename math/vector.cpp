@@ -72,18 +72,65 @@ void Vector::print() const {
 
 Vector Vector::random_generate(int num_qubits) {
   // Standard mersenne_twister_engine seeded with 0
-#ifdef USE_ARBLIB
-  using generator_value_type = double;
-#else
-  using generator_value_type = ComplexType::value_type;
-#endif
+  std::cout << "A" << std::endl;
   static std::mt19937 gen(0);
-  static std::uniform_real_distribution<generator_value_type> dis_real(0, 1);
   static std::uniform_int_distribution<int> dis_int(0, 1);
-
   Vector result(1 << num_qubits);
-  generator_value_type remaining_norm = 1;
   int remaining_numbers = (2 << num_qubits);
+
+#ifdef USE_ARBLIB
+  constexpr slong kRandPrec = 64;
+  flint_rand_t flint_rand_state;
+  flint_randinit(flint_rand_state);
+  arb_t remaining_norm;
+  arb_init(remaining_norm);
+  arb_one(remaining_norm);  // remaining_norm = 1;
+  arb_t number;
+  arb_init(number);
+
+  auto generate = [&] () {
+    arb_t tmp;
+    arb_init(tmp);
+    if (remaining_numbers > 1) {
+      // TODO: debugging
+      std::cout << "b " << remaining_numbers << std::endl;
+      std::cout << "norm= ";
+      arb_printd(remaining_norm, 6);
+      std::cout << std::endl;
+      // Same algorithm as WeChat red packet
+//      fmpq_t random_value;
+//      arb_unit_interval(tmp);
+//      arb_get_rand_fmpq(random_value, flint_rand_state, tmp, kRandPrec);
+//      arb_set_fmpq(number, random_value, kRandPrec);
+      arb_urandom(number, flint_rand_state, kRandPrec);
+      std::cout << "number= ";
+      arb_printd(number, 6);
+      std::cout << std::endl;
+      // number = random value in [0, 1] now
+      std::cout << "c" << std::endl;
+      arb_mul(tmp, number, remaining_norm, kRandPrec);
+      arb_set(number, tmp);  // number *= remaining_norm;
+      arb_div_si(tmp, number, remaining_numbers * 2, kRandPrec);
+      arb_set(number, tmp);  // number /= remaining_numbers * 2;
+      std::cout << "d" << std::endl;
+    } else {
+      arb_set(number, remaining_norm);  // number = remaining_norm;
+    }
+    remaining_numbers--;
+    arb_sub(tmp, remaining_norm, number, kRandPrec);
+    arb_set(remaining_norm, tmp);  // remaining_norm -= number;
+    arb_sqrt(tmp, number, kRandPrec);
+    arb_set(number, tmp);  // number = std::sqrt(number);
+    if (dis_int(gen)) {
+      arb_neg(tmp, number);
+      arb_set(number, tmp);  // number = -number;
+    }
+    arb_clear(tmp);
+    return number;
+  };
+#else
+  static std::uniform_real_distribution<ComplexType::value_type> dis_real(0, 1);
+  ComplexType::value_type remaining_norm = 1;
 
   auto generate = [&] () {
     auto number = remaining_norm;
@@ -99,11 +146,19 @@ Vector Vector::random_generate(int num_qubits) {
     }
     return number;
   };
+#endif
 
   for (int i = 0; i < (1 << num_qubits); i++) {
     result[i].real(generate());
     result[i].imag(generate());
   }
+
+#ifdef USE_ARBLIB
+  arb_clear(remaining_norm);
+  arb_clear(number);
+  flint_randclear(flint_rand_state);
+#endif
+
   return result;
 }
 

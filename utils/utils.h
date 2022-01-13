@@ -15,6 +15,7 @@ using EquivalenceHashType = std::pair<unsigned long long, int>;
 using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 // Constants for DAG::hash()
+constexpr double kDAGHashMaxError = 1e-15;
 constexpr int kDAGHashDiscardBits = 20;
 constexpr bool kFingerprintInvariantUnderPhaseShift = true;
 constexpr bool kCheckPhaseShiftInGenerator = false;

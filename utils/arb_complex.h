@@ -2,6 +2,7 @@
 
 #ifdef USE_ARBLIB
 #include "arb.h"
+#include "acb.h"
 
 #include <cmath>
 #include <complex>
@@ -70,6 +71,18 @@ class ArbComplex {
   }
   void imag(double new_im) {
     arb_set_d(im, new_im);
+  }
+  [[nodiscard]] double get_abs_max_error() const {
+    acb_t tmp;
+    acb_init(tmp);
+    acb_set_arb_arb(tmp, re, im);
+    arf_t tmp2;
+    arf_init(tmp2);
+    acb_get_rad_ubound_arf(tmp2, tmp, kArbPrec);
+    double result = arf_get_d(tmp2, ARF_RND_NEAR);
+    acb_clear(tmp);
+    arf_clear(tmp2);
+    return result;
   }
   void print(int digits) const {
     std::cout << "(";

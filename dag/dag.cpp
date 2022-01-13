@@ -507,14 +507,21 @@ void DAG::generate_hash_values(Context *ctx,
   // assert(sizeof(DAGHashType) == sizeof(double));
 
   if (kFingerprintInvariantUnderPhaseShift) {
+#ifdef USE_ARBLIB
     auto val = std::abs(hash_value);
-    DAGHashType valhash = *((DAGHashType *) (&val));
-    *main_hash = valhash >> discard_bits;
-    other_hash->emplace_back((valhash + (1 << discard_bits)) >> discard_bits,
-                             phase_shift_id);
+    auto max_error = hash_value.get_abs_max_error();
+    assert(max_error < kDAGHashMaxError);
+#else
+    auto val = std::abs(hash_value);
+#endif
+    auto valhash =
+        (DAGHashType) std::floor((long double) val / kDAGHashMaxError);
+    std::cout << val << " " << valhash << std::endl;
+    other_hash->emplace_back(valhash + 1, phase_shift_id);
     return;
   }
 
+  // TODO: Use kDAGHashMaxError instead
   auto val1 = hash_value.real(), val2 = hash_value.imag();
   DAGHashType val1hash = *((DAGHashType *) (&val1));
   DAGHashType val2hash = *((DAGHashType *) (&val2));

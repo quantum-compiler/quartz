@@ -514,10 +514,9 @@ void DAG::generate_hash_values(Context *ctx,
 #else
     auto val = std::abs(hash_value);
 #endif
-    auto valhash =
+    *main_hash =
         (DAGHashType) std::floor((long double) val / kDAGHashMaxError);
-    std::cout << val << " " << valhash << std::endl;
-    other_hash->emplace_back(valhash + 1, phase_shift_id);
+    other_hash->emplace_back(*main_hash + 1, phase_shift_id);
     return;
   }
 

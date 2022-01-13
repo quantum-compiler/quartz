@@ -33,9 +33,20 @@ class ArbComplex {
     this->re[0] = re[0];
     this->im[0] = im[0];
   }
+  ArbComplex(const ArbComplex &other) {
+    arb_init(re);
+    arb_init(im);
+    arb_set(re, other.re);
+    arb_set(im, other.im);
+  }
   ~ArbComplex() {
     arb_clear(re);
     arb_clear(im);
+  }
+  ArbComplex &operator=(const ArbComplex &other) {
+    arb_set(re, other.re);
+    arb_set(im, other.im);
+    return *this;
   }
   ArbComplex operator+(const ArbComplex &other) const {
     ArbComplex result;

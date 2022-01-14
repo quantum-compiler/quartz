@@ -83,6 +83,10 @@ class ArbComplex {
   void imag(double new_im) {
     arb_set_d(im, new_im);
   }
+  [[nodiscard]] double abs() const {
+    double r = real(), i = imag();
+    return std::sqrt(r * r + i * i);
+  }
   [[nodiscard]] double get_abs_max_error() const {
     acb_t tmp;
     acb_init(tmp);
@@ -105,9 +109,5 @@ class ArbComplex {
  private:
   arb_t re, im;
 };
-
-namespace std {
-double abs(const ArbComplex &val);
-}
 
 #endif

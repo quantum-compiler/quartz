@@ -508,7 +508,7 @@ void DAG::generate_hash_values(Context *ctx,
 
   if (kFingerprintInvariantUnderPhaseShift) {
 #ifdef USE_ARBLIB
-    auto val = std::abs(hash_value);
+    auto val = hash_value.abs();
     auto max_error = hash_value.get_abs_max_error();
     assert(max_error < kDAGHashMaxError);
 #else

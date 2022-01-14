@@ -2,9 +2,6 @@
 
 #ifdef USE_ARBLIB
 
-double std::abs(const ArbComplex &val) {
-  double re = val.real(), im = val.imag();
-  return std::sqrt(re * re + im * im);
-}
+// TODO: Move implementation from arb_complex.h to this file
 
 #endif

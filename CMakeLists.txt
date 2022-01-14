@@ -4,7 +4,7 @@ project(quantum-superoptimization)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE "Debug")
 
-set(USE_ARBLIB TRUE)
+set(USE_ARBLIB FALSE)
 
 if(USE_ARBLIB)
     macro (add_executable _name)

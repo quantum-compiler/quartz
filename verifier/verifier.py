@@ -508,6 +508,7 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 if other_hashtag not in data.keys():
                     # Not equivalent to any other ones
                     continue
+                print(other_hashtag)
                 assert other_hashtag in num_different_dags_with_same_hash.keys()
                 i_range = num_different_dags_with_same_hash[other_hashtag]
                 for i in range(i_range):

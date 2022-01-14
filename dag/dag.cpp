@@ -502,48 +502,28 @@ void DAG::generate_hash_values(Context *ctx,
                                DAGHashType *main_hash,
                                std::vector<std::pair<DAGHashType,
                                                      PhaseShiftIdType>> *other_hash) {
-  constexpr int discard_bits = kDAGHashDiscardBits;
-  // assert(typeid(ComplexType::value_type) == typeid(double));
-  // assert(sizeof(DAGHashType) == sizeof(double));
-
   if (kFingerprintInvariantUnderPhaseShift) {
+#ifdef USE_ARBLIB
+    auto val = hash_value.abs();
+    auto max_error = hash_value.get_abs_max_error();
+    assert(max_error < kDAGHashMaxError);
+#else
     auto val = std::abs(hash_value);
-    DAGHashType valhash = *((DAGHashType *) (&val));
-    *main_hash = valhash >> discard_bits;
-    other_hash->emplace_back((valhash + (1 << discard_bits)) >> discard_bits,
-                             phase_shift_id);
+#endif
+    *main_hash =
+        (DAGHashType) std::floor((long double) val / kDAGHashMaxError);
+    // Besides rounding the hash value down, we might want to round it up to
+    // account for floating point errors.
+    other_hash->emplace_back(*main_hash + 1, phase_shift_id);
     return;
   }
 
-  auto val1 = hash_value.real(), val2 = hash_value.imag();
-  DAGHashType val1hash = *((DAGHashType *) (&val1));
-  DAGHashType val2hash = *((DAGHashType *) (&val2));
-  *main_hash = val1hash >> discard_bits << discard_bits;
-  *main_hash ^= val2hash >> discard_bits;
-
-  // Besides rounding both values down, we might want to round them up to
+  auto val = hash_value.real() * kDAGHashAlpha + hash_value.imag() * (1 - kDAGHashAlpha);
+  *main_hash =
+      (DAGHashType) std::floor((long double) val / kDAGHashMaxError);
+  // Besides rounding the hash value down, we might want to round it up to
   // account for floating point errors.
-  // For example, it is possible that a DAG's hash value is
-  // ...10100000000000
-  // which is rounded down to
-  // ...1010
-  // after discarding the last 10 bits,
-  // but another equivalent DAG's hash value is
-  // ...10011111111111
-  // which is rounded down to
-  // ...1001
-  // after discarding the last 10 bits.
-  // Rounding the latter up can solve this issue.
-  DAGHashType tmp;
-  tmp = ((val1hash + (1 << discard_bits)) >> discard_bits) << discard_bits;
-  tmp ^= val2hash >> discard_bits;
-  other_hash->emplace_back(tmp, phase_shift_id);
-  tmp = ((val1hash + (1 << discard_bits)) >> discard_bits) << discard_bits;
-  tmp ^= ((val2hash + (1 << discard_bits)) >> discard_bits);
-  other_hash->emplace_back(tmp, phase_shift_id);
-  tmp = val1hash >> discard_bits << discard_bits;
-  tmp ^= ((val2hash + (1 << discard_bits)) >> discard_bits);
-  other_hash->emplace_back(tmp, phase_shift_id);
+  other_hash->emplace_back(*main_hash + 1, phase_shift_id);
 }
 
 DAGHashType DAG::hash(Context *ctx) {

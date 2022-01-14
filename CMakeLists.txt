@@ -11,7 +11,7 @@ if(USE_ARBLIB)
         # invoke built-in add_executable
         _add_executable(${ARGV})
         if (TARGET ${_name})
-            target_link_libraries(${_name} flint flint-arb)
+            target_link_libraries(${_name} flint flint-arb gmp)
         endif()
     endmacro()
     add_compile_definitions(USE_ARBLIB)

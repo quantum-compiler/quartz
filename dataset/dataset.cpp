@@ -1,5 +1,6 @@
 #include "dataset.h"
 
+#include <cassert>
 #include <fstream>
 #include <iomanip>
 
@@ -41,6 +42,10 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
   fout << "{" << std::endl;
   start0 = true;
   for (const auto &it : dataset) {
+    if (it.second.empty()) {
+      // Empty DAG set
+      continue;
+    }
     if (start0) {
       start0 = false;
     } else {
@@ -72,13 +77,23 @@ int Dataset::remove_singletons(Context *ctx) {
       continue;
     }
     auto &dag = it->second[0];
-    dag->hash(ctx);
+    auto it_hash_value = dag->hash(ctx);
     bool found_possible_equivalence = false;
     for (auto &hash_value : dag->other_hash_values()) {
-      if (dataset.count(hash_value) > 0) {
+      auto find_other = dataset.find(hash_value);
+      if (find_other != dataset.end() && !find_other->second.empty()) {
         found_possible_equivalence = true;
         break;
       }
+      assert(hash_value == it_hash_value + 1);  // Only deal with this case...
+    }
+    // ...so that we know for sure that only DAGs with hash value equal to
+    // |it_hash_value - 1| can have other_hash_values() containing
+    // |it_hash_value|.
+    auto find_other = dataset.find(it_hash_value - 1);
+    if (find_other != dataset.end() && !find_other->second.empty()) {
+      found_possible_equivalence = true;
+      break;
     }
     if (found_possible_equivalence) {
       it++;

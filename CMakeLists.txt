@@ -9,6 +9,19 @@ else()
   endif()
 endif()
 
+set(USE_ARBLIB FALSE)
+
+if(USE_ARBLIB)
+    macro (add_executable _name)
+        # invoke built-in add_executable
+        _add_executable(${ARGV})
+        if (TARGET ${_name})
+            target_link_libraries(${_name} flint flint-arb gmp)
+        endif()
+    endmacro()
+    add_compile_definitions(USE_ARBLIB)
+endif()
+
 include_directories(${CMAKE_INCLUDE_PATH})
 include_directories("include")
 

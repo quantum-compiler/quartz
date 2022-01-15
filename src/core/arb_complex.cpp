@@ -1,7 +1,10 @@
-#include "arb_complex.h"
+#include "quartz/utils/arb_complex.h"
 
 #ifdef USE_ARBLIB
 
-// TODO: Move implementation from arb_complex.h to this file
+namespace quartz {
+	// TODO: Move implementation from arb_complex.h to this file
+
+}
 
 #endif

@@ -33,7 +33,13 @@
 
 # CMake
 cmake-build-*
-CMake*
+CMakeCache.txt
+cmake_install.cmake
+test/CMakeFiles/
+test/cmake_install.cmake
+test/CMakeCache.txt
+test/Makefile
+Makefile
 
 # IDE
 .idea/

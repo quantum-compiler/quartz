@@ -1,90 +1,92 @@
-#include "../gate/gate.h"
-#include "../dag/dag.h"
-#include "../math/vector.h"
-#include "../context/context.h"
+#include "quartz/gate/gate.h"
+#include "quartz/dag/dag.h"
+#include "quartz/math/vector.h"
+#include "quartz/context/context.h"
 #include "test_dataset.h"
 #include "test_generator.h"
 
 #include <iostream>
 
+using namespace quartz;
+
 int main() {
-  std::cout << "Hello, World!" << std::endl;
-  Context ctx
-      ({GateType::x, GateType::y, GateType::add, GateType::neg, GateType::u2, GateType::u3, GateType::cx});
+	std::cout << "Hello, World!" << std::endl;
+	Context ctx({GateType::x, GateType::y, GateType::add, GateType::neg,
+	             GateType::u2, GateType::u3, GateType::cx});
 
-  auto y = ctx.get_gate(GateType::y);
-  y->get_matrix()->print();
+	auto y = ctx.get_gate(GateType::y);
+	y->get_matrix()->print();
 
-  DAG dag(2, 0);
-  dag.add_gate({0}, {}, y, nullptr);
-  std::cout << "Is_minimal=" << dag.is_minimal_circuit_representation() << std::endl;
+	DAG dag(2, 0);
+	dag.add_gate({0}, {}, y, nullptr);
+	std::cout << "Is_minimal=" << dag.is_minimal_circuit_representation()
+	          << std::endl;
 
-  Vector input_dis = Vector::random_generate(2);
-  Vector output_dis;
-  input_dis.print();
-  dag.evaluate(input_dis, {}, output_dis);
-  output_dis.print();
+	Vector input_dis = Vector::random_generate(2);
+	Vector output_dis;
+	input_dis.print();
+	dag.evaluate(input_dis, {}, output_dis);
+	output_dis.print();
 
-  auto dag1 = std::make_unique<DAG>(2, 2);
-  auto dag2 = std::make_unique<DAG>(2, 2);
-  int tmp;
-  dag1->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
-  dag1->add_gate({1}, {3, 4}, ctx.get_gate(GateType::u2), &tmp);
-  dag1->add_gate({0, 1}, {}, ctx.get_gate(GateType::cx), &tmp);
-  dag1->add_gate({1}, {2, 4}, ctx.get_gate(GateType::u2), &tmp);
+	auto dag1 = std::make_unique< DAG >(2, 2);
+	auto dag2 = std::make_unique< DAG >(2, 2);
+	int tmp;
+	dag1->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
+	dag1->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
+	dag1->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
+	dag1->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
+	dag1->add_gate({1}, {3, 4}, ctx.get_gate(GateType::u2), &tmp);
+	dag1->add_gate({0, 1}, {}, ctx.get_gate(GateType::cx), &tmp);
+	dag1->add_gate({1}, {2, 4}, ctx.get_gate(GateType::u2), &tmp);
 
-  dag2->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
-  dag2->add_gate({1}, {0, 4}, ctx.get_gate(GateType::u2), &tmp);
-  dag2->add_gate({1, 0}, {}, ctx.get_gate(GateType::cx), &tmp);
-  dag2->add_gate({0}, {0, 3}, ctx.get_gate(GateType::u2), &tmp);
+	dag2->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
+	dag2->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
+	dag2->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
+	dag2->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
+	dag2->add_gate({1}, {0, 4}, ctx.get_gate(GateType::u2), &tmp);
+	dag2->add_gate({1, 0}, {}, ctx.get_gate(GateType::cx), &tmp);
+	dag2->add_gate({0}, {0, 3}, ctx.get_gate(GateType::u2), &tmp);
 
-  std::cout << std::hex << "dag1->hash() = " << dag1->hash(&ctx) << std::endl;
-  std::cout << std::hex << "dag2->hash() = " << dag2->hash(&ctx) << std::endl;
-  std::cout << dag1->to_json() << std::endl;
-  std::cout << dag2->to_json() << std::endl;
+	std::cout << std::hex << "dag1->hash() = " << dag1->hash(&ctx) << std::endl;
+	std::cout << std::hex << "dag2->hash() = " << dag2->hash(&ctx) << std::endl;
+	std::cout << dag1->to_json() << std::endl;
+	std::cout << dag2->to_json() << std::endl;
 
-  /*dag1 = std::make_unique<DAG>(1, 7);
-  dag2 = std::make_unique<DAG>(1, 7);
-  ctx.set_generated_parameter(0, 0);
-  ctx.set_generated_parameter(3, 0);
-  ctx.set_generated_parameter(6, std::acos(-1.0) / 2);
-  dag1->add_gate({0}, {1, 2}, ctx.get_gate(GateType::u2), &tmp);
-  dag1->add_gate({0}, {4, 5}, ctx.get_gate(GateType::u2), &tmp);
-  dag2->add_gate({}, {2, 4}, ctx.get_gate(GateType::add), &tmp);  // 7
-  dag2->add_gate({}, {7}, ctx.get_gate(GateType::neg), &tmp);  // 8
-  dag2->add_gate({}, {6, 6}, ctx.get_gate(GateType::add), &tmp);  // 9
-  dag2->add_gate({}, {8, 9}, ctx.get_gate(GateType::add), &tmp);  // 10
-  dag2->add_gate({}, {10, 0}, ctx.get_gate(GateType::add), &tmp);  // 11
-  dag2->add_gate({}, {11, 3}, ctx.get_gate(GateType::add), &tmp);  // 12
-  dag2->add_gate({}, {1, 6}, ctx.get_gate(GateType::add), &tmp);  // 13
-  dag2->add_gate({}, {5, 6}, ctx.get_gate(GateType::add), &tmp);  // 14
-  dag2->add_gate({0}, {12, 13, 14}, ctx.get_gate(GateType::u3), &tmp);
+	/*dag1 = std::make_unique<DAG>(1, 7);
+	dag2 = std::make_unique<DAG>(1, 7);
+	ctx.set_generated_parameter(0, 0);
+	ctx.set_generated_parameter(3, 0);
+	ctx.set_generated_parameter(6, std::acos(-1.0) / 2);
+	dag1->add_gate({0}, {1, 2}, ctx.get_gate(GateType::u2), &tmp);
+	dag1->add_gate({0}, {4, 5}, ctx.get_gate(GateType::u2), &tmp);
+	dag2->add_gate({}, {2, 4}, ctx.get_gate(GateType::add), &tmp);  // 7
+	dag2->add_gate({}, {7}, ctx.get_gate(GateType::neg), &tmp);  // 8
+	dag2->add_gate({}, {6, 6}, ctx.get_gate(GateType::add), &tmp);  // 9
+	dag2->add_gate({}, {8, 9}, ctx.get_gate(GateType::add), &tmp);  // 10
+	dag2->add_gate({}, {10, 0}, ctx.get_gate(GateType::add), &tmp);  // 11
+	dag2->add_gate({}, {11, 3}, ctx.get_gate(GateType::add), &tmp);  // 12
+	dag2->add_gate({}, {1, 6}, ctx.get_gate(GateType::add), &tmp);  // 13
+	dag2->add_gate({}, {5, 6}, ctx.get_gate(GateType::add), &tmp);  // 14
+	dag2->add_gate({0}, {12, 13, 14}, ctx.get_gate(GateType::u3), &tmp);
 
-  std::cout << std::hex << "dag1->hash() = " << dag1->hash(&ctx) << std::endl;
-  std::cout << std::hex << "dag2->hash() = " << dag2->hash(&ctx) << std::endl;
-  std::cout << dag1->to_json() << std::endl;
-  std::cout << dag2->to_json() << std::endl;*/
+	std::cout << std::hex << "dag1->hash() = " << dag1->hash(&ctx) << std::endl;
+	std::cout << std::hex << "dag2->hash() = " << dag2->hash(&ctx) << std::endl;
+	std::cout << dag1->to_json() << std::endl;
+	std::cout << dag2->to_json() << std::endl;*/
 
-  test_generator(/*support_gates=*/{GateType::x, GateType::rx,
-                                    GateType::cx, GateType::add},
-      /*num_qubits=*/3,
-      /*max_num_input_parameters=*/2,
-      /*max_num_gates=*/3,
-      /*verbose=*/false,
-      /*save_file_name=*/"data.json",
-      /*count_minimal_representations=*/true);
+	test_generator(/*support_gates=*/{GateType::x, GateType::rx, GateType::cx,
+	                                  GateType::add},
+	               /*num_qubits=*/3,
+	               /*max_num_input_parameters=*/2,
+	               /*max_num_gates=*/3,
+	               /*verbose=*/false,
+	               /*save_file_name=*/"data.json",
+	               /*count_minimal_representations=*/true);
 
-  // Working directory is cmake-build-debug/ here.
-  system("python ../test/test_verifier.py");
+	// Working directory is cmake-build-debug/ here.
+	system("python ../test/test_verifier.py");
 
-  test_equivalence_set(all_supported_gates(),
-                       "equivalences.json",
-                       "equivalences_simplified.json");
-  return 0;
+	test_equivalence_set(all_supported_gates(), "equivalences.json",
+	                     "equivalences_simplified.json");
+	return 0;
 }

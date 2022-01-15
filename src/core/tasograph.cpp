@@ -1,5 +1,5 @@
-#include "tasograph/tasograph.h"
-#include "tasograph/substitution.h"
+#include "quartz/tasograph/tasograph.h"
+#include "quartz/tasograph/substitution.h"
 
 #include <cassert>
 #include <iomanip>

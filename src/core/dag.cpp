@@ -1,6 +1,6 @@
-#include "dag/dag.h"
-#include "gate/gate.h"
-#include "context/context.h"
+#include "quartz/dag/dag.h"
+#include "quartz/gate/gate.h"
+#include "quartz/context/context.h"
 
 #include <algorithm>
 #include <cassert>

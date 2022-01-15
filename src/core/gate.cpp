@@ -1,4 +1,4 @@
-#include "gate/gate.h"
+#include "quartz/gate/gate.h"
 
 using namespace quartz;
 

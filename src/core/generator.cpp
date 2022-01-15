@@ -1,5 +1,5 @@
-#include "generator/generator.h"
-#include "dataset/equivalence_set.h"
+#include "quartz/generator/generator.h"
+#include "quartz/dataset/equivalence_set.h"
 
 #include <cassert>
 

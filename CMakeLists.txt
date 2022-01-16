@@ -9,6 +9,9 @@ else()
   endif()
 endif()
 
+# Put the binary files in the same folder as dll files
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
 set(USE_ARBLIB FALSE)
 
 if(USE_ARBLIB)
@@ -37,12 +40,27 @@ file(GLOB_RECURSE QUARTZ_SRCS
 #Generic compilation options
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-  message("Build in Debug mode")
-  set(CMAKE_CXX_FLAGS "-O0 -g -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+if(MSVC)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+    set(BUILD_SHARED_LIBS TRUE)
 else()
-  set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
 endif()
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    message("Build in Debug mode")
+    if (MSVC)
+        set(CMAKE_CXX_FLAGS "/Od /Wall ${CMAKE_CXX_FLAGS}")
+    else ()
+        set(CMAKE_CXX_FLAGS "-O0 -g -Wall ${CMAKE_CXX_FLAGS}")
+    endif ()
+else ()
+    if (MSVC)
+        set(CMAKE_CXX_FLAGS "/O2 /Wall ${CMAKE_CXX_FLAGS}")
+    else ()
+        set(CMAKE_CXX_FLAGS "-O2 -Wall ${CMAKE_CXX_FLAGS}")
+    endif ()
+endif ()
 
 add_library(quartz_runtime SHARED ${QUARTZ_SRCS})
 
@@ -59,3 +77,5 @@ install(TARGETS quartz_runtime
 
 install (DIRECTORY ${PROJECT_SOURCE_DIR}/include
     DESTINATION .)
+
+add_subdirectory(test)

@@ -2,6 +2,7 @@
 
 ## Prerequisites
 
+
 ### Linux/Unix
 
 Install Arb (**version >= 2.20.0**):
@@ -20,3 +21,11 @@ If there's no such version of Arb:
 - If there are errors like `The following signatures couldn't be verified because the public key is not available`,
   run `apt-key adv --keyserver keyring.debian.org --recv-keys [public key]` for each public key. Then run `sudo apt update` again.
   
+
+### Mac OS
+
+- Install arb  `sudo apt install arb`
+- Download cmake
+- Run `$ cmake cmake CMakeLists.txt`
+  This will generate a `Makefile`
+- Run `$ make`

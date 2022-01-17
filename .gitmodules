@@ -1,0 +1,3 @@
+[submodule "lib/arb"]
+	path = lib/arb
+	url = https://github.com/fredrik-johansson/arb.git

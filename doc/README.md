@@ -1,4 +1,4 @@
-# Diderot Developer Guide
+# Quartz Guide
 ## Table of Contents
 <!-- Reference links -->
 [install]: ./installation.md

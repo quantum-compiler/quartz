@@ -42,9 +42,9 @@ cdef extern from "math/matrix.h" namespace "quartz":
 cdef extern from "gate/gate.h" namespace "quartz":
     cdef cppclass Gate:
         Gate(GateType, int, int) except +
-        MatrixBase *get_matrix()
-        MatrixBase *get_matrix(const vector[ParamType])
-        ParamType compute(const vector[ParamType])
+        # MatrixBase *get_matrix()
+        # MatrixBase *get_matrix(const vector[ParamType])
+        # ParamType compute(const vector[ParamType])
         bool is_commutative() const
         int get_num_qubits() const
         int get_num_parameters() const

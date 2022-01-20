@@ -54,6 +54,10 @@ namespace quartz {
 		[[nodiscard]] bool qubit_used(int qubit_index) const;
 		[[nodiscard]] bool input_param_used(int param_index) const;
 		DAGHashType hash(Context *ctx);
+        // Evaluate the output distribution 2^|num_qubits| times, with the i-th
+        // time the input distribution being a vector with only the i-th entry
+        // equals to 1 and all other entries equal to 0.
+        [[nodiscard]] std::vector<Vector> get_matrix(Context *ctx) const;
 		[[nodiscard]] bool hash_value_valid() const;
 		[[nodiscard]] DAGHashType cached_hash_value() const;
 		[[nodiscard]] std::vector< DAGHashType > other_hash_values() const;

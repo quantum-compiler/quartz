@@ -20,6 +20,7 @@ def config_cython():
         for fn in os.listdir(path):
             if not fn.endswith(".pyx"):
                 continue
+            print(fn)
             ret.append(Extension(
                 "quartz.%s" % fn[:-4],
                 ["%s/%s" % (path, fn)],

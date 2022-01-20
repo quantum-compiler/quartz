@@ -4,6 +4,7 @@
 #include <cassert>
 #include <chrono>
 #include <fstream>
+#include <iomanip>
 #include <map>
 
 using namespace quartz;
@@ -38,8 +39,8 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
   start = std::chrono::steady_clock::now();
   gen.generate(num_qubits, num_input_parameters,
                max_num_quantum_gates, max_num_param_gates,
-               &dataset,        /*verify_equivalences=*/
-               true, &equiv_set, /*verbose=*/
+               &dataset,
+               true, &equiv_set,
                true);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec
@@ -134,19 +135,22 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
 
   equiv_set.simplify(&ctx);
   eccs = equiv_set.get_all_equivalence_sets();
-  nnz_distribution.clear();
+  // <matrix size, nnz>
+  std::map<std::pair<int, int>, int> nnz_distribution_pair;
 
   for (auto &ecc: eccs) {
     assert(!ecc.empty());
     auto mat = ecc[0]->get_matrix(&ctx);
     auto num = nnz(mat, kNNZEPS);
-    nnz_distribution[num]++;
+    nnz_distribution_pair[std::make_pair(mat.size(), num)]++;
   }
   std::cout
-      << "After all optimizations on the equivalence set (note that many ECCs can be pruned here):"
+      << "After all optimizations on the equivalence set (note that many ECCs are pruned here):"
       << std::endl;
-  for (auto &it: nnz_distribution) {
-    std::cout << "nnz=" << it.first << ": " << it.second << " circuits."
+  for (auto &it: nnz_distribution_pair) {
+    std::cout << "matrix size=" << it.first.first << "x" << it.first.first
+              << ", nnz=" << it.first.second << ": " << it.second
+              << " circuits."
               << std::endl;
   }
 }

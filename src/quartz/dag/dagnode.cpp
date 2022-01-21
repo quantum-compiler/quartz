@@ -1,4 +1,4 @@
-#include "quartz/dag/dagnode.h"
+#include "dagnode.h"
 
 namespace quartz {
 	bool DAGNode::is_qubit() const {

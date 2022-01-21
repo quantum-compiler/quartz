@@ -1,6 +1,6 @@
-#include "quartz/dag/dag.h"
-#include "quartz/gate/gate.h"
-#include "quartz/context/context.h"
+#include "dag.h"
+#include "../gate/gate.h"
+#include "../context/context.h"
 
 #include <algorithm>
 #include <cassert>
@@ -586,22 +586,22 @@ namespace quartz {
 		return hash_value_;
 	}
 
-std::vector<Vector> DAG::get_matrix(Context *ctx) const {
-  const auto sz = 1 << get_num_qubits();
-  Vector input_dis(sz);
-  auto input_parameters =
-      ctx->get_generated_parameters(get_num_input_parameters());
-  std::vector< ParamType > all_parameters;
-  std::vector<Vector> result(sz);
-  for (int S = 0; S < sz; S++) {
-    input_dis[S] = ComplexType(1);
-    if (S > 0) {
-      input_dis[S - 1] = ComplexType(0);
-    }
-    evaluate(input_dis, input_parameters, result[S], &all_parameters);
-  }
-  return result;
-}
+	std::vector< Vector > DAG::get_matrix(Context *ctx) const {
+		const auto sz = 1 << get_num_qubits();
+		Vector input_dis(sz);
+		auto input_parameters =
+		    ctx->get_generated_parameters(get_num_input_parameters());
+		std::vector< ParamType > all_parameters;
+		std::vector< Vector > result(sz);
+		for (int S = 0; S < sz; S++) {
+			input_dis[S] = ComplexType(1);
+			if (S > 0) {
+				input_dis[S - 1] = ComplexType(0);
+			}
+			evaluate(input_dis, input_parameters, result[S], &all_parameters);
+		}
+		return result;
+	}
 
 	bool DAG::hash_value_valid() const { return hash_value_valid_; }
 

@@ -1,6 +1,6 @@
-#include "quartz/context/context.h"
-#include "quartz/gate/all_gates.h"
-#include "quartz/dag/dag.h"
+#include "context.h"
+#include "../gate/all_gates.h"
+#include "../dag/dag.h"
 
 #include <cassert>
 #include <cmath>

@@ -26,7 +26,7 @@ else()
 endif()
 
 include_directories(${CMAKE_INCLUDE_PATH})
-include_directories("../include")
+include_directories("../src/")
 
 link_directories("../")
 

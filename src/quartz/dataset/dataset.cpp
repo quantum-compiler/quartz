@@ -1,4 +1,4 @@
-#include "quartz/dataset/dataset.h"
+#include "dataset.h"
 
 #include <cassert>
 #include <fstream>

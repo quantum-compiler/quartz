@@ -1,4 +1,4 @@
-#include "quartz/gate/gate.h"
+#include "gate.h"
 
 namespace quartz {
 	Gate::Gate(GateType tp, int num_qubits, int num_parameters)

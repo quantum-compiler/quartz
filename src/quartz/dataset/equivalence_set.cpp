@@ -1,4 +1,4 @@
-#include "quartz/dataset/equivalence_set.h"
+#include "equivalence_set.h"
 
 #include <cassert>
 #include <fstream>

@@ -1,4 +1,4 @@
-#include "quartz/tasograph/substitution.h"
+#include "substitution.h"
 
 namespace quartz {
 

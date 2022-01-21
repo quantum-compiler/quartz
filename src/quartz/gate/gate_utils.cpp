@@ -1,4 +1,4 @@
-#include "quartz/gate/gate_utils.h"
+#include "gate_utils.h"
 
 #include <cassert>
 

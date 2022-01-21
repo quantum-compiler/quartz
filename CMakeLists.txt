@@ -26,7 +26,7 @@ if(USE_ARBLIB)
 endif()
 
 include_directories(${CMAKE_INCLUDE_PATH})
-include_directories("include")
+include_directories("src/quartz/")
 
 #initial variables
 set(QUARTZ_LIBS "")
@@ -34,7 +34,7 @@ set(QUARTZ_LINK_LIBS ${CMAKE_DL_LIBS})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 file(GLOB_RECURSE QUARTZ_SRCS
-  src/core/*.cpp
+  src/quartz/*.cpp
   )
 
 #Generic compilation options

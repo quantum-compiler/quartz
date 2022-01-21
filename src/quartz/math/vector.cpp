@@ -1,4 +1,4 @@
-#include "quartz/math/vector.h"
+#include "vector.h"
 
 #include <cassert>
 #include <iomanip>

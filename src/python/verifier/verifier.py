@@ -9,10 +9,15 @@ Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 import multiprocessing as mp
 import math
 import z3
-from .gates import get_matrix, compute
-from .gates import add, neg  # for searching phase factors
-from utils.utils import *
+from gates import get_matrix, compute
+from gates import add, neg  # for searching phase factors
 
+import sys
+import os
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
+from utils.utils import *
 
 # functions for generating z3 constraints
 
@@ -91,8 +96,10 @@ def apply_matrix(vec, mat, qubit_indices):
             val_real = 0
             val_imag = 0
             for k in range(n):
-                val_real += mat[r][k][0] * vec[current_indices[k]][0] - mat[r][k][1] * vec[current_indices[k]][1]
-                val_imag += mat[r][k][0] * vec[current_indices[k]][1] + mat[r][k][1] * vec[current_indices[k]][0]
+                val_real += mat[r][k][0] * vec[current_indices[k]
+                                               ][0] - mat[r][k][1] * vec[current_indices[k]][1]
+                val_imag += mat[r][k][0] * vec[current_indices[k]
+                                               ][1] + mat[r][k][1] * vec[current_indices[k]][0]
             result_vec[current_indices[r]] = (val_real, val_imag)
     assert len(result_vec[0]) == 2
     return result_vec
@@ -103,7 +110,8 @@ def input_distribution(num_qubits, equation_list):
     real_part = z3.RealVector('r', vec_size)
     imag_part = z3.RealVector('i', vec_size)
     # A quantum state requires the sum of modulus of all numbers to be 1.
-    sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
+    sum_modulus = sum([x * x for x in real_part]) + \
+        sum([x * x for x in imag_part])
     equation_list.append(sum_modulus == 1)
     return list(zip(real_part, imag_part))
 
@@ -114,7 +122,8 @@ def random_input_distribution(num_qubits):
     real_part = [random.random() * 2 - 1 for _ in range(vec_size)]
     imag_part = [random.random() * 2 - 1 for _ in range(vec_size)]
     # A quantum state requires the sum of modulus of all numbers to be 1.
-    sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
+    sum_modulus = sum([x * x for x in real_part]) + \
+        sum([x * x for x in imag_part])
     real_part = [x / math.sqrt(sum_modulus) for x in real_part]
     imag_part = [x / math.sqrt(sum_modulus) for x in imag_part]
     return list(zip(real_part, imag_part))
@@ -148,7 +157,8 @@ def evaluate(dag, input_dis, input_parameters, use_z3=True):
     num_input_parameters = dag_meta[meta_index_num_input_parameters]
     num_total_parameters = dag_meta[meta_index_num_total_parameters]
     assert (len(input_parameters) >= num_input_parameters)
-    parameters = input_parameters[:num_input_parameters] + [None] * (num_total_parameters - num_input_parameters)
+    parameters = input_parameters[:num_input_parameters] + \
+        [None] * (num_total_parameters - num_input_parameters)
 
     output_dis = input_dis
     gates = dag[1]
@@ -172,9 +182,11 @@ def evaluate(dag, input_dis, input_parameters, use_z3=True):
             assert (gate[1][0].startswith('Q'))
             # quantum gate
             if use_z3:
-                output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values), qubit_indices)
+                output_dis = apply_matrix(output_dis, get_matrix(
+                    gate[0], *parameter_values), qubit_indices)
             else:
-                output_dis = apply_matrix(output_dis, get_matrix(gate[0], *parameter_values, False), qubit_indices)
+                output_dis = apply_matrix(output_dis, get_matrix(
+                    gate[0], *parameter_values, False), qubit_indices)
     return output_dis, parameters
 
 
@@ -196,14 +208,17 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     num_total_params = dag_meta[meta_index_num_total_parameters]
     if kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8:
         k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index
-        cosk_table = [1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2), 0, 1.0 / z3.Sqrt(2)]
-        sink_table = [0, 1.0 / z3.Sqrt(2), 1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2)]
+        cosk_table = [
+            1, 1.0 / z3.Sqrt(2), 0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2), 0, 1.0 / z3.Sqrt(2)]
+        sink_table = [0, 1.0 / z3.Sqrt(2), 1, 1.0 / z3.Sqrt(2),
+                      0, -1.0 / z3.Sqrt(2), -1, -1.0 / z3.Sqrt(2)]
         phase_shift_lambda = (cosk_table[k], sink_table[k])
     elif phase_shift_id < num_total_params:
         phase_shift_lambda = all_parameters[phase_shift_id]
     else:
         phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
-        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])  # lam -> -lam: (cos, sin) -> (cos, -sin)
+        # lam -> -lam: (cos, sin) -> (cos, -sin)
+        phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])
     return phase_shift(vec, phase_shift_lambda)
 
 
@@ -237,7 +252,8 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
             dag2_meta = dag2[0]
             num_qubits = dag1_meta[meta_index_num_qubits]
             vec = random_input_distribution(num_qubits)
-            num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+            num_parameters = max(
+                dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
             params = random_parameters(num_parameters)
             output_vec1 = evaluate(dag1, vec, params, use_z3=False)[0]
             output_vec2 = evaluate(dag2, vec, params, use_z3=False)[0]
@@ -251,12 +267,15 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         solver = z3.Solver()
         solver.add(equations)
-        output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
+        output_vec2_shifted = phase_shift(
+            output_vec2, current_phase_factor_symbolic)
         solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
         result = solver.check()
         if result != z3.unsat:
-            print(f'z3 returns {result} for the following equivalence which passed random testing:')
-            print(f'Phase factor for fingerprint is {phase_factor_for_fingerprint}')
+            print(
+                f'z3 returns {result} for the following equivalence which passed random testing:')
+            print(
+                f'Phase factor for fingerprint is {phase_factor_for_fingerprint}')
             print(f'Goal phase factor is {goal_phase_factor}')
             print(f'Symbolic phase factor is {current_phase_factor_symbolic}')
             print(f'Solver found {solver.model()}')
@@ -269,10 +288,11 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
         new_phase_factor_symbolic = current_phase_factor_symbolic
         if coeff != 0:
             new_phase_factor_for_fingerprint = current_phase_factor_for_fingerprint + coeff * \
-                                               parameters_for_fingerprint[
-                                                   current_param_id]
+                parameters_for_fingerprint[
+                    current_param_id]
             if coeff == 1:
-                new_phase_factor_symbolic = add(current_phase_factor_symbolic, parameters_symbolic[current_param_id])
+                new_phase_factor_symbolic = add(
+                    current_phase_factor_symbolic, parameters_symbolic[current_param_id])
             elif coeff == -1:
                 new_phase_factor_symbolic = add(current_phase_factor_symbolic,
                                                 neg(parameters_symbolic[current_param_id]))
@@ -285,7 +305,8 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
                                                 neg(add(parameters_symbolic[current_param_id],
                                                         parameters_symbolic[current_param_id])))
             else:
-                raise Exception(f'Unsupported phase factor coefficient {coeff}')
+                raise Exception(
+                    f'Unsupported phase factor coefficient {coeff}')
         if search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, parameters_symbolic,
                                                     parameters_for_fingerprint, num_parameters, goal_phase_factor,
                                                     current_param_id + 1, new_phase_factor_symbolic,
@@ -307,7 +328,8 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
     equation_list = []
     if check_phase_shift_in_smt_solver:
         # Let z3 check phase shift
-        num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+        num_parameters = max(
+            dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
         params = create_parameters(num_parameters, equation_list)
         cosL = z3.Real('cosL')
         sinL = z3.Real('sinL')
@@ -318,19 +340,23 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
             output_vec1_S = evaluate(dag1, vec_S, params)[0]
             output_vec2_S = evaluate(dag2, vec_S, params)[0]
             output_vec2_S_shifted = phase_shift(output_vec2_S, [cosL, sinL])
-            matrix_equal_list += eq_vector(output_vec1_S, output_vec2_S_shifted)
+            matrix_equal_list += eq_vector(output_vec1_S,
+                                           output_vec2_S_shifted)
         solver.add(z3.And(equation_list))
-        solver.add(z3.ForAll([cosL, sinL], z3.Implies(angle(cosL, sinL), z3.Not(z3.And(matrix_equal_list)))))
+        solver.add(z3.ForAll([cosL, sinL], z3.Implies(
+            angle(cosL, sinL), z3.Not(z3.And(matrix_equal_list)))))
     else:
         vec = input_distribution(num_qubits, equation_list)
-        num_parameters = max(dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+        num_parameters = max(
+            dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
         params = create_parameters(num_parameters, equation_list)
         output_vec1, all_parameters = evaluate(dag1, vec, params)
         output_vec2 = evaluate(dag2, vec, params)[0]
         if phase_shift_id is not None:
             # Phase factor is provided in generator
             # We shift dag1 here
-            output_vec1 = phase_shift_by_id(output_vec1, dag1, phase_shift_id, all_parameters)
+            output_vec1 = phase_shift_by_id(
+                output_vec1, dag1, phase_shift_id, all_parameters)
         else:
             # Figure out the phase factor here
             assert len(parameters_for_fingerprint) >= num_parameters
@@ -399,7 +425,8 @@ def find_equivalences_helper(hashtag, dags, parameters_for_fingerprint, check_ph
             # dag is not equivalent do any of different_dags_with_same_hash
             different_dags_with_same_hash.append(dag)
             # Insert |dag| eagerly
-            current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+            current_tag = hashtag + '_' + \
+                str(len(different_dags_with_same_hash) - 1)
             output_dict[current_tag] = [dag]
     return hashtag, output_dict, equivalent_called, total_equivalence_found
 
@@ -409,7 +436,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                       do_not_invoke_smt_solver=False):
     input_file_data = load_json(input_file)
     data = input_file_data[1]
-    parameters_for_fingerprint = input_file_data[0]  # parameters generated for random testing
+    # parameters generated for random testing
+    parameters_for_fingerprint = input_file_data[0]
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0
@@ -419,7 +447,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     import time
     t_start = time.monotonic()
     num_different_dags_with_same_hash = {}
-    print(f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...')
+    print(
+        f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...')
 
     if False:
         # sequential version
@@ -429,7 +458,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
             num_potential_equivalences += len(dags) - 1
             different_dags_with_same_hash = []
             if verbose:
-                print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+                print(
+                    f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
             for dag in dags:
                 equivalence_found = False
                 for i in range(len(different_dags_with_same_hash)):
@@ -445,9 +475,11 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                 if not equivalence_found:
                     different_dags_with_same_hash.append(dag)
                     # Insert |dag| eagerly
-                    current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+                    current_tag = hashtag + '_' + \
+                        str(len(different_dags_with_same_hash) - 1)
                     output_dict[current_tag] = [dag]
-            num_different_dags_with_same_hash[hashtag] = len(different_dags_with_same_hash)
+            num_different_dags_with_same_hash[hashtag] = len(
+                different_dags_with_same_hash)
 
     else:
         # parallel version
@@ -481,7 +513,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
         print('Start checking equivalence with different hash...')
         for hashtag, dags in output_dict.items():
             from collections import defaultdict
-            other_hashtags = defaultdict(dict)  # A map from other hashtags to corresponding phase shifts.
+            # A map from other hashtags to corresponding phase shifts.
+            other_hashtags = defaultdict(dict)
             # |other_hashtags[other_hash][None]| indicates that if it's possible that a DAG with |other_hash|
             #    is equivalent with a DAG with |hashtag| without phase shifts.
             # |other_hashtags[other_hash][phase_shift_id]| is a list of DAGs with |hashtag| that can be equivalent
@@ -498,7 +531,8 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                         assert isinstance(item, list)
                         assert len(item) == 2
                         # We need the exact parameter in |dag|, so we cannot use the representative DAG |dags[0]|.
-                        other_hashtags[item[0]][item[1]] = other_hashtags[item[0]].get(item[1], []) + [dag]
+                        other_hashtags[item[0]][item[1]] = other_hashtags[item[0]].get(
+                            item[1], []) + [dag]
             assert hashtag.split('_')[0] not in other_hashtags
             if len(other_hashtags) == 0:
                 print(f'Warning: other hash values unspecified for hash value {hashtag}.'
@@ -539,10 +573,10 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
                             # Warning: If DAG::hash() is modified,
                             # the expression |is_fixed_for_all_dags| should be modified correspondingly.
                             is_fixed_for_all_dags = 0 <= phase_shift_id < dag[0][meta_index_num_input_parameters] or \
-                                                    dag[0][meta_index_num_total_parameters] <= phase_shift_id < dag[0][
-                                                        meta_index_num_total_parameters] + dag[0][
-                                                        meta_index_num_input_parameters] or \
-                                                    kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8
+                                dag[0][meta_index_num_total_parameters] <= phase_shift_id < dag[0][
+                                meta_index_num_total_parameters] + dag[0][
+                                meta_index_num_input_parameters] or \
+                                kCheckPhaseShiftOfPiOver4Index < phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8
                             if is_fixed_for_all_dags:
                                 if input_param_tried:
                                     continue

@@ -78,7 +78,7 @@ namespace quartz {
 				assert(ret);
 
 				// Assume working directory is cmake-build-debug/ here.
-				system("python ../python/verify_equivalences.py "
+				system("python src/python/verifier/verify_equivalences.py "
 				       "tmp_before_verify.json tmp_after_verify.json");
 
 				dags_to_search.clear();

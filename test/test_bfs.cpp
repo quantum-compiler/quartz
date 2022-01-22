@@ -6,9 +6,9 @@ int main() {
 	Context ctx({GateType::h, GateType::rz, GateType::cx, GateType::add});
 	Generator gen(&ctx);
 
-	const int num_qubits = 3;
+	const int num_qubits = 1;
 	const int num_input_parameters = 2;
-	const int max_num_quantum_gates = 4;
+	const int max_num_quantum_gates = 2;
 	const int max_num_param_gates = 1;
 	const bool run_dfs = false; // original (without pruning) and
 	// restricting search space (which may miss some transformations)
@@ -42,7 +42,8 @@ int main() {
 
 		start = std::chrono::steady_clock::now();
 		equiv_set.clear();
-		system("python ../python/verify_equivalences.py dfs_restricted.json "
+		system("python src/python/verifier/verify_equivalences.py "
+		       "dfs_restricted.json "
 		       "dfs_restricted_verified.json");
 		equiv_set.load_json(&ctx, "dfs_restricted_verified.json");
 		equiv_set.simplify(&ctx);
@@ -81,7 +82,7 @@ int main() {
 
 		start = std::chrono::steady_clock::now();
 		equiv_set.clear();
-		system("python ../python/verify_equivalences.py dfs_all.json "
+		system("python src/python/verifier/verify_equivalences.py dfs_all.json "
 		       "dfs_all_verified.json");
 		equiv_set.load_json(&ctx, "dfs_all_verified.json");
 		equiv_set.simplify(&ctx);
@@ -122,7 +123,8 @@ int main() {
 
 		start = std::chrono::steady_clock::now();
 		equiv_set.clear();
-		system("python ../python/verify_equivalences.py bfs_unverified.json "
+		system("python src/python/verifier/verify_equivalences.py "
+		       "bfs_unverified.json "
 		       "bfs_unverified_verified.json");
 		equiv_set.load_json(&ctx, "bfs_unverified_verified.json");
 		equiv_set.simplify(&ctx);
@@ -163,7 +165,8 @@ int main() {
 
 		start = std::chrono::steady_clock::now();
 		equiv_set.clear();
-		system("python ../python/verify_equivalences.py tmp_before_verify.json "
+		system("python src/python/verifier/verify_equivalences.py "
+		       "tmp_before_verify.json "
 		       "bfs_verified.json");
 		equiv_set.load_json(&ctx, "bfs_verified.json");
 		equiv_set.simplify(&ctx);

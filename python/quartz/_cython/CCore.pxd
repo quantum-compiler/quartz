@@ -106,6 +106,4 @@ cdef extern from "dataset/equivalence_set.h" namespace "quartz":
         EquivalenceSet() except +
         bool load_json(Context *, const string)
 
-        vector[vector[DAG_ptr]] get_all_equivalence_sets() const
-        # [[nodiscard]] std::vector< std::vector< DAG * > >
-        # get_all_equivalence_sets() const;
+        vector[vector[DAG_ptr]] get_all_equivalence_sets() except +

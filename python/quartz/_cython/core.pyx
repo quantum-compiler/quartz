@@ -3,9 +3,14 @@
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
+from CCore cimport DAG_ptr
 from CCore cimport GraphXfer
+from CCore cimport Graph
 from CCore cimport Context
 from CCore cimport EquivalenceSet
+import ctypes
+
+ctypedef GraphXfer* GraphXfer_ptr
 
 cdef class PyGateType:
     cdef GateType gt
@@ -83,16 +88,16 @@ cdef class PyGate:
     def num_parameters(self):
         return self.cpp_gate.num_parameters
 
-cdef class QuartzDAG:
-    cdef DAG *dag
+cdef class PyDAG:
+    cdef DAG_ptr dag
 
     def __cinit__(self):
         pass
 
     def __dealloc__(self):
-        pass
+        del self.dag
 
-    cdef set_this(self, DAG* dag_):
+    cdef set_this(self, DAG_ptr dag_):
         del self.dag
         self.dag = dag_
         return self
@@ -100,11 +105,11 @@ cdef class QuartzDAG:
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
 
-    def __cinit__(self):
-        pass
+    def __cinit__(self, QuartzContext q_context, PyDAG py_dag_from, PyDAG py_dag_to):
+        self.graphXfer = new GraphXfer(q_context.context, py_dag_from.dag, py_dag_to.dag)
 
     def __dealloc__(self):
-        pass
+        del self.graphXfer
 
     cdef set_this(self, GraphXfer *graphXfer_):
         del self.graphXfer
@@ -114,35 +119,33 @@ cdef class PyXfer:
 cdef class QuartzContext:
     cdef Context *context
     cdef EquivalenceSet *eqs
-    
-    # @property
-    # def xfers pass
 
-    # Context(const vector[GateType]) except +
     def __cinit__(self, gate_type_list, equivalence_set_filename):
         self.context = new Context(gate_type_list)
         self.eqs = new EquivalenceSet()
+        self.load_json(equivalence_set_filename)
+        
+    cdef load_json(self, filename):
+        # Load ECC from file
+        filename_bytes = filename.encode('utf-8')
+        assert(self.eqs.load_json(self.context, filename_bytes), "Failed to load equivalence set.")
 
-        # Load ECCs from files
-        assert(self.eqs.load_json(self.context, equivalence_set_filename), "Failed to load equivalence set.")
+    @property
+    def xfers(self):
         # Get all the equivalence sets
         # And convert them into xfers
         eq_sets = self.eqs.get_all_equivalence_sets()
-        self.xfers = []
-        
+
+        xfers = []
         for eq_set in eq_sets:
             first = True
-            first_dag_ptr = None
             for dag_ptr in eq_set:
                 if first:
                     first = False
-                    first_dag_ptr = dag_ptr
                 else:
-                    self.xfers.append(PyXfer(self.context, first_dag_ptr, dag_ptr))
+                    xfers.append(PyXfer(self, PyDAG().set_this(eq_set[0]), PyDAG().set_this(dag_ptr)))
+        return xfers
 
+    def get_xfer_from_id(self, id):
+        return self.xfers[id]
 
-    # def get_all_equivalence_sets(self):
-    #     equivalent_sets = self.eqs.get_all_equivalence_sets()
-    #     pass
-        
-        

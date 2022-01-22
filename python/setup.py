@@ -3,13 +3,14 @@ import sys
 import sysconfig
 from setuptools import find_packages
 
-# need to use distutils.core for correct placement of cython dll           
-if "--inplace" in sys.argv:                                                
+# need to use distutils.core for correct placement of cython dll
+if "--inplace" in sys.argv:
     from distutils.core import setup
-    from distutils.extension import Extension                              
+    from distutils.extension import Extension
 else:
     from setuptools import setup
     from setuptools.extension import Extension
+
 
 def config_cython():
     sys_cflags = sysconfig.get_config_var("CFLAGS")
@@ -24,15 +25,16 @@ def config_cython():
             ret.append(Extension(
                 "quartz.%s" % fn[:-4],
                 ["%s/%s" % (path, fn)],
-                include_dirs=["../include/quartz"],
+                include_dirs=["../src/quartz/"],
                 libraries=["quartz_runtime"],
                 extra_compile_args=["-std=c++17"],
                 extra_link_args=[],
                 language="c++"))
-        return cythonize(ret, compiler_directives={"language_level" : 3})
+        return cythonize(ret, compiler_directives={"language_level": 3})
     except ImportError:
         print("WARNING: cython is not installed!!!")
         return []
+
 
 setup_args = {}
 
@@ -45,4 +47,3 @@ setup(name='quartz',
       url='https://github.com/quantum-compiler/quartz',
       ext_modules=config_cython(),
       )
-

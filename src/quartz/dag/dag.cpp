@@ -508,7 +508,7 @@ namespace quartz {
 			auto val = std::abs(hash_value);
 #endif
 			*main_hash =
-			    (DAGHashType)std::floor((long double)val / kDAGHashMaxError);
+			    (DAGHashType)std::floor((long double)val / (2 * kDAGHashMaxError));
 			// Besides rounding the hash value down, we might want to round it
 			// up to account for floating point errors.
 			other_hash->emplace_back(*main_hash + 1, phase_shift_id);
@@ -518,7 +518,7 @@ namespace quartz {
 		auto val = hash_value.real() * kDAGHashAlpha +
 		           hash_value.imag() * (1 - kDAGHashAlpha);
 		*main_hash =
-		    (DAGHashType)std::floor((long double)val / kDAGHashMaxError);
+		    (DAGHashType)std::floor((long double)val / (2 * kDAGHashMaxError));
 		// Besides rounding the hash value down, we might want to round it up to
 		// account for floating point errors.
 		other_hash->emplace_back(*main_hash + 1, phase_shift_id);

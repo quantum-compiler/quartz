@@ -1390,4 +1390,65 @@ namespace quartz {
 		}
 		assert(false); // Should never reach here
 	}
+
+	bool Graph::xfer_appliable(GraphXfer *xfer, Op *op) {
+		for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
+			// Find a match for the given Op
+			if (xfer->can_match(*it, *op, this)) {
+				xfer->match(*it, *op, this);
+				bool rest_match =
+				    _match_rest_ops(xfer, op, 0, it - xfer->srcOps.begin(),
+				                    op->guid) != nullptr;
+				xfer->unmatch(*it, *op, this);
+				if (rest_match)
+					return true;
+			}
+		}
+		return false;
+	}
+
+	Graph *Graph::_match_rest_ops(GraphXfer *xfer, Op *op, int depth,
+	                              int ignore_depth, int min_guid) {
+		// The parameter min_guid is the guid of the first mapped Op
+		if (depth == xfer->srcOps.size()) {
+			return xfer->create_new_graph(this);
+		}
+		if (depth == ignore_depth) {
+			return _match_rest_ops(xfer, op, depth + 1, ignore_depth, min_guid);
+		}
+		OpX *srcOp = xfer->srcOps[depth];
+		std::map< Op, std::set< Edge, EdgeCompare >, OpCompare >::const_iterator
+		    it;
+		for (it = inEdges.begin(); it != inEdges.end(); ++it) {
+			if (it->first.guid < min_guid)
+				continue;
+			if (xfer->can_match(srcOp, it->first, this) &&
+			    (xfer->mappedOps.find(it->first) == xfer->mappedOps.end())) {
+				Op match_op = it->first;
+				// Check mapOutput
+				xfer->match(srcOp, match_op, this);
+				Graph *new_graph = _match_rest_ops(xfer, op, depth + 1,
+				                                   ignore_depth, min_guid);
+				xfer->unmatch(srcOp, match_op, this);
+				if (new_graph != nullptr)
+					return new_graph;
+			}
+		}
+		return nullptr;
+	}
+
+	Graph *Graph::apply_transfer(GraphXfer *xfer, Op *op) {
+		for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
+			// Find a match for the given Op
+			if (xfer->can_match(*it, *op, this)) {
+				xfer->match(*it, *op, this);
+				Graph *new_graph = _match_rest_ops(
+				    xfer, op, 0, it - xfer->srcOps.begin(), op->guid);
+				xfer->unmatch(*it, *op, this);
+				if (new_graph != nullptr)
+					return new_graph;
+			}
+		}
+		return nullptr;
+	}
 }; // namespace quartz

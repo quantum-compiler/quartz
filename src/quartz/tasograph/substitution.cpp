@@ -576,6 +576,7 @@ namespace quartz {
 	}
 
 	Graph *GraphXfer::create_new_graph(Graph *graph) {
+		// std::shared_ptr<Graph> newGraph(new Graph(*graph));
 		Graph *newGraph = new Graph(*graph);
 		// Step 1: map dst ops
 		std::map< Op, std::set< Edge, EdgeCompare >, OpCompare >::const_iterator

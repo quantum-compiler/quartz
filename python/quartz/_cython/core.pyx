@@ -1,11 +1,13 @@
 # distutils: language = c++
 
+from cython.operator import dereference
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
 from CCore cimport DAG_ptr
 from CCore cimport GraphXfer
 from CCore cimport Graph
+from CCore cimport Op
 from CCore cimport Context
 from CCore cimport EquivalenceSet
 import ctypes
@@ -47,52 +49,57 @@ def get_gate_type(gate_type_str):
     if gate_type_str == "input_param" :return GateType.input_param        
 
 cdef class PyGate:
-    cdef Gate *cpp_gate
+    cdef Gate *gate
 
     def __cinit__(self, GateType gate_type, int num_qubits, int num_parameters):
-        self.cpp_gate = new Gate(gate_type, num_qubits, num_parameters)
+        self.gate = new Gate(gate_type, num_qubits, num_parameters)
 
     def __dealloc__(self):
-        del self.cpp_gate
+        del self.gate
+
+    cdef set_this(self, Gate* gate_):
+        del self.gate
+        self.gate = gate_
+        return self
 
     def is_commutative(self):
-        return self.cpp_gate.is_commutative()
+        return self.gate.is_commutative()
 
     def get_num_qubits(self):
-        return self.cpp_gate.get_num_qubits()
+        return self.gate.get_num_qubits()
 
     def get_num_parameters(self):
-        return self.cpp_gate.get_num_parameters()
+        return self.gate.get_num_parameters()
 
     def is_parameter_gate(self):
-        return self.cpp_gate.is_parameter_gate()
+        return self.gate.is_parameter_gate()
 
     def is_quantum_gate(self):
-        return self.cpp_gate.is_quantum_gate()
+        return self.gate.is_quantum_gate()
 
     def is_parametrized_gate(self):
-        return self.cpp_gate.is_parametrized_gate()
+        return self.gate.is_parametrized_gate()
 
     def is_toffoli_gate(self):
-        return self.cpp_gate.is_toffoli_gate()
+        return self.gate.is_toffoli_gate()
 
     @property
     def tp(self):
-        return self.cpp_gate.tp
+        return self.gate.tp
 
     @property
     def num_qubits(self):
-        return self.cpp_gate.num_qubits
+        return self.gate.num_qubits
 
     @property
     def num_parameters(self):
-        return self.cpp_gate.num_parameters
+        return self.gate.num_parameters
 
 cdef class PyDAG:
     cdef DAG_ptr dag
 
-    def __cinit__(self):
-        pass
+    def __cinit__(self, int num_qubits=-1, int num_input_parameters=-1):
+        self.dag = new DAG(num_qubits, num_input_parameters)
 
     def __dealloc__(self):
         del self.dag
@@ -106,7 +113,7 @@ cdef class PyXfer:
     cdef GraphXfer *graphXfer
 
     def __cinit__(self, QuartzContext q_context, PyDAG py_dag_from, PyDAG py_dag_to):
-        self.graphXfer = new GraphXfer(q_context.context, py_dag_from.dag, py_dag_to.dag)
+        self.graphXfer = GraphXfer.create_GraphXfer(q_context.context, py_dag_from.dag, py_dag_to.dag)
 
     def __dealloc__(self):
         del self.graphXfer
@@ -130,6 +137,10 @@ cdef class QuartzContext:
         filename_bytes = filename.encode('utf-8')
         assert(self.eqs.load_json(self.context, filename_bytes), "Failed to load equivalence set.")
 
+    # size_t next_global_unique_id();
+    def next_global_unique_id(self):
+        return self.context.next_global_unique_id()
+
     @property
     def xfers(self):
         # Get all the equivalence sets
@@ -143,9 +154,69 @@ cdef class QuartzContext:
                 if first:
                     first = False
                 else:
+                    # Construct PyXfer for both directions
                     xfers.append(PyXfer(self, PyDAG().set_this(eq_set[0]), PyDAG().set_this(dag_ptr)))
+                    xfers.append(PyXfer(self, PyDAG().set_this(dag_ptr), PyDAG().set_this(eq_set[0])))
+                    pass
         return xfers
 
     def get_xfer_from_id(self, id):
         return self.xfers[id]
 
+cdef class PyNode:
+    cdef Op *node
+
+    def __cinit__(self, int node_id, PyGate py_gate):
+        self.node = new Op(node_id, py_gate.gate)
+
+    def __dealloc__(self):
+        del self.node
+
+    @property
+    def node_id(self):
+        return self.node.guid
+
+    @property
+    def gate(self):
+        pass
+
+
+cdef class PyGraph:
+    cdef Graph *graph
+
+    def __cinit__(self, QuartzContext quartz_context, PyDAG py_dag = None):
+        if py_dag == None:
+            self.graph = new Graph(quartz_context.context)
+        else:
+            self.graph = new Graph(quartz_context.context, dereference(py_dag.dag))
+
+    def __dealloc__(self):
+        del self.graph
+
+    cdef set_this(self, Graph *graph_):
+        del self.graph
+        self.graph = graph_
+        return self
+
+    cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
+        return self.graph.xfer_appliable(xfer.graphXfer, node.node)
+
+    def available_xfers(self, quartz_context, py_node, output_format):
+        xfers = quartz_context.xfers
+        result = []
+        for i in range(len(xfers)):
+            xfer = xfers[i]
+            if self._xfer_appliable(xfer, py_node):
+                if output_format in ['int']:
+                    result.append(i)
+                else:
+                    result.append(xfer)
+        return result
+                    
+    cdef _apply_xfer(self, QuartzContext quartz_context, PyXfer xfer, PyNode node):
+        graph = PyGraph(quartz_context)
+        return graph.set_this(self.graph.apply_transfer(xfer.graphXfer, node.node))
+
+    def apply_xfer(self,quartz_context, py_xfer, py_node):
+        return self._apply_xfer(quartz_context, py_xfer, py_node)
+        

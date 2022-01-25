@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(Quartz)
 
+SET(CMAKE_BUILD_TYPE "Debug")
+
 if (EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
   include (${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
 else()
@@ -47,7 +49,8 @@ else()
     set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
 endif()
 
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+# if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Build in Debug mode")
     if (MSVC)
         set(CMAKE_CXX_FLAGS "/Od /Wall ${CMAKE_CXX_FLAGS}")

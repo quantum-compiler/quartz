@@ -57,15 +57,15 @@ namespace quartz {
 		          const DAG *dst_graph);
 		TensorX new_tensor(void);
 		bool map_output(const TensorX &src, const TensorX &dst);
-		bool can_match(OpX *srcOp, Op op, Graph *graph);
-		void match(OpX *srcOp, Op op, Graph *graph);
-		void unmatch(OpX *srcOp, Op op, Graph *graph);
+		bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
+		void match(OpX *srcOp, Op op, const Graph *graph);
+		void unmatch(OpX *srcOp, Op op, const Graph *graph);
 		void run(int depth, Graph *graph,
 		         std::vector< Graph * > &new_candidates, std::set< size_t > &,
 		         float threshold, int maxNumOps, bool enable_early_stop,
 		         bool &stop_search);
 		Graph *run_1_time(int depth, Graph *graph);
-		Graph *create_new_graph(Graph *graph);
+		Graph *create_new_graph(const Graph *graph) const;
 		bool create_new_operator(const OpX *opx, Op &op);
 
 	public:

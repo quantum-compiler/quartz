@@ -311,7 +311,7 @@ namespace quartz {
 		return true;
 	}
 
-	bool GraphXfer::can_match(OpX *srcOp, Op op, Graph *graph) {
+	bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
 		if (srcOp->type != op.ptr->tp)
 			return false;
 		// check num input tensors
@@ -373,7 +373,7 @@ namespace quartz {
 		return true;
 	}
 
-	void GraphXfer::match(OpX *srcOp, Op op, Graph *graph) {
+	void GraphXfer::match(OpX *srcOp, Op op, const Graph *graph) {
 		for (size_t i = 0; i < srcOp->inputs.size(); i++) {
 			TensorX in = srcOp->inputs[i];
 			if (in.op == NULL) {
@@ -395,7 +395,7 @@ namespace quartz {
 		mappedOps[op] = srcOp;
 	}
 
-	void GraphXfer::unmatch(OpX *srcOp, Op op, Graph *graph) {
+	void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
 		for (size_t i = 0; i < srcOp->inputs.size(); i++) {
 			TensorX in = srcOp->inputs[i];
 			if (in.op == NULL) {
@@ -575,7 +575,7 @@ namespace quartz {
 		return true;
 	}
 
-	Graph *GraphXfer::create_new_graph(Graph *graph) {
+	Graph *GraphXfer::create_new_graph(const Graph *graph) const {
 		// std::shared_ptr<Graph> newGraph(new Graph(*graph));
 		Graph *newGraph = new Graph(*graph);
 		// Step 1: map dst ops
@@ -593,11 +593,11 @@ namespace quartz {
 					if (mappedOps.find(it->srcOp) != mappedOps.end()) {
 						// mapped src -> unmapped dst
 						TensorX srcTen;
-						srcTen.op = mappedOps[it->srcOp];
+						srcTen.op = mappedOps.find(it->srcOp)->second;
 						srcTen.idx = it->srcIdx;
 						assert(mappedOutputs.find(srcTen) !=
 						       mappedOutputs.end());
-						TensorX dstTen = mappedOutputs[srcTen];
+						TensorX dstTen = mappedOutputs.find(srcTen)->second;
 						if (dstTen.op == NULL) {
 							// mappedOutput is an input --- this indicates an
 							// empty target graph
@@ -634,7 +634,7 @@ namespace quartz {
 						    context->get_gate(GateType::input_param));
 						newGraph
 						    ->constant_param_values[input_constant_param_op] =
-						    paramValues[dstOp->inputs[i].idx];
+						    paramValues.find(dstOp->inputs[i].idx)->second;
 						newGraph->add_edge(input_constant_param_op,
 						                   dstOp->mapOp, 0, i);
 						continue;

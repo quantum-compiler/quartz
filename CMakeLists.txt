@@ -72,13 +72,16 @@ target_compile_features(quartz_runtime PUBLIC cxx_std_17)
 target_link_libraries(quartz_runtime ${QUARTZ_LINK_LIBS})
 
 target_include_directories(quartz_runtime
-  PUBLIC ${PROJECT_SOURCE_DIR}/src)
+  PUBLIC ${PROJECT_SOURCE_DIR}/src/quartz)
 
 #install library
 install(TARGETS quartz_runtime
     LIBRARY DESTINATION lib)
 
-install (DIRECTORY ${PROJECT_SOURCE_DIR}/include
+# install (DIRECTORY ${PROJECT_SOURCE_DIR}/include
+#     DESTINATION .)
+
+install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz
     DESTINATION .)
 
 add_subdirectory(test)

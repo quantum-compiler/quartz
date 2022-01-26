@@ -66,7 +66,7 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
   dataset.clear();
 
   start = std::chrono::steady_clock::now();
-  system(("python ../python/verify_equivalences.py " + file_prefix +
+  system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
       "unverified.json " + file_prefix + "verified.json")
              .c_str());
   equiv_set.clear();

@@ -1412,6 +1412,28 @@ namespace quartz {
 	                              int min_guid) const {
 		// The parameter min_guid is the guid of the first mapped Op
 		if (depth == xfer->srcOps.size()) {
+			// Check that output tensors with external edges are mapped
+			for (auto mapped_ops_it = xfer->mappedOps.cbegin();
+			     mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
+				if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
+					const std::set< Edge, EdgeCompare > &list =
+					    outEdges.find(mapped_ops_it->first)->second;
+					for (auto edge_it = list.cbegin(); edge_it != list.cend();
+					     ++edge_it)
+						if (xfer->mappedOps.find(edge_it->dstOp) ==
+						    xfer->mappedOps.end()) {
+							// dstOp is external, (srcOp, srcIdx) must be in
+							// mappedOutputs
+							TensorX srcTen;
+							srcTen.op = mapped_ops_it->second;
+							srcTen.idx = edge_it->srcIdx;
+							if (xfer->mappedOutputs.find(srcTen) ==
+							    xfer->mappedOutputs.end()) {
+								return nullptr;
+							}
+						}
+				}
+			}
 			return xfer->create_new_graph(this);
 		}
 		if (depth == ignore_depth) {

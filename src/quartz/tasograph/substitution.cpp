@@ -312,27 +312,34 @@ namespace quartz {
 	}
 
 	bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
+		// This function takes in an OpX, and will check all its input and
+		// output tensors. If there are tensors connecting it with other already
+		// mapped ops, check whether these edges exists in the given Graph. No
+		// need to call this function with topological order. Because once both
+		// the src op and the dst op are mapped, the edge connecting them will
+		// be checked. This gauarentee that every edges are checked at the end.
 		if (srcOp->type != op.ptr->tp)
 			return false;
-		// check num input tensors
+		// Check num input tensors
 		if ((int)srcOp->inputs.size() !=
 		    op.ptr->get_num_qubits() + op.ptr->get_num_parameters())
 			return false;
-		// check inputs
+		// Check inputs
 		std::map< int, std::pair< Op, int > > newMapInputs;
 		for (size_t i = 0; i < srcOp->inputs.size(); i++) {
 			TensorX in = srcOp->inputs[i];
-			if (in.op == NULL) {
-				// input tensor
+			if (in.op == NULL) { // Input tensor
 				std::multimap< int, std::pair< Op, int > >::const_iterator it;
 				it = mappedInputs.find(in.idx);
 				if (it != mappedInputs.end()) {
+					// Input is already mapped
 					Op mappedOp = it->second.first;
 					int mappedIdx = it->second.second;
 					if (!(graph->has_edge(mappedOp, op, mappedIdx, i)))
 						return false;
 				}
 				else {
+					// Input haven't been mapped
 					std::map< int, std::pair< Op, int > >::const_iterator newit;
 					newit = newMapInputs.find(in.idx);
 					if (newit != newMapInputs.end()) {
@@ -353,21 +360,49 @@ namespace quartz {
 							}
 						}
 					}
-					// Do nothing when we check the match
-					/* mapped in.idx to an op
-					std::set<Edge, EdgeCompare> list =
-					graph->inEdges.find(op)->second; std::set<Edge,
-					EdgeCompare>::const_iterator it2; for (it2 = list.begin();
-					it2 != list.end(); it2++) { Edge e = *it2; if (e.dstIdx ==
-					i) mappedInputs[in.idx] = std::make_pair(e.srcOp, e.srcIdx);
-					}*/
 				}
 			}
 			else {
-				// intermediate tensor
-				assert(in.op->mapOp.ptr != NULL);
-				if (!(graph->has_edge(in.op->mapOp, op, in.idx, i)))
+				// Intermediate tensor
+				// If the src op of the edge is not mapped, skip it
+				if (in.op->mapOp.ptr == nullptr)
+					continue;
+				else if (!(graph->has_edge(in.op->mapOp, op, in.idx, i)))
 					return false;
+			}
+			// Check output
+			for (size_t i = 0; i < srcOp->outputs.size(); i++) {
+				TensorX out = srcOp->outputs[i];
+				std::map< TensorX, TensorX, TensorXCompare >::const_iterator it;
+				it = mappedOutputs.find(out);
+				// If out is in mappedOutputs, it represents an external edge,
+				// we don't check it here
+				if (it == mappedOutputs.end()) {
+					// We have to find out the dst op of this output edge and
+					// check its existence in the Graph
+					bool found = false;
+					for (auto mapped_ops_it = mappedOps.cbegin();
+					     mapped_ops_it != mappedOps.cend(); ++mapped_ops_it) {
+						OpX *output_src_opx = mapped_ops_it->second;
+						for (size_t j = 0; j < output_src_opx->inputs.size();
+						     ++j) {
+							auto input_tensor = output_src_opx->inputs[j];
+							if (input_tensor.op == out.op &&
+							    input_tensor.idx == out.idx) {
+								found = true;
+								if (!graph->has_edge(srcOp->mapOp,
+								                     mapped_ops_it->first, i,
+								                     j)) {
+									return false;
+								}
+								else
+									break;
+							}
+						}
+						if (found)
+							break;
+					}
+				}
 			}
 		}
 		return true;
@@ -376,7 +411,8 @@ namespace quartz {
 	void GraphXfer::match(OpX *srcOp, Op op, const Graph *graph) {
 		for (size_t i = 0; i < srcOp->inputs.size(); i++) {
 			TensorX in = srcOp->inputs[i];
-			if (in.op == NULL) {
+			if (in.op == nullptr) {
+				// Input TensorX
 				// Update mappedInputs
 				std::set< Edge, EdgeCompare > list =
 				    graph->inEdges.find(op)->second;
@@ -398,7 +434,7 @@ namespace quartz {
 	void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
 		for (size_t i = 0; i < srcOp->inputs.size(); i++) {
 			TensorX in = srcOp->inputs[i];
-			if (in.op == NULL) {
+			if (in.op == nullptr) {
 				// Update mappedInputsa
 				std::multimap< int, std::pair< Op, int > >::iterator it;
 				it = mappedInputs.find(in.idx);
@@ -408,7 +444,7 @@ namespace quartz {
 		// Unmap op
 		mappedOps.erase(op);
 		srcOp->mapOp.guid = 0;
-		srcOp->mapOp.ptr = NULL;
+		srcOp->mapOp.ptr = nullptr;
 	}
 
 	Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
@@ -502,7 +538,7 @@ namespace quartz {
 				}
 			if (!pass)
 				return;
-			// Check that output tensors with external edges are mapped
+			// Check that all external edges are mapped outputs
 			std::map< Op, OpX *, OpCompare >::const_iterator opIt;
 			for (opIt = mappedOps.begin(); opIt != mappedOps.end(); opIt++) {
 				const std::set< Edge, EdgeCompare > &list =
@@ -599,8 +635,8 @@ namespace quartz {
 						       mappedOutputs.end());
 						TensorX dstTen = mappedOutputs.find(srcTen)->second;
 						if (dstTen.op == NULL) {
-							// mappedOutput is an input --- this indicates an
-							// empty target graph
+							// mappedOutput is an input --- this indicates
+							// an empty target graph
 							std::multimap< int, std::pair< Op, int > >::
 							    const_iterator it2 =
 							        mappedInputs.find(dstTen.idx);

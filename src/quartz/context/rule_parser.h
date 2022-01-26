@@ -31,7 +31,6 @@ namespace quartz {
 			tp = to_gate_type(gate_tp);
 
 			std::string input;
-			int param_cnt = 0;
 			while (!iss.eof()) {
 				getline(iss, input, ' ');
 				if (input == "")

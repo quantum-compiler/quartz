@@ -79,7 +79,7 @@ void test_pruning(const std::vector< GateType > &supported_gates,
 		}
 
 		start = std::chrono::steady_clock::now();
-		system(("python ../python/verify_equivalences.py " + file_prefix +
+		system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
 		        "pruning_unverified.json " + file_prefix + "pruning.json")
 		           .c_str());
 		equiv_set.clear();
@@ -186,7 +186,7 @@ void test_pruning(const std::vector< GateType > &supported_gates,
 
 		start = std::chrono::steady_clock::now();
 		// Do not invoke SMT solver to save time at first.
-		system(("python ../python/verify_equivalences.py " + file_prefix +
+		system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
 		        "original_unverified.json " + file_prefix + "original.json -n")
 		           .c_str());
 		equiv_set.clear();
@@ -236,7 +236,7 @@ void test_pruning(const std::vector< GateType > &supported_gates,
 		           1000.0
 		    << " seconds." << std::endl;
 
-		system(("python ../python/verify_equivalences.py " + file_prefix +
+		system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
 		        "original_unverified.json " + file_prefix +
 		        "original_verified.json")
 		           .c_str());

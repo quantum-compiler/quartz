@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 from cython.operator import dereference
+from libcpp.vector cimport vector
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
@@ -219,4 +220,18 @@ cdef class PyGraph:
 
     def apply_xfer(self,quartz_context, py_xfer, py_node):
         return self._apply_xfer(quartz_context, py_xfer, py_node)
+        
+    cdef _all_ops(self):
+        cdef int gate_count = self.gate_count
+        cdef vector[Op] vec
+        vec.resize(gate_count)
+        self.graph.all_ops(vec)
+        py_node_list = []
+        for i in range(gate_count):
+            py_node_list.append(PyNode(vec[i].guid, PyGate().set_this(vec[i].ptr)))
+        return py_node_list
+
+    @property
+    def gate_count(self):
+        return self.graph.gate_count()
         

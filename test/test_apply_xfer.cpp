@@ -6,12 +6,13 @@
 using namespace quartz;
 
 int main() {
-	Context ctx({GateType::input_qubit, GateType::input_param, GateType::h});
+	Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
+	             GateType::cx});
 
 	// Construct circuit graph from qasm file
 	QASMParser qasm_parser(&ctx);
 	DAG *dag = nullptr;
-	if (!qasm_parser.load_qasm("circuit/example-circuits/h_h.qasm", dag)) {
+	if (!qasm_parser.load_qasm("circuit/example-circuits/h_h_cx.qasm", dag)) {
 		std::cout << "Parser failed" << std::endl;
 		return 0;
 	}
@@ -19,7 +20,6 @@ int main() {
 
 	EquivalenceSet eqs;
 	// Load equivalent dags from file
-	auto start = std::chrono::steady_clock::now();
 	if (!eqs.load_json(&ctx, "bfs_verified_simplified.json")) {
 		std::cout << "Failed to load equivalence file." << std::endl;
 		assert(false);

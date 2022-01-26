@@ -177,6 +177,7 @@ namespace quartz {
 		size_t hash();
 		bool check_correctness();
 		float total_cost() const;
+		int gate_count() const;
 		size_t get_next_special_op_guid();
 		size_t get_special_op_guid();
 		void set_special_op_guid(size_t _special_op_guid);

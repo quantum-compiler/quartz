@@ -86,6 +86,8 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *, const DAG&) except +
         bool xfer_appliable(GraphXfer *, Op *)
         Graph *apply_transfer(GraphXfer *, Op *)
+        void all_ops(vector[Op]&) const
+        int gate_count() const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

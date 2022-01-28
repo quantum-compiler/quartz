@@ -10,31 +10,31 @@ ctypedef float ParamType
 
 cdef extern from "gate/gate_utils.h" namespace "quartz":
     cpdef enum class GateType:
-        h
-        x
-        y
-        rx
-        ry
-        rz
-        cx
-        ccx
-        add
-        neg
-        z
-        s
-        sdg
-        t
-        tdg
-        ch
-        swap
-        p
-        pdg
-        u1
-        u2
-        u3
-        ccz
-        cz
-        input_qubit
+        h,
+        x,
+        y,
+        rx,
+        ry,
+        rz,
+        cx,
+        ccx,
+        add,
+        neg,
+        z,
+        s,
+        sdg,
+        t,
+        tdg,
+        ch,
+        swap,
+        p,
+        pdg,
+        u1,
+        u2,
+        u3,
+        ccz,
+        cz,
+        input_qubit,
         input_param
 
 cdef extern from "math/matrix.h" namespace "quartz":
@@ -64,6 +64,11 @@ ctypedef Context* Context_ptr
 cdef extern from "dag/dag.h" namespace "quartz":
     cdef cppclass DAG:
         DAG(int, int) except +
+        int get_num_qubits() const
+        int get_num_input_parameters() const
+        int get_num_total_parameters() const
+        int get_num_internal_parameters() const
+        int get_num_gates() const
 
 ctypedef DAG* DAG_ptr
 
@@ -83,7 +88,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Graph:
         Graph(Context *) except +
-        Graph(Context *, const DAG&) except +
+        Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op *)
         Graph *apply_transfer(GraphXfer *, Op *)
         void all_ops(vector[Op]&) const
@@ -93,5 +98,11 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":
     cdef cppclass EquivalenceSet:
         EquivalenceSet() except +
+        int num_equivalence_classes() const
         bool load_json(Context *, const string)
         vector[vector[DAG_ptr]] get_all_equivalence_sets() except +
+
+cdef extern from "parser/qasm_parser.h" namespace "quartz":
+    cdef cppclass QASMParser:
+        QASMParser(Context *)
+        bool load_qasm(const string &, DAG *&) except +

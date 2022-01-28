@@ -11,15 +11,12 @@ from CCore cimport Graph
 from CCore cimport Op
 from CCore cimport Context
 from CCore cimport EquivalenceSet
+from CCore cimport QASMParser
+from enum import Enum
 import ctypes
 
 ctypedef GraphXfer* GraphXfer_ptr
 
-cdef class PyGateType:
-    cdef GateType gt
-
-    def __cinit__(self, GateType gt_):
-        self.gt = gt_
 
 def get_gate_type(gate_type_str):
     if gate_type_str == "h": return GateType.h
@@ -49,10 +46,23 @@ def get_gate_type(gate_type_str):
     if gate_type_str == "input_qubit" :return GateType.input_qubit        
     if gate_type_str == "input_param" :return GateType.input_param        
 
+cdef class PyQASMParser:
+    cdef QASMParser *parser
+
+    def __cinit__(self, QuartzContext qc):
+        self.parser = new QASMParser(qc.context)
+
+    def __dealloc__(self):
+        del self.parser
+
+    def load_qasm(self, qasm_fn, PyDAG py_dag):
+        qasm_fn_bytes = qasm_fn.encode('utf-8')
+        return self.parser.load_qasm(qasm_fn_bytes, py_dag.dag)
+
 cdef class PyGate:
     cdef Gate *gate
 
-    def __cinit__(self, GateType gate_type, int num_qubits, int num_parameters):
+    def __cinit__(self, GateType gate_type=GateType.h, int num_qubits=1, int num_parameters=0):
         self.gate = new Gate(gate_type, num_qubits, num_parameters)
 
     def __dealloc__(self):
@@ -99,7 +109,7 @@ cdef class PyGate:
 cdef class PyDAG:
     cdef DAG_ptr dag
 
-    def __cinit__(self, int num_qubits=-1, int num_input_parameters=-1):
+    def __cinit__(self, int num_qubits=1, int num_input_parameters=1):
         self.dag = new DAG(num_qubits, num_input_parameters)
 
     def __dealloc__(self):
@@ -109,6 +119,26 @@ cdef class PyDAG:
         del self.dag
         self.dag = dag_
         return self
+
+    @property
+    def num_qubits(self):
+        return self.dag.get_num_qubits()
+    
+    @property
+    def num_input_parameters(self):
+        return self.dag.get_num_input_parameters()
+    
+    @property
+    def num_total_parameters(self):
+        return self.dag.get_num_total_parameters() 
+
+    @property
+    def num_internal_parameters(self):
+        return self.dag.get_num_internal_parameters() 
+    
+    @property
+    def num_gates(self):
+        return self.dag.get_num_gates() 
 
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
@@ -129,6 +159,8 @@ cdef class QuartzContext:
     cdef EquivalenceSet *eqs
 
     def __cinit__(self, gate_type_list, equivalence_set_filename):
+        if GateType.input_param not in gate_type_list:
+            gate_type_list.append(GateType.input_param)
         self.context = new Context(gate_type_list)
         self.eqs = new EquivalenceSet()
         self.load_json(equivalence_set_filename)
@@ -143,22 +175,25 @@ cdef class QuartzContext:
         return self.context.next_global_unique_id()
 
     @property
+    def num_equivalence_classes(self):
+        return self.eqs.num_equivalence_classes()
+
+    @property
     def xfers(self):
         # Get all the equivalence sets
         # And convert them into xfers
         eq_sets = self.eqs.get_all_equivalence_sets()
 
         xfers = []
-        for eq_set in eq_sets:
-            first = True
-            for dag_ptr in eq_set:
-                if first:
-                    first = False
-                else:
-                    # Construct PyXfer for both directions
-                    xfers.append(PyXfer(self, PyDAG().set_this(eq_set[0]), PyDAG().set_this(dag_ptr)))
-                    xfers.append(PyXfer(self, PyDAG().set_this(dag_ptr), PyDAG().set_this(eq_set[0])))
-                    pass
+        for i in range(eq_sets.size()):
+            for j in range(eq_sets[i].size()):
+                if j != 0:
+                    dag_0 = PyDAG().set_this(eq_sets[i][0])
+                    dag_1 = PyDAG().set_this(eq_sets[i][j])
+                    xfer_0 = PyXfer(self, dag_0, dag_1)
+                    xfer_1 = PyXfer(self, dag_1, dag_0)
+                    xfers.append(xfer_0)
+                    xfers.append(xfer_1)
         return xfers
 
     def get_xfer_from_id(self, id):
@@ -189,7 +224,7 @@ cdef class PyGraph:
         if py_dag == None:
             self.graph = new Graph(quartz_context.context)
         else:
-            self.graph = new Graph(quartz_context.context, dereference(py_dag.dag))
+            self.graph = new Graph(quartz_context.context, py_dag.dag)
 
     def __dealloc__(self):
         del self.graph
@@ -221,7 +256,7 @@ cdef class PyGraph:
     def apply_xfer(self,quartz_context, py_xfer, py_node):
         return self._apply_xfer(quartz_context, py_xfer, py_node)
         
-    cdef _all_ops(self):
+    cdef _all_nodes(self):
         cdef int gate_count = self.gate_count
         cdef vector[Op] vec
         vec.resize(gate_count)
@@ -230,6 +265,9 @@ cdef class PyGraph:
         for i in range(gate_count):
             py_node_list.append(PyNode(vec[i].guid, PyGate().set_this(vec[i].ptr)))
         return py_node_list
+    
+    def all_nodes(self):
+        return self._all_nodes()
 
     @property
     def gate_count(self):

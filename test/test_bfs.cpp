@@ -3,11 +3,11 @@
 using namespace quartz;
 
 int main() {
-	Context ctx({GateType::h, GateType::rz, GateType::cx, GateType::add});
+	Context ctx({GateType::h});
 	Generator gen(&ctx);
 
 	const int num_qubits = 1;
-	const int num_input_parameters = 2;
+	const int num_input_parameters = 0;
 	const int max_num_quantum_gates = 2;
 	const int max_num_param_gates = 1;
 	const bool run_dfs = false; // original (without pruning) and

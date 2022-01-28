@@ -21,7 +21,7 @@ void test_optimization(Context *ctx, const std::string &file_name,
 		return;
 	}
 
-	quartz::Graph graph(ctx, *dag);
+	quartz::Graph graph(ctx, dag);
 	std::cout << graph.total_cost() << " gates in circuit before optimizing."
 	          << std::endl;
 	auto start = std::chrono::steady_clock::now();

@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 	if (!qasm_parser.load_qasm(input_fn, dag)) {
 		std::cout << "Parser failed" << std::endl;
 	}
-	Graph graph(&src_ctx, *dag);
+	Graph graph(&src_ctx, dag);
 
 	// Greedy toffoli flip
 	Graph *new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first,

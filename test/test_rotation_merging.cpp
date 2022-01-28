@@ -26,7 +26,7 @@ int main() {
 		std::cout << "Parser failed" << std::endl;
 	}
 
-	Graph graph(&union_ctx, *dag);
+	Graph graph(&union_ctx, dag);
 	RuleParser rule_parser(
 	    {"t q0 = rz q0 0.25pi", // t -> rz
 	     "tdg q0 = rz q0 -0.25pi",

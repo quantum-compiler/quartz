@@ -14,7 +14,7 @@ int main() {
 		std::cout << "Parser failed" << std::endl;
 	}
 
-	Graph graph(ctx, *dag);
+	Graph graph(ctx, dag);
 	graph.to_qasm("temp.qasm", /*print_result=*/true, true);
 	graph.draw_circuit("temp.qasm", "temp.png");
 }

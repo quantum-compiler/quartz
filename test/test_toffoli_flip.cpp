@@ -41,7 +41,7 @@ int main() {
 	if (!qasm_parser.load_qasm(benchmark_filename, dag)) {
 		std::cout << "Parser failed" << std::endl;
 	}
-	Graph graph(&src_ctx, *dag);
+	Graph graph(&src_ctx, dag);
 	Graph *new_graph =
 	    graph.toffoli_flip_greedy(GateType::rz, xfer, xfer_inverse);
 	std::cout << "gate count after toffoli flip: " << new_graph->total_cost()

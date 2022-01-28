@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
 	if (!qasm_parser.load_qasm(input_fn, dag)) {
 		std::cout << "Parser failed" << std::endl;
 	}
-	Graph graph(&src_ctx, *dag);
+	Graph graph(&src_ctx, dag);
 
 	// Context shift
 	RuleParser rule_parser({"h q0 = u2 q0 0 pi", "x q0 = u3 q0 0.5pi, 0, -pi"});

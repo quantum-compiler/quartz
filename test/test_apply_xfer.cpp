@@ -12,11 +12,11 @@ int main() {
 	// Construct circuit graph from qasm file
 	QASMParser qasm_parser(&ctx);
 	DAG *dag = nullptr;
-	if (!qasm_parser.load_qasm("circuit/example-circuits/h_h_cx.qasm", dag)) {
+	if (!qasm_parser.load_qasm("circuit/example-circuits/h_h.qasm", dag)) {
 		std::cout << "Parser failed" << std::endl;
 		return 0;
 	}
-	Graph graph(&ctx, *dag);
+	Graph graph(&ctx, dag);
 
 	EquivalenceSet eqs;
 	// Load equivalent dags from file
@@ -27,6 +27,8 @@ int main() {
 
 	// Get xfer from the equivalent set
 	auto all_xfers = eqs.get_all_equivalence_sets();
+	auto num_equivalent_classes = eqs.num_equivalence_classes();
+	std::cout << num_equivalent_classes << std::endl;
 	GraphXfer *xfer =
 	    GraphXfer::create_GraphXfer(&ctx, all_xfers[0][1], all_xfers[0][0]);
 

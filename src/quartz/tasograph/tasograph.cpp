@@ -31,12 +31,11 @@ namespace quartz {
 	Graph::Graph(Context *ctx)
 	    : context(ctx), special_op_guid(0), totalCost(0.0f) {}
 
-	Graph::Graph(Context *ctx, const DAG &dag)
+	Graph::Graph(Context *ctx, const DAG *dag)
 	    : context(ctx), special_op_guid(0) {
-		// assert(dag);
 		// Guid for input qubit and input parameter nodes
-		int num_input_qubits = dag.get_num_qubits();
-		int num_input_params = dag.get_num_input_parameters();
+		int num_input_qubits = dag->get_num_qubits();
+		int num_input_params = dag->get_num_input_parameters();
 		// Currently only 100 vacant guid
 		assert(num_input_qubits + num_input_params <= GUID_PRESERVED);
 		std::vector< Op > input_qubits_op;
@@ -51,7 +50,7 @@ namespace quartz {
 		// 	input_params_op.push_back(
 		// 	    Op(get_next_special_op_guid(),
 		// ctx->get_gate(GateType::input_param)));
-		for (auto &node : dag.nodes) {
+		for (auto &node : dag->nodes) {
 			if (node->type == DAGNode::input_qubit) {
 				auto input_qubit_op = Op(get_next_special_op_guid(),
 				                         ctx->get_gate(GateType::input_qubit));
@@ -67,7 +66,7 @@ namespace quartz {
 
 		// Map all edges in dag to Op
 		std::map< DAGHyperEdge *, Op > edge_2_op;
-		for (auto &edge : dag.edges) {
+		for (auto &edge : dag->edges) {
 			auto e = edge.get();
 			if (edge_2_op.find(e) == edge_2_op.end()) {
 				Op op(ctx->next_global_unique_id(), edge->gate);
@@ -77,7 +76,7 @@ namespace quartz {
 
 		//   std::cout << edge_2_op.size() << std::endl;
 
-		for (auto &node : dag.nodes) {
+		for (auto &node : dag->nodes) {
 			int srcIdx = -1; // Assumption: a node can have at most 1 input
 			Op srcOp;
 			if (node->type == DAGNode::input_qubit) {

@@ -161,6 +161,8 @@ cdef class QuartzContext:
     def __cinit__(self, gate_type_list, equivalence_set_filename):
         if GateType.input_param not in gate_type_list:
             gate_type_list.append(GateType.input_param)
+        if GateType.input_qubit not in gate_type_list:
+            gate_type_list.append(GateType.input_qubit)
         self.context = new Context(gate_type_list)
         self.eqs = new EquivalenceSet()
         self.load_json(equivalence_set_filename)

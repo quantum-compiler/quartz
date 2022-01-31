@@ -35,6 +35,9 @@ int main() {
 	std::vector< Op > ops;
 	graph.all_ops(ops);
 	for (auto it = ops.begin(); it != ops.end(); ++it) {
+		std::cout << gate_type_name(it->ptr->tp) << std::endl;
+	}
+	for (auto it = ops.begin(); it != ops.end(); ++it) {
 		bool xfer_ok = graph.xfer_appliable(xfer, &(*it));
 		std::cout << (int)xfer_ok << std::endl;
 	}

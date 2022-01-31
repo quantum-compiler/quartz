@@ -89,8 +89,8 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Graph:
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
-        bool xfer_appliable(GraphXfer *, Op *)
-        Graph *apply_transfer(GraphXfer *, Op *)
+        bool xfer_appliable(GraphXfer *, Op *) except +
+        Graph *apply_transfer(GraphXfer *, Op *) except +
         void all_ops(vector[Op]&) const
         int gate_count() const
         

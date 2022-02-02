@@ -200,7 +200,7 @@ namespace quartz {
 		Graph *toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
 		                           GraphXfer *inverse_xfer);
 		bool xfer_appliable(GraphXfer *xfer, Op *op) const;
-		Graph *apply_transfer(GraphXfer *xfer, Op *op);
+		Graph *apply_xfer(GraphXfer *xfer, Op *op);
 		Graph *_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
 		                       int min_guid) const;
 		void all_ops(std::vector< Op > &ops);

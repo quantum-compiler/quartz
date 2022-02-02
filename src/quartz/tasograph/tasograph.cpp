@@ -1420,6 +1420,18 @@ namespace quartz {
 	                              int min_guid) const {
 		// The parameter min_guid is the guid of the first mapped Op
 		if (depth == xfer->srcOps.size()) {
+			// Create dst operators
+			bool pass = true;
+			for (auto dst_it = xfer->dstOps.cbegin();
+			     dst_it != xfer->dstOps.cend(); ++dst_it) {
+				if (pass) {
+					OpX *dstOp = *dst_it;
+					pass =
+					    (pass & xfer->create_new_operator(dstOp, dstOp->mapOp));
+				}
+			}
+			if (!pass)
+				return nullptr;
 			// Check that output tensors with external edges are mapped
 			for (auto mapped_ops_it = xfer->mappedOps.cbegin();
 			     mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
@@ -1448,9 +1460,7 @@ namespace quartz {
 			return _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
 		}
 		OpX *srcOp = xfer->srcOps[depth];
-		std::map< Op, std::set< Edge, EdgeCompare >, OpCompare >::const_iterator
-		    it;
-		for (it = inEdges.begin(); it != inEdges.end(); ++it) {
+		for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
 			if (it->first.guid < min_guid)
 				continue;
 			if (xfer->can_match(srcOp, it->first, this) &&
@@ -1468,7 +1478,7 @@ namespace quartz {
 		return nullptr;
 	}
 
-	Graph *Graph::apply_transfer(GraphXfer *xfer, Op *op) {
+	Graph *Graph::apply_xfer(GraphXfer *xfer, Op *op) {
 		for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
 			// Find a match for the given Op
 			if (xfer->can_match(*it, *op, this)) {
@@ -1476,15 +1486,16 @@ namespace quartz {
 				Graph *new_graph = _match_rest_ops(
 				    xfer, 0, it - xfer->srcOps.begin(), op->guid);
 				xfer->unmatch(*it, *op, this);
-				if (new_graph != nullptr)
+				if (new_graph != nullptr) {
 					return new_graph;
+				}
 			}
 		}
 		return nullptr;
 	}
 
 	void Graph::all_ops(std::vector< Op > &ops) {
-		for (auto it = inEdges.begin(); it != inEdges.end(); ++it) {
+		for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
 			ops.push_back(it->first);
 		}
 	}

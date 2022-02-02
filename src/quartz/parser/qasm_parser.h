@@ -59,7 +59,7 @@ namespace quartz {
 				find_and_replace_all(line, ",", " ");
 				// ignore semicolon at the end
 				find_and_replace_all(line, ";", "");
-				std::cout << line << std::endl;
+				// std::cout << line << std::endl;
 				std::stringstream ss(line);
 				std::string command;
 				std::getline(ss, command, ' ');

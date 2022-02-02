@@ -18,7 +18,7 @@ import ctypes
 ctypedef GraphXfer* GraphXfer_ptr
 
 
-def get_gate_type(gate_type_str):
+def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "h": return GateType.h
     if gate_type_str == "x": return GateType.x
     if gate_type_str == "y": return GateType.y
@@ -159,7 +159,10 @@ cdef class QuartzContext:
     cdef EquivalenceSet *eqs
     cdef vector[GraphXfer *] v_xfers
 
-    def __cinit__(self, gate_type_list, equivalence_set_filename):
+    def __cinit__(self, gate_set_strs, equivalence_set_filename):
+        gate_type_list = []
+        for s in gate_set_strs:
+            gate_type_list.append(get_gate_type_from_str(s))
         if GateType.input_param not in gate_type_list:
             gate_type_list.append(GateType.input_param)
         if GateType.input_qubit not in gate_type_list:
@@ -240,21 +243,17 @@ cdef class PyNode:
 
     @property
     def gate_tp(self):
-        if self.node == NULL:
-            print("node NULL")
-        if self.node.ptr == NULL:
-            print("gate NULL")
         return self.node.ptr.tp
 
 
 cdef class PyGraph:
     cdef Graph *graph
 
-    def __cinit__(self, QuartzContext quartz_context, PyDAG py_dag = None):
-        if py_dag == None:
-            self.graph = new Graph(quartz_context.context)
-        else:
-            self.graph = new Graph(quartz_context.context, py_dag.dag)
+    def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
+        if context == None:
+            self.graph = NULL
+        elif dag != None:
+            self.graph = new Graph(context.context, dag.dag)
 
     def __dealloc__(self):
         pass
@@ -264,10 +263,6 @@ cdef class PyGraph:
         return self
 
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
-        if xfer.graphXfer == NULL:
-            print("xfer NULL")
-        if node.node == NULL:
-            print("node NULL")
         return self.graph.xfer_appliable(xfer.graphXfer, node.node)
 
     def available_xfers(self, quartz_context, py_node, output_format):
@@ -275,19 +270,14 @@ cdef class PyGraph:
         result = []
         for i in range(len(xfers)):
             if self._xfer_appliable(xfers[i], py_node):
-                print("_xfer_appliable")
                 if output_format in ['int']:
                     result.append(i)
                 else:
                     result.append(xfers[i])
         return result
                     
-    cdef _apply_xfer(self, QuartzContext quartz_context, PyXfer xfer, PyNode node):
-        graph = PyGraph(quartz_context)
-        return graph.set_this(self.graph.apply_transfer(xfer.graphXfer, node.node))
-
-    def apply_xfer(self,quartz_context, py_xfer, py_node):
-        return self._apply_xfer(quartz_context, py_xfer, py_node)
+    def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
+        return PyGraph().set_this(self.graph.apply_xfer(xfer.graphXfer, node.node))
         
     cdef _all_nodes(self):
         cdef int gate_count = self.gate_count
@@ -301,6 +291,9 @@ cdef class PyGraph:
     
     def all_nodes(self):
         return self._all_nodes()
+
+    def hash(self):
+        return self.graph.hash()
 
     @property
     def gate_count(self):

@@ -90,9 +90,10 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op *) except +
-        Graph *apply_transfer(GraphXfer *, Op *) except +
+        Graph *apply_xfer(GraphXfer *, Op *) except +
         void all_ops(vector[Op]&) const
         int gate_count() const
+        size_t hash()
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

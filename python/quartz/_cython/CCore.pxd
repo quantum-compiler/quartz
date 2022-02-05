@@ -86,6 +86,12 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Gate * ptr
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
+    cdef cppclass Edge:
+        Op srcOp, dstOp
+        int srcIdx, dstIdx
+
+
+cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Graph:
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
@@ -94,6 +100,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         void all_ops(vector[Op]&) const
         int gate_count() const
         size_t hash()
+        void all_edges(vector[Edge]&) const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

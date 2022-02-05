@@ -2,6 +2,7 @@
 
 from cython.operator import dereference
 from libcpp.vector cimport vector
+from libcpp.memory cimport shared_ptr
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
@@ -12,6 +13,7 @@ from CCore cimport Op
 from CCore cimport Context
 from CCore cimport EquivalenceSet
 from CCore cimport QASMParser
+from CCore cimport Edge
 from enum import Enum
 import ctypes
 
@@ -49,21 +51,28 @@ def get_gate_type_from_str(gate_type_str):
 cdef class PyQASMParser:
     cdef QASMParser *parser
 
-    def __cinit__(self, QuartzContext qc):
-        self.parser = new QASMParser(qc.context)
+    def __cinit__(self, *, QuartzContext context):
+        self.parser = new QASMParser(context.context)
 
     def __dealloc__(self):
         pass
 
-    def load_qasm(self, qasm_fn, PyDAG py_dag):
-        qasm_fn_bytes = qasm_fn.encode('utf-8')
-        return self.parser.load_qasm(qasm_fn_bytes, py_dag.dag)
+    def load_qasm(self, *, str filename) -> PyDAG:
+        dag = PyDAG()
+        filename_bytes = filename.encode('utf-8')
+        success = self.parser.load_qasm(filename_bytes, dag.dag)
+        assert(success, "Failed to load qasm file!")
+        return dag
 
 cdef class PyGate:
     cdef Gate *gate
 
-    def __cinit__(self, GateType gate_type=GateType.h, int num_qubits=1, int num_parameters=0):
-        self.gate = new Gate(gate_type, num_qubits, num_parameters)
+    def __cinit__(self, *, str type_name=None, int num_qubits=-1, int num_parameters=-1):
+        if type_name is not None and num_qubits >= 0 and num_parameters >= 0:
+            gate_type = get_gate_type_from_str(type_name.lower())
+            self.gate = new Gate(gate_type, num_qubits, num_parameters)
+        else:
+            self.gate = NULL
 
     def __dealloc__(self):
         pass
@@ -108,8 +117,11 @@ cdef class PyGate:
 cdef class PyDAG:
     cdef DAG_ptr dag
 
-    def __cinit__(self, int num_qubits=1, int num_input_parameters=1):
-        self.dag = new DAG(num_qubits, num_input_parameters)
+    def __cinit__(self, *, int num_qubits=-1, int num_input_params=-1):
+        if num_qubits >= 0 and num_input_params >= 0:
+            self.dag = new DAG(num_qubits, num_input_params)
+        else:
+            self.dag = NULL
 
     def __dealloc__(self):
         pass
@@ -141,11 +153,11 @@ cdef class PyDAG:
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
 
-    def __cinit__(self, QuartzContext q_context=None, PyDAG py_dag_from=None, PyDAG py_dag_to=None):
-        if q_context == None:
+    def __cinit__(self, *, QuartzContext context=None, PyDAG dag_from=None, PyDAG dag_to=None):
+        if context == None:
             self.graphXfer = NULL
-        else:
-            self.graphXfer = GraphXfer.create_GraphXfer(q_context.context, py_dag_from.dag, py_dag_to.dag)
+        elif dag_from is not None and dag_to is not None:
+            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag)
 
     def __dealloc__(self):
         pass
@@ -159,9 +171,9 @@ cdef class QuartzContext:
     cdef EquivalenceSet *eqs
     cdef vector[GraphXfer *] v_xfers
 
-    def __cinit__(self, gate_set_strs, equivalence_set_filename):
+    def __cinit__(self, *,  gate_set, filename):
         gate_type_list = []
-        for s in gate_set_strs:
+        for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
         if GateType.input_param not in gate_type_list:
             gate_type_list.append(GateType.input_param)
@@ -169,7 +181,7 @@ cdef class QuartzContext:
             gate_type_list.append(GateType.input_qubit)
         self.context = new Context(gate_type_list)
         self.eqs = new EquivalenceSet()
-        self.load_json(equivalence_set_filename)
+        self.load_json(filename)
 
         eq_sets = self.eqs.get_all_equivalence_sets()
 
@@ -205,7 +217,7 @@ cdef class QuartzContext:
             xfers.append(PyXfer().set_this(self.v_xfers[i]))
         return xfers
 
-    def get_xfer_from_id(self, id):
+    def get_xfer_from_id(self, *, id):
         xfer = PyXfer().set_this(self.v_xfers[id])
         return xfer
 
@@ -220,11 +232,11 @@ cdef class QuartzContext:
 cdef class PyNode:
     cdef Op *node
 
-    def __cinit__(self, int node_id = -1, PyGate py_gate = None):
-        if node_id == -1:
-            self.node = NULL
+    def __cinit__(self, *, int id = -1, PyGate gate = None):
+        if id != -1 and gate != None:
+            self.node = new Op(id, gate.gate)
         else:
-            self.node = new Op(node_id, py_gate.gate)
+            self.node = NULL
 
     def __dealloc__(self):
         pass
@@ -248,6 +260,7 @@ cdef class PyNode:
 
 cdef class PyGraph:
     cdef Graph *graph
+    # cdef shared_ptr[Graph] g
 
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
         if context == None:
@@ -286,7 +299,7 @@ cdef class PyGraph:
         self.graph.all_ops(vec)
         py_node_list = []
         for i in range(gate_count):
-            py_node_list.append(PyNode(vec[i].guid, PyGate().set_this(vec[i].ptr)))
+            py_node_list.append(PyNode(id=vec[i].guid, gate=PyGate().set_this(vec[i].ptr)))
         return py_node_list
     
     def all_nodes(self):
@@ -294,6 +307,49 @@ cdef class PyGraph:
 
     def hash(self):
         return self.graph.hash()
+
+    cdef _all_edges(self):
+        cdef vector[Edge] vec
+        self.graph.all_edges(vec)
+        edges = []
+        cdef int edge_cnt = vec.size()
+        for i in range(edge_cnt):
+            e = (vec[i].srcOp.guid, vec[i].dstOp.guid, vec[i].srcIdx, vec[i].dstIdx)
+            edges.append(e)
+        return edges
+
+
+    def all_edges(self):
+        return self._all_edges()
+
+    def to_dgl_graph(self):
+        import dgl
+        import torch
+        
+        edges = self._all_edges()
+        src_id = []
+        dst_id = []
+        src_idx = []
+        dst_idx = []
+        for e in edges:
+            src_id.append(e[0])
+            dst_id.append(e[1])
+            src_idx.append(e[2])
+            dst_idx.append(e[3])
+
+        g = dgl.graph((torch.tensor(src_id), torch.tensor(dst_id)))
+        print(torch.tensor(src_idx).shape)
+        g.edata['src_idx'] = torch.tensor(src_idx)
+        g.edata['dst_idx'] = torch.tensor(dst_idx)
+
+        return g
+
+
+    def __lt__(self, other):
+        return self.gate_count < other.gate_count
+    
+    def __le__(self, other):
+        return self.gate_count <= other.gate_count
 
     @property
     def gate_count(self):

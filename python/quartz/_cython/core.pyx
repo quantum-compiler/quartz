@@ -16,6 +16,8 @@ from CCore cimport QASMParser
 from CCore cimport Edge
 from enum import Enum
 import ctypes
+import dgl
+import torch
 
 ctypedef GraphXfer* GraphXfer_ptr
 
@@ -230,28 +232,24 @@ cdef class QuartzContext:
         return self.v_xfers.size()
 
 cdef class PyNode:
-    cdef Op *node
+    cdef Op node
 
-    def __cinit__(self, *, int id = -1, PyGate gate = None):
+    def __cinit__(self, *, int guid = -1, PyGate gate = None):
         if id != -1 and gate != None:
-            self.node = new Op(id, gate.gate)
+            self.node = Op(guid, gate.gate)
         else:
-            self.node = NULL
+            self.node = Op()
 
     def __dealloc__(self):
         pass
     
-    cdef set_this(self, Op *node_):
-        self.node = node_
-        return self
-
     @property
-    def node_id(self):
+    def node_guid(self):
         return self.node.guid
 
     @property
     def gate(self):
-        pass
+        return PyGate().set_this(self.node.ptr)
 
     @property
     def gate_tp(self):
@@ -260,19 +258,27 @@ cdef class PyNode:
 
 cdef class PyGraph:
     cdef Graph *graph
-    # cdef shared_ptr[Graph] g
+    cdef vector[Op] nodes
 
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
-        if context == None:
-            self.graph = NULL
-        elif dag != None:
+        if context != None and dag != None:
             self.graph = new Graph(context.context, dag.dag)
+            gate_count = self.gate_count
+            self.nodes.reserve(gate_count)
+            self.graph.topology_order_ops(self.nodes)
+        else:
+            self.graph = NULL
+            self.nodes.clear()
 
     def __dealloc__(self):
         pass
 
     cdef set_this(self, Graph *graph_):
         self.graph = graph_
+        gate_count = self.gate_count
+        self.nodes.clear()
+        self.nodes.reserve(gate_count)
+        self.graph.topology_order_ops(self.nodes)
         return self
 
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
@@ -292,41 +298,47 @@ cdef class PyGraph:
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
         return PyGraph().set_this(self.graph.apply_xfer(xfer.graphXfer, node.node))
         
-    cdef _all_nodes(self):
-        cdef int gate_count = self.gate_count
-        cdef vector[Op] vec
-        vec.reserve(gate_count)
-        self.graph.all_ops(vec)
+    def all_nodes_with_id(self) -> list:
         py_node_list = []
+        gate_count = self.gate_count
         for i in range(gate_count):
-            py_node_list.append(PyNode(id=vec[i].guid, gate=PyGate().set_this(vec[i].ptr)))
+            node_dict = {}
+            node_dict['id'] = i
+            node_dict['node'] = PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr))
+            py_node_list.append(node_dict)
         return py_node_list
-    
-    def all_nodes(self):
-        return self._all_nodes()
+
+    def all_nodes(self) -> list:
+        py_node_list = []
+        gate_count = self.gate_count
+        for i in range(gate_count):
+            py_node_list.append(PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr)))
+        return py_node_list
+
+    def get_node_from_id(self, *, id) -> PyNode:
+        assert(id < self.num_nodes)
+        return PyNode(guid=self.nodes[id].guid, gate=PyGate().set_this(self.nodes[id].ptr))
 
     def hash(self):
         return self.graph.hash()
 
-    cdef _all_edges(self):
-        cdef vector[Edge] vec
-        self.graph.all_edges(vec)
+    def all_edges(self):
+        id_guid_mapping = {}
+        gate_cnt = self.nodes.size()
+        for i in range(gate_cnt):
+            id_guid_mapping[self.nodes[i].guid] = i
+
+        cdef vector[Edge] edge_v
+        self.graph.all_edges(edge_v)
         edges = []
-        cdef int edge_cnt = vec.size()
+        cdef int edge_cnt = edge_v.size()
         for i in range(edge_cnt):
-            e = (vec[i].srcOp.guid, vec[i].dstOp.guid, vec[i].srcIdx, vec[i].dstIdx)
+            e = (id_guid_mapping[edge_v[i].srcOp.guid], id_guid_mapping[edge_v[i].dstOp.guid], edge_v[i].srcIdx, edge_v[i].dstIdx)
             edges.append(e)
         return edges
 
-
-    def all_edges(self):
-        return self._all_edges()
-
     def to_dgl_graph(self):
-        import dgl
-        import torch
-        
-        edges = self._all_edges()
+        edges = self.all_edges()
         src_id = []
         dst_id = []
         src_idx = []
@@ -338,7 +350,6 @@ cdef class PyGraph:
             dst_idx.append(e[3])
 
         g = dgl.graph((torch.tensor(src_id), torch.tensor(dst_id)))
-        print(torch.tensor(src_idx).shape)
         g.edata['src_idx'] = torch.tensor(src_idx)
         g.edata['dst_idx'] = torch.tensor(dst_idx)
 
@@ -353,5 +364,15 @@ cdef class PyGraph:
 
     @property
     def gate_count(self):
-        return self.graph.gate_count()
+        return self.nodes.size()
+
+    @property
+    def num_nodes(self):
+        return self.nodes.size()
+
+    @property
+    def num_edges(self):
+        cdef vector[Edge] edge_v
+        self.graph.all_edges(edge_v)
+        return edge_v.size()
         

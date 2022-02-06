@@ -313,7 +313,8 @@ float Graph::total_cost(void) const {
 int Graph::gate_count() const {
   int cnt = 0;
   for (const auto &it : inEdges) {
-    if (it.first.ptr->is_quantum_gate())
+    if (it.first.ptr->tp != GateType::input_qubit &&
+        it.first.ptr->tp != GateType::input_param)
       cnt++;
   }
   return cnt;
@@ -1332,14 +1333,14 @@ Graph *Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
   assert(false); // Should never reach here
 }
 
-bool Graph::xfer_appliable(GraphXfer *xfer, Op *op) const {
+bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
     // Find a match for the given Op
-    if (xfer->can_match(*it, *op, this)) {
-      xfer->match(*it, *op, this);
+    if (xfer->can_match(*it, op, this)) {
+      xfer->match(*it, op, this);
       bool rest_match = _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(),
-                                        op->guid) != nullptr;
-      xfer->unmatch(*it, *op, this);
+                                        op.guid) != nullptr;
+      xfer->unmatch(*it, op, this);
       if (rest_match)
         return true;
     }
@@ -1405,14 +1406,14 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
   return nullptr;
 }
 
-Graph *Graph::apply_xfer(GraphXfer *xfer, Op *op) {
+Graph *Graph::apply_xfer(GraphXfer *xfer, Op op) {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
     // Find a match for the given Op
-    if (xfer->can_match(*it, *op, this)) {
-      xfer->match(*it, *op, this);
+    if (xfer->can_match(*it, op, this)) {
+      xfer->match(*it, op, this);
       Graph *new_graph =
-          _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(), op->guid);
-      xfer->unmatch(*it, *op, this);
+          _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(), op.guid);
+      xfer->unmatch(*it, op, this);
       if (new_graph != nullptr) {
         return new_graph;
       }
@@ -1428,8 +1429,43 @@ void Graph::all_ops(std::vector<Op> &ops) {
 }
 
 void Graph::all_edges(std::vector<Edge> &edges) {
-  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
-    edges.insert(edges.end(), it->second.begin(), it->second.end());
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
+    if (it->first.ptr->tp != GateType::input_qubit &&
+        it->first.ptr->tp != GateType::input_param)
+      edges.insert(edges.end(), it->second.begin(), it->second.end());
   }
 }
+
+void Graph::topology_order_ops(std::vector<Op> &ops) const {
+  std::unordered_map<Op, int, OpHash> op_in_degree;
+  std::queue<Op> op_q;
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
+    if (it->first.ptr->tp == GateType::input_qubit ||
+        it->first.ptr->tp == GateType::input_param) {
+      op_q.push(it->first);
+    }
+  }
+
+  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
+    op_in_degree[it->first] = it->second.size();
+  }
+
+  while (!op_q.empty()) {
+    auto op = op_q.front();
+    op_q.pop();
+    if (outEdges.find(op) != outEdges.end()) {
+      auto op_out_edges = outEdges.find(op)->second;
+      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
+           ++e_it) {
+        assert(op_in_degree[e_it->dstOp] > 0);
+        op_in_degree[e_it->dstOp]--;
+        if (op_in_degree[e_it->dstOp] == 0) {
+          ops.push_back(e_it->dstOp);
+          op_q.push(e_it->dstOp);
+        }
+      }
+    }
+  }
+}
+
 }; // namespace quartz

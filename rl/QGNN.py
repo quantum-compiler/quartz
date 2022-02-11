@@ -133,9 +133,9 @@ g.edata['reversed'] = torch.tensor(reverse)
 g.ndata['gate_type'] = torch.tensor(node_gate_tp)
 
 g.ndata['label'] = torch.tensor([1,1,1,1,1,1])
-g.ndata['train_mask'] = torch.tensor([1,1,1,1,0,0]) 
-g.ndata['val_mask'] = torch.tensor([0,0,0,0,1,0]) 
-g.ndata['test_mask'] = torch.tensor([0,0,0,0,0,1]) 
+g.ndata['train_mask'] = torch.tensor([1,1,1,1,0,0],dtype=torch.bool) 
+g.ndata['val_mask'] = torch.tensor([0,0,0,0,1,0],dtype=torch.bool) 
+g.ndata['test_mask'] = torch.tensor([0,0,0,0,0,1],dtype=torch.bool) 
     
 model = QGNN(5, 16, 200, 16)
 train(g, model)

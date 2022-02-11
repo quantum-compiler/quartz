@@ -78,10 +78,8 @@ target_include_directories(quartz_runtime
 install(TARGETS quartz_runtime
     LIBRARY DESTINATION lib)
 
-# install (DIRECTORY ${PROJECT_SOURCE_DIR}/include
-#     DESTINATION .)
-
-install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz
-    DESTINATION .)
+install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
+    DESTINATION include/quartz
+    FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory(test)

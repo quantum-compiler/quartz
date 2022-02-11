@@ -360,6 +360,10 @@ cdef class PyGraph:
         g.edata['dst_idx'] = torch.tensor(dst_idx2)
         g.edata['reversed'] = torch.tensor(reversed)
 
+        nodes = self.all_nodes()
+        node_gate_tp = [node.gate_tp for node in nodes]
+        g.ndata['gate_type'] = torch.tensor(node_gate_tp)
+
         return g
 
 

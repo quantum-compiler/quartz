@@ -343,15 +343,22 @@ cdef class PyGraph:
         dst_id = []
         src_idx = []
         dst_idx = []
+        
         for e in edges:
             src_id.append(e[0])
             dst_id.append(e[1])
             src_idx.append(e[2])
             dst_idx.append(e[3])
+        src_id2 = src_id + dst_id
+        dst_id2 = dst_id + src_id
+        src_idx2 = src_idx + dst_idx
+        dst_idx2 = dst_idx + src_idx
+        reversed = [0] * len(src_id) + [1] * len(src_id)
 
-        g = dgl.graph((torch.tensor(src_id), torch.tensor(dst_id)))
-        g.edata['src_idx'] = torch.tensor(src_idx)
-        g.edata['dst_idx'] = torch.tensor(dst_idx)
+        g = dgl.graph((torch.tensor(src_id2), torch.tensor(dst_id2)))
+        g.edata['src_idx'] = torch.tensor(src_idx2)
+        g.edata['dst_idx'] = torch.tensor(dst_idx2)
+        g.edata['reversed'] = torch.tensor(reversed)
 
         return g
 

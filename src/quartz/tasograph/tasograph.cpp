@@ -1146,6 +1146,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   hashmap.insert(hash());
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
+  start = std::chrono::steady_clock::now();
   // TODO: add optional rotation merging in sa
   if (use_simulated_annealing) {
     const double kSABeginTemp = bestCost;
@@ -1279,8 +1280,19 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
         ;
       }
       counter++;
-      fprintf(stderr, "bestCost(%.4lf) candidates(%zu)\n", bestCost,
-              candidates.size());
+      end = std::chrono::steady_clock::now();
+      std::cout
+          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                 end - start)
+                     .count() /
+                 1000.0
+          << " seconds." << std::endl;
+      fprintf(stderr, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
+              bestCost, candidates.size(),
+              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start)
+                      .count() /
+                  1000.0);
 
       std::vector<Graph *> new_candidates;
       bool stop_search = false;

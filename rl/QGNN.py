@@ -111,6 +111,50 @@ def train(g, model):
             print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
                 e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
    
+def train_supervised(g, model):
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    all_logits = []
+    best_val_acc = 0
+    best_test_acc = 0
+
+    features = g.ndata['gate_type']
+
+    labels = g.ndata['label']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+    for e in range(20):
+        # Forward
+        logits = model(g)
+
+        # Compute loss
+        # Note that we should only compute the losses of the nodes in the training set,
+        # i.e. with train_mask 1.
+        #print(logits)
+        
+        loss = torch.nn.MSELoss()(logits[train_mask], labels[train_mask])
+        pred = logits > 0.5
+
+        # Compute accuracy on training/validation/test
+        train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
+        val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
+        test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+
+        # Save the best validation accuracy and the corresponding test accuracy.
+        if best_val_acc < val_acc:
+            best_val_acc = val_acc
+            best_test_acc = test_acc
+
+        # Backward
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        all_logits.append(logits.detach())
+
+        if e % 5 == 0:
+            print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
+                e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
+   
 
     
 #import dgl.data
@@ -132,10 +176,11 @@ g.edata['dst_idx'] = torch.tensor(dst_idx2)
 g.edata['reversed'] = torch.tensor(reverse)
 g.ndata['gate_type'] = torch.tensor(node_gate_tp)
 
-g.ndata['label'] = torch.tensor([1,1,1,1,1,1])
+#g.ndata['label'] = torch.tensor([1,1,1,1,1,1])
+g.ndata['label'] = torch.tensor([[1,1,1],[1,1,1],[1,1,1],[1,1,1],[1,1,1],[1,1,1]],dtype=torch.float)
 g.ndata['train_mask'] = torch.tensor([1,1,1,1,0,0],dtype=torch.bool) 
 g.ndata['val_mask'] = torch.tensor([0,0,0,0,1,0],dtype=torch.bool) 
 g.ndata['test_mask'] = torch.tensor([0,0,0,0,0,1],dtype=torch.bool) 
     
-model = QGNN(5, 16, 200, 16)
-train(g, model)
+model = QGNN(5, 16, 3, 16)
+train_supervised(g, model)

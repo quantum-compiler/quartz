@@ -26,6 +26,7 @@ def config_cython():
                 ["%s/%s" % (path, fn)],
                 include_dirs=["../src/quartz/", "/usr/local/include/"],
                 libraries=["quartz_runtime"],
+                library_dirs=["/usr/local/lib/"],
                 extra_compile_args=["-std=c++17"],
                 extra_link_args=[],
                 language="c++"))

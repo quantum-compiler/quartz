@@ -296,7 +296,11 @@ cdef class PyGraph:
         return result
                     
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
-        return PyGraph().set_this(self.graph.apply_xfer(xfer.graphXfer, node.node))
+        ret = self.graph.apply_xfer(xfer.graphXfer, node.node)
+        if ret == NULL:
+            return None
+        else:
+            return PyGraph().set_this(ret)
         
     def all_nodes_with_id(self) -> list:
         py_node_list = []

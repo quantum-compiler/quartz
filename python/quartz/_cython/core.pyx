@@ -388,7 +388,7 @@ cdef class PyGraph:
 
     @property
     def gate_count(self):
-        return self.nodes.size()
+        return self.graph.gate_count()
 
     @property
     def num_nodes(self):

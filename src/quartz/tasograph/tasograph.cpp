@@ -1394,7 +1394,13 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
           }
       }
     }
-    return xfer->create_new_graph(this);
+
+    auto new_graph = xfer->create_new_graph(this);
+    if (new_graph->has_loop()) {
+      delete new_graph;
+      return nullptr;
+    }
+    return new_graph;
   }
   if (depth == ignore_depth) {
     return _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);

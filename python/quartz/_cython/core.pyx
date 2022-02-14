@@ -284,11 +284,11 @@ cdef class PyGraph:
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
         return self.graph.xfer_appliable(xfer.graphXfer, node.node)
 
-    def available_xfers(self, quartz_context, py_node, output_format):
-        xfers = quartz_context.get_xfers()
+    def available_xfers(self,*, context, node, output_format):
+        xfers = context.get_xfers()
         result = []
         for i in range(len(xfers)):
-            if self._xfer_appliable(xfers[i], py_node):
+            if self._xfer_appliable(xfers[i], node):
                 if output_format in ['int']:
                     result.append(i)
                 else:
@@ -370,6 +370,15 @@ cdef class PyGraph:
 
         return g
 
+    def get_available_xfers_matrix(self, *, context):
+        rows, cols = (self.num_nodes, context.num_xfers)
+        arr = [[0 for i in range(cols)] for j in range(rows)]
+        nodes = self.all_nodes()
+        for i in range(rows):
+            available_list = self.available_xfers(context=context, node=nodes[i], output_format='int')
+            for xfer_id in available_list:
+                arr[i][xfer_id] = 1
+        return arr
 
     def __lt__(self, other):
         return self.gate_count < other.gate_count

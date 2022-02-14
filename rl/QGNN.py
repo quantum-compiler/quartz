@@ -48,7 +48,7 @@ class QGNN(nn.Module):
         self.conv3 = QConv(h_feats, inter_dim, h_feats)
         self.conv4 = QConv(h_feats, inter_dim, h_feats)
         self.conv5 = QConv(h_feats, inter_dim, num_classes)
-        self.embedding = nn.Embedding(5, 5)
+        self.embedding = nn.Embedding(in_feats, in_feats)
     
     def forward(self, g):
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])

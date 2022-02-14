@@ -284,7 +284,7 @@ cdef class PyGraph:
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
         return self.graph.xfer_appliable(xfer.graphXfer, node.node)
 
-    def available_xfers(self,*, context, node, output_format):
+    def available_xfers(self, *, context, node, output_format):
         xfers = context.get_xfers()
         result = []
         for i in range(len(xfers)):

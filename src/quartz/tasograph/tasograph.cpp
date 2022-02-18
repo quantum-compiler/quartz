@@ -1360,8 +1360,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return false;
 }
 
-Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
-                              int min_guid) const {
+std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, int depth,
+                                              int ignore_depth,
+                                              int min_guid) const {
   // The parameter min_guid is the guid of the first mapped Op
   if (depth == xfer->srcOps.size()) {
     // Create dst operators
@@ -1374,7 +1375,7 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
       }
     }
     if (!pass)
-      return nullptr;
+      return std::shared_ptr<Graph>(nullptr);
     // Check that output tensors with external edges are mapped
     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
          mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
@@ -1389,7 +1390,7 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
             srcTen.op = mapped_ops_it->second;
             srcTen.idx = edge_it->srcIdx;
             if (xfer->mappedOutputs.find(srcTen) == xfer->mappedOutputs.end()) {
-              return nullptr;
+              return std::shared_ptr<Graph>(nullptr);
             }
           }
       }
@@ -1397,8 +1398,8 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
 
     auto new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      delete new_graph;
-      return nullptr;
+      new_graph.reset();
+      return new_graph;
     }
     return new_graph;
   }
@@ -1414,30 +1415,29 @@ Graph *Graph::_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
       Op match_op = it->first;
       // Check mapOutput
       xfer->match(srcOp, match_op, this);
-      Graph *new_graph =
-          _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
+      auto new_graph = _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
       xfer->unmatch(srcOp, match_op, this);
       if (new_graph != nullptr)
         return new_graph;
     }
   }
-  return nullptr;
+  return std::shared_ptr<Graph>(nullptr);
 }
 
-Graph *Graph::apply_xfer(GraphXfer *xfer, Op op) {
+std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
     // Find a match for the given Op
     if (xfer->can_match(*it, op, this)) {
       xfer->match(*it, op, this);
-      Graph *new_graph =
+      auto new_graph =
           _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(), op.guid);
       xfer->unmatch(*it, op, this);
-      if (new_graph != nullptr) {
+      if (new_graph.get() != nullptr) {
         return new_graph;
       }
     }
   }
-  return nullptr;
+  return std::shared_ptr<Graph>(nullptr);
 }
 
 void Graph::all_ops(std::vector<Op> &ops) {

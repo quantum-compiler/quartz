@@ -1,8 +1,8 @@
 # distutils: language = c++
 
-from cython.operator import dereference
+from cython.operator cimport dereference as deref
 from libcpp.vector cimport vector
-from libcpp.memory cimport shared_ptr
+from libcpp.memory cimport shared_ptr, make_shared
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
@@ -257,32 +257,33 @@ cdef class PyNode:
 
 
 cdef class PyGraph:
-    cdef Graph *graph
+    # cdef Graph *graph
+    cdef shared_ptr[Graph] graph
     cdef vector[Op] nodes
 
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
         if context != None and dag != None:
-            self.graph = new Graph(context.context, dag.dag)
+            self.graph = make_shared[Graph](context.context, dag.dag)
             gate_count = self.gate_count
             self.nodes.reserve(gate_count)
-            self.graph.topology_order_ops(self.nodes)
+            deref(self.graph).topology_order_ops(self.nodes)
         else:
-            self.graph = NULL
+            self.graph = shared_ptr[Graph](NULL)
             self.nodes.clear()
 
     def __dealloc__(self):
-        pass
+        self.graph.reset()
 
-    cdef set_this(self, Graph *graph_):
+    cdef set_this(self, shared_ptr[Graph] graph_):
         self.graph = graph_
         gate_count = self.gate_count
         self.nodes.clear()
         self.nodes.reserve(gate_count)
-        self.graph.topology_order_ops(self.nodes)
+        deref(self.graph).topology_order_ops(self.nodes)
         return self
 
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
-        return self.graph.xfer_appliable(xfer.graphXfer, node.node)
+        return deref(self.graph).xfer_appliable(xfer.graphXfer, node.node)
 
     def available_xfers(self, *, context, node, output_format):
         xfers = context.get_xfers()
@@ -296,8 +297,8 @@ cdef class PyGraph:
         return result
                     
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
-        ret = self.graph.apply_xfer(xfer.graphXfer, node.node)
-        if ret == NULL:
+        ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node)
+        if ret.get() == NULL:
             return None
         else:
             return PyGraph().set_this(ret)
@@ -324,7 +325,7 @@ cdef class PyGraph:
         return PyNode(guid=self.nodes[id].guid, gate=PyGate().set_this(self.nodes[id].ptr))
 
     def hash(self):
-        return self.graph.hash()
+        return deref(self.graph).hash()
 
     def all_edges(self):
         id_guid_mapping = {}
@@ -333,7 +334,7 @@ cdef class PyGraph:
             id_guid_mapping[self.nodes[i].guid] = i
 
         cdef vector[Edge] edge_v
-        self.graph.all_edges(edge_v)
+        deref(self.graph).all_edges(edge_v)
         edges = []
         cdef int edge_cnt = edge_v.size()
         for i in range(edge_cnt):
@@ -388,7 +389,7 @@ cdef class PyGraph:
 
     @property
     def gate_count(self):
-        return self.graph.gate_count()
+        return deref(self.graph).gate_count()
 
     @property
     def num_nodes(self):
@@ -397,6 +398,6 @@ cdef class PyGraph:
     @property
     def num_edges(self):
         cdef vector[Edge] edge_v
-        self.graph.all_edges(edge_v)
+        deref(self.graph).all_edges(edge_v)
         return edge_v.size()
         

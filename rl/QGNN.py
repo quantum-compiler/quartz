@@ -116,6 +116,7 @@ def train_supervised(g, model):
     all_logits = []
     best_val_acc = 0
     best_test_acc = 0
+    epochs = 20
 
     features = g.ndata['gate_type']
 
@@ -123,7 +124,7 @@ def train_supervised(g, model):
     train_mask = g.ndata['train_mask']
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
-    for e in range(20):
+    for e in range(epochs):
         # Forward
         logits = model(g)
 
@@ -152,8 +153,8 @@ def train_supervised(g, model):
         all_logits.append(logits.detach())
 
         if e % 5 == 0:
-            print('In epoch {}, loss: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
-                e, loss, val_acc, best_val_acc, test_acc, best_test_acc))
+            print('In epoch {}, loss: {:.3f}, train acc: {:.3f}, val acc: {:.3f} (best {:.3f}), test acc: {:.3f} (best {:.3f})'.format(
+                e, loss, train_acc, val_acc, best_val_acc, test_acc, best_test_acc))
    
 
     

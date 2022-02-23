@@ -102,6 +102,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         size_t hash()
         void all_edges(vector[Edge]&) const
         void topology_order_ops(vector[Op] &) const
+        shared_ptr[Graph] ccz_flip_t(Context *)
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

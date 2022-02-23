@@ -257,7 +257,6 @@ cdef class PyNode:
 
 
 cdef class PyGraph:
-    # cdef Graph *graph
     cdef shared_ptr[Graph] graph
     cdef vector[Op] nodes
 
@@ -285,7 +284,7 @@ cdef class PyGraph:
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
         return deref(self.graph).xfer_appliable(xfer.graphXfer, node.node)
 
-    def available_xfers(self, *, context, node, output_format):
+    def available_xfers(self, *, context, node, output_format="int"):
         xfers = context.get_xfers()
         result = []
         for i in range(len(xfers)):
@@ -380,6 +379,11 @@ cdef class PyGraph:
             for xfer_id in available_list:
                 arr[i][xfer_id] = 1
         return arr
+
+    def toffoli_flip(self, *, QuartzContext context, str target):
+        if target == "t":
+            return PyGraph().set_this(deref(self.graph).ccz_flip_t(context.context))
+        return None
 
     def __lt__(self, other):
         return self.gate_count < other.gate_count

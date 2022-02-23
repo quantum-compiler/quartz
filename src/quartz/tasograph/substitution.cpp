@@ -221,6 +221,24 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_u1_xfer(Context *ctx) {
   return std::make_pair(xfer_0, xfer_1);
 }
 
+std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
+  Context dst_ctx({GateType::t, GateType::tdg, GateType::cx,
+                   GateType::input_qubit, GateType::input_param});
+  std::pair<RuleParser *, RuleParser *> toffoli_rules =
+      RuleParser::ccz_cx_t_rules();
+  std::vector<Command> cmds;
+  Command cmd;
+  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                             cmds);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
+                                              cmds);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
+  delete toffoli_rules.first;
+  delete toffoli_rules.second;
+  return std::make_pair(xfer_0, xfer_1);
+}
+
 GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
                      const DAG *dst_graph)
     : context(_context), tensorId(10) {
@@ -433,7 +451,7 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
   srcOp->mapOp.ptr = nullptr;
 }
 
-Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
+std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
   if (depth >= (int)srcOps.size()) {
     // Create dst operators
     bool pass = true;
@@ -481,7 +499,7 @@ Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
       return nullptr;
     }
     // return dst_graph;
-    return dst_graph.get();
+    return dst_graph;
   } else {
     OpX *srcOp = srcOps[depth];
     std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
@@ -496,7 +514,7 @@ Graph *GraphXfer::run_1_time(int depth, Graph *src_graph) {
         match(srcOp, op, src_graph);
         auto dst_graph = run_1_time(depth + 1, src_graph);
         unmatch(srcOp, op, src_graph);
-        if (dst_graph != nullptr)
+        if (dst_graph.get() != nullptr)
           return dst_graph;
       }
     }

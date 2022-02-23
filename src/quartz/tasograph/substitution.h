@@ -61,7 +61,7 @@ public:
   void run(int depth, Graph *graph, std::vector<Graph *> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps,
            bool enable_early_stop, bool &stop_search);
-  Graph *run_1_time(int depth, Graph *graph);
+  std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);
   std::shared_ptr<Graph> create_new_graph(const Graph *graph) const;
   bool create_new_operator(const OpX *opx, Op &op);
 
@@ -73,6 +73,7 @@ public:
                                                  std::vector<Command> dst_cmds);
   static std::pair<GraphXfer *, GraphXfer *> ccz_cx_rz_xfer(Context *ctx);
   static std::pair<GraphXfer *, GraphXfer *> ccz_cx_u1_xfer(Context *ctx);
+  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_t_xfer(Context *ctx);
 
 public:
   Context *context;

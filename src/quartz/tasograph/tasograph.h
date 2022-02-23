@@ -202,6 +202,9 @@ public:
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;
+  std::shared_ptr<Graph> ccz_flip_t(Context *ctx);
+  std::shared_ptr<Graph> ccz_flip_greedy_rz();
+  std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
 private:
   void replace_node(Op oldOp, Op newOp);

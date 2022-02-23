@@ -292,7 +292,8 @@ Graph *Graph::context_shift(Context *src_ctx, Context *dst_ctx,
   Graph *src_graph = this;
   Graph *dst_graph = nullptr;
   for (auto it = tp_2_xfer.begin(); it != tp_2_xfer.end(); ++it) {
-    while ((dst_graph = it->second->run_1_time(0, src_graph)) != nullptr) {
+    while ((dst_graph = it->second->run_1_time(0, src_graph).get()) !=
+           nullptr) {
       if (src_graph != this)
         delete src_graph;
       src_graph = dst_graph;
@@ -1320,12 +1321,40 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   return bestGraph;
 }
 
+std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
+  // Transform ccz to t, an naive solution
+  // Simply 1 normal 1 inverse
+  auto xfers = GraphXfer::ccz_cx_t_xfer(ctx);
+  Graph *graph = this;
+  bool flip = false;
+  while (true) {
+    std::shared_ptr<Graph> new_graph(nullptr);
+    if (flip) {
+      new_graph = xfers.first->run_1_time(0, graph);
+      flip = false;
+    } else {
+      new_graph = xfers.second->run_1_time(0, graph);
+      flip = true;
+    }
+    if (new_graph.get() == nullptr) {
+      return std::shared_ptr<Graph>(graph);
+    }
+    if (graph != this)
+      delete graph;
+    graph = new_graph.get();
+  }
+  assert(false); // Should never reach here
+}
+
+// std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {}
+// std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
+
 Graph *Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
                                   GraphXfer *inverse_xfer) {
   Graph *graph = this;
   while (true) {
-    Graph *new_graph_0 = xfer->run_1_time(0, graph);
-    Graph *new_graph_1 = inverse_xfer->run_1_time(0, graph);
+    auto new_graph_0 = xfer->run_1_time(0, graph);
+    auto new_graph_1 = inverse_xfer->run_1_time(0, graph);
     if (new_graph_0 == nullptr) {
       assert(new_graph_1 == nullptr);
       return graph;
@@ -1335,11 +1364,11 @@ Graph *Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
     if (graph != this)
       delete graph;
     if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
-      delete new_graph_1;
-      graph = new_graph_0;
+      new_graph_1.reset();
+      graph = new_graph_0.get();
     } else {
-      delete new_graph_0;
-      graph = new_graph_1;
+      new_graph_0.reset();
+      graph = new_graph_1.get();
     }
   }
   assert(false); // Should never reach here

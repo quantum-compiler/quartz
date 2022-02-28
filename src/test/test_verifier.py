@@ -2,8 +2,8 @@ import sys
 
 sys.path.append("..")
 
-from verifier.verifier import *
-from verifier.gates import *
+from src.python.verifier.verifier import *
+from src.python.verifier.gates import *
 
 
 def test_apply_matrix():

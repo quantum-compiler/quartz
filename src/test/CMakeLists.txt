@@ -26,9 +26,9 @@ else()
 endif()
 
 include_directories(${CMAKE_INCLUDE_PATH})
-include_directories("../src/")
+include_directories("..")
 
-link_directories("../")
+link_directories("../..")
 
 file(GLOB_RECURSE TEST_ALL "test_all.cpp")
 file(GLOB_RECURSE TEST_BFS "test_bfs.cpp")

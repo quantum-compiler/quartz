@@ -36,10 +36,10 @@ CMakeFiles/*
 cmake-build-*
 CMakeCache.txt
 cmake_install.cmake
-test/CMakeFiles/
-test/cmake_install.cmake
-test/CMakeCache.txt
-test/Makefile
+src/test/CMakeFiles/
+src/test/cmake_install.cmake
+src/test/CMakeCache.txt
+src/test/Makefile
 Makefile
 
 # IDE

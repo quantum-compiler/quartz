@@ -84,7 +84,7 @@ int main() {
 	               /*count_minimal_representations=*/true);
 
 	// Working directory is cmake-build-debug/ here.
-	system("python ../test/test_verifier.py");
+	system("python ../src/test/test_verifier.py");
 
 	test_equivalence_set(all_supported_gates(), "equivalences.json",
 	                     "equivalences_simplified.json");

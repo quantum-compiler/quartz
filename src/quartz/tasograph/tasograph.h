@@ -195,8 +195,9 @@ public:
                     const std::string &save_filename);
   size_t get_num_qubits();
   void print_qubit_ops();
-  Graph *toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
-                             GraphXfer *inverse_xfer);
+  std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
+                                             GraphXfer *xfer,
+                                             GraphXfer *inverse_xfer);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   void all_ops(std::vector<Op> &ops);

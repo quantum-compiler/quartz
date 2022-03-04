@@ -12,7 +12,7 @@ enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 16000,
+  GUID_PRESERVED = 100000,
 };
 
 bool equal_to_2k_pi(double d) {
@@ -1349,26 +1349,31 @@ std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
 // std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {}
 // std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
 
-Graph *Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
-                                  GraphXfer *inverse_xfer) {
+std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
+                                                  GraphXfer *xfer,
+                                                  GraphXfer *inverse_xfer) {
   Graph *graph = this;
+  std::shared_ptr<Graph> temp_graph(nullptr);
   while (true) {
-    auto new_graph_0 = xfer->run_1_time(0, graph);
-    auto new_graph_1 = inverse_xfer->run_1_time(0, graph);
+    std::shared_ptr<Graph> new_graph_0(nullptr);
+    std::shared_ptr<Graph> new_graph_1(nullptr);
+    if (temp_graph == nullptr) {
+      new_graph_0 = xfer->run_1_time(0, graph);
+      new_graph_1 = inverse_xfer->run_1_time(0, graph);
+    } else {
+      new_graph_0 = xfer->run_1_time(0, temp_graph.get());
+      new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
+    }
     if (new_graph_0 == nullptr) {
       assert(new_graph_1 == nullptr);
-      return graph;
+      return temp_graph;
     }
     new_graph_0->rotation_merging(target_rotation);
     new_graph_1->rotation_merging(target_rotation);
-    if (graph != this)
-      delete graph;
     if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
-      new_graph_1.reset();
-      graph = new_graph_0.get();
+      temp_graph = new_graph_0;
     } else {
-      new_graph_0.reset();
-      graph = new_graph_1.get();
+      temp_graph = new_graph_1;
     }
   }
   assert(false); // Should never reach here

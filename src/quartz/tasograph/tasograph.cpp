@@ -12,7 +12,7 @@ enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 32768,
+  GUID_PRESERVED = 16383
 };
 
 bool equal_to_2k_pi(double d) {

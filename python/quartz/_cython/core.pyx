@@ -385,6 +385,10 @@ cdef class PyGraph:
             return PyGraph().set_this(deref(self.graph).ccz_flip_t(context.context))
         return None
 
+    def to_qasm(self, *, str filename):
+        fn_bytes = filename.encode('utf-8')
+        deref(self.graph).to_qasm(fn_bytes, False, False)
+
     def __lt__(self, other):
         return self.gate_count < other.gate_count
     

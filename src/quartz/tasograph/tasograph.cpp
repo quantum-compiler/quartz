@@ -12,7 +12,7 @@ enum {
   GUID_INVALID = 0,
   GUID_INPUT = 10,
   GUID_WEIGHT = 11,
-  GUID_PRESERVED = 100000,
+  GUID_PRESERVED = 32768,
 };
 
 bool equal_to_2k_pi(double d) {
@@ -871,7 +871,7 @@ void Graph::rotation_merging(GateType target_rotation) {
   }
 }
 
-size_t Graph::get_num_qubits() { return qubit_2_idx.size(); }
+size_t Graph::get_num_qubits() const { return qubit_2_idx.size(); }
 
 void Graph::print_qubit_ops() {
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
@@ -938,7 +938,7 @@ void Graph::print_qubit_ops() {
 }
 
 void Graph::to_qasm(const std::string &save_filename, bool print_result,
-                    bool print_guid) {
+                    bool print_guid) const {
   std::ofstream ofs(save_filename);
   std::ostringstream o;
   std::map<float, std::string> constant_2_pi;
@@ -961,7 +961,7 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
-      int qubit_idx = qubit_2_idx[it.first];
+      int qubit_idx = qubit_2_idx.find(it.first)->second;
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);
@@ -985,7 +985,7 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
       std::ostringstream iss;
       iss << gate_type_name(op.ptr->tp);
       int num_qubits = op.ptr->get_num_qubits();
-      auto in_edges = inEdges[op];
+      auto in_edges = inEdges.find(op)->second;
       // Maintain pos_to_qubits
       if (op.ptr->is_parametrized_gate()) {
         iss << '(';
@@ -1000,7 +1000,7 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
                    constant_param_values.end()); // All parameters should be
                                                  // constant
             param_values[edge.dstIdx - num_qubits] =
-                constant_param_values[edge.srcOp];
+                constant_param_values.find(edge.srcOp)->second;
           }
         }
         bool first = true;
@@ -1049,7 +1049,7 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
     }
 
     if (outEdges.find(op) != outEdges.end()) {
-      std::set<Edge, EdgeCompare> list = outEdges[op];
+      std::set<Edge, EdgeCompare> list = outEdges.find(op)->second;
       std::set<Edge, EdgeCompare>::const_iterator it2;
       for (it2 = list.begin(); it2 != list.end(); it2++) {
         auto e = *it2;

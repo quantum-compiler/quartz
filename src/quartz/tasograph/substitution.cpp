@@ -39,6 +39,13 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
       return nullptr;
   }
 
+  // Eliminate transfers where src dag has unused input parameters
+  auto src_num_input_params = src_dag->get_num_input_parameters();
+  for (int i = 0; i < src_num_input_params; ++i) {
+    if (!src_dag->input_param_used(i))
+      return nullptr;
+  }
+
   assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
   assert(src_dag->get_num_input_parameters() ==
          dst_dag->get_num_input_parameters());

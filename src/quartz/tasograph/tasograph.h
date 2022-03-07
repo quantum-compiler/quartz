@@ -190,10 +190,10 @@ public:
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   void to_qasm(const std::string &save_filename, bool print_result,
-               bool print_id);
+               bool print_id) const;
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
-  size_t get_num_qubits();
+  size_t get_num_qubits() const;
   void print_qubit_ops();
   std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
                                              GraphXfer *xfer,

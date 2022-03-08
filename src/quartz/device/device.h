@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <queue>
+#include <memory>
 
 namespace quartz {
     struct DeviceEdge {

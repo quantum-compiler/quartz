@@ -1,4 +1,4 @@
-#include "device/device.h"
+#include "quartz/device/device.h"
 #include <iostream>
 
 int main() {

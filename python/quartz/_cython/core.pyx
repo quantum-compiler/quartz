@@ -167,6 +167,14 @@ cdef class PyXfer:
     cdef set_this(self, GraphXfer *graphXfer_):
         self.graphXfer = graphXfer_
         return self
+    
+    @property
+    def src_gate_count(self):
+        return self.graphXfer.num_src_op()
+    
+    @property
+    def dst_gate_count(self):
+        return self.graphXfer.num_dst_op()
 
 cdef class QuartzContext:
     cdef Context *context

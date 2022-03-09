@@ -686,5 +686,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
   }
   return newGraph;
 }
+int GraphXfer::num_src_op() { return srcOps.size(); }
+int GraphXfer::num_dst_op() { return dstOps.size(); }
 
 }; // namespace quartz

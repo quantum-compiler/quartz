@@ -64,6 +64,8 @@ public:
   std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);
   std::shared_ptr<Graph> create_new_graph(const Graph *graph) const;
   bool create_new_operator(const OpX *opx, Op &op);
+  int num_src_op();
+  int num_dst_op();
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,

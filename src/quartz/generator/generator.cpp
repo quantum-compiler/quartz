@@ -2,7 +2,7 @@
 #include "../dataset/equivalence_set.h"
 
 #include <cassert>
-
+#include <chrono>
 #include <omp.h>
 const int NUM_THREADS = 1;
 

@@ -157,7 +157,7 @@ namespace quartz {
 		arb_clear(remaining_norm);
 		arb_clear(number);
 #endif
-
+        // std::cout << result[0].real() << ", " << result[0].imag() << std::endl;
 		return result;
 	}
 

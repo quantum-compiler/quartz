@@ -626,4 +626,4 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     dump_json(output_dict, output_file)
     t_end = time.monotonic()
     if print_basic_info:
-        print(f'Json saved in {t_end - t_start} seconds.')
+        print(f'Json {output_file} saved in {t_end - t_start} seconds.')

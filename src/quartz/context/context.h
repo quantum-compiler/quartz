@@ -28,6 +28,10 @@ namespace quartz {
 		const Vector &get_generated_hashing_dis(int num_qubits);
 		std::vector< ParamType > get_generated_parameters(int num_params);
 		std::vector< ParamType > get_all_generated_parameters() const;
+        // generate at once
+        void generate_input_dis(const int max_num_qubits);
+        void generate_hashing_dis(const int max_num_qubits);
+        void generate_parameters(const int max_num_params);
 		size_t next_global_unique_id();
 
 		// A hacky function: set a generated parameter.

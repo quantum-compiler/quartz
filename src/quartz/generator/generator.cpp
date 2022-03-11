@@ -3,6 +3,9 @@
 
 #include <cassert>
 
+#include <omp.h>
+const int NUM_THREADS = 1;
+
 namespace quartz {
 	void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
 	                             int max_num_quantum_gates,
@@ -335,6 +338,7 @@ namespace quartz {
 	                    const EquivalenceSet *equiv_set) {
 		auto try_to_add_to_result = [&](DAG *new_dag) {
 			// A new DAG with |current_max_num_gates| + 1 gates.
+            assert(verify_equivalences);
 			if (verify_equivalences) {
 				assert(equiv_set);
 				if (!verifier_.redundant(context, equiv_set, new_dag)) {
@@ -370,6 +374,9 @@ namespace quartz {
 				}
 			}
 		};
+        std::cout << "---- BFS: dags.back().size() = " << dags.back().size() << std::endl;
+        auto start_time = std::chrono::system_clock::now();
+#pragma omp parallel for num_threads(NUM_THREADS)
 		for (auto &dag : dags.back()) {
 			std::vector< int > qubit_indices, parameter_indices;
 			// Add 1 quantum gate.
@@ -441,7 +448,10 @@ namespace quartz {
 				}
 			}
 			dag->hash(context); // restore hash value
-		}
+		} // for dag
+        auto end_time = std::chrono::system_clock::now();
+        auto bfs_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        std::cout << "---- BFS: duration = " << bfs_duration << " ms" << std::endl;
 	}
 
 	void Generator::dfs_parameter_gates(

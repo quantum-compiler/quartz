@@ -3,6 +3,7 @@
 #include <cassert>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 
 namespace quartz {
 	int Dataset::num_hash_values() const { return (int)dataset.size(); }

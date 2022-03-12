@@ -24,7 +24,7 @@ int main() {
 	auto start = std::chrono::steady_clock::now();
 	gen.generate(num_qubits, num_input_parameters, max_num_gates,
 	             max_num_param_gates, &dataset, /*verify_equivalences=*/
-	             true, &equiv_set,              /*verbose=*/
+	             true, &equiv_set, /*unique_parameters=*/false, /*verbose=*/
 	             true);
 	auto end = std::chrono::steady_clock::now();
 	std::cout

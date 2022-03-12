@@ -24,7 +24,8 @@ namespace quartz {
 	void Generator::generate(int num_qubits, int num_input_parameters,
 	                         int max_num_quantum_gates, int max_num_param_gates,
 	                         Dataset *dataset, bool verify_equivalences,
-	                         EquivalenceSet *equiv_set, bool verbose) {
+                             EquivalenceSet *equiv_set, bool unique_parameters,
+                             bool verbose) {
 		auto empty_dag =
 		    std::make_unique< DAG >(num_qubits, num_input_parameters);
 		// Generate all possible parameter gates at the beginning.

@@ -36,7 +36,8 @@ namespace quartz {
 		void generate(int num_qubits, int num_input_parameters,
 		              int max_num_quantum_gates, int max_num_param_gates,
 		              Dataset *dataset, bool verify_equivalences,
-		              EquivalenceSet *equiv_set, bool verbose = false);
+		              EquivalenceSet *equiv_set, bool unique_parameters,
+		              bool verbose = false);
 
 	private:
 		void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,

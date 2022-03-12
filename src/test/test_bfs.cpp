@@ -105,10 +105,15 @@ int main() {
 
 		Dataset dataset2;
 		start = std::chrono::steady_clock::now();
-		gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-		             max_num_param_gates, &dataset2, /*verify_equivalences=*/
-		             false, nullptr,                 /*verbose=*/
-		             true);
+        gen.generate(num_qubits,
+                     num_input_parameters,
+                     max_num_quantum_gates,
+                     max_num_param_gates,
+                     &dataset2, /*verify_equivalences=*/
+                     false,
+                     nullptr, /*unique_parameters=*/
+                     false,                /*verbose=*/
+                     true);
 		end = std::chrono::steady_clock::now();
 		std::cout
 		    << std::dec << "BFS unverified: " << dataset2.num_total_dags()
@@ -147,10 +152,15 @@ int main() {
 	if (run_bfs_verified) {
 		Dataset dataset3;
 		start = std::chrono::steady_clock::now();
-		gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-		             max_num_param_gates, &dataset3, /*verify_equivalences=*/
-		             true, &equiv_set,               /*verbose=*/
-		             true);
+        gen.generate(num_qubits,
+                     num_input_parameters,
+                     max_num_quantum_gates,
+                     max_num_param_gates,
+                     &dataset3, /*verify_equivalences=*/
+                     true,
+                     &equiv_set, /*unique_parameters=*/
+                     false,              /*verbose=*/
+                     true);
 		end = std::chrono::steady_clock::now();
 		std::cout
 		    << std::dec << "BFS verified: " << dataset3.num_total_dags()

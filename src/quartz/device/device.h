@@ -40,6 +40,8 @@ namespace quartz {
         int idx{-1};
         std::vector<std::shared_ptr<DeviceEdge>> out_edges;
         std::vector<std::shared_ptr<DeviceEdge>> in_edges;
+        bool swap_cost_cache_valid{false};
+        std::vector<double> swap_cost_cache;
     };
 
     class DeviceTopologyGraph {
@@ -72,9 +74,18 @@ namespace quartz {
             }
         }
 
-        double cal_swap_cost(int src_idx, int dst_idx) const {
-            // implemented using dijkstra with heap optimization
-            // time complexity is nlog(n)
+        [[nodiscard]] double cal_swap_cost(int src_idx, int dst_idx) const {
+            // This function calculates the cost of moving a logical qubit from physical
+            // qubit with src_idx to the physical qubit with dst_idx using swap gates
+            if (!device_qubits[src_idx]->swap_cost_cache_valid) _cal_swap_cost(src_idx);
+            return device_qubits[src_idx]->swap_cost_cache[dst_idx];
+        }
+
+    private:
+        void _cal_swap_cost(int src_idx) const {
+            // This function calculates the cost of moving a logical qubit from physical
+            // qubit with src_idx to all other physical qubits using swap gates.
+            // Implemented using heap optimized dijkstra algorithm, with time complexity nlog(n).
 
             // a query structure used locally
             struct Query {
@@ -120,8 +131,9 @@ namespace quartz {
                     }
             }
 
-            // return
-            return swap_cost[dst_idx];
+            // cache data into src_node
+            device_qubits[src_idx]->swap_cost_cache_valid = true;
+            device_qubits[src_idx]->swap_cost_cache = std::move(swap_cost);
         }
 
     private:

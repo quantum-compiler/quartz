@@ -2,6 +2,7 @@
 #include <iostream>
 
 int main() {
+    // build graph
     auto device_graph = quartz::DeviceTopologyGraph(9);
     device_graph.add_qubit();
     device_graph.add_edge(0, 1, 4);
@@ -20,8 +21,11 @@ int main() {
     device_graph.add_edge(6, 8, 6);
     device_graph.add_edge(7, 8, 7);
     device_graph.add_qubit();
+    device_graph.cache_swap_cost();
     // device_graph.print();
     for (int i = 0; i < 12; ++i) {
-        std::cout << "dst: " << i << ", cost: " << device_graph.cal_swap_cost(0, i) << '\n';
+        for (int j=0; j < 12; ++j) {
+            std::cout << "src: " << i << ", dst: " << j << ", cost: " << device_graph.cal_swap_cost(i, j) << '\n';
+        }
     }
 };

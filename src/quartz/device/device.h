@@ -81,6 +81,11 @@ namespace quartz {
             return device_qubits[src_idx]->swap_cost_cache[dst_idx];
         }
 
+        void cache_swap_cost() const {
+            for (auto src_idx = 0; src_idx < num_qubits; ++src_idx)
+                _cal_swap_cost(src_idx);
+        }
+
     private:
         void _cal_swap_cost(int src_idx) const {
             // This function calculates the cost of moving a logical qubit from physical

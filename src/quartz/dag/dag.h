@@ -52,7 +52,13 @@ namespace quartz {
 		[[nodiscard]] int get_num_internal_parameters() const;
 		[[nodiscard]] int get_num_gates() const;
 		[[nodiscard]] bool qubit_used(int qubit_index) const;
+		// Used by a parameter gate is considered as used here.
 		[[nodiscard]] bool input_param_used(int param_index) const;
+		// Returns a pair. The first component denotes the input parameters
+		// already used in this DAG. The second component denotes the input
+		// parameters used in each of the parameters in this DAG.
+        [[nodiscard]] std::pair<InputParamMaskType,
+                                std::vector<InputParamMaskType>> get_input_param_mask() const;
 		DAGHashType hash(Context *ctx);
         // Evaluate the output distribution 2^|num_qubits| times, with the i-th
         // time the input distribution being a vector with only the i-th entry

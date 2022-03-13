@@ -48,7 +48,8 @@ namespace quartz {
 		void bfs(const std::vector< std::vector< DAG * > > &dags,
 		         int max_num_param_gates, Dataset &dataset,
 		         std::vector< DAG * > *new_representatives,
-		         bool verify_equivalences, const EquivalenceSet *equiv_set);
+		         bool verify_equivalences, const EquivalenceSet *equiv_set,
+                 bool unique_parameters);
 
 		void dfs_parameter_gates(std::unique_ptr< DAG > dag,
 		                         int remaining_gates, int max_unused_params,

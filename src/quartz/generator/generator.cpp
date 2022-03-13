@@ -60,14 +60,14 @@ namespace quartz {
 				assert(dataset);
 				dags_to_search.clear();
 				bfs(dags, max_num_param_gates, *dataset, &dags_to_search,
-				    verify_equivalences, nullptr);
+				    verify_equivalences, nullptr, unique_parameters);
 				dags.push_back(dags_to_search);
 			}
 			else {
 				assert(dataset);
 				assert(equiv_set);
 				bfs(dags, max_num_param_gates, *dataset, nullptr,
-				    verify_equivalences, equiv_set);
+				    verify_equivalences, equiv_set, unique_parameters);
 				// Do not verify when |num_gates == max_num_quantum_gates|.
 				// This is to make the behavior the same when
 				// |verify_equivalences| is true or false.
@@ -333,7 +333,8 @@ namespace quartz {
 	                    int max_num_param_gates, Dataset &dataset,
 	                    std::vector< DAG * > *new_representatives,
 	                    bool verify_equivalences,
-	                    const EquivalenceSet *equiv_set) {
+	                    const EquivalenceSet *equiv_set,
+                        bool unique_parameters) {
 		auto try_to_add_to_result = [&](DAG *new_dag) {
 			// A new DAG with |current_max_num_gates| + 1 gates.
 			if (verify_equivalences) {
@@ -372,6 +373,12 @@ namespace quartz {
 			}
 		};
 		for (auto &dag : dags.back()) {
+		    InputParamMaskType input_param_usage_mask;
+		    std::vector<InputParamMaskType> input_param_masks;
+            if (unique_parameters) {
+              std::tie(input_param_usage_mask, input_param_masks) =
+                  dag->get_input_param_mask();
+            }
 			std::vector< int > qubit_indices, parameter_indices;
 			// Add 1 quantum gate.
 			for (const auto &idx : context->get_supported_quantum_gates()) {
@@ -382,6 +389,7 @@ namespace quartz {
 						qubit_indices.push_back(i);
 						auto
 						    search_parameters = [&](int num_remaining_parameters,
+						                            const InputParamMaskType &current_usage_mask,
 						                            auto &
 						                                search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
 							    if (num_remaining_parameters == 0) {
@@ -398,14 +406,29 @@ namespace quartz {
 							    for (int p1 = 0;
 							         p1 < dag->get_num_total_parameters();
 							         p1++) {
-								    parameter_indices.push_back(p1);
-								    search_parameters_ref(
-								        num_remaining_parameters - 1,
-								        search_parameters_ref);
-								    parameter_indices.pop_back();
+								    if (unique_parameters) {
+								      if (current_usage_mask & input_param_masks[p1]) {
+								        // p1 contains an already used input parameter.
+								        continue;
+								      }
+                                      parameter_indices.push_back(p1);
+                                      search_parameters_ref(
+                                          num_remaining_parameters - 1,
+                                          current_usage_mask | input_param_masks[p1],
+                                          search_parameters_ref);
+                                      parameter_indices.pop_back();
+								    } else {
+                                      parameter_indices.push_back(p1);
+                                      search_parameters_ref(
+                                          num_remaining_parameters - 1,
+                                          /*unused*/0,
+                                          search_parameters_ref);
+                                      parameter_indices.pop_back();
+								    }
 							    }
 						    };
 						search_parameters(gate->get_num_parameters(),
+                                          input_param_usage_mask,
 						                  search_parameters);
 
 						qubit_indices.pop_back();

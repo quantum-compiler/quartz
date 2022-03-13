@@ -11,6 +11,7 @@ using ComplexType = std::complex< double >;
 using DAGHashType = unsigned long long;
 using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair< unsigned long long, int >;
+using InputParamMaskType = unsigned long long;
 
 using namespace std::complex_literals; // so that we can write stuff like 1.0i
 

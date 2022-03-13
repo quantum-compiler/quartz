@@ -1,6 +1,8 @@
 #include "test_pruning.h"
 
 int main() {
+  test_pruning({GateType::u1, GateType::u2, GateType::u3, GateType::add},
+               "IBM_with_U3_2_1_", 1, 4, 2, true, 1, true, false, false, false, true);
   test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
                 GateType::add}, "Nam_3_", 3, 2, 3, true, 1, true, true, false, true);
   test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,

@@ -26,6 +26,9 @@ namespace quartz {
 		//     parameters, restrict the order (for example, if a CX gate uses
 		//     two fresh new qubits, the control qubit must have the smaller
 		//     index).
+        // If |unique_parameters| is true, we only search for DAGs that use
+        // each input parameters only once (note: use a doubled parameter, i.e.,
+        // Rx(2theta) is considered using the parameter theta once).
 		void generate_dfs(int num_qubits, int max_num_input_parameters,
 		                  int max_num_quantum_gates, int max_num_param_gates,
 		                  Dataset &dataset, bool restrict_search_space,
@@ -34,6 +37,9 @@ namespace quartz {
 		// Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
 		// |num_input_parameters| input parameters (probably with some unused),
 		// and <= |max_num_quantum_gates| gates.
+		// If |unique_parameters| is true, we only search for DAGs that use
+		// each input parameters only once (note: use a doubled parameter, i.e.,
+		// Rx(2theta) is considered using the parameter theta once).
 		void generate(int num_qubits, int num_input_parameters,
 		              int max_num_quantum_gates, int max_num_param_gates,
 		              Dataset *dataset, bool verify_equivalences,

@@ -26,7 +26,7 @@ int main() {
 		gen.generate_dfs(num_qubits, num_input_parameters,
 		                 max_num_quantum_gates, max_num_param_gates,
 		                 dataset1, /*restrict_search_space=*/
-		                 true);
+		                 true, /*unique_parameters=*/false);
 		end = std::chrono::steady_clock::now();
 		std::cout
 		    << std::dec
@@ -67,7 +67,7 @@ int main() {
 		gen.generate_dfs(num_qubits, num_input_parameters,
 		                 max_num_quantum_gates, max_num_param_gates,
 		                 dataset1, /*restrict_search_space=*/
-		                 false);
+		                 false, /*unique_parameters=*/false);
 		end = std::chrono::steady_clock::now();
 		std::cout
 		    << std::dec << "DFS for all DAGs: " << dataset1.num_total_dags()

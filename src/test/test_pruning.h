@@ -165,7 +165,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       gen.generate_dfs(num_qubits, num_input_parameters,
                        max_num_quantum_gates, max_num_param_gates,
                        dataset1, /*restrict_search_space=*/
-                       false);
+                       false, /*unique_parameters=*/false);
       end = std::chrono::steady_clock::now();
       std::cout << std::dec << "Original: " << dataset1.num_total_dags()
                 << " circuits with " << dataset1.num_hash_values()

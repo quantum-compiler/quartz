@@ -28,7 +28,8 @@ namespace quartz {
 		//     index).
 		void generate_dfs(int num_qubits, int max_num_input_parameters,
 		                  int max_num_quantum_gates, int max_num_param_gates,
-		                  Dataset &dataset, bool restrict_search_space);
+		                  Dataset &dataset, bool restrict_search_space,
+                          bool unique_parameters);
 
 		// Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
 		// |num_input_parameters| input parameters (probably with some unused),
@@ -42,7 +43,8 @@ namespace quartz {
 	private:
 		void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,
 		         DAG *dag, std::vector< int > &used_parameters,
-		         Dataset &dataset, bool restrict_search_space);
+		         Dataset &dataset, bool restrict_search_space,
+                 bool unique_parameters);
 
 		// |dags[i]| is the DAGs with |i| gates.
 		void bfs(const std::vector< std::vector< DAG * > > &dags,

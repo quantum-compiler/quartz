@@ -7,7 +7,8 @@ namespace quartz {
 	void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
 	                             int max_num_quantum_gates,
 	                             int max_num_param_gates, Dataset &dataset,
-	                             bool restrict_search_space) {
+	                             bool restrict_search_space,
+	                             bool unique_parameters) {
 		DAG *dag = new DAG(num_qubits, max_num_input_parameters);
 		// Generate all possible parameter gates at the beginning.
 		assert(max_num_param_gates == 1);
@@ -17,7 +18,7 @@ namespace quartz {
 		// max_num_param_gates, 0);
 		std::vector< int > used_parameters(dag->get_num_total_parameters(), 0);
 		dfs(0, max_num_quantum_gates, max_num_param_gates, dag, used_parameters,
-		    dataset, restrict_search_space);
+		    dataset, restrict_search_space, unique_parameters);
 		delete dag;
 	}
 
@@ -111,7 +112,7 @@ namespace quartz {
 	void Generator::dfs(int gate_idx, int max_num_gates,
 	                    int max_remaining_param_gates, DAG *dag,
 	                    std::vector< int > &used_parameters, Dataset &dataset,
-	                    bool restrict_search_space) {
+	                    bool restrict_search_space, bool unique_parameters) {
 		if (restrict_search_space) {
 			// An optimization to restrict the search space, but may also cause
 			// the equivalences found to be incomplete.
@@ -169,6 +170,12 @@ namespace quartz {
 			return;
 		std::vector< int > qubit_indices;
 		std::vector< int > parameter_indices;
+        InputParamMaskType input_param_usage_mask;
+        std::vector<InputParamMaskType> input_param_masks;
+        if (unique_parameters) {
+          std::tie(input_param_usage_mask, input_param_masks) =
+              dag->get_input_param_mask();
+        }
 		for (const auto &idx : context->get_supported_quantum_gates()) {
 			Gate *gate = context->get_gate(idx);
 			if (gate->get_num_qubits() == 0) {
@@ -188,7 +195,7 @@ namespace quartz {
 						assert(ret);
 						dfs(gate_idx + 1, max_num_gates,
 						    max_remaining_param_gates - 1, dag, used_parameters,
-						    dataset, restrict_search_space);
+						    dataset, restrict_search_space, unique_parameters);
 						ret = dag->remove_last_gate();
 						assert(ret);
 						used_parameters[p] -= 1;
@@ -232,7 +239,7 @@ namespace quartz {
 							dfs(gate_idx + 1, max_num_gates,
 							    max_remaining_param_gates - 1, dag,
 							    used_parameters, dataset,
-							    restrict_search_space);
+							    restrict_search_space, unique_parameters);
 							ret = dag->remove_last_gate();
 							assert(ret);
 							used_parameters[p2] -= 1;
@@ -250,6 +257,7 @@ namespace quartz {
 				for (int i = 0; i < dag->get_num_qubits(); i++) {
 					qubit_indices.push_back(i);
 					auto search_parameters = [&](int num_remaining_parameters,
+                                                 const InputParamMaskType &current_usage_mask,
 					                             auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
 						if (num_remaining_parameters == 0) {
 							bool ret =
@@ -258,7 +266,7 @@ namespace quartz {
 							assert(ret);
 							dfs(gate_idx + 1, max_num_gates,
 							    max_remaining_param_gates, dag, used_parameters,
-							    dataset, restrict_search_space);
+							    dataset, restrict_search_space, unique_parameters);
 							ret = dag->remove_last_gate();
 							assert(ret);
 							return;
@@ -266,15 +274,33 @@ namespace quartz {
 
 						for (int p1 = 0; p1 < dag->get_num_total_parameters();
 						     p1++) {
-							parameter_indices.push_back(p1);
-							used_parameters[p1] += 1;
-							search_parameters_ref(num_remaining_parameters - 1,
-							                      search_parameters_ref);
-							used_parameters[p1] -= 1;
-							parameter_indices.pop_back();
+                            if (unique_parameters) {
+                              if (current_usage_mask & input_param_masks[p1]) {
+                                // p1 contains an already used input parameter.
+                                continue;
+                              }
+                              parameter_indices.push_back(p1);
+                              used_parameters[p1] += 1;
+                              search_parameters_ref(
+                                  num_remaining_parameters - 1,
+                                  current_usage_mask | input_param_masks[p1],
+                                  search_parameters_ref);
+                              used_parameters[p1] -= 1;
+                              parameter_indices.pop_back();
+                            } else {
+                              parameter_indices.push_back(p1);
+                              used_parameters[p1] += 1;
+                              search_parameters_ref(
+                                  num_remaining_parameters - 1,
+                                  /*unused*/0,
+                                  search_parameters_ref);
+                              used_parameters[p1] -= 1;
+                              parameter_indices.pop_back();
+                            }
 						}
 					};
 					search_parameters(gate->get_num_parameters(),
+                                      input_param_usage_mask,
 					                  search_parameters);
 
 					qubit_indices.pop_back();
@@ -310,7 +336,7 @@ namespace quartz {
 							assert(ret);
 							dfs(gate_idx + 1, max_num_gates,
 							    max_remaining_param_gates, dag, used_parameters,
-							    dataset, restrict_search_space);
+							    dataset, restrict_search_space, unique_parameters);
 							ret = dag->remove_last_gate();
 							assert(ret);
 							qubit_indices.pop_back();

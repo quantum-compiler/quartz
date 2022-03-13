@@ -494,6 +494,33 @@ namespace quartz {
 		return !nodes[get_num_qubits() + param_index]->output_edges.empty();
 	}
 
+    std::pair<InputParamMaskType, std::vector<InputParamMaskType>>
+    DAG::get_input_param_mask() const {
+	  std::vector<InputParamMaskType> param_mask(get_num_total_parameters());
+	  for (int i = 0; i < get_num_input_parameters(); i++) {
+	    param_mask[i] = 1 << i;
+	  }
+	  for (int i = get_num_input_parameters(); i < get_num_total_parameters(); i++) {
+	    param_mask[i] = 0;
+	    assert(parameters[i]->input_edges.size() == 1);
+	    for (auto &input_node : parameters[i]->input_edges[0]->input_nodes) {
+          param_mask[i] |= param_mask[input_node->index];
+	    }
+	  }
+      InputParamMaskType usage_mask{0};
+	  for (auto &edge : edges) {
+	    // Only consider quantum gate usages of parameters
+	    if (edge->gate->is_parametrized_gate()) {
+	      for (auto &input_node : edge->input_nodes) {
+	        if (input_node->is_parameter()) {
+	          usage_mask |= param_mask[input_node->index];
+	        }
+	      }
+	    }
+	  }
+	  return std::make_pair(usage_mask, param_mask);
+	}
+
 	void DAG::generate_hash_values(
 	    Context *ctx, const ComplexType &hash_value,
 	    const PhaseShiftIdType &phase_shift_id,

@@ -67,14 +67,14 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 int main() {
   gen_ecc_set(
       {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
-      "Nam_5_3_", false, 3, 2, 5);
-  gen_ecc_set({GateType::u1, GateType::u2, GateType::cx, GateType::add},
-              "IBM_4_2_", false, 2, 2, 4);
+      "Nam_5_3_", true, 3, 3, 5);
+  gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx, GateType::add},
+              "IBM_4_2_", true, 2, 4, 4);
   gen_ecc_set({GateType::rx, GateType::rz, GateType::cz, GateType::add},
-              "Rigetti_5_3_", false, 3, 2, 5);
+              "Rigetti_5_3_", true, 3, 2, 5);
   gen_ecc_set({GateType::h, GateType::cz}, "H_CZ_2_2_", false, 2, 0, 2);
-  std::cout << "Now running IBM gate set with U3 gate, which may take a long time." << std::endl;
-  gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::add},
-              "IBM_with_U3_2_1_", false, 1, 3, 2);
+//  std::cout << "Now running IBM gate set with U3 gate, which may take a long time." << std::endl;
+//  gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::add},
+//              "IBM_with_U3_2_1_", false, 1, 3, 2);
   return 0;
 }

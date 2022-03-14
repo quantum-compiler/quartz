@@ -58,16 +58,16 @@ int main(int argc, char **argv) {
   Graph *graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::u1);
-  eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
-  Graph *graph_after_u3_pass = graph_after_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::u1);
+//  eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
+//  Graph *graph_after_u3_pass = graph_after_search->optimize(
+//      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
+//      /*rotation_merging_in_searching*/ false, GateType::u1);
   auto end = std::chrono::steady_clock::now();
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
   std::cout << "Optimization results of Quartz for " << fn
             << " on IBMQ gate set." << std::endl
             << "Gate count after optimization: "
-            << graph_after_u3_pass->total_cost() << ", "
+            << graph_after_search->total_cost() << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /

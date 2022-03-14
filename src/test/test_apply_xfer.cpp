@@ -67,7 +67,7 @@ int main() {
     candidate_q.pop();
     std::vector<Op> all_ops;
     top_graph->topology_order_ops(all_ops);
-    assert(all_ops.size() == top_graph->gate_count());
+    assert(all_ops.size() == (size_t)top_graph->gate_count());
     for (auto op : all_ops) {
       for (auto xfer : xfers) {
         if (top_graph->xfer_appliable(xfer, op)) {

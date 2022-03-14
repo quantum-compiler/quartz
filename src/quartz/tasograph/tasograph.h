@@ -190,18 +190,22 @@ public:
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   void to_qasm(const std::string &save_filename, bool print_result,
-               bool print_id);
+               bool print_id) const;
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
-  size_t get_num_qubits();
+  size_t get_num_qubits() const;
   void print_qubit_ops();
-  Graph *toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
-                             GraphXfer *inverse_xfer);
+  std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
+                                             GraphXfer *xfer,
+                                             GraphXfer *inverse_xfer);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  Graph *apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;
+  std::shared_ptr<Graph> ccz_flip_t(Context *ctx);
+  std::shared_ptr<Graph> ccz_flip_greedy_rz();
+  std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
 private:
   void replace_node(Op oldOp, Op newOp);
@@ -219,8 +223,8 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
-  Graph *_match_rest_ops(GraphXfer *xfer, int depth, int ignore_depth,
-                         int min_guid) const;
+  std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, int depth,
+                                         int ignore_depth, int min_guid) const;
 
 private:
   size_t special_op_guid;

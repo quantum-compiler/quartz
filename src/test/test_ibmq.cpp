@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
                                              true);
 
   // Greedy toffoli flip
-  Graph *graph_before_search = graph_new_ctx->toffoli_flip_greedy(
+  auto graph_before_search = graph_new_ctx->toffoli_flip_greedy(
       GateType::u1, xfer_pair.first, xfer_pair.second);
 
   // Optimization

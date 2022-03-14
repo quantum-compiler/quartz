@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  Graph *graph_before_search = graph.toffoli_flip_greedy(
+  auto graph_before_search = graph.toffoli_flip_greedy(
       GateType::rz, xfer_pair.first, xfer_pair.second);
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 

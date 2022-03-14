@@ -23,7 +23,7 @@ class QAgent:
         if pretrained_model != None:
             self.q_net = copy.deepcopy(pretrained_model)
         else:
-            self.q_net = QGNN(gate_type_num, 16, a_size, 16)
+            self.q_net = QGNN(gate_type_num, 64, a_size, 64)
         self.target_net = copy.deepcopy(self.q_net)
         self.loss_fn = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=lr)
@@ -72,7 +72,7 @@ class QAgent:
             #s_a = s_as.gather(1, a)
 
             if s_next == None:
-                target_r = torch.tensor(-5.0)
+                target_r = torch.tensor(-3.0)
             else:
                 q_next = self.target_net(s_next).detach()
                 # q_next_r = q_next[node][a]
@@ -105,7 +105,7 @@ class QAgent:
 
 class QData:
     def __init__(self):
-        self.data = deque(maxlen=1000000)
+        self.data = deque(maxlen=2000)
         self.hash_map = {}
 
     def add_data(self, d):
@@ -146,8 +146,10 @@ def train(*,
           init_graph,
           max_seq_len,
           batch_size,
+          target_update_interval=1,
           log_fn='',
-          pretrained_model=None):
+          pretrained_model=None,
+          **kwargs):
 
     # Prepare for log
     if log_fn != '':
@@ -174,6 +176,7 @@ def train(*,
     data = QData()
 
     average_seq_lens = []
+    correct_cnts = []
 
     for i in tqdm(range(episodes)):
         rewards = 0
@@ -193,7 +196,7 @@ def train(*,
 
                 if new_g == None:
                     end = True
-                    data.add_data([g, node, A, torch.tensor(-5), None])
+                    data.add_data([g, node, A, torch.tensor(-3), None])
                     print_log("end")
 
                 else:
@@ -217,11 +220,29 @@ def train(*,
         if epsilon > 0.05:
             epsilon -= 0.0001
 
-        agent.target_net.load_state_dict(agent.q_net.state_dict())
+        if i % target_update_interval == 0:
+            agent.target_net.load_state_dict(agent.q_net.state_dict())
+
+        with torch.no_grad():
+            pred = agent.q_net(init_graph.to_dgl_graph())
+            _, As = torch.max(pred, dim=1)
+            print_log(As)
+            if 'valid_xfer_dict' in kwargs:
+                correct_cnt = 0
+                valid_xfer_dict = kwargs['valid_xfer_dict']
+                for k in range(len(As)):
+                    a = As[k]
+                    if a in valid_xfer_dict[k]:
+                        correct_cnt += 1
+                print_log(f'correct count is {correct_cnt}')
+                correct_cnts.append(correct_cnt)
 
         print_log(f'end of episode {i}')
 
     if f != None:
         f.close()
+
+    if 'valid_xfer_dict' in kwargs:
+        return average_seq_lens, correct_cnts
 
     return average_seq_lens

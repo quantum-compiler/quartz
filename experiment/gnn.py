@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 
-class QConv(nn.Module):
 
+class QConv(nn.Module):
     def __init__(self, in_feat, inter_dim, out_feat):
         super(QConv, self).__init__()
         self.linear2 = nn.Linear(in_feat + inter_dim, out_feat)
@@ -24,10 +24,11 @@ class QConv(nn.Module):
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
-        #print(f'node m {nodes.mailbox["m"].shape}')
+        # print(f'node m {nodes.mailbox["m"].shape}')
         tmp = self.linear1(nodes.mailbox['m'])
         tmp = F.leaky_relu(tmp)
         h = torch.mean(tmp, dim=1)
+        # h = torch.max(tmp, dim=1).values
         return {'h_N': h}
 
     def forward(self, g, h):
@@ -36,8 +37,11 @@ class QConv(nn.Module):
         g.update_all(self.message_func, self.reduce_func)
         h_N = g.ndata['h_N']
         h_total = torch.cat([h, h_N], dim=1)
-        return self.linear2(h_total)
-
+        h_linear = self.linear2(h_total)
+        h_relu = F.relu(h_linear)
+        h_norm = torch.unsqueeze(torch.linalg.norm(h_relu, dim=1), dim=1)
+        h_normed = torch.divide(h_relu, h_norm)
+        return h_normed
 
 
 class QGNN(nn.Module):
@@ -47,24 +51,27 @@ class QGNN(nn.Module):
         self.conv2 = QConv(h_feats, inter_dim, h_feats)
         self.conv3 = QConv(h_feats, inter_dim, h_feats)
         self.conv4 = QConv(h_feats, inter_dim, h_feats)
-        self.conv5 = QConv(h_feats, inter_dim, num_classes)
+        # self.conv5 = QConv(h_feats, inter_dim, h_feats)
+        self.linear = nn.Linear(h_feats, num_classes)
+        gain = nn.init.calculate_gain('relu')
+        nn.init.xavier_normal_(self.linear.weight, gain=gain)
         self.embedding = nn.Embedding(in_feats, in_feats)
-    
+
     def forward(self, g):
         #print(g.ndata['gate_type'])
         #print(self.embedding)
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([torch.unsqueeze(g.edata['src_idx'],1),torch.unsqueeze(g.edata['dst_idx'],1),torch.unsqueeze(g.edata['reversed'],1)],dim = 1)
-        g.edata['w'] = w 
+        w = torch.cat([
+            torch.unsqueeze(g.edata['src_idx'], 1),
+            torch.unsqueeze(g.edata['dst_idx'], 1),
+            torch.unsqueeze(g.edata['reversed'], 1)
+        ],
+                      dim=1)
+        g.edata['w'] = w
         h = self.conv1(g, g.ndata['h'])
-        h = F.relu(h)
         h = self.conv2(g, h)
-        h = F.relu(h)
         h = self.conv3(g, h)
-        h = F.relu(h)
         h = self.conv4(g, h)
-        h = F.relu(h)
-        h = self.conv5(g, h)
-        # h = F.softmax(h)
+        # h = self.conv5(g, h)
+        h = self.linear(h)
         return h
-

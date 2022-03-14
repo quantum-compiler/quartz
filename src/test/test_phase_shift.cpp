@@ -11,12 +11,11 @@
 using namespace quartz;
 
 int main() {
-	Context ctx({GateType::rz, GateType::u1, GateType::add});
-
 	const int num_qubits = 1;
 	const int num_input_parameters = 1;
 	const int max_num_gates = 2;
 	const int max_num_param_gates = 1;
+    Context ctx({GateType::rz, GateType::u1, GateType::add}, num_qubits, num_input_parameters);
 
 	Generator gen(&ctx);
 	Dataset dataset;

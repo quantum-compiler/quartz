@@ -27,7 +27,7 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
                    const std::string &file_prefix, int num_qubits,
                    int num_input_parameters, int max_num_quantum_gates,
                    int max_num_param_gates = 1) {
-  Context ctx(supported_gates);
+  Context ctx(supported_gates, num_qubits, num_input_parameters);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;

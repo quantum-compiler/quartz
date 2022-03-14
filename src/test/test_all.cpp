@@ -11,8 +11,9 @@ using namespace quartz;
 
 int main() {
 	std::cout << "Hello, World!" << std::endl;
-	Context ctx({GateType::x, GateType::y, GateType::add, GateType::neg,
-	             GateType::u2, GateType::u3, GateType::cx});
+	Context ctx(
+            {GateType::x, GateType::y, GateType::add, GateType::neg,
+             GateType::u2, GateType::u3, GateType::cx}, 2, 0);
 
 	auto y = ctx.get_gate(GateType::y);
 	y->get_matrix()->print();

@@ -198,6 +198,9 @@ public:
   std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
                                              GraphXfer *xfer,
                                              GraphXfer *inverse_xfer);
+  void toffoli_flip_greedy_with_trace(GateType target_rotation, GraphXfer *xfer,
+                                      GraphXfer *inverse_xfer,
+                                      std::vector<int> &trace);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   void all_ops(std::vector<Op> &ops);
@@ -223,18 +226,18 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
-  std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, int depth,
-                                         int ignore_depth, int min_guid) const;
-
-private:
-  size_t special_op_guid;
+  std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, size_t depth,
+                                         size_t ignore_depth,
+                                         size_t min_guid) const;
 
 public:
   Context *context;
-  float totalCost;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> qubit_2_idx;
+
+private:
+  size_t special_op_guid;
 };
 
 }; // namespace quartz

@@ -27,8 +27,7 @@ Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
 
-Graph::Graph(Context *ctx)
-    : context(ctx), special_op_guid(0), totalCost(0.0f) {}
+Graph::Graph(Context *ctx) : context(ctx), special_op_guid(0) {}
 
 Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
   // Guid for input qubit and input parameter nodes
@@ -73,7 +72,7 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
   //   std::cout << edge_2_op.size() << std::endl;
 
   for (auto &node : dag->nodes) {
-    int srcIdx = -1; // Assumption: a node can have at most 1 input
+    size_t srcIdx = -1; // Assumption: a node can have at most 1 input
     Op srcOp;
     if (node->type == DAGNode::input_qubit) {
       srcOp = input_qubits_op[node->index];
@@ -100,7 +99,7 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     assert(srcOp != Op::INVALID_OP);
 
     for (auto output_edge : node->output_edges) {
-      int dstIdx;
+      size_t dstIdx;
       bool found = false;
       for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
         if (node.get() == output_edge->input_nodes[dstIdx]) {
@@ -115,8 +114,6 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       add_edge(srcOp, dstOp, srcIdx, dstIdx);
     }
   }
-
-  totalCost = total_cost();
 }
 
 Graph::Graph(const Graph &graph) {
@@ -490,7 +487,6 @@ void Graph::constant_and_rotation_elimination() {
       auto input_edges = inEdges[op];
       bool all_parameter_is_0 = true;
       int num_qubits = op.ptr->get_num_qubits();
-      int num_params = op.ptr->get_num_parameters();
       for (auto in_edge : input_edges) {
         if (in_edge.dstIdx >= num_qubits &&
             in_edge.srcOp.ptr->is_parameter_gate()) {
@@ -1379,6 +1375,38 @@ std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
   assert(false); // Should never reach here
 }
 
+void Graph::toffoli_flip_greedy_with_trace(GateType target_rotation,
+                                           GraphXfer *xfer,
+                                           GraphXfer *inverse_xfer,
+                                           std::vector<int> &trace) {
+  Graph *graph = this;
+  std::shared_ptr<Graph> temp_graph(nullptr);
+  while (true) {
+    std::shared_ptr<Graph> new_graph_0(nullptr);
+    std::shared_ptr<Graph> new_graph_1(nullptr);
+    if (temp_graph == nullptr) {
+      new_graph_0 = xfer->run_1_time(0, graph);
+      new_graph_1 = inverse_xfer->run_1_time(0, graph);
+    } else {
+      new_graph_0 = xfer->run_1_time(0, temp_graph.get());
+      new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
+    }
+    if (new_graph_0 == nullptr) {
+      assert(new_graph_1 == nullptr);
+      return;
+    }
+    new_graph_0->rotation_merging(target_rotation);
+    new_graph_1->rotation_merging(target_rotation);
+    if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
+      temp_graph = new_graph_0;
+      trace.push_back(0);
+    } else {
+      temp_graph = new_graph_1;
+      trace.push_back(1);
+    }
+  }
+  assert(false); // Should never reach here
+}
 bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
     // Find a match for the given Op
@@ -1394,9 +1422,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return false;
 }
 
-std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, int depth,
-                                              int ignore_depth,
-                                              int min_guid) const {
+std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, size_t depth,
+                                              size_t ignore_depth,
+                                              size_t min_guid) const {
   // The parameter min_guid is the guid of the first mapped Op
   if (depth == xfer->srcOps.size()) {
     // Create dst operators

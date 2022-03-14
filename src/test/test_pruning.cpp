@@ -4,6 +4,8 @@ int main() {
     test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
                   GateType::add}, "Nam_4_", 3, 2, 4, true, 1, true, false, false, true);
     /*
+  test_pruning({GateType::u1, GateType::u2, GateType::u3, GateType::cx, GateType::add},
+               "IBM_with_U3_4_2_", 2, 4, 4, false, 1, true, false, false, false, true);
   test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,
                 GateType::add}, "Nam_3_", 3, 2, 3, true, 1, true, true, false, true);
   test_pruning({GateType::rz, GateType::h, GateType::cx, GateType::x,

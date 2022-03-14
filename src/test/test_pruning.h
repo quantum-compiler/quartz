@@ -16,7 +16,8 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                   bool run_representative_pruning = true,
                   bool run_original = true,
                   bool run_original_unverified = false,
-                  bool run_original_verified = true) {
+                  bool run_original_verified = true,
+                  bool unique_parameters = false) {
   Context ctx(supported_gates);
   Generator gen(&ctx);
   ctx.generate_hashing_dis(num_qubits);
@@ -45,7 +46,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       gen.generate(num_qubits, num_input_parameters,
                    max_num_quantum_gates, max_num_param_gates,
                    &dataset1,        /*verify_equivalences=*/
-                   true, &equiv_set, /*verbose=*/
+                   true, &equiv_set, unique_parameters, /*verbose=*/
                    true);
       end = std::chrono::steady_clock::now();
       running_time_with_all_pruning_techniques += end - start;
@@ -168,7 +169,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       gen.generate_dfs(num_qubits, num_input_parameters,
                        max_num_quantum_gates, max_num_param_gates,
                        dataset1, /*restrict_search_space=*/
-                       false);
+                       false, unique_parameters);
       end = std::chrono::steady_clock::now();
       std::cout << std::dec << "Original: " << dataset1.num_total_dags()
                 << " circuits with " << dataset1.num_hash_values()

@@ -12,7 +12,7 @@ void test_generator(const std::vector< GateType > &support_gates,
                     int max_num_gates, bool verbose,
                     const std::string &save_file_name,
                     bool count_minimal_representations = false) {
-	Context ctx(support_gates);
+	Context ctx(support_gates, num_qubits, max_num_input_parameters);
 	Generator generator(&ctx);
 	Dataset dataset;
 	auto start = std::chrono::steady_clock::now();

@@ -5,6 +5,10 @@
 
 using namespace quartz;
 
+bool graph_cmp(std::shared_ptr<Graph> a, std::shared_ptr<Graph> b) {
+  return a->gate_count() < b->gate_count();
+}
+
 int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::t, GateType::tdg});
@@ -12,46 +16,81 @@ int main() {
   // Construct circuit graph from qasm file
   QASMParser qasm_parser(&ctx);
   DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm("circuit/example-circuits/barenco_tof_3.qasm",
-                             dag)) {
+  if (!qasm_parser.load_qasm(
+          "experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
     std::cout << "Parser failed" << std::endl;
     return 0;
   }
-  Graph graph(&ctx, dag);
+  std::shared_ptr<Graph> graph(new Graph(&ctx, dag));
 
-  std::vector<Op> ops_0;
-  graph.topology_order_ops(ops_0);
-  std::cout << ops_0.size() << std::endl;
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(&ctx, "bfs_verified_simplified.json")) {
+    std::cout << "Failed to load equivalence file." << std::endl;
+    assert(false);
+  }
 
-  //   EquivalenceSet eqs;
-  //   // Load equivalent dags from file
-  //   if (!eqs.load_json(&ctx, "bfs_verified_simplified.json")) {
-  //     std::cout << "Failed to load equivalence file." << std::endl;
-  //     assert(false);
-  //   }
+  // Get xfer from the equivalent set
+  auto ecc = eqs.get_all_equivalence_sets();
+  std::vector<GraphXfer *> xfers;
+  for (auto eqcs : ecc) {
+    bool first = true;
+    // std::cout << eqcs.size() << std::endl;
+    for (auto circ : eqcs) {
+      if (first)
+        first = false;
+      else {
+        auto xfer_0 = GraphXfer::create_GraphXfer(&ctx, eqcs[0], circ);
+        auto xfer_1 = GraphXfer::create_GraphXfer(&ctx, circ, eqcs[0]);
+        if (xfer_0 != nullptr)
+          xfers.push_back(xfer_0);
+        if (xfer_1 != nullptr)
+          xfers.push_back(xfer_1);
+      }
+    }
+  }
+  std::cout << "number of xfers: " << xfers.size() << std::endl;
 
-  //   // Get xfer from the equivalent set
-  //   auto ecc = eqs.get_all_equivalence_sets();
-  //   auto num_equivalent_classes = eqs.num_equivalence_classes();
-  //   std::cout << num_equivalent_classes << std::endl;
-  //   std::vector<GraphXfer *> xfers;
-  //   for (auto eqcs : ecc) {
-  //     bool first = true;
-  //     // std::cout << eqcs.size() << std::endl;
-  //     for (auto circ : eqcs) {
-  //       if (first)
-  //         first = false;
-  //       else {
-  //         auto xfer_0 = GraphXfer::create_GraphXfer(&ctx, eqcs[0], circ);
-  //         auto xfer_1 = GraphXfer::create_GraphXfer(&ctx, circ, eqcs[0]);
-  //         if (xfer_0 != nullptr)
-  //           xfers.push_back(xfer_0);
-  //         if (xfer_1 != nullptr)
-  //           xfers.push_back(xfer_1);
-  //       }
-  //     }
-  //   }
+  //   back tracking search
+  int budget = 1000000;
+  std::priority_queue<
+      std::shared_ptr<Graph>, std::vector<std::shared_ptr<Graph>>,
+      std::function<bool(std::shared_ptr<Graph>, std::shared_ptr<Graph>)>>
+      candidate_q(graph_cmp);
+  std::set<size_t> hash_mp;
+  candidate_q.push(graph);
+  std::shared_ptr<Graph> best_graph = graph;
+  hash_mp.insert(graph->hash());
+  int best_gate_cnt = graph->gate_count();
+  while (!candidate_q.empty() && budget >= 0) {
+    auto top_graph = candidate_q.top();
+    candidate_q.pop();
+    std::vector<Op> all_ops;
+    top_graph->topology_order_ops(all_ops);
+    assert(all_ops.size() == top_graph->gate_count());
+    for (auto op : all_ops) {
+      for (auto xfer : xfers) {
+        if (top_graph->xfer_appliable(xfer, op)) {
+          auto new_graph = top_graph->apply_xfer(xfer, op);
+          if (hash_mp.find(new_graph->hash()) == hash_mp.end()) {
+            candidate_q.push(new_graph);
+            hash_mp.insert(new_graph->hash());
+            if (new_graph->gate_count() < best_gate_cnt) {
+              best_graph = new_graph;
+              best_gate_cnt = new_graph->gate_count();
+            }
+            budget--;
+            if (budget % 1000 == 0) {
+              std::cout << "budget: " << budget << " best gate count "
+                        << best_gate_cnt << std::endl;
+            }
+          }
+        }
+      }
+    }
+  }
 
+  best_graph->to_qasm("test.qasm", false, false);
   //   std::vector<Op> ops;
   //   graph.all_ops(ops);
   //   int num_xfers = xfers.size();

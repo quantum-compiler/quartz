@@ -5,7 +5,7 @@
 using namespace quartz;
 
 int main() {
-	Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h});
+	Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h}, 3, 3);
 	Generator gen(&ctx);
 	Dataset dataset;
 	gen.generate_dfs(3 /*num_qubits*/, 3 /*max_num_input_parameters*/,

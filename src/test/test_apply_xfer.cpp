@@ -17,6 +17,9 @@ int main() {
     std::cout << "Parser failed" << std::endl;
     return 0;
   }
+  ctx.get_and_gen_input_dis(dag->get_num_qubits());
+  ctx.get_and_gen_hashing_dis(dag->get_num_qubits());
+  ctx.get_and_gen_parameters(dag->get_num_input_parameters());
   Graph graph(&ctx, dag);
 
   std::vector<Op> ops_0;

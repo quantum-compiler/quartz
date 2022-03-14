@@ -21,6 +21,15 @@ namespace quartz {
 		}
 	}
 
+    Context::Context(
+            const std::vector< GateType > &supported_gates,
+            const int num_qubits, const int num_params)
+            : Context(supported_gates) {
+        get_and_gen_input_dis(num_qubits);
+        get_and_gen_hashing_dis(num_qubits);
+        get_and_gen_parameters(num_params);
+    }
+
 	size_t Context::next_global_unique_id(void) { return global_unique_id++; }
 
 	void Context::set_generated_parameter(int id, ParamType param) {
@@ -65,45 +74,58 @@ namespace quartz {
 		return supported_quantum_gates_;
 	}
 
-	const Vector &Context::get_generated_input_dis(int num_qubits) {
-		assert(num_qubits >= 0);
-		if (random_input_distribution_.size() <= num_qubits) {
-			random_input_distribution_.resize(num_qubits + 1);
-		}
-		if (random_input_distribution_[num_qubits].size() == 0) {
-			random_input_distribution_[num_qubits] =
-			    Vector::random_generate(num_qubits);
-		}
+    const Vector& Context::get_and_gen_input_dis(const int num_qubits) {
+        assert(num_qubits >= 0);
+        while (random_input_distribution_.size() <= num_qubits) {
+            random_input_distribution_.emplace_back(
+                    Vector::random_generate(random_input_distribution_.size())
+            );
+        }
+        return random_input_distribution_[num_qubits];
+    }
+
+    const Vector& Context::get_and_gen_hashing_dis(const int num_qubits) {
+        assert(num_qubits >= 0);
+        while (random_hashing_distribution_.size() <= num_qubits) {
+            random_hashing_distribution_.emplace_back(
+                    Vector::random_generate(random_hashing_distribution_.size())
+            );
+        }
+        return random_hashing_distribution_[num_qubits];
+    }
+
+    std::vector< ParamType > Context::get_and_gen_parameters(const int num_params) {
+        assert(num_params >= 0);
+        if (random_parameters_.size() < num_params) {
+            // Standard mersenne_twister_engine seeded with 0
+            static std::mt19937 gen(0);
+            static ParamType pi = std::acos((ParamType)-1.0);
+            static std::uniform_real_distribution< ParamType > dis_real(-pi,
+                                                                        pi);
+            while (random_parameters_.size() < num_params) {
+                random_parameters_.emplace_back(dis_real(gen));
+            }
+        }
+        return std::vector< ParamType >(
+                random_parameters_.begin(),
+                random_parameters_.begin() + num_params);
+    }
+
+	const Vector &Context::get_generated_input_dis(int num_qubits) const {
+		assert(0 <= num_qubits && num_qubits < random_input_distribution_.size());
 		return random_input_distribution_[num_qubits];
 	}
 
-	const Vector &Context::get_generated_hashing_dis(int num_qubits) {
-		assert(num_qubits >= 0);
-		if (random_hashing_distribution_.size() <= num_qubits) {
-			random_hashing_distribution_.resize(num_qubits + 1);
-		}
-		if (random_hashing_distribution_[num_qubits].size() == 0) {
-			random_hashing_distribution_[num_qubits] =
-			    Vector::random_generate(num_qubits);
-		}
+	const Vector &Context::get_generated_hashing_dis(int num_qubits) const {
+        assert(0 <= num_qubits && num_qubits < random_hashing_distribution_.size());
 		return random_hashing_distribution_[num_qubits];
 	}
 
-	std::vector< ParamType > Context::get_generated_parameters(int num_params) {
-		assert(num_params >= 0);
-		if (random_parameters_.size() < num_params) {
-			// Standard mersenne_twister_engine seeded with 0
-			static std::mt19937 gen(0);
-			static ParamType pi = std::acos((ParamType)-1.0);
-			static std::uniform_real_distribution< ParamType > dis_real(-pi,
-			                                                            pi);
-			while (random_parameters_.size() < num_params) {
-				random_parameters_.emplace_back(dis_real(gen));
-			}
-		}
-		return std::vector< ParamType >(random_parameters_.begin(),
-		                                random_parameters_.begin() +
-		                                    num_params);
+	std::vector< ParamType > Context::get_generated_parameters(int num_params) const {
+        assert(0 <= num_params && num_params <= random_parameters_.size());
+		return std::vector< ParamType >(
+                random_parameters_.begin(),
+		        random_parameters_.begin() + num_params);
 	}
 
 	std::vector< ParamType > Context::get_all_generated_parameters() const {

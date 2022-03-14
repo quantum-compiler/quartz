@@ -409,8 +409,10 @@ namespace quartz {
 		classes_.clear();
 	}
 
-	bool EquivalenceSet::simplify(Context *ctx, bool common_subcircuit_pruning,
-	                              bool other_simplification) {
+	bool EquivalenceSet::simplify(Context *ctx,
+								  bool normalize_to_minimal_circuit_representation,
+								  bool common_subcircuit_pruning,
+								  bool other_simplification) {
 		bool ever_simplified = false;
 		// If there are 2 continuous optimizations with no effect, break.
 		constexpr int kNumOptimizationsToPerform = 5;
@@ -424,7 +426,7 @@ namespace quartz {
 			else if (!--remaining_optimizations) {
 				break;
 			}
-			if (other_simplification &&
+			if (normalize_to_minimal_circuit_representation &&
 			    normalize_to_minimal_circuit_representations(ctx)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;

@@ -40,7 +40,7 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
   gen.generate(num_qubits, num_input_parameters,
                max_num_quantum_gates, max_num_param_gates,
                &dataset,
-               true, &equiv_set,
+               true, &equiv_set, /*unique_parameters=*/false,
                true);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec

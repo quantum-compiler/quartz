@@ -1,0 +1,18 @@
+merging op rz(16418) and rz(16473)
+eliminating op rz(16418)
+merging op rz(16418) and rz(16486)
+merging op rz(16525) and rz(16444)
+eliminating op rz(16525)
+merging op rz(16444) and rz(16538)
+merging op rz(16576) and rz(16602)
+merging op rz(16576) and rz(16615)
+eliminating op rz(16576)
+gate count after toffoli flip: 164
+9100 classes of equivalences with 19528 DAGs are loaded in 0.99 seconds.
+Number of different transfers is 20844.
+
+        ===== Start Cost-Based Backtracking Search =====
+0 seconds.
+        ===== Finish Cost-Based Backtracking Search =====
+
+gate count after optimization: 164

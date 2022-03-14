@@ -159,7 +159,7 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
   for (auto cmd : dst_cmds) {
     OpX *op = new OpX(cmd.get_gate_type());
     auto num_qubit = cmd.qubit_idx.size();
-    for (int i = 0; i < num_qubit; ++i) {
+    for (size_t i = 0; i < num_qubit; ++i) {
       assert(dst_qubits_2_tensorx.find(cmd.qubit_idx[i]) !=
              dst_qubits_2_tensorx.end());
       op->add_input(dst_qubits_2_tensorx[cmd.qubit_idx[i]]);
@@ -169,7 +169,7 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
       dst_qubits_2_tensorx[cmd.qubit_idx[i]] = tensor;
     }
     auto num_params = cmd.param_idx.size();
-    for (int i = 0; i < num_params; ++i) {
+    for (size_t i = 0; i < num_params; ++i) {
       // Non-constant parameters
       if (cmd.param_idx[i] != -1) {
         assert(dst_params_2_tensorx.find(cmd.param_idx[i]) !=

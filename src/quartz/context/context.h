@@ -16,6 +16,7 @@ namespace quartz {
 	class Context {
 	public:
 		explicit Context(const std::vector< GateType > &supported_gates);
+        Context(const std::vector< GateType > &supported_gates, const int num_qubits, const int num_params);
 		Gate *get_gate(GateType tp);
 		[[nodiscard]] const std::vector< GateType > &
 		get_supported_gates() const;
@@ -24,9 +25,12 @@ namespace quartz {
 		[[nodiscard]] const std::vector< GateType > &
 		get_supported_quantum_gates() const;
 		// Two deterministic (random) distributions for each number of qubits.
-		const Vector &get_generated_input_dis(int num_qubits);
-		const Vector &get_generated_hashing_dis(int num_qubits);
-		std::vector< ParamType > get_generated_parameters(int num_params);
+        const Vector& get_and_gen_input_dis(int num_qubits);
+        const Vector& get_and_gen_hashing_dis(int num_qubits);
+        std::vector< ParamType > get_and_gen_parameters(int num_params);
+		const Vector &get_generated_input_dis(int num_qubits) const;
+		const Vector &get_generated_hashing_dis(int num_qubits) const;
+		std::vector< ParamType > get_generated_parameters(int num_params) const;
 		std::vector< ParamType > get_all_generated_parameters() const;
         // generate at once
         void generate_input_dis(const int max_num_qubits);

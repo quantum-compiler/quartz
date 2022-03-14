@@ -21,6 +21,11 @@ int main() {
     std::cout << "Parser failed" << std::endl;
     return 0;
   }
+
+  ctx.get_and_gen_input_dis(dag->get_num_qubits());
+  ctx.get_and_gen_hashing_dis(dag->get_num_qubits());
+  ctx.get_and_gen_parameters(dag->get_num_input_parameters());
+
   std::shared_ptr<Graph> graph(new Graph(&ctx, dag));
 
   EquivalenceSet eqs;
@@ -67,7 +72,7 @@ int main() {
     candidate_q.pop();
     std::vector<Op> all_ops;
     top_graph->topology_order_ops(all_ops);
-    assert(all_ops.size() == top_graph->gate_count());
+    assert(all_ops.size() == (size_t)top_graph->gate_count());
     for (auto op : all_ops) {
       for (auto xfer : xfers) {
         if (top_graph->xfer_appliable(xfer, op)) {

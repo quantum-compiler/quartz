@@ -2,6 +2,7 @@
 #include "../gate/all_gates.h"
 #include "../dag/dag.h"
 
+#include <iostream>
 #include <cassert>
 #include <cmath>
 #include <random>
@@ -20,6 +21,15 @@ namespace quartz {
 			}
 		}
 	}
+
+    Context::Context(
+            const std::vector< GateType > &supported_gates,
+            const int num_qubits, const int num_params)
+            : Context(supported_gates) {
+        get_and_gen_input_dis(num_qubits);
+        get_and_gen_hashing_dis(num_qubits);
+        get_and_gen_parameters(num_params);
+    }
 
 	size_t Context::next_global_unique_id(void) { return global_unique_id++; }
 
@@ -65,66 +75,28 @@ namespace quartz {
 		return supported_quantum_gates_;
 	}
 
-    // expected to be called after init and must be called once
-    void Context::generate_input_dis(const int max_num_qubits) {
-        assert(max_num_qubits >= 0);
-        random_input_distribution_.resize(max_num_qubits + 1);
-        for (int num_q = 0; num_q <= max_num_qubits; num_q++) {
-            random_input_distribution_[num_q] =
-                    Vector::random_generate(num_q);
-        }
-    }
-
-    void Context::generate_hashing_dis(const int max_num_qubits) {
-        assert(max_num_qubits >= 0);
-        random_hashing_distribution_.resize(max_num_qubits + 1);
-        for (int num_q = 0; num_q <= max_num_qubits; num_q++) {
-            random_hashing_distribution_[num_q] =
-                    Vector::random_generate(num_q);
-        }
-    }
-
-    void Context::generate_parameters(const int max_num_params) {
-        assert(max_num_params >= 0);
-        static std::mt19937 gen(0);
-        static ParamType pi = std::acos((ParamType)-1.0);
-        static std::uniform_real_distribution< ParamType > dis_real(-pi, pi);
-        while (random_parameters_.size() < max_num_params) {
-            random_parameters_.emplace_back(dis_real(gen));
-        }
-    }
-
-    const Vector &Context::get_generated_input_dis(int num_qubits) {
+    const Vector& Context::get_and_gen_input_dis(const int num_qubits) {
         assert(num_qubits >= 0);
-        assert(random_input_distribution_.size() > num_qubits &&
-               random_input_distribution_[num_qubits].size() > 0);
-        if (random_input_distribution_.size() <= num_qubits) {
-            random_input_distribution_.resize(num_qubits + 1);
-        }
-        if (random_input_distribution_[num_qubits].size() == 0) {
-            random_input_distribution_[num_qubits] =
-                    Vector::random_generate(num_qubits);
+        while (random_input_distribution_.size() <= num_qubits) {
+            random_input_distribution_.emplace_back(
+                    Vector::random_generate(random_input_distribution_.size())
+            );
         }
         return random_input_distribution_[num_qubits];
     }
 
-    const Vector &Context::get_generated_hashing_dis(int num_qubits) {
+    const Vector& Context::get_and_gen_hashing_dis(const int num_qubits) {
         assert(num_qubits >= 0);
-        assert(random_hashing_distribution_.size() > num_qubits &&
-               random_hashing_distribution_[num_qubits].size() > 0);
-        if (random_hashing_distribution_.size() <= num_qubits) {
-            random_hashing_distribution_.resize(num_qubits + 1);
-        }
-        if (random_hashing_distribution_[num_qubits].size() == 0) {
-            random_hashing_distribution_[num_qubits] =
-                    Vector::random_generate(num_qubits);
+        while (random_hashing_distribution_.size() <= num_qubits) {
+            random_hashing_distribution_.emplace_back(
+                    Vector::random_generate(random_hashing_distribution_.size())
+            );
         }
         return random_hashing_distribution_[num_qubits];
     }
 
-    std::vector< ParamType > Context::get_generated_parameters(int num_params) {
+    std::vector< ParamType > Context::get_and_gen_parameters(const int num_params) {
         assert(num_params >= 0);
-        assert(random_parameters_.size() >= num_params);
         if (random_parameters_.size() < num_params) {
             // Standard mersenne_twister_engine seeded with 0
             static std::mt19937 gen(0);
@@ -135,10 +107,51 @@ namespace quartz {
                 random_parameters_.emplace_back(dis_real(gen));
             }
         }
-        return std::vector< ParamType >(random_parameters_.begin(),
-                                        random_parameters_.begin() +
-                                        num_params);
+        return std::vector< ParamType >(
+                random_parameters_.begin(),
+                random_parameters_.begin() + num_params);
     }
+
+	const Vector &Context::get_generated_input_dis(int num_qubits) const {
+        if (0 <= num_qubits && num_qubits < random_input_distribution_.size())
+		    return random_input_distribution_[num_qubits];
+        else {
+            std::cerr << "Currently random_input_distribution_.size() = "
+                      << random_input_distribution_.size()
+                      << " , but the queried num_qubits = " << num_qubits << std::endl
+                      << "Please generate enough random_input_distribution_ in advance"
+                         " or use Context::get_and_gen_input_dis ." << std::endl;
+            assert(false);
+        }
+	}
+
+	const Vector &Context::get_generated_hashing_dis(int num_qubits) const {
+        if (0 <= num_qubits && num_qubits < random_hashing_distribution_.size())
+		    return random_hashing_distribution_[num_qubits];
+        else {
+            std::cerr << "Currently random_hashing_distribution_.size() = "
+                      << random_hashing_distribution_.size()
+                      << " , but the queried num_qubits = " << num_qubits << std::endl
+                      << "Please generate enough random_hashing_distribution_ in advance"
+                         " or use Context::get_and_gen_hashing_dis ." << std::endl;
+            assert(false);
+        }
+	}
+
+	std::vector< ParamType > Context::get_generated_parameters(int num_params) const {
+        if (0 <= num_params && num_params <= random_parameters_.size())
+		    return std::vector< ParamType >(
+                random_parameters_.begin(),
+		        random_parameters_.begin() + num_params);
+        else {
+            std::cerr << "Currently random_parameters_.size() = "
+                      << random_parameters_.size()
+                      << " , but the queried num_params = " << num_params << std::endl
+                      << "Please generate enough random_parameters_ in advance"
+                         " or use Context::get_and_gen_parameters ." << std::endl;
+            assert(false);
+        }
+	}
 
 	std::vector< ParamType > Context::get_all_generated_parameters() const {
 		return random_parameters_;

@@ -33,11 +33,11 @@ int main() {
   std::vector<Command> cmds;
   Command cmd;
   rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  GraphXfer *xfer =
-      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
-  rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  GraphXfer *xfer_inverse =
-      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
+  //   GraphXfer *xfer =
+  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
+  //   rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  //   GraphXfer *xfer_inverse =
+  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   DAG *dag = nullptr;

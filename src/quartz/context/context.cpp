@@ -2,6 +2,7 @@
 #include "../gate/all_gates.h"
 #include "../dag/dag.h"
 
+#include <iostream>
 #include <cassert>
 #include <cmath>
 #include <random>
@@ -112,20 +113,44 @@ namespace quartz {
     }
 
 	const Vector &Context::get_generated_input_dis(int num_qubits) const {
-		assert(0 <= num_qubits && num_qubits < random_input_distribution_.size());
-		return random_input_distribution_[num_qubits];
+        if (0 <= num_qubits && num_qubits < random_input_distribution_.size())
+		    return random_input_distribution_[num_qubits];
+        else {
+            std::cerr << "Currently random_input_distribution_.size() = "
+                      << random_input_distribution_.size()
+                      << " , but the queried num_qubits = " << num_qubits << std::endl
+                      << "Please generate enough random_input_distribution_ in advance"
+                         " or use Context::get_and_gen_input_dis ." << std::endl;
+            assert(false);
+        }
 	}
 
 	const Vector &Context::get_generated_hashing_dis(int num_qubits) const {
-        assert(0 <= num_qubits && num_qubits < random_hashing_distribution_.size());
-		return random_hashing_distribution_[num_qubits];
+        if (0 <= num_qubits && num_qubits < random_hashing_distribution_.size())
+		    return random_hashing_distribution_[num_qubits];
+        else {
+            std::cerr << "Currently random_hashing_distribution_.size() = "
+                      << random_hashing_distribution_.size()
+                      << " , but the queried num_qubits = " << num_qubits << std::endl
+                      << "Please generate enough random_hashing_distribution_ in advance"
+                         " or use Context::get_and_gen_hashing_dis ." << std::endl;
+            assert(false);
+        }
 	}
 
 	std::vector< ParamType > Context::get_generated_parameters(int num_params) const {
-        assert(0 <= num_params && num_params <= random_parameters_.size());
-		return std::vector< ParamType >(
+        if (0 <= num_params && num_params <= random_parameters_.size())
+		    return std::vector< ParamType >(
                 random_parameters_.begin(),
 		        random_parameters_.begin() + num_params);
+        else {
+            std::cerr << "Currently random_parameters_.size() = "
+                      << random_parameters_.size()
+                      << " , but the queried num_params = " << num_params << std::endl
+                      << "Please generate enough random_parameters_ in advance"
+                         " or use Context::get_and_gen_parameters ." << std::endl;
+            assert(false);
+        }
 	}
 
 	std::vector< ParamType > Context::get_all_generated_parameters() const {

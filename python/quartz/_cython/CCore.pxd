@@ -4,7 +4,7 @@ from libcpp.vector cimport vector
 from libcpp cimport bool
 from libc.stdint cimport uint32_t
 from libcpp.string cimport string
-
+from libcpp.memory cimport shared_ptr
 
 ctypedef float ParamType
 
@@ -77,6 +77,8 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
         GraphXfer(Context_ptr, const DAG_ptr, const DAG_ptr) except +
         @staticmethod
         GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr)
+        int num_src_op()
+        int num_dst_op()
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Op:
@@ -96,12 +98,14 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
-        Graph *apply_xfer(GraphXfer *, Op) except +
+        shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
         void all_ops(vector[Op]&) const
         int gate_count() const
         size_t hash()
         void all_edges(vector[Edge]&) const
         void topology_order_ops(vector[Op] &) const
+        shared_ptr[Graph] ccz_flip_t(Context *)
+        void to_qasm(const string &, bool, bool) const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

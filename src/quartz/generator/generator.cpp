@@ -4,7 +4,6 @@
 #include <cassert>
 #include <chrono>
 #include <omp.h>
-const int NUM_THREADS = 1;
 
 namespace quartz {
 	void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
@@ -404,7 +403,7 @@ namespace quartz {
 		};
         std::cout << "---- BFS: dags.back().size() = " << dags.back().size() << std::endl;
         auto start_time = std::chrono::system_clock::now();
-#pragma omp parallel for num_threads(NUM_THREADS)
+#pragma omp parallel for
 		for (auto &dag : dags.back()) {
 		    InputParamMaskType input_param_usage_mask;
 		    std::vector<InputParamMaskType> input_param_masks;

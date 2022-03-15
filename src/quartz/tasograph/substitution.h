@@ -44,7 +44,7 @@ public:
 
 class GraphCompare {
 public:
-  bool operator()(Graph *lhs, Graph *rhs) {
+  bool operator()(std::shared_ptr<Graph> lhs, std::shared_ptr<Graph> rhs) {
     return lhs->total_cost() > rhs->total_cost();
   }
 };
@@ -58,7 +58,8 @@ public:
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
   void match(OpX *srcOp, Op op, const Graph *graph);
   void unmatch(OpX *srcOp, Op op, const Graph *graph);
-  void run(int depth, Graph *graph, std::vector<Graph *> &new_candidates,
+  void run(int depth, Graph *graph,
+           std::vector<std::shared_ptr<Graph>> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps,
            bool enable_early_stop, bool &stop_search);
   std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);

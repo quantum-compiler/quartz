@@ -121,6 +121,8 @@ Graph::Graph(const Graph &graph) {
   constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
   qubit_2_idx = graph.qubit_2_idx;
+  inEdges = graph.inEdges;
+  outEdges = graph.outEdges;
 }
 
 size_t Graph::get_next_special_op_guid() {
@@ -1068,11 +1070,13 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                       const std::string &equiv_file_name,
-                       bool use_simulated_annealing, bool enable_early_stop,
-                       bool use_rotation_merging_in_searching,
-                       GateType target_rotation) {
+std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
+                                       bool print_subst, Context *ctx,
+                                       const std::string &equiv_file_name,
+                                       bool use_simulated_annealing,
+                                       bool enable_early_stop,
+                                       bool use_rotation_merging_in_searching,
+                                       GateType target_rotation) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1135,11 +1139,13 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
   int counter = 0;
   int maxNumOps = inEdges.size();
 
-  std::priority_queue<Graph *, std::vector<Graph *>, GraphCompare> candidates;
+  std::priority_queue<std::shared_ptr<Graph>,
+                      std::vector<std::shared_ptr<Graph>>, GraphCompare>
+      candidates;
   std::set<size_t> hashmap;
-  Graph *bestGraph = this;
+  std::shared_ptr<Graph> bestGraph(new Graph(*this));
   float bestCost = total_cost();
-  candidates.push(this);
+  candidates.push(std::shared_ptr<Graph>(new Graph(*this)));
   hashmap.insert(hash());
 
   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
@@ -1155,7 +1161,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
     constexpr bool always_delete_original_circuit = true;
     const double kDeleteOriginalCircuitRate = -1;
     // <cost, graph>
-    std::vector<std::pair<float, Graph *>> sa_candidates;
+    std::vector<std::pair<float, std::shared_ptr<Graph>>> sa_candidates;
     sa_candidates.reserve(kNumKeepGraph);
     sa_candidates.emplace_back(bestCost, this);
     int num_iteration = 0;
@@ -1164,17 +1170,17 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
     for (double T = kSABeginTemp; T > kSAEndTemp; T *= kSACoolingFactor) {
       num_iteration++;
       hashmap.clear();
-      std::vector<std::pair<float, Graph *>> new_candidates;
+      std::vector<std::pair<float, std::shared_ptr<Graph>>> new_candidates;
       new_candidates.reserve(sa_candidates.size() * xfers.size());
       int num_possible_new_candidates = 0;
       int num_candidates_kept = 0;
       for (auto &candidate : sa_candidates) {
         const auto current_cost = candidate.first;
-        std::vector<Graph *> current_new_candidates;
+        std::vector<std::shared_ptr<Graph>> current_new_candidates;
         current_new_candidates.reserve(xfers.size());
         bool stop_search = false;
         for (auto &xfer : xfers) {
-          xfer->run(0, candidate.second, current_new_candidates, hashmap,
+          xfer->run(0, candidate.second.get(), current_new_candidates, hashmap,
                     bestCost * alpha, 2 * maxNumOps, enable_early_stop,
                     stop_search);
         }
@@ -1198,7 +1204,7 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
             // Accept the new candidate.
             new_candidates.emplace_back(new_cost, new_candidate);
           } else {
-            delete new_candidate;
+            new_candidate.reset();
           }
         }
         if (!always_delete_original_circuit &&
@@ -1209,8 +1215,8 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
           hashmap.insert(candidate.second->hash());
           num_candidates_kept++;
         } else {
-          if (candidate.second != bestGraph && candidate.second != this) {
-            delete candidate.second;
+          if (candidate.second != bestGraph && candidate.second.get() != this) {
+            candidate.second.reset();
           }
         }
       }
@@ -1240,9 +1246,9 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                           new_candidates.begin() + kNumKeepGraph,
                           new_candidates.end());
         for (int i = kNumKeepGraph; i < (int)new_candidates.size(); i++) {
-          if (new_candidates[i].second != this &&
+          if (new_candidates[i].second.get() != this &&
               new_candidates[i].second != bestGraph) {
-            delete new_candidates[i].second;
+            new_candidates[i].second.reset();
           }
         }
         new_candidates.resize(kNumKeepGraph);
@@ -1258,18 +1264,16 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                 << min_cost << ", " << max_cost << "]" << std::endl;
     }
   } else {
+    std::vector<GraphXfer *> good_xfers;
     while (!candidates.empty()) {
-      Graph *subGraph = candidates.top();
+      auto subGraph = candidates.top();
       if (use_rotation_merging_in_searching) {
         subGraph->rotation_merging(target_rotation);
       }
       candidates.pop();
       if (subGraph->total_cost() < bestCost) {
-        if (bestGraph != this)
-          delete bestGraph;
         bestCost = subGraph->total_cost();
         bestGraph = subGraph;
-        // bestGraph->to_qasm("current_best.qasm", false, false);
       }
       if (counter > budget) {
         // TODO: free all remaining candidates when budget exhausted
@@ -1291,17 +1295,20 @@ Graph *Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
                       .count() /
                   1000.0);
 
-      std::vector<Graph *> new_candidates;
+      //   std::vector<Graph *> new_candidates;
       bool stop_search = false;
       for (auto &xfer : xfers) {
-        xfer->run(0, subGraph, new_candidates, hashmap, bestCost * alpha,
+        std::vector<std::shared_ptr<Graph>> new_candidates;
+        xfer->run(0, subGraph.get(), new_candidates, hashmap, bestCost * alpha,
                   2 * maxNumOps, enable_early_stop, stop_search);
-      }
-      for (auto &candidate : new_candidates) {
-        candidates.push(candidate);
-      }
-      if (bestGraph != subGraph) {
-        delete subGraph;
+        auto front_gate_count = candidates.top()->gate_count();
+        for (auto &candidate : new_candidates) {
+          candidates.push(candidate);
+        }
+        auto new_front_gate_count = candidates.top()->gate_count();
+        if (new_front_gate_count < front_gate_count) {
+          good_xfers.push_back(xfer);
+        }
       }
     }
   }
@@ -1348,25 +1355,17 @@ std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
 std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
                                                   GraphXfer *xfer,
                                                   GraphXfer *inverse_xfer) {
-  Graph *graph = this;
-  std::shared_ptr<Graph> temp_graph(nullptr);
+  std::shared_ptr<Graph> temp_graph(new Graph(*this));
   while (true) {
-    std::shared_ptr<Graph> new_graph_0(nullptr);
-    std::shared_ptr<Graph> new_graph_1(nullptr);
-    if (temp_graph == nullptr) {
-      new_graph_0 = xfer->run_1_time(0, graph);
-      new_graph_1 = inverse_xfer->run_1_time(0, graph);
-    } else {
-      new_graph_0 = xfer->run_1_time(0, temp_graph.get());
-      new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
-    }
-    if (new_graph_0 == nullptr) {
-      assert(new_graph_1 == nullptr);
+    auto new_graph_0 = xfer->run_1_time(0, temp_graph.get());
+    auto new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
+    if (new_graph_0.get() == nullptr) {
+      assert(new_graph_1.get() == nullptr);
       return temp_graph;
     }
     new_graph_0->rotation_merging(target_rotation);
     new_graph_1->rotation_merging(target_rotation);
-    if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
+    if (new_graph_0->gate_count() <= new_graph_1->gate_count()) {
       temp_graph = new_graph_0;
     } else {
       temp_graph = new_graph_1;

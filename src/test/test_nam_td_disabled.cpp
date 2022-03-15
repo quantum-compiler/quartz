@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
-  Graph *graph_after_search = graph_before_search->optimize(
+  auto graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::rz);
   auto end = std::chrono::steady_clock::now();

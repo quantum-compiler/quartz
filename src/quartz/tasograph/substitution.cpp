@@ -495,17 +495,13 @@ std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
     if (dst_graph->has_loop()) {
       std::cout << "Found a new graph with LOOP!!!!\n" << std::endl;
       //   delete dst_graph;
-      dst_graph.reset();
       return nullptr;
     }
     // TODO: remove me for better performance
     assert(dst_graph->check_correctness());
     if (dst_graph->hash() == src_graph->hash()) {
-      //   delete dst_graph;
-      dst_graph.reset();
       return nullptr;
     }
-    // return dst_graph;
     return dst_graph;
   } else {
     OpX *srcOp = srcOps[depth];
@@ -530,7 +526,7 @@ std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
 }
 
 void GraphXfer::run(int depth, Graph *graph,
-                    std::vector<Graph *> &new_candidates,
+                    std::vector<std::shared_ptr<Graph>> &new_candidates,
                     std::set<size_t> &hashmap, float threshold, int maxNumOps,
                     bool enable_early_stop, bool &stop_search) {
   if (stop_search)
@@ -583,7 +579,7 @@ void GraphXfer::run(int depth, Graph *graph,
         (int)newGraph->inEdges.size() < maxNumOps) {
       if (hashmap.find(newGraph->hash()) == hashmap.end()) {
         hashmap.insert(newGraph->hash());
-        // new_candidates.push_back(newGraph);
+        new_candidates.push_back(newGraph);
         if (enable_early_stop)
           stop_search = true;
         // std::cout << newGraph->total_cost() << " ";
@@ -622,6 +618,8 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 
 std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
   std::shared_ptr<Graph> newGraph(new Graph(*graph));
+  newGraph->inEdges.clear();
+  newGraph->outEdges.clear();
   // Step 1: map dst ops
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
   std::vector<OpX *>::const_iterator dstIt;

@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   auto union_ctx_0 = union_contexts(&cz_ctx, &dst_ctx);
   Graph *graph_before_h_cz_merge = new_graph->context_shift(
       &dst_ctx, &cz_ctx, &union_ctx_0, &cx_2_cz, false);
-  Graph *graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
+  auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
       0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
       GateType::rz);
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
       &cz_ctx, &rigetti_ctx, &union_ctx_1, &rules, false);
 
   // Optimization
-  Graph *graph_after_search = graph_rigetti->optimize(
+  auto graph_after_search = graph_rigetti->optimize(
       0.999, 0, false, &union_ctx_1, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::rz);
   auto end = std::chrono::steady_clock::now();

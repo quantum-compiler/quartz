@@ -55,11 +55,11 @@ int main(int argc, char **argv) {
       GateType::u1, xfer_pair.first, xfer_pair.second);
 
   // Optimization
-  Graph *graph_after_search = graph_before_search->optimize(
+  auto graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::u1);
   eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
-  Graph *graph_after_u3_pass = graph_after_search->optimize(
+  auto graph_after_u3_pass = graph_after_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::u1);
   auto end = std::chrono::steady_clock::now();

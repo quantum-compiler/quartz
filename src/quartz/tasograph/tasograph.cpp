@@ -219,6 +219,11 @@ namespace quartz {
         return okay;
     }
 
+    bool Graph::check_mapping_correctness() {
+        // every gate has identical logical index for each pair of input and output
+        return true;
+    }
+
 // TODO: add constant parameters
     size_t Graph::hash(void) {
         size_t total = 0;

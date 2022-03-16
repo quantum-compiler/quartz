@@ -4,6 +4,7 @@
 #include <vector>
 #include <queue>
 #include <memory>
+#include <algorithm>
 
 namespace quartz {
     struct DeviceEdge {
@@ -72,6 +73,12 @@ namespace quartz {
                 device_qubits[dst_idx]->out_edges.emplace_back(reverse_edge);
                 device_qubits[src_idx]->in_edges.emplace_back(reverse_edge);
             }
+        }
+
+        [[nodiscard]] bool has_edge(int src_idx, int dst_idx) const {
+            return std::any_of(device_qubits[src_idx]->out_edges.begin(),
+                               device_qubits[src_idx]->out_edges.end(),
+                               [&dst_idx](const std::shared_ptr<DeviceEdge>& edge){ return edge->dst_idx == dst_idx; });
         }
 
         [[nodiscard]] double cal_swap_cost(int src_idx, int dst_idx) const {

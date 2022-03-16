@@ -5,6 +5,7 @@
 #include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
+#include "../device/device.h"
 
 #include <chrono>
 #include <fstream>
@@ -202,6 +203,8 @@ namespace quartz {
 
         bool check_correctness();
 
+        bool check_mapping_correctness();
+
         float total_cost() const;
 
         int gate_count() const;
@@ -286,6 +289,7 @@ namespace quartz {
         std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
         std::map<Op, ParamType> constant_param_values;
         std::unordered_map<Op, int, OpHash> qubit_2_idx;
+        std::shared_ptr<DeviceTopologyGraph> device_topology_graph;
     };
 
 }; // namespace quartz

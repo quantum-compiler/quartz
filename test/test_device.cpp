@@ -28,4 +28,6 @@ int main() {
             std::cout << "src: " << i << ", dst: " << j << ", cost: " << device_graph.cal_swap_cost(i, j) << '\n';
         }
     }
+    std::cout << "Has 0->1 edge: " << device_graph.has_edge(0, 1) << '\n';
+    std::cout << "Has 1->3 edge: " << device_graph.has_edge(1, 3) << '\n';
 };

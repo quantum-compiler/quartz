@@ -253,6 +253,9 @@ namespace quartz {
                         if (!device_topology_graph->has_edge(in_edge1->physical_qubit_idx,
                                                              in_edge2->physical_qubit_idx))
                             return false;
+                    } else {
+                        // Operations on more than 3 qubits are not supported.
+                        assert(false);
                     }
                 }
             }

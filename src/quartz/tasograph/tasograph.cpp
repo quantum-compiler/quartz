@@ -220,7 +220,6 @@ namespace quartz {
     }
 
     bool Graph::check_mapping_correctness() {
-        // TODO: are there better ways of accessing Op, will this miss out any Ops?
         for (const auto &op_out: outEdges) {
             // input_param always passes
             if (op_out.first.ptr->tp == GateType::input_param) continue;

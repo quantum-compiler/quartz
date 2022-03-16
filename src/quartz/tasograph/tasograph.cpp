@@ -220,12 +220,24 @@ namespace quartz {
     }
 
     bool Graph::check_mapping_correctness() {
-        // TODO: are there better ways of accessing Op?
-        for (const auto &op_in: inEdges) {
-            for (const auto &op_out: outEdges) {
+        // TODO: are there better ways of accessing Op, will this miss out any Ops?
+        for (const auto &op_out: outEdges) {
+            // input_param always passes
+            if (op_out.first.ptr->tp == GateType::input_param) continue;
+
+            // input_qubit only needs to check out edges
+            if (op_out.first.ptr->tp == GateType::input_qubit) {
+                if (op_out.second.size() != 1) return false;
+                if (op_out.second.begin()->physical_qubit_idx != op_out.first.physical_qubit_id ||
+                    op_out.second.begin()->logical_qubit_idx != op_out.first.logical_qubit_id)
+                    return false;
+                continue;
+            }
+
+            // other kind of Ops
+            for (const auto &op_in: inEdges) {
                 if (op_in.first.guid == op_out.first.guid) {
-                    // TODO: how to deal with input_param and input_qubit?
-                    if (op_in.second.size() == 1) {
+                    if (op_out.second.size() == 1) {
                         // case for one qubit gate
                         auto in_edge = op_in.second.begin();
                         auto out_edge = op_out.second.begin();
@@ -235,7 +247,7 @@ namespace quartz {
 
                         // physical qubit index should also be the same except for swap gates
                         if (in_edge->physical_qubit_idx != out_edge->physical_qubit_idx) return false;
-                    } else if (op_in.second.size() == 2) {
+                    } else if (op_out.second.size() == 2) {
                         // case for two qubits gate
                         auto in_edge1 = op_in.second.begin();
                         auto out_edge1 = op_out.second.begin();
@@ -264,6 +276,7 @@ namespace quartz {
                             return false;
                     } else {
                         // Operations on more than 3 qubits are not supported.
+                        std::cout << "Detect gates with 0 / more than 3 outputs" << '\n';
                         assert(false);
                     }
                 }

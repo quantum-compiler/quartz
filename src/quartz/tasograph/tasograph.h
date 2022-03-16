@@ -63,6 +63,9 @@ namespace quartz {
     public:
         size_t guid;
         Gate *ptr;
+        // only useful for input_qubit
+        int physical_qubit_id{-1};
+        int logical_qubit_id{-1};
     };
 
     class OpCompare {

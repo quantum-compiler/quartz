@@ -172,7 +172,7 @@ public:
   Graph(const Graph &graph);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
-  bool has_loop();
+  bool has_loop() const;
   size_t hash();
   bool check_correctness();
   float total_cost() const;
@@ -180,8 +180,10 @@ public:
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
-  Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
-                       RuleParser *rule_parser, bool ignore_toffoli = false);
+  std::shared_ptr<Graph> context_shift(Context *src_ctx, Context *dst_ctx,
+                                       Context *union_ctx,
+                                       RuleParser *rule_parser,
+                                       bool ignore_toffoli = false);
   std::shared_ptr<Graph>
   optimize(float alpha, int budget, bool print_subst, Context *ctx,
            const std::string &equiv_file_name, bool use_simulated_annealing,

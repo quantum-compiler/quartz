@@ -339,6 +339,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
   // be checked. This gauarentee that every edges are checked at the end.
+  // Check gate type
   if (srcOp->type != op.ptr->tp)
     return false;
   // Check num input tensors
@@ -471,8 +472,7 @@ std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
     if (!pass)
       return nullptr;
     // Check that output tensors with external edges are mapped
-    std::map<Op, OpX *, OpCompare>::const_iterator opIt;
-    for (opIt = mappedOps.begin(); opIt != mappedOps.end(); opIt++) {
+    for (auto opIt = mappedOps.cbegin(); opIt != mappedOps.cend(); opIt++) {
       const std::set<Edge, EdgeCompare> &list =
           src_graph->outEdges[opIt->first];
       std::set<Edge, EdgeCompare>::const_iterator it;
@@ -510,8 +510,8 @@ std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
          ++it) {
       // printf("can_match(%d)\n", can_match(srcOp, it->first,
       // graph));
-      if (can_match(srcOp, it->first, src_graph) &&
-          (mappedOps.find(it->first) == mappedOps.end())) {
+      if ((mappedOps.find(it->first) == mappedOps.end()) &&
+          can_match(srcOp, it->first, src_graph)) {
         Op op = it->first;
         // Check mapOutput
         match(srcOp, op, src_graph);
@@ -546,8 +546,7 @@ void GraphXfer::run(int depth, Graph *graph,
     if (!pass)
       return;
     // Check that all external edges are mapped outputs
-    std::map<Op, OpX *, OpCompare>::const_iterator opIt;
-    for (opIt = mappedOps.begin(); opIt != mappedOps.end(); opIt++) {
+    for (auto opIt = mappedOps.cbegin(); opIt != mappedOps.cend(); opIt++) {
       const std::set<Edge, EdgeCompare> &list = graph->outEdges[opIt->first];
       std::set<Edge, EdgeCompare>::const_iterator it;
       for (it = list.begin(); it != list.end(); it++)
@@ -569,8 +568,6 @@ void GraphXfer::run(int depth, Graph *graph,
     // Check that the new graph should not have any loop
     if (newGraph->has_loop()) {
       // printf("Found a new graph with LOOP!!!!\n");
-      //   delete newGraph;
-      newGraph.reset();
       return;
     }
     // TODO: remove me for better performance
@@ -584,9 +581,6 @@ void GraphXfer::run(int depth, Graph *graph,
           stop_search = true;
         // std::cout << newGraph->total_cost() << " ";
       }
-    } else {
-      //   delete newGraph;
-      newGraph.reset();
     }
   } else {
     OpX *srcOp = srcOps[depth];
@@ -594,8 +588,8 @@ void GraphXfer::run(int depth, Graph *graph,
     for (it = graph->inEdges.begin(); it != graph->inEdges.end(); it++) {
       // printf("can_match(%d)\n", can_match(srcOp, it->first,
       // graph));
-      if (can_match(srcOp, it->first, graph) &&
-          (mappedOps.find(it->first) == mappedOps.end())) {
+      if ((mappedOps.find(it->first) == mappedOps.end()) &&
+          can_match(srcOp, it->first, graph)) {
         Op op = it->first;
         // Check mapOutput
         match(srcOp, op, graph);

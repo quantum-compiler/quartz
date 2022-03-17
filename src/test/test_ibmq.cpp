@@ -46,9 +46,9 @@ int main(int argc, char **argv) {
   // Context shift
   RuleParser rule_parser(
       {"h q0 = u2 q0 0 pi", "x q0 = u3 q0 pi 0 -pi", "t q0 = u1 q0 0.25pi"});
-  Graph *graph_new_ctx = graph.context_shift(&src_ctx, &dst_ctx, &union_ctx,
-                                             &rule_parser, /*ignore_toffoli*/
-                                             true);
+  auto graph_new_ctx = graph.context_shift(&src_ctx, &dst_ctx, &union_ctx,
+                                           &rule_parser, /*ignore_toffoli*/
+                                           true);
 
   // Greedy toffoli flip
   auto graph_before_search = graph_new_ctx->toffoli_flip_greedy(

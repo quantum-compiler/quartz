@@ -270,6 +270,7 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
         output_vec2_shifted = phase_shift(
             output_vec2, current_phase_factor_symbolic)
         solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
+        solver.set("timeout", 30000)  # timeout after 30s
         result = solver.check()
         if result != z3.unsat:
             print(

@@ -833,10 +833,10 @@ void Graph::rotation_merging(GateType target_rotation) {
             is_first = false;
           } else {
             merge_2_rotation_op(first.op, pos.op);
-            std::cout << "merging op " << gate_type_name(first.op.ptr->tp)
-                      << "(" << first.op.guid << ")"
-                      << " and " << gate_type_name(pos.op.ptr->tp) << "("
-                      << pos.op.guid << ")" << std::endl;
+            // std::cout << "merging op " << gate_type_name(first.op.ptr->tp)
+            //           << "(" << first.op.guid << ")"
+            //           << " and " << gate_type_name(pos.op.ptr->tp) << "("
+            //           << pos.op.guid << ")" << std::endl;
           }
         }
 
@@ -861,8 +861,9 @@ void Graph::rotation_merging(GateType target_rotation) {
             }
           }
           remove_node(op);
-          std::cout << "eliminating op " << gate_type_name(op.ptr->tp) << "("
-                    << op.guid << ")" << std::endl;
+          //   std::cout << "eliminating op " << gate_type_name(op.ptr->tp) <<
+          //   "("
+          //             << op.guid << ")" << std::endl;
         }
       }
     }
@@ -1282,18 +1283,19 @@ std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
       }
       counter++;
       end = std::chrono::steady_clock::now();
-      std::cout
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                 end - start)
-                     .count() /
-                 1000.0
-          << " seconds." << std::endl;
-      fprintf(stderr, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
-              bestCost, candidates.size(),
-              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                      .count() /
-                  1000.0);
+      //   std::cout
+      //       << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+      //              end - start)
+      //                  .count() /
+      //              1000.0
+      //       << " seconds." << std::endl;
+      //   fprintf(stderr, "bestCost(%.4lf) candidates(%zu) after %.4lf
+      //   seconds\n",
+      //           bestCost, candidates.size(),
+      //           (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+      //               end - start)
+      //                   .count() /
+      //               1000.0);
 
       //   std::vector<Graph *> new_candidates;
       bool stop_search = false;

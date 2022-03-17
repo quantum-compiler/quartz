@@ -20,7 +20,7 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
 
 int main(int argc, char **argv) {
   std::string input_fn, output_fn;
-  std::string eqset_fn = "../Nam_5_3_complete_ECC_set_up.json";
+  std::string eqset_fn = "../Nam_5_3_complete_ECC_set.json";
   bool simulated_annealing = false;
   bool early_stop = false;
   parse_args(argv, argc, simulated_annealing, early_stop, input_fn, output_fn,

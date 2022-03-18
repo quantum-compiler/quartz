@@ -13,7 +13,11 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
   for (int i = 2; i < argc; i++) {
     if (!std::strcmp(argv[i], "--output")) {
       output_filename = std::string(argv[++i]);
-      break;
+      continue;
+    }
+    if (!std::strcmp(argv[i], "--eqset")) {
+      eqset_filename = std::string(argv[++i]);
+      continue;
     }
   }
 }

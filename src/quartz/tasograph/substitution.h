@@ -19,6 +19,13 @@ struct TensorX {
   Tensor to_edge(const GraphXfer *xfer) const;
   OpX *op;
   int idx;
+  inline bool operator==(const TensorX &b) const {
+    if (op != b.op)
+      return false;
+    if (idx != b.idx)
+      return false;
+    return true;
+  }
 };
 
 struct TensorXCompare {
@@ -27,6 +34,11 @@ struct TensorXCompare {
       return a.op < b.op;
     return a.idx < b.idx;
   };
+};
+
+class TensorXHash {
+public:
+  size_t operator()(const TensorX &a) const { return a.idx; }
 };
 
 class OpX {
@@ -82,8 +94,8 @@ public:
   Context *context;
   int tensorId;
   std::unordered_map<Op, OpX *, OpHash> mappedOps;
-  std::multimap<int, std::pair<Op, int>> mappedInputs;
-  std::map<TensorX, TensorX, TensorXCompare> mappedOutputs;
+  std::unordered_multimap<int, std::pair<Op, int>> mappedInputs;
+  std::unordered_map<TensorX, TensorX, TensorXHash> mappedOutputs;
   std::vector<OpX *> srcOps;
   std::vector<OpX *> dstOps;
   std::unordered_map<int, ParamType> paramValues;

@@ -347,12 +347,11 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
       op.ptr->get_num_qubits() + op.ptr->get_num_parameters())
     return false;
   // Check inputs
-  std::map<int, std::pair<Op, int>> newMapInputs;
+  std::unordered_map<int, std::pair<Op, int>> newMapInputs;
   for (size_t i = 0; i < srcOp->inputs.size(); i++) {
     TensorX in = srcOp->inputs[i];
     if (in.op == NULL) { // Input tensor
-      std::multimap<int, std::pair<Op, int>>::const_iterator it;
-      it = mappedInputs.find(in.idx);
+      auto it = mappedInputs.find(in.idx);
       if (it != mappedInputs.end()) {
         // Input is already mapped
         Op mappedOp = it->second.first;
@@ -361,8 +360,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           return false;
       } else {
         // Input haven't been mapped
-        std::map<int, std::pair<Op, int>>::const_iterator newit;
-        newit = newMapInputs.find(in.idx);
+        auto newit = newMapInputs.find(in.idx);
         if (newit != newMapInputs.end()) {
           Op mappedOp = newit->second.first;
           int mappedIdx = newit->second.second;
@@ -391,8 +389,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
     // Check output
     for (size_t i = 0; i < srcOp->outputs.size(); i++) {
       TensorX out = srcOp->outputs[i];
-      std::map<TensorX, TensorX, TensorXCompare>::const_iterator it;
-      it = mappedOutputs.find(out);
+      auto it = mappedOutputs.find(out);
       // If out is in mappedOutputs, it represents an external edge,
       // we don't check it here
       if (it == mappedOutputs.end()) {
@@ -448,8 +445,7 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
     TensorX in = srcOp->inputs[i];
     if (in.op == nullptr) {
       // Update mappedInputsa
-      std::multimap<int, std::pair<Op, int>>::iterator it;
-      it = mappedInputs.find(in.idx);
+      auto it = mappedInputs.find(in.idx);
       mappedInputs.erase(it);
     }
   }
@@ -634,8 +630,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
           if (dstTen.op == NULL) {
             // mappedOutput is an input --- this indicates
             // an empty target graph
-            std::multimap<int, std::pair<Op, int>>::const_iterator it2 =
-                mappedInputs.find(dstTen.idx);
+            auto it2 = mappedInputs.find(dstTen.idx);
             assert(it2 != mappedInputs.end());
             std::pair<Op, int> srcEdge = it2->second;
             newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second,
@@ -664,8 +659,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
           newGraph->add_edge(input_constant_param_op, dstOp->mapOp, 0, i);
           continue;
         };
-        std::multimap<int, std::pair<Op, int>>::const_iterator it =
-            mappedInputs.find(dstOp->inputs[i].idx);
+        auto it = mappedInputs.find(dstOp->inputs[i].idx);
         assert(it != mappedInputs.end());
         std::pair<Op, int> srcEdge = it->second;
         newGraph->add_edge(srcEdge.first, dstOp->mapOp, srcEdge.second, i);

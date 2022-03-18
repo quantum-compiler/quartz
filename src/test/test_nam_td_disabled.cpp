@@ -44,13 +44,16 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  auto graph_before_search = graph.toffoli_flip_greedy(
-      GateType::rz, xfer_pair.first, xfer_pair.second);
+  std::vector<int> trace;
+  graph.toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
+                                       xfer_pair.second, trace);
+  auto graph_before_search = graph.toffoli_flip_by_instruction(
+      GateType::rz, xfer_pair.first, xfer_pair.second, trace);
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
   auto graph_after_search = graph_before_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
+      1, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::rz);
   auto end = std::chrono::steady_clock::now();
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);

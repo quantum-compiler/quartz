@@ -203,6 +203,10 @@ public:
   void toffoli_flip_greedy_with_trace(GateType target_rotation, GraphXfer *xfer,
                                       GraphXfer *inverse_xfer,
                                       std::vector<int> &trace);
+  std::shared_ptr<Graph>
+  toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
+                              GraphXfer *inverse_xfer,
+                              std::vector<int> instruction);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   void all_ops(std::vector<Op> &ops);

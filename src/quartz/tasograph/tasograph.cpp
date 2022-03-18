@@ -418,11 +418,10 @@ void Graph::remove_edge(Op srcOp, Op dstOp) {
 // Merge constant parameters
 // Eliminate rotation with parameter 0
 void Graph::constant_and_rotation_elimination() {
-  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
   std::unordered_map<size_t, size_t> hash_values;
   std::queue<Op> op_queue;
   // Compute the hash value for input ops
-  for (it = outEdges.begin(); it != outEdges.end(); it++) {
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); it++) {
     if (it->first.ptr->tp == GateType::input_qubit ||
         it->first.ptr->tp == GateType::input_param) {
       op_queue.push(it->first);
@@ -431,7 +430,7 @@ void Graph::constant_and_rotation_elimination() {
 
   // Construct in-degree map
   std::map<Op, size_t> op_in_edges_cnt;
-  for (it = inEdges.begin(); it != inEdges.end(); ++it) {
+  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }
 
@@ -1153,6 +1152,7 @@ std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
   float bestCost = total_cost();
   candidates.push(std::shared_ptr<Graph>(new Graph(*this)));
   hashmap.insert(hash());
+  std::vector<GraphXfer *> good_xfers;
 
   //   printf("\n        ===== Start Cost-Based Backtracking Search =====\n");
   start = std::chrono::steady_clock::now();
@@ -1270,7 +1270,6 @@ std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
                 << min_cost << ", " << max_cost << "]" << std::endl;
     }
   } else {
-    std::vector<GraphXfer *> good_xfers;
     while (!candidates.empty()) {
       auto subGraph = candidates.top();
       if (use_rotation_merging_in_searching) {
@@ -1412,6 +1411,23 @@ void Graph::toffoli_flip_greedy_with_trace(GateType target_rotation,
     }
   }
   assert(false); // Should never reach here
+}
+
+std::shared_ptr<Graph>
+Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
+                                   GraphXfer *inverse_xfer,
+                                   std::vector<int> instruction) {
+  std::shared_ptr<Graph> graph(new Graph(*this));
+  std::shared_ptr<Graph> new_graph(nullptr);
+  for (const auto direction : instruction) {
+    if (direction == 0) {
+      new_graph = xfer->run_1_time(0, graph.get());
+    } else {
+      new_graph = inverse_xfer->run_1_time(0, graph.get());
+    }
+    graph = new_graph;
+  }
+  return graph;
 }
 bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {

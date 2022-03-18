@@ -46,8 +46,11 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  auto new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first,
-                                             xfer_pair.second);
+  std::vector<int> trace;
+  graph.toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
+                                       xfer_pair.second, trace);
+  auto new_graph = graph.toffoli_flip_by_instruction(
+      GateType::rz, xfer_pair.first, xfer_pair.second, trace);
   // Convert cx to cz and merge h gates
   RuleParser cx_2_cz({"cx q0 q1 = h q1; cz q0 q1; h q1;"});
   Context cz_ctx({GateType::rz, GateType::h, GateType::x, GateType::cz,

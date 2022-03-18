@@ -59,8 +59,8 @@ int main(int argc, char **argv) {
       0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
       GateType::rz);
-  graph_after_h_cz_merge->to_qasm(
-      "circuit/voqc-benchmarks/after_h_cz_merge.qasm", false, false);
+  //   graph_after_h_cz_merge->to_qasm(
+  //       "circuit/voqc-benchmarks/after_h_cz_merge.qasm", false, false);
 
   // Shift the context to Rigetti Agave
   RuleParser rules({"h q0 = rx q0 pi; rz q0 0.5pi; rx q0 0.5pi; rz q0 -0.5pi;",

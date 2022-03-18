@@ -38,7 +38,10 @@ struct TensorXCompare {
 
 class TensorXHash {
 public:
-  size_t operator()(const TensorX &a) const { return a.idx; }
+  size_t operator()(const TensorX &a) const {
+    std::hash<size_t> hash_fn;
+    return hash_fn(a.idx) * 17 + hash_fn((size_t)(a.op));
+  }
 };
 
 class OpX {

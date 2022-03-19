@@ -34,6 +34,8 @@ def extract_results(filename):
     print('num_circuits =', len(result))
     print('geomean_gatecount =', gate_product ** (1 / len(result)))
     print('tot_time =', tot_time)
+    for k, v in natsorted(result.items()):
+        print(v)  # easy paste to google doc
 
 
 if __name__ == '__main__':

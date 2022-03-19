@@ -1,4 +1,5 @@
 import sys
+from natsort import natsorted
 
 
 def extract_results(filename):
@@ -27,12 +28,14 @@ def extract_results(filename):
             key = line[pos2 + 1:pos]
         else:
             flag = False
-    for k, v in sorted(result.items()):
+    for k, v in natsorted(result.items()):
         print(k.ljust(15), v)
     print('tot_gate =', tot_gate)
     print('num_circuits =', len(result))
     print('geomean_gatecount =', gate_product ** (1 / len(result)))
     print('tot_time =', tot_time)
+    for k, v in natsorted(result.items()):
+        print(v)  # easy paste to google doc
 
 
 if __name__ == '__main__':

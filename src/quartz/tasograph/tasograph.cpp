@@ -1080,13 +1080,12 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
-                                       bool print_subst, Context *ctx,
-                                       const std::string &equiv_file_name,
-                                       bool use_simulated_annealing,
-                                       bool enable_early_stop,
-                                       bool use_rotation_merging_in_searching,
-                                       GateType target_rotation) {
+std::shared_ptr<Graph>
+Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
+                const std::string &equiv_file_name,
+                bool use_simulated_annealing, bool enable_early_stop,
+                bool use_rotation_merging_in_searching,
+                GateType target_rotation, std::string circuit_name) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1286,20 +1285,16 @@ std::shared_ptr<Graph> Graph::optimize(float alpha, int budget,
         ;
       }
       counter++;
+      subGraph->constant_and_rotation_elimination();
       end = std::chrono::steady_clock::now();
-      //   std::cout
-      //       << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-      //              end - start)
-      //                  .count() /
-      //              1000.0
-      //       << " seconds." << std::endl;
-      //   fprintf(stderr, "bestCost(%.4lf) candidates(%zu) after %.4lf
-      //   seconds\n",
-      //           bestCost, candidates.size(),
-      //           (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-      //               end - start)
-      //                   .count() /
-      //               1000.0);
+      if (circuit_name != "")
+        std::cout << circuit_name << ": ";
+      fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n ",
+              bestCost, candidates.size(),
+              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start)
+                      .count() /
+                  1000.0);
 
       //   std::vector<Graph *> new_candidates;
       bool stop_search = false;
@@ -1355,9 +1350,6 @@ std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   assert(false); // Should never reach here
 }
 
-// std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {}
-// std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
-
 std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
                                                   GraphXfer *xfer,
                                                   GraphXfer *inverse_xfer) {
@@ -1384,25 +1376,17 @@ void Graph::toffoli_flip_greedy_with_trace(GateType target_rotation,
                                            GraphXfer *xfer,
                                            GraphXfer *inverse_xfer,
                                            std::vector<int> &trace) {
-  Graph *graph = this;
-  std::shared_ptr<Graph> temp_graph(nullptr);
+  std::shared_ptr<Graph> temp_graph(new Graph(*this));
   while (true) {
-    std::shared_ptr<Graph> new_graph_0(nullptr);
-    std::shared_ptr<Graph> new_graph_1(nullptr);
-    if (temp_graph == nullptr) {
-      new_graph_0 = xfer->run_1_time(0, graph);
-      new_graph_1 = inverse_xfer->run_1_time(0, graph);
-    } else {
-      new_graph_0 = xfer->run_1_time(0, temp_graph.get());
-      new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
-    }
-    if (new_graph_0 == nullptr) {
-      assert(new_graph_1 == nullptr);
+    auto new_graph_0 = xfer->run_1_time(0, temp_graph.get());
+    auto new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
+    if (new_graph_0.get() == nullptr) {
+      assert(new_graph_1.get() == nullptr);
       return;
     }
     new_graph_0->rotation_merging(target_rotation);
     new_graph_1->rotation_merging(target_rotation);
-    if (new_graph_0->total_cost() <= new_graph_1->total_cost()) {
+    if (new_graph_0->gate_count() <= new_graph_1->gate_count()) {
       temp_graph = new_graph_0;
       trace.push_back(0);
     } else {
@@ -1429,6 +1413,18 @@ Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
   }
   return graph;
 }
+
+std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(context);
+  std::vector<int> trace;
+  toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
+                                 xfer_pair.second, trace);
+  auto graph_ccz_flipped = toffoli_flip_by_instruction(
+      GateType::rz, xfer_pair.first, xfer_pair.second, trace);
+  return graph_ccz_flipped;
+}
+// std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
+
 bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
     // Find a match for the given Op

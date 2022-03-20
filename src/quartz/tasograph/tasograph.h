@@ -172,7 +172,7 @@ public:
   Graph(const Graph &graph);
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
-  bool has_loop();
+  bool has_loop() const;
   size_t hash();
   bool check_correctness();
   float total_cost() const;
@@ -180,13 +180,15 @@ public:
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
-  Graph *context_shift(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
-                       RuleParser *rule_parser, bool ignore_toffoli = false);
-  Graph *optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                  const std::string &equiv_file_name,
-                  bool use_simulated_annealing, bool enable_early_stop,
-                  bool use_rotation_merging_in_searching,
-                  GateType target_rotation);
+  std::shared_ptr<Graph> context_shift(Context *src_ctx, Context *dst_ctx,
+                                       Context *union_ctx,
+                                       RuleParser *rule_parser,
+                                       bool ignore_toffoli = false);
+  std::shared_ptr<Graph>
+  optimize(float alpha, int budget, bool print_subst, Context *ctx,
+           const std::string &equiv_file_name, bool use_simulated_annealing,
+           bool enable_early_stop, bool use_rotation_merging_in_searching,
+           GateType target_rotation, std::string circuit_name = "");
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   void to_qasm(const std::string &save_filename, bool print_result,
@@ -201,6 +203,10 @@ public:
   void toffoli_flip_greedy_with_trace(GateType target_rotation, GraphXfer *xfer,
                                       GraphXfer *inverse_xfer,
                                       std::vector<int> &trace);
+  std::shared_ptr<Graph>
+  toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
+                              GraphXfer *inverse_xfer,
+                              std::vector<int> instruction);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   void all_ops(std::vector<Op> &ops);

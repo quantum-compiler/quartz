@@ -46,28 +46,31 @@ int main(int argc, char **argv) {
   // Context shift
   RuleParser rule_parser(
       {"h q0 = u2 q0 0 pi", "x q0 = u3 q0 pi 0 -pi", "t q0 = u1 q0 0.25pi"});
-  Graph *graph_new_ctx = graph.context_shift(&src_ctx, &dst_ctx, &union_ctx,
-                                             &rule_parser, /*ignore_toffoli*/
-                                             true);
+  auto graph_new_ctx = graph.context_shift(&src_ctx, &dst_ctx, &union_ctx,
+                                           &rule_parser, /*ignore_toffoli*/
+                                           true);
 
   // Greedy toffoli flip
-  auto graph_before_search = graph_new_ctx->toffoli_flip_greedy(
-      GateType::u1, xfer_pair.first, xfer_pair.second);
+  std::vector<int> trace;
+  graph_new_ctx->toffoli_flip_greedy_with_trace(GateType::u1, xfer_pair.first,
+                                                xfer_pair.second, trace);
+  auto graph_before_search = graph_new_ctx->toffoli_flip_by_instruction(
+      GateType::u1, xfer_pair.first, xfer_pair.second, trace);
 
   // Optimization
-  Graph *graph_after_search = graph_before_search->optimize(
+  auto graph_after_search = graph_before_search->optimize(
       0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::u1);
-  eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
-  Graph *graph_after_u3_pass = graph_after_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::u1);
+  //  eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
+  //  Graph *graph_after_u3_pass = graph_after_search->optimize(
+  //      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
+  //      /*rotation_merging_in_searching*/ false, GateType::u1);
   auto end = std::chrono::steady_clock::now();
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
   std::cout << "Optimization results of Quartz for " << fn
             << " on IBMQ gate set." << std::endl
             << "Gate count after optimization: "
-            << graph_after_u3_pass->total_cost() << ", "
+            << graph_after_search->total_cost() << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /

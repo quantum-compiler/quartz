@@ -391,14 +391,17 @@ cdef class PyGraph:
                 arr[i][xfer_id] = 1
         return arr
 
-    def toffoli_flip(self, *, QuartzContext context, str target):
-        if target == "t":
-            return PyGraph().set_this(deref(self.graph).ccz_flip_t(context.context))
-        return None
+    # def toffoli_flip(self, *, QuartzContext context, str target):
+    #     if target == "t":
+    #         return PyGraph().set_this(deref(self.graph).ccz_flip_t(context.context))
+    #     return None
 
     def to_qasm(self, *, str filename):
         fn_bytes = filename.encode('utf-8')
         deref(self.graph).to_qasm(fn_bytes, False, False)
+
+    def ccz_flip_greedy_rz(self, *, rotation_merging=False):
+        return PyGraph().set_this(deref(self.graph).ccz_flip_greedy_rz())
 
     def __lt__(self, other):
         return self.gate_count < other.gate_count

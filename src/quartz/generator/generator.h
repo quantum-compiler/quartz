@@ -6,6 +6,7 @@
 #include "../dataset/equivalence_set.h"
 #include "../verifier/verifier.h"
 
+#include <chrono>
 #include <unordered_set>
 
 namespace quartz {
@@ -40,11 +41,17 @@ namespace quartz {
 		// If |unique_parameters| is true, we only search for DAGs that use
 		// each input parameters only once (note: use a doubled parameter, i.e.,
 		// Rx(2theta) is considered using the parameter theta once).
-		void generate(int num_qubits, int num_input_parameters,
-		              int max_num_quantum_gates, int max_num_param_gates,
-		              Dataset *dataset, bool verify_equivalences,
-		              EquivalenceSet *equiv_set, bool unique_parameters,
-		              bool verbose = false);
+        void generate(int num_qubits,
+                      int num_input_parameters,
+                      int max_num_quantum_gates,
+                      int max_num_param_gates,
+                      Dataset *dataset,
+                      bool verify_equivalences,
+                      EquivalenceSet *equiv_set,
+                      bool unique_parameters,
+                      bool verbose = false,
+                      decltype(std::chrono::steady_clock::now()
+                          - std::chrono::steady_clock::now()) *record_verification_time = nullptr);
 
 	private:
 		void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,

@@ -46,16 +46,19 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  auto new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first,
-                                             xfer_pair.second);
+  std::vector<int> trace;
+  graph.toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
+                                       xfer_pair.second, trace);
+  auto new_graph = graph.toffoli_flip_by_instruction(
+      GateType::rz, xfer_pair.first, xfer_pair.second, trace);
   // Convert cx to cz and merge h gates
   RuleParser cx_2_cz({"cx q0 q1 = h q1; cz q0 q1; h q1;"});
   Context cz_ctx({GateType::rz, GateType::h, GateType::x, GateType::cz,
                   GateType::add, GateType::input_qubit, GateType::input_param});
   auto union_ctx_0 = union_contexts(&cz_ctx, &dst_ctx);
-  Graph *graph_before_h_cz_merge = new_graph->context_shift(
+  auto graph_before_h_cz_merge = new_graph->context_shift(
       &dst_ctx, &cz_ctx, &union_ctx_0, &cx_2_cz, false);
-  Graph *graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
+  auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
       0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
       GateType::rz);
@@ -68,11 +71,11 @@ int main(int argc, char **argv) {
   Context rigetti_ctx({GateType::rx, GateType::rz, GateType::cz, GateType::add,
                        GateType::input_qubit, GateType::input_param});
   auto union_ctx_1 = union_contexts(&rigetti_ctx, &union_ctx_0);
-  Graph *graph_rigetti = graph_after_h_cz_merge->context_shift(
+  auto graph_rigetti = graph_after_h_cz_merge->context_shift(
       &cz_ctx, &rigetti_ctx, &union_ctx_1, &rules, false);
 
   // Optimization
-  Graph *graph_after_search = graph_rigetti->optimize(
+  auto graph_after_search = graph_rigetti->optimize(
       0.999, 0, false, &union_ctx_1, eqset_fn, simulated_annealing, early_stop,
       /*rotation_merging_in_searching*/ false, GateType::rz);
   auto end = std::chrono::steady_clock::now();

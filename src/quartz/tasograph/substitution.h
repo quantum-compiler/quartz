@@ -19,6 +19,13 @@ struct TensorX {
   Tensor to_edge(const GraphXfer *xfer) const;
   OpX *op;
   int idx;
+  inline bool operator==(const TensorX &b) const {
+    if (op != b.op)
+      return false;
+    if (idx != b.idx)
+      return false;
+    return true;
+  }
 };
 
 struct TensorXCompare {
@@ -27,6 +34,14 @@ struct TensorXCompare {
       return a.op < b.op;
     return a.idx < b.idx;
   };
+};
+
+class TensorXHash {
+public:
+  size_t operator()(const TensorX &a) const {
+    std::hash<size_t> hash_fn;
+    return hash_fn(a.idx) * 17 + hash_fn((size_t)(a.op));
+  }
 };
 
 class OpX {
@@ -44,7 +59,7 @@ public:
 
 class GraphCompare {
 public:
-  bool operator()(Graph *lhs, Graph *rhs) {
+  bool operator()(std::shared_ptr<Graph> lhs, std::shared_ptr<Graph> rhs) {
     return lhs->total_cost() > rhs->total_cost();
   }
 };
@@ -58,7 +73,8 @@ public:
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
   void match(OpX *srcOp, Op op, const Graph *graph);
   void unmatch(OpX *srcOp, Op op, const Graph *graph);
-  void run(int depth, Graph *graph, std::vector<Graph *> &new_candidates,
+  void run(int depth, Graph *graph,
+           std::vector<std::shared_ptr<Graph>> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps,
            bool enable_early_stop, bool &stop_search);
   std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);
@@ -80,9 +96,9 @@ public:
 public:
   Context *context;
   int tensorId;
-  std::map<Op, OpX *, OpCompare> mappedOps;
-  std::multimap<int, std::pair<Op, int>> mappedInputs;
-  std::map<TensorX, TensorX, TensorXCompare> mappedOutputs;
+  std::unordered_map<Op, OpX *, OpHash> mappedOps;
+  std::unordered_multimap<int, std::pair<Op, int>> mappedInputs;
+  std::unordered_map<TensorX, TensorX, TensorXHash> mappedOutputs;
   std::vector<OpX *> srcOps;
   std::vector<OpX *> dstOps;
   std::unordered_map<int, ParamType> paramValues;

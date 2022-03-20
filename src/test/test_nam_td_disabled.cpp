@@ -9,7 +9,7 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
                 std::string &output_filename, std::string &eqset_filename) {
   assert(argv[1] != nullptr);
   input_filename = std::string(argv[1]);
-  early_stop = true;
+  early_stop = false;
   for (int i = 2; i < argc; i++) {
     if (!std::strcmp(argv[i], "--output")) {
       output_filename = std::string(argv[++i]);
@@ -44,16 +44,19 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  auto graph_before_search = graph.toffoli_flip_greedy(
-      GateType::rz, xfer_pair.first, xfer_pair.second);
+  std::vector<int> trace;
+  graph.toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
+                                       xfer_pair.second, trace);
+  auto graph_before_search = graph.toffoli_flip_by_instruction(
+      GateType::rz, xfer_pair.first, xfer_pair.second, trace);
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
-  Graph *graph_after_search = graph_before_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::rz);
-  auto end = std::chrono::steady_clock::now();
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
+  auto graph_after_search = graph_before_search->optimize(
+      1.02, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
+      /*rotation_merging_in_searching*/ false, GateType::rz, fn);
+  auto end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
             << " on Nam's gate set." << std::endl
             << "Gate count after optimization: "

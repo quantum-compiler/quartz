@@ -27,6 +27,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
   auto start = std::chrono::steady_clock::now();
   auto end = std::chrono::steady_clock::now();
   decltype(end - start) running_time_with_all_pruning_techniques{0};
+  decltype(end - start) verification_time{0};
   int num_singletons = 0;
 
   if (run_representative_pruning) {
@@ -44,7 +45,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                    max_num_quantum_gates, max_num_param_gates,
                    &dataset1,        /*verify_equivalences=*/
                    true, &equiv_set, unique_parameters, /*verbose=*/
-                   true);
+                   true, &verification_time);
       end = std::chrono::steady_clock::now();
       running_time_with_all_pruning_techniques += end - start;
       std::cout << std::dec
@@ -85,6 +86,12 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     equiv_set.load_json(&ctx, file_prefix + "pruning.json");
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
+    verification_time += end - start;
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Verification Time (s): "
+              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                  verification_time)
+                  .count() /
+                  1000.0 << std::endl;
     std::cout
         << std::dec << "Representative pruning: there are "
         << equiv_set.num_total_dags() + num_singletons << " circuits in "

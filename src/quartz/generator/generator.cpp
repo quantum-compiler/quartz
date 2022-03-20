@@ -26,7 +26,8 @@ namespace quartz {
 	                         int max_num_quantum_gates, int max_num_param_gates,
 	                         Dataset *dataset, bool verify_equivalences,
                              EquivalenceSet *equiv_set, bool unique_parameters,
-                             bool verbose) {
+                             bool verbose, decltype(std::chrono::steady_clock::now()
+        - std::chrono::steady_clock::now()) *record_verification_time) {
 		auto empty_dag =
 		    std::make_unique< DAG >(num_qubits, num_input_parameters);
 		// Generate all possible parameter gates at the beginning.
@@ -79,9 +80,17 @@ namespace quartz {
 				    dataset->save_json(context, "tmp_before_verify.json");
 				assert(ret);
 
+				decltype(std::chrono::steady_clock::now()) start;
+				if (record_verification_time) {
+				  start = std::chrono::steady_clock::now();
+				}
 				// Assume working directory is cmake-build-debug/ here.
 				system("python src/python/verifier/verify_equivalences.py "
 				       "tmp_before_verify.json tmp_after_verify.json");
+                if (record_verification_time) {
+                  auto end = std::chrono::steady_clock::now();
+                  *record_verification_time += end - start;
+                }
 
 				dags_to_search.clear();
 				ret = equiv_set->load_json(context, "tmp_after_verify.json",

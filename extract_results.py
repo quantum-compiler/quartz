@@ -12,6 +12,7 @@ def extract_results(filename):
     key = ''
     result = {}
     for line in content:
+        line = line.strip()
         if flag:
             pos = line.find(':')
             pos2 = line.find(',', pos)

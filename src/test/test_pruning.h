@@ -96,31 +96,14 @@ void test_pruning(const std::vector<GateType> &supported_gates,
             1000.0
         << " seconds." << std::endl;
 
-    start = std::chrono::steady_clock::now();
-    equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/false, /*common_subcircuit_pruning=*/
-                       false, /*other_simplification=*/
-                       true);
-    equiv_set.save_json(file_prefix + "pruning_other_simplification.json");
-    end = std::chrono::steady_clock::now();
-    std::cout
-        << std::dec << "Representative pruning: there are "
-        << equiv_set.num_total_dags() << " circuits in "
-        << equiv_set.num_equivalence_classes()
-        << " equivalence classes after other simplification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-            end - start)
-            .count() /
-            1000.0
-        << " seconds." << std::endl;
-
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Representative: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen Before Pruning: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
     equiv_set.clear();
     equiv_set.load_json(&ctx, file_prefix + "pruning.json");
     start = std::chrono::steady_clock::now();
-    equiv_set.simplify(&ctx, /*normalize_to_minimal_circuit_representation=*/false);
+    equiv_set.simplify(&ctx);
     equiv_set.save_json(file_prefix + "pruning_simplified.json");
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
@@ -135,7 +118,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Common Subcircuit: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen After Pruning: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
@@ -216,27 +199,11 @@ void test_pruning(const std::vector<GateType> &supported_gates,
               .count() /
               1000.0
           << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Original (Unverified): "
+      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " All Circuits (Unverified): "
                 << equiv_set.num_total_dags() + num_singletons << " ("
                 << equiv_set.num_equivalence_classes() + num_singletons << ")" << std::endl;
 
-      start = std::chrono::steady_clock::now();
-      equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/false, /*common_subcircuit_pruning=*/
-                         false, /*other_simplification=*/
-                         true);
-      equiv_set.save_json(file_prefix + "original_other_simplification.json");
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original unverified: there are "
-          << equiv_set.num_total_dags() << " circuits in "
-          << equiv_set.num_equivalence_classes()
-          << " equivalence classes after other simplification in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-              end - start)
-              .count() /
-              1000.0
-          << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ECC Simplification (Unverified): "
+      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Singleton Removal (Unverified): "
                 << equiv_set.num_total_dags() << " ("
                 << equiv_set.num_equivalence_classes() << ")" << std::endl;
     }
@@ -263,28 +230,11 @@ void test_pruning(const std::vector<GateType> &supported_gates,
               .count() /
               1000.0
           << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Original: "
+      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " All Circuits: "
                 << equiv_set.num_total_dags() + num_singletons << " ("
                 << equiv_set.num_equivalence_classes() + num_singletons << ")" << std::endl;
 
-      start = std::chrono::steady_clock::now();
-      equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/false, /*common_subcircuit_pruning=*/
-                         false, /*other_simplification=*/
-                         true);
-      equiv_set.save_json(file_prefix +
-          "original_verified_other_simplification.json");
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original verified: there are "
-          << equiv_set.num_total_dags() << " circuits in "
-          << equiv_set.num_equivalence_classes()
-          << " equivalence classes after other simplification in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-              end - start)
-              .count() /
-              1000.0
-          << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ECC Simplification: "
+      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Singleton Removal: "
                 << equiv_set.num_total_dags() << " ("
                 << equiv_set.num_equivalence_classes() << ")" << std::endl;
     }

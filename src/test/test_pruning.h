@@ -87,11 +87,14 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
     verification_time += end - start;
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Verification Time (s): "
+    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1) << " Verification Time (s): "
               << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                   verification_time)
                   .count() /
                   1000.0 << std::endl;
+    if (!use_generated_file_if_possible) {
+      std::cout << "### Rn size: " << equiv_set.num_equivalence_classes() + num_singletons << std::endl;
+    }
     std::cout
         << std::dec << "Representative pruning: there are "
         << equiv_set.num_total_dags() + num_singletons << " circuits in "
@@ -129,7 +132,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Running Time (s): "
+    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1) << " Running Time (s): "
               << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                   running_time_with_all_pruning_techniques)
                   .count() /

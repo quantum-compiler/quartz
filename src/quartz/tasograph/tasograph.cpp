@@ -250,8 +250,8 @@ namespace quartz {
                         // case for two qubits gate
                         auto in_edge1 = op_in.second.begin();
                         auto out_edge1 = op_out.second.begin();
-                        auto in_edge2 = op_in.second.end();
-                        auto out_edge2 = op_out.second.end();
+                        auto in_edge2 = std::next(op_in.second.begin(), 1);
+                        auto out_edge2 = std::next(op_out.second.begin(), 1);
 
                         // make sure edges are in order
                         if (in_edge1->dstIdx != out_edge1->srcIdx) std::swap(out_edge1, out_edge2);
@@ -268,14 +268,9 @@ namespace quartz {
                             if (in_edge1->physical_qubit_idx != out_edge2->physical_qubit_idx) return false;
                             if (in_edge2->physical_qubit_idx != out_edge1->physical_qubit_idx) return false;
                         }
-
-                        // every two-qubit gate must be applied to physical qubits with a connection in between
-                        if (!device_topology_graph->has_edge(in_edge1->physical_qubit_idx,
-                                                             in_edge2->physical_qubit_idx))
-                            return false;
                     } else {
                         // Operations on more than 3 qubits are not supported.
-                        std::cout << "Detect gates with 0 / more than 3 outputs" << '\n';
+                        std::cout << "Detect gates with zero / more than two outputs" << '\n';
                         assert(false);
                     }
                 }

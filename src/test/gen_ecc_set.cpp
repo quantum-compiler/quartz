@@ -81,7 +81,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 int main() {
   gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
                GateType::add},
-              "IBM_4_2_", true, 2, 4, 4);
+              "IBM_3_3_", true, 3, 4, 3);
   gen_ecc_set({GateType::rx, GateType::rz, GateType::cz, GateType::add},
               "Rigetti_5_3_", true, 3, 2, 5);
   gen_ecc_set({GateType::h, GateType::cz}, "H_CZ_2_2_", false, 2, 0, 2);
@@ -99,7 +99,7 @@ int main() {
   }
   gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
                GateType::add},
-              "IBM_5_2_", true, 2, 4, 5);
+              "IBM_4_3_", true, 3, 4, 4);
   gen_ecc_set({GateType::rx, GateType::rz, GateType::cz, GateType::add},
               "Rigetti_6_3_", true, 3, 2, 6);
   return 0;

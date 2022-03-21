@@ -70,9 +70,9 @@ int main(int argc, char **argv) {
     Context rigetti_ctx({GateType::rx, GateType::rz, GateType::cz,
                          GateType::add, GateType::input_qubit,
                          GateType::input_param});
-    auto union_ctx_0 = union_contexts(&src_ctx, &rigetti_ctx);
+    auto union_ctx_0 = union_contexts(&dst_ctx, &rigetti_ctx);
     auto graph_before_search =
-        new_graph->context_shift(&src_ctx, &dst_ctx, &union_ctx, &rules);
+        new_graph->context_shift(&dst_ctx, &rigetti_ctx, &union_ctx_0, &rules);
     std::cout << "Optimization results of Quartz for " << fn
               << " on Rigetti gate set." << std::endl
               << "Gate count after optimization: "

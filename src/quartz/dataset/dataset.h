@@ -29,6 +29,7 @@ namespace quartz {
 		// Returns true iff the hash value is new to the |dataset|.
 		bool insert(Context *ctx, std::unique_ptr< DAG > dag);
 
+		// Make this Dataset a brand new one.
 		void clear();
 
 		std::unordered_map< DAGHashType, std::vector< std::unique_ptr< DAG > > >

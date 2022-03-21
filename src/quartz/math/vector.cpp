@@ -71,9 +71,12 @@ namespace quartz {
 		std::cout << "]" << std::endl;
 	}
 
-	Vector Vector::random_generate(int num_qubits) {
+	Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
 		// Standard mersenne_twister_engine seeded with 0
-		static std::mt19937 gen(0);
+		static std::mt19937 static_gen(0);
+		if (!gen) {
+          gen = &static_gen;
+        }
 		static std::uniform_int_distribution< int > dis_int(0, 1);
 		Vector result(1 << num_qubits);
 		int remaining_numbers = (2 << num_qubits);
@@ -119,7 +122,7 @@ namespace quartz {
 			arb_set(remaining_norm, tmp); // remaining_norm -= number;
 			arb_sqrt(tmp, number, kRandPrec);
 			arb_set(number, tmp); // number = std::sqrt(number);
-			if (dis_int(gen)) {
+			if (dis_int(*gen)) {
 				arb_neg(tmp, number);
 				arb_set(number, tmp); // number = -number;
 			}
@@ -136,12 +139,12 @@ namespace quartz {
 			if (remaining_numbers > 1) {
 				// Same algorithm as WeChat red packet
 				number =
-				    dis_real(gen) * (remaining_norm / remaining_numbers * 2);
+				    dis_real(*gen) * (remaining_norm / remaining_numbers * 2);
 			}
 			remaining_numbers--;
 			remaining_norm -= number;
 			number = std::sqrt(number);
-			if (dis_int(gen)) {
+			if (dis_int(*gen)) {
 				number = -number;
 			}
 			return number;

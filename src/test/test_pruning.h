@@ -106,7 +106,28 @@ void test_pruning(const std::vector<GateType> &supported_gates,
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen Before Pruning: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen: "
+              << equiv_set.num_total_dags() << " ("
+              << equiv_set.num_equivalence_classes() << ")" << std::endl;
+
+    start = std::chrono::steady_clock::now();
+    equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/true, /*common_subcircuit_pruning=*/
+                       false, /*other_simplification=*/
+                       true);
+    equiv_set.save_json(file_prefix + "pruning_other_simplification.json");
+    end = std::chrono::steady_clock::now();
+    std::cout
+        << std::dec << "Representative pruning: there are "
+        << equiv_set.num_total_dags() << " circuits in "
+        << equiv_set.num_equivalence_classes()
+        << " equivalence classes after other simplification in "
+        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+            end - start)
+            .count() /
+            1000.0
+        << " seconds." << std::endl;
+
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen + ECC Simplification: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
@@ -128,7 +149,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen After Pruning: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen + All Pruning: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
@@ -243,10 +264,6 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " All Circuits: "
                 << equiv_set.num_total_dags() + num_singletons << " ("
                 << equiv_set.num_equivalence_classes() + num_singletons << ")" << std::endl;
-
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Singleton Removal: "
-                << equiv_set.num_total_dags() << " ("
-                << equiv_set.num_equivalence_classes() << ")" << std::endl;
     }
   }
 }

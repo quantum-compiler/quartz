@@ -2,6 +2,7 @@
 
 #include "matrix.h"
 
+#include <random>
 #include <vector>
 
 namespace quartz {
@@ -20,7 +21,9 @@ namespace quartz {
 		[[nodiscard]] ComplexType dot(const Vector &other) const; // dot product
 		void print() const;
 
-		static Vector random_generate(int num_qubits);
+		// If |gen| is not nullptr, then use |gen| as the mt19937 generator.
+		// Otherwise, use a static mt19937 generator for this function.
+		static Vector random_generate(int num_qubits, std::mt19937 *gen = nullptr);
 
 	private:
 		std::vector< ComplexType > data_;

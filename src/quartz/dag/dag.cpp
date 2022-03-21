@@ -945,9 +945,9 @@ namespace quartz {
 		fin.ignore(std::numeric_limits< std::streamsize >::max(), ',');
 		fin >> num_gates;
 
-        ctx->get_and_gen_hashing_dis(num_dag_qubits);
-        ctx->get_and_gen_input_dis(num_dag_qubits);
-        ctx->get_and_gen_parameters(num_input_params);
+        ctx->get_generated_hashing_dis(num_dag_qubits);
+        ctx->get_generated_input_dis(num_dag_qubits);
+        ctx->get_generated_parameters(num_input_params);
 
 		// ignore other hash values
 		fin.ignore(std::numeric_limits< std::streamsize >::max(), '[');

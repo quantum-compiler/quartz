@@ -74,6 +74,7 @@ target_link_libraries(quartz_runtime ${QUARTZ_LINK_LIBS})
 target_include_directories(quartz_runtime
   PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
+# OpenMP
 execute_process(COMMAND cat /proc/version RESULT_VARIABLE NOT_LINUX)
 if (NOT_LINUX)
     message("build on macOS, link openmp lib")
@@ -84,6 +85,11 @@ if (NOT_LINUX)
 else()
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
 endif()
+
+# z3
+include_directories(/Users/colin/miniconda3/include)
+find_library(Z3_LIB libz3.dylib /Users/colin/miniconda3/lib)
+target_link_libraries(quartz_runtime LINK_PUBLIC ${Z3_LIB})
 
 #install library
 install(TARGETS quartz_runtime

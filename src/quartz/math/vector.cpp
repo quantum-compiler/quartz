@@ -139,7 +139,7 @@ namespace quartz {
 			if (remaining_numbers > 1) {
 				// Same algorithm as WeChat red packet
 				number =
-				    dis_real(gen) * (remaining_norm / remaining_numbers * 2);
+				    dis_real(*gen) * (remaining_norm / remaining_numbers * 2);
 			}
 			remaining_numbers--;
 			remaining_norm -= number;

@@ -29,6 +29,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
   decltype(end - start) running_time_with_all_pruning_techniques{0};
   decltype(end - start) verification_time{0};
   int num_singletons = 0;
+  int Rn = -1;
 
   if (run_representative_pruning) {
     std::ifstream fin(file_prefix + "pruning_unverified.json");
@@ -52,7 +53,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                 << "Representative pruning: " << dataset1.num_total_dags()
                 << " circuits with " << dataset1.num_hash_values()
                 << " different hash values are found in "
-                << (double)std::chrono::duration_cast<
+                << (double) std::chrono::duration_cast<
                     std::chrono::milliseconds>(end - start)
                     .count() /
                     1000.0
@@ -69,7 +70,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       end = std::chrono::steady_clock::now();
       running_time_with_all_pruning_techniques += end - start;
       std::cout << std::dec << "Representative pruning: json saved in "
-                << (double)std::chrono::duration_cast<
+                << (double) std::chrono::duration_cast<
                     std::chrono::milliseconds>(end - start)
                     .count() /
                     1000.0
@@ -87,31 +88,37 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
     verification_time += end - start;
-    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1) << " Verification Time (s): "
-              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1)
+              << " Verification Time (s): "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   verification_time)
                   .count() /
                   1000.0 << std::endl;
     if (!use_generated_file_if_possible) {
-      std::cout << "### Rn size: " << equiv_set.num_equivalence_classes() + num_singletons << std::endl;
+      std::cout << "### Rn size: "
+                << equiv_set.num_equivalence_classes() + num_singletons
+                << std::endl;
+      Rn = equiv_set.num_equivalence_classes() + num_singletons;
     }
     std::cout
         << std::dec << "Representative pruning: there are "
         << equiv_set.num_total_dags() + num_singletons << " circuits in "
         << equiv_set.num_equivalence_classes() + num_singletons
         << " equivalence classes after verification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+        << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
             end - start)
             .count() /
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+              << " ReGen: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
     start = std::chrono::steady_clock::now();
-    equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/true, /*common_subcircuit_pruning=*/
+    equiv_set.simplify(&ctx,  /*normalize_to_minimal_circuit_representation=*/
+                       true, /*common_subcircuit_pruning=*/
                        false, /*other_simplification=*/
                        true);
     equiv_set.save_json(file_prefix + "pruning_other_simplification.json");
@@ -121,13 +128,14 @@ void test_pruning(const std::vector<GateType> &supported_gates,
         << equiv_set.num_total_dags() << " circuits in "
         << equiv_set.num_equivalence_classes()
         << " equivalence classes after other simplification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+        << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
             end - start)
             .count() /
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen + ECC Simplification: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+              << " ReGen + ECC Simplification: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
@@ -143,18 +151,20 @@ void test_pruning(const std::vector<GateType> &supported_gates,
         << equiv_set.num_total_dags() << " circuits in "
         << equiv_set.num_equivalence_classes()
         << " equivalence classes after all simplification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+        << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
             end - start)
             .count() /
             1000.0
         << " seconds." << std::endl;
 
-    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " ReGen + All Pruning: "
+    std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+              << " ReGen + All Pruning: "
               << equiv_set.num_total_dags() << " ("
               << equiv_set.num_equivalence_classes() << ")" << std::endl;
 
-    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1) << " Running Time (s): "
-              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1)
+              << " Running Time (s): "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   running_time_with_all_pruning_techniques)
                   .count() /
                   1000.0 << std::endl;
@@ -185,7 +195,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       std::cout << std::dec << "Original: " << dataset1.num_total_dags()
                 << " circuits with " << dataset1.num_hash_values()
                 << " different hash values are found in "
-                << (double)std::chrono::duration_cast<
+                << (double) std::chrono::duration_cast<
                     std::chrono::milliseconds>(end - start)
                     .count() /
                     1000.0
@@ -198,7 +208,7 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
       end = std::chrono::steady_clock::now();
       std::cout << std::dec << "Original: json saved in "
-                << (double)std::chrono::duration_cast<
+                << (double) std::chrono::duration_cast<
                     std::chrono::milliseconds>(end - start)
                     .count() /
                     1000.0
@@ -206,64 +216,103 @@ void test_pruning(const std::vector<GateType> &supported_gates,
     }
 
     ctx.clear_representatives();
-    dataset1.clear();
 
     if (run_original_unverified) {
-      equiv_set.clear();
-      start = std::chrono::steady_clock::now();
-      // Do not invoke SMT solver to save time at first.
-      system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
-          "original_unverified.json " + file_prefix + "original.json -n")
-                 .c_str());
-      equiv_set.load_json(&ctx, file_prefix + "original.json");
-      end = std::chrono::steady_clock::now();
-      if (missing_num_singletons) {
-        std::cout << "Warning: missing num_singletons. The following two lines are inaccurate." << std::endl;
+      if (!use_generated_file_if_possible) {
+        if (Rn == -1) {
+          // Use Rn if possible
+          std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+                    << " All Circuits: "
+                    << dataset1.num_total_dags() + num_singletons << " ("
+                    << dataset1.num_hash_values() + num_singletons
+                    << ")" << std::endl;
+          std::cout << "Number of different hash values: "
+                    << dataset1.num_hash_values() + num_singletons
+                    << std::endl;
+        } else {
+          std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+                    << " All Circuits (Unverified, the number in the parenthesis is the number of different hash values): "
+                    << dataset1.num_total_dags() + num_singletons << " ("
+                    << dataset1.num_hash_values() + num_singletons
+                    << ")" << std::endl;
+        }
+      } else {
+        equiv_set.clear();
+        start = std::chrono::steady_clock::now();
+        // Do not invoke SMT solver to save time at first.
+        system(("python src/python/verifier/verify_equivalences.py "
+            + file_prefix +
+            "original_unverified.json " + file_prefix + "original.json -n")
+                   .c_str());
+        equiv_set.load_json(&ctx, file_prefix + "original.json");
+        end = std::chrono::steady_clock::now();
+        if (missing_num_singletons) {
+          std::cout
+              << "Warning: missing num_singletons. The following two lines are inaccurate."
+              << std::endl;
+        }
+        std::cout
+            << std::dec << "Original unverified: there are "
+            << equiv_set.num_total_dags() + num_singletons << " circuits in "
+            << equiv_set.num_equivalence_classes() + num_singletons
+            << " equivalence classes after verification in "
+            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                end - start)
+                .count() /
+                1000.0
+            << " seconds." << std::endl;
+        if (Rn == -1) {
+          // Use Rn if possible
+          std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+                    << " All Circuits: "
+                    << equiv_set.num_total_dags() + num_singletons << " ("
+                    << equiv_set.num_equivalence_classes() + num_singletons
+                    << ")" << std::endl;
+          std::cout << "Number of different hash values: "
+                    << equiv_set.num_equivalence_classes() + num_singletons
+                    << std::endl;
+        } else {
+          std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+                    << " All Circuits (Unverified, the number in the parenthesis can have a small error): "
+                    << equiv_set.num_total_dags() + num_singletons << " ("
+                    << equiv_set.num_equivalence_classes() + num_singletons
+                    << ")" << std::endl;
+        }
       }
-      std::cout
-          << std::dec << "Original unverified: there are "
-          << equiv_set.num_total_dags() + num_singletons << " circuits in "
-          << equiv_set.num_equivalence_classes() + num_singletons
-          << " equivalence classes after verification in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-              end - start)
-              .count() /
-              1000.0
-          << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " All Circuits (Unverified): "
-                << equiv_set.num_total_dags() + num_singletons << " ("
-                << equiv_set.num_equivalence_classes() + num_singletons << ")" << std::endl;
-
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " Singleton Removal (Unverified): "
-                << equiv_set.num_total_dags() << " ("
-                << equiv_set.num_equivalence_classes() << ")" << std::endl;
     }
+
+    dataset1.clear();
 
     if (run_original_verified) {
       equiv_set.clear();
       start = std::chrono::steady_clock::now();
-      system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
-          "original_unverified.json " + file_prefix +
+      system(("python src/python/verifier/verify_equivalences.py " + file_prefix
+          +
+              "original_unverified.json " + file_prefix +
           "original_verified.json")
                  .c_str());
       equiv_set.load_json(&ctx, file_prefix + "original_verified.json");
       end = std::chrono::steady_clock::now();
       if (missing_num_singletons) {
-        std::cout << "Warning: missing num_singletons. The following two lines are inaccurate." << std::endl;
+        std::cout
+            << "Warning: missing num_singletons. The following two lines are inaccurate."
+            << std::endl;
       }
       std::cout
           << std::dec << "Original verified: there are "
           << equiv_set.num_total_dags() + num_singletons << " circuits in "
           << equiv_set.num_equivalence_classes() + num_singletons
           << " equivalence classes after verification in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+          << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
               end - start)
               .count() /
               1000.0
           << " seconds." << std::endl;
-      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1) << " All Circuits: "
+      std::cout << "*** " << file_prefix.substr(0, file_prefix.size() - 1)
+                << " All Circuits: "
                 << equiv_set.num_total_dags() + num_singletons << " ("
-                << equiv_set.num_equivalence_classes() + num_singletons << ")" << std::endl;
+                << equiv_set.num_equivalence_classes() + num_singletons << ")"
+                << std::endl;
     }
   }
 }

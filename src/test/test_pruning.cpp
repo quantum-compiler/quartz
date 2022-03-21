@@ -11,13 +11,13 @@ int main() {
                 GateType::add}, "IBM_2_", 3, 4, 2, false, 1, true, true, false, true, true);
   test_pruning({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
                 GateType::add}, "IBM_3_", 3, 4, 3, false, 1, true, true, false, true, true);
-  test_pruning({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
-                GateType::add}, "IBM_4_", 3, 4, 4, false, 1, true, true, false, true, true);
   test_pruning({GateType::rx, GateType::rz, GateType::cz,
                 GateType::add}, "Rigetti_3_", 3, 2, 3, false, 1, true, true, false, true, true);
   test_pruning({GateType::rx, GateType::rz, GateType::cz,
                 GateType::add}, "Rigetti_4_", 3, 2, 4, false, 1, true, true, false, true, true);
   test_pruning({GateType::rx, GateType::rz, GateType::cz,
                 GateType::add}, "Rigetti_5_", 3, 2, 5, false, 1, true, true, true, false, true);
+  test_pruning({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
+                GateType::add}, "IBM_4_", 3, 4, 4, false, 1, true, true, true, false, true);
   return 0;
 }

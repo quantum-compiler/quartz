@@ -51,10 +51,12 @@ class QGNN(nn.Module):
         self.conv2 = QConv(h_feats, inter_dim, h_feats)
         self.conv3 = QConv(h_feats, inter_dim, h_feats)
         self.conv4 = QConv(h_feats, inter_dim, h_feats)
-        # self.conv5 = QConv(h_feats, inter_dim, h_feats)
-        self.linear = nn.Linear(h_feats, num_classes)
+        self.conv5 = QConv(h_feats, inter_dim, h_feats)
+        self.linear1 = nn.Linear(h_feats, 32)
+        self.linear2 = nn.Linear(32, num_classes)
         gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.linear.weight, gain=gain)
+        nn.init.xavier_normal_(self.linear1.weight, gain=gain)
+        nn.init.xavier_normal_(self.linear2.weight, gain=gain)
         self.embedding = nn.Embedding(in_feats, in_feats)
 
     def forward(self, g):
@@ -72,6 +74,8 @@ class QGNN(nn.Module):
         h = self.conv2(g, h)
         h = self.conv3(g, h)
         h = self.conv4(g, h)
-        # h = self.conv5(g, h)
-        h = self.linear(h)
+        h = self.conv5(g, h)
+        h = self.linear1(h)
+        h = F.relu(h)
+        h = self.linear2(h)
         return h

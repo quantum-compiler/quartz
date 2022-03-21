@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
+#include <random>
 #include <set>
 
 namespace quartz {
@@ -64,6 +65,8 @@ namespace quartz {
 		// A vector to store the representative DAGs.
 		std::vector< std::unique_ptr< DAG > > representative_dags_;
 		std::unordered_map< DAGHashType, DAG * > representatives_;
+        // Standard mersenne_twister_engine seeded with 0
+        std::mt19937 gen{0};
 	};
 
 	Context union_contexts(Context *ctx_0, Context *ctx_1);

@@ -19,9 +19,6 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                   bool run_original_verified = true,
                   bool unique_parameters = false) {
   Context ctx(supported_gates, num_qubits, num_input_parameters);
-  ctx.get_and_gen_input_dis(3);
-  ctx.get_and_gen_hashing_dis(3);
-  ctx.get_and_gen_parameters(5);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;

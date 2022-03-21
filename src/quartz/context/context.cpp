@@ -79,7 +79,7 @@ namespace quartz {
         assert(num_qubits >= 0);
         while (random_input_distribution_.size() <= num_qubits) {
             random_input_distribution_.emplace_back(
-                    Vector::random_generate(random_input_distribution_.size())
+                    Vector::random_generate(random_input_distribution_.size(), &gen)
             );
         }
         return random_input_distribution_[num_qubits];
@@ -89,7 +89,7 @@ namespace quartz {
         assert(num_qubits >= 0);
         while (random_hashing_distribution_.size() <= num_qubits) {
             random_hashing_distribution_.emplace_back(
-                    Vector::random_generate(random_hashing_distribution_.size())
+                    Vector::random_generate(random_hashing_distribution_.size(), &gen)
             );
         }
         return random_hashing_distribution_[num_qubits];
@@ -98,8 +98,6 @@ namespace quartz {
     std::vector< ParamType > Context::get_and_gen_parameters(const int num_params) {
         assert(num_params >= 0);
         if (random_parameters_.size() < num_params) {
-            // Standard mersenne_twister_engine seeded with 0
-            static std::mt19937 gen(0);
             static ParamType pi = std::acos((ParamType)-1.0);
             static std::uniform_real_distribution< ParamType > dis_real(-pi,
                                                                         pi);
@@ -172,7 +170,6 @@ namespace quartz {
 	}
 
 	double Context::random_number() {
-		static std::mt19937 gen(0);
 		static std::uniform_real_distribution< double > dis_real(0, 1);
 		return dis_real(gen);
 	}

@@ -945,6 +945,8 @@ namespace quartz {
 		fin.ignore(std::numeric_limits< std::streamsize >::max(), ',');
 		fin >> num_gates;
 
+		// TODO: Do not generate the distribution here -- we should generate
+		//  earlier to make the result more deterministic.
         ctx->get_and_gen_hashing_dis(num_dag_qubits);
         ctx->get_and_gen_input_dis(num_dag_qubits);
         ctx->get_and_gen_parameters(num_input_params);

@@ -1289,12 +1289,13 @@ Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
       end = std::chrono::steady_clock::now();
       if (circuit_name != "")
         std::cout << circuit_name << ": ";
-      fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n ",
+      fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
               bestCost, candidates.size(),
               (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start)
                       .count() /
                   1000.0);
+      fflush(stdout);
 
       //   std::vector<Graph *> new_candidates;
       bool stop_search = false;

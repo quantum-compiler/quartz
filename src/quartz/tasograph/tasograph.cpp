@@ -137,6 +137,18 @@ namespace quartz {
         special_op_guid = _special_op_guid;
     }
 
+    void Graph::init_qubit_mapping() {
+        // TODO: quartz physical: test this
+        // TODO: quartz physical: use a better initial mapping
+        int qubit_index = 0;
+        for (const auto& op_in_edge : inEdges) {
+            if (op_in_edge.first.ptr->tp == GateType::input_qubit) {
+                qubit_mapping_table.insert({op_in_edge.first, std::pair<int, int>(qubit_index, qubit_index)});
+                qubit_index += 1;
+            }
+        }
+    }
+
     void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
         if (inEdges.find(dstOp) == inEdges.end()) {
             inEdges[dstOp];
@@ -220,6 +232,7 @@ namespace quartz {
     }
 
     bool Graph::check_mapping_correctness() {
+        // TODO: quartz physical: test this
         // build a map of Op -> <in_edges, out_edges>
         struct EdgePacket{
             EdgePacket() = default;
@@ -242,8 +255,8 @@ namespace quartz {
                 // each input qubit has no input edge
                 if (!op_edge.second.in_edges->empty()) return false;
                 // check if input qubit's physical and logical idx match the edge
-                if (op_edge.second.out_edges->begin()->physical_qubit_idx != op_edge.first.physical_qubit_id ||
-                    op_edge.second.out_edges->begin()->logical_qubit_idx != op_edge.first.logical_qubit_id)
+                if (op_edge.second.out_edges->begin()->physical_qubit_idx != qubit_mapping_table[op_edge.first].second ||
+                    op_edge.second.out_edges->begin()->logical_qubit_idx != qubit_mapping_table[op_edge.first].first)
                     return false;
                 continue;
             }

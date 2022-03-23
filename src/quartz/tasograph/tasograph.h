@@ -63,9 +63,6 @@ namespace quartz {
     public:
         size_t guid;
         Gate *ptr;
-        // only useful for input_qubit
-        int physical_qubit_id{-1};
-        int logical_qubit_id{-1};
     };
 
     class OpCompare {
@@ -196,6 +193,8 @@ namespace quartz {
 
         Graph(const Graph &graph);
 
+        void init_qubit_mapping();
+
         void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
 
         bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
@@ -292,7 +291,11 @@ namespace quartz {
         std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
         std::map<Op, ParamType> constant_param_values;
         std::unordered_map<Op, int, OpHash> qubit_2_idx;
+
+        // device topology
         std::shared_ptr<DeviceTopologyGraph> device_topology_graph;
+        // stores the mapping of input_qubit Ops -> <logical, physical idx>
+        std::unordered_map<Op, std::pair<int, int>, OpHash> qubit_mapping_table;
     };
 
 }; // namespace quartz

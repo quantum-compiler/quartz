@@ -1080,12 +1080,11 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-std::shared_ptr<Graph>
-Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-                const std::string &equiv_file_name,
-                bool use_simulated_annealing, bool enable_early_stop,
-                bool use_rotation_merging_in_searching,
-                GateType target_rotation, std::string circuit_name) {
+std::shared_ptr<Graph> Graph::optimize(
+    float alpha, int budget, bool print_subst, Context *ctx,
+    const std::string &equiv_file_name, bool use_simulated_annealing,
+    bool enable_early_stop, bool use_rotation_merging_in_searching,
+    GateType target_rotation, int timeout, std::string circuit_name) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1289,6 +1288,13 @@ Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
       end = std::chrono::steady_clock::now();
       if (circuit_name != "")
         std::cout << circuit_name << ": ";
+      if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                     start)
+                  .count() /
+              1000.0 >
+          timeout) {
+        std::cout << "Timeout. Program terminated." << std::endl;
+      }
       fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
               bestCost, candidates.size(),
               (double)std::chrono::duration_cast<std::chrono::milliseconds>(

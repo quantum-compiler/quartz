@@ -23,7 +23,9 @@ export QUARTZ_HOME=/path/to/quartz
 
 * Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`. 
 ```
-mkdir build; cd build; cmake ..
+mkdir build; 
+cd build; 
+cmake ..
 sudo make install
 ```
 

@@ -30,5 +30,5 @@ sudo make install
 * Install the Quartz python package.
 ```
 cd ../python
-python setup.py build_ext --inplace install
+python setup.py install
 ```

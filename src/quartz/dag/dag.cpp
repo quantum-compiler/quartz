@@ -40,6 +40,9 @@ namespace quartz {
 	}
 
 	bool DAG::fully_equivalent(const DAG &other) const {
+	    if (this == &other) {
+	      return true;
+	    }
 		// Do not check the hash value because of floating point errors
 		// and it is possible that one of the two DAGs may have not calculated
 		// the hash value.
@@ -89,6 +92,9 @@ namespace quartz {
 	}
 
 	bool DAG::less_than(const DAG &other) const {
+        if (this == &other) {
+          return false;
+        }
 		if (num_qubits != other.num_qubits) {
 			return num_qubits < other.num_qubits;
 		}

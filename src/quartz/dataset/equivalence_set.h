@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <list>
+#include <map>
 #include <set>
 #include <unordered_set>
 #include <unordered_map>
@@ -53,9 +54,30 @@ namespace quartz {
 		// Return the number of circuits modified.
 		int remove_unused_internal_parameters(Context *ctx);
 
+		// Return the hash of the first DAG.
+		DAGHashType hash(Context *ctx);
+
+		// Compare two ECCs in a deterministic order.
+		// ECCs with fewer DAGs are considered smaller.
+		// For ECCs with the same number of DAGs, an alphabetical order of
+		// DAGs is used.
+		static bool less_than(const EquivalenceClass &ecc1, const EquivalenceClass &ecc2);
+
 	private:
 		std::vector< std::unique_ptr< DAG > > dags_;
 	};
+
+    class UniquePtrEquivalenceClassComparator {
+     public:
+      bool operator()(const std::unique_ptr<EquivalenceClass> &ecc1,
+                      const std::unique_ptr<EquivalenceClass> &ecc2) const {
+        if (!ecc1 || !ecc2) {
+          // nullptr
+          return !ecc2;
+        }
+        return EquivalenceClass::less_than(*ecc1, *ecc2);
+      }
+    };
 
 	// This class stores all equivalence classes.
 	class EquivalenceSet {
@@ -76,25 +98,26 @@ namespace quartz {
         bool simplify(Context *ctx,
                       bool normalize_to_minimal_circuit_representation = true,
                       bool common_subcircuit_pruning = true,
-                      bool other_simplification = true);
+                      bool other_simplification = true,
+                      bool verbose = false);
 
 		// Remove equivalence classes with only one DAG.
 		// Return the number of equivalent classes removed.
-		int remove_singletons(Context *ctx);
+		int remove_singletons(Context *ctx, bool verbose = false);
 
 		// Normalize each DAG to have the minimal circuit representation.
 		// Return the number of equivalent classes modified.
-		int normalize_to_minimal_circuit_representations(Context *ctx);
+		int normalize_to_minimal_circuit_representations(Context *ctx, bool verbose = false);
 
 		// Remove unused internal parameters.
 		// Return the number of equivalent classes modified.
-		int remove_unused_internal_params(Context *ctx);
+		int remove_unused_internal_params(Context *ctx, bool verbose = false);
 
 		// Remove unused qubits and input parameters if they are unused in
 		// each DAG of an equivalent class.
 		// Return the number of equivalent classes removed
 		// (and possibly inserted again).
-		int remove_unused_qubits_and_input_params(Context *ctx);
+		int remove_unused_qubits_and_input_params(Context *ctx, bool verbose = false);
 
 		// For each pair of circuits in one equivalence class, if they share
 		// a common "first" gate or a common "last" gate, remove the latter one.
@@ -102,12 +125,12 @@ namespace quartz {
 		// on any other quantum gates, and "last" means a quantum gate which can
 		// appear at last in some topological order of the DAG.
 		// Return the number of equivalent classes modified.
-		int remove_common_first_or_last_gates(Context *ctx);
+		int remove_common_first_or_last_gates(Context *ctx, bool verbose = false);
 
 		// If there are two equivalence classes that are equivalent under
 		// permutation of parameters, remove one of them.
 		// Return the number of equivalent classes removed.
-		int remove_parameter_permutations(Context *ctx);
+		int remove_parameter_permutations(Context *ctx, bool verbose = false);
 
 		// This function runs in O(1).
 		[[nodiscard]] int num_equivalence_classes() const;
@@ -137,9 +160,9 @@ namespace quartz {
 		            std::unique_ptr< DAG > dag);
 
 		// If the whole equivalence set contains a DAG fully equivalent to
-		// |dag|, return the equivalence class containing it. Otherwise, return
-		// nullptr.
-		[[nodiscard]] EquivalenceClass *get_containing_class(Context *ctx,
+		// |dag|, return the equivalence class(es) containing it. Otherwise, return
+		// an empty vector.
+		[[nodiscard]] std::vector<EquivalenceClass *> get_containing_class(Context *ctx,
 		                                                     DAG *dag) const;
 
 	private:

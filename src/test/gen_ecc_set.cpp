@@ -43,6 +43,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
              .c_str());
   auto end2 = std::chrono::steady_clock::now();
   verification_time += end2 - start2;
+  equiv_set.clear();  // this is necessary
   equiv_set.load_json(&ctx, file_prefix + "pruning.json");
   start2 = std::chrono::steady_clock::now();
   equiv_set.simplify(&ctx);
@@ -69,6 +70,9 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                 .count() /
                 1000.0
             << std::endl;
+  std::cout << "Num_total_dags = " << equiv_set.num_total_dags()
+            << ", num_equivalence_classes = "
+            << equiv_set.num_equivalence_classes() << std::endl;
 
   std::cout << "*** Number of transformations of "
             << file_prefix.substr(0, file_prefix.size() - 1) << " = "

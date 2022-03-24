@@ -161,6 +161,38 @@ namespace quartz {
 		return num_dag_modified;
 	}
 
+    DAGHashType EquivalenceClass::hash(Context *ctx) {
+	  for (auto &dag : dags_) {
+	    if (dag) {
+	      // Not nullptr
+	      return dag->hash(ctx);
+	    }
+	  }
+	  return 0;  // empty class
+	}
+
+	bool EquivalenceClass::less_than(const EquivalenceClass &ecc1, const EquivalenceClass &ecc2) {
+	  if (ecc1.size() != ecc2.size()) {
+	    return ecc1.size() < ecc2.size();
+	  }
+	  for (int i = 0; i < ecc1.size(); i++) {
+	    // deal with nullptrs
+	    if (!ecc1.dags_[i]) {
+	      if (!ecc2.dags_[i]) {
+	        continue;
+	      }
+	      return false;
+	    }
+	    if (!ecc2.dags_[i]) {
+	      return true;
+	    }
+	    if (!ecc1.dags_[i]->fully_equivalent(*ecc2.dags_[i])) {
+	      return ecc1.dags_[i]->less_than(*ecc2.dags_[i]);
+	    }
+	  }
+	  return false;
+	}
+
 	bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
 	                               std::vector< DAG * > *new_representatives) {
 		std::ifstream fin;
@@ -412,14 +444,15 @@ namespace quartz {
 	bool EquivalenceSet::simplify(Context *ctx,
 								  bool normalize_to_minimal_circuit_representation,
 								  bool common_subcircuit_pruning,
-								  bool other_simplification) {
+								  bool other_simplification,
+								  bool verbose) {
 		bool ever_simplified = false;
 		// If there are 2 continuous optimizations with no effect, break.
 		constexpr int kNumOptimizationsToPerform = 5;
 		// Initially we want to run all optimizations once.
 		int remaining_optimizations = kNumOptimizationsToPerform + 1;
 		while (true) {
-			if (other_simplification && remove_singletons(ctx)) {
+			if (other_simplification && remove_singletons(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
@@ -427,14 +460,14 @@ namespace quartz {
 				break;
 			}
 			if (normalize_to_minimal_circuit_representation &&
-			    normalize_to_minimal_circuit_representations(ctx)) {
+			    normalize_to_minimal_circuit_representations(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
 			else if (!--remaining_optimizations) {
 				break;
 			}
-			if (other_simplification && remove_unused_internal_params(ctx)) {
+			if (other_simplification && remove_unused_internal_params(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
@@ -442,14 +475,14 @@ namespace quartz {
 				break;
 			}
 			if (other_simplification &&
-			    remove_unused_qubits_and_input_params(ctx)) {
+			    remove_unused_qubits_and_input_params(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
 			else if (!--remaining_optimizations) {
 				break;
 			}
-			if (other_simplification && remove_parameter_permutations(ctx)) {
+			if (other_simplification && remove_parameter_permutations(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
@@ -457,7 +490,7 @@ namespace quartz {
 				break;
 			}
 			if (common_subcircuit_pruning &&
-			    remove_common_first_or_last_gates(ctx)) {
+			    remove_common_first_or_last_gates(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
@@ -468,7 +501,7 @@ namespace quartz {
 		return ever_simplified;
 	}
 
-	int EquivalenceSet::remove_singletons(Context *ctx) {
+	int EquivalenceSet::remove_singletons(Context *ctx, bool verbose) {
 		bool have_singletons_to_remove = false;
 		for (auto &item : classes_) {
 			if (item->size() <= 1) {
@@ -493,6 +526,9 @@ namespace quartz {
 				num_removed++;
 				// Remove all pointers to the equivalence class.
 				if (item->size() > 0) {
+				  if (verbose) {
+				    std::cout << "Remove singleton: " << item->get_all_dags()[0]->hash(ctx) << std::endl;
+				  }
 					for (auto &dag : item->get_all_dags()) {
 						remove_possible_class(dag->hash(ctx), item.get());
 						for (const auto &other_hash :
@@ -500,6 +536,10 @@ namespace quartz {
 							remove_possible_class(other_hash, item.get());
 						}
 					}
+				} else {
+				  if (verbose) {
+				    std::cout << "Remove empty ECC" << std::endl;
+				  }
 				}
 			}
 		}
@@ -508,18 +548,18 @@ namespace quartz {
 	}
 
 	int
-	EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx) {
+	EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx, bool verbose) {
 		int num_class_modified = 0;
 		for (auto &item : classes_) {
 			auto dags = item->extract();
 			std::vector< std::unique_ptr< DAG > > new_dags;
 			std::unique_ptr< DAG > new_dag;
 			std::unordered_set< DAGHashType > hash_values_to_remove;
-			bool class_modified = false;
+			int class_modified = 0;
 			for (auto &dag : dags) {
 				bool is_minimal = dag->minimal_circuit_representation(&new_dag);
 				if (!is_minimal) {
-					class_modified = true;
+					class_modified++;
 					new_dags.push_back(std::move(new_dag));
 					hash_values_to_remove.insert(dag->hash(ctx));
 					for (const auto &other_hash : dag->other_hash_values()) {
@@ -532,6 +572,11 @@ namespace quartz {
 				item->set_dags(std::move(dags));
 				continue;
 			}
+          if (verbose) {
+            std::cout << "Normalize to minimal circuit representations: "
+                      << new_dags[0]->hash(ctx) << ": " << class_modified
+                      << " DAGs modified." << std::endl;
+          }
 			std::unordered_set< DAGHashType > existing_hash_values;
 			std::unordered_set< DAGHashType > hash_values_to_insert;
 			num_class_modified++;
@@ -578,17 +623,20 @@ namespace quartz {
 		return num_class_modified;
 	}
 
-	int EquivalenceSet::remove_unused_internal_params(Context *ctx) {
+	int EquivalenceSet::remove_unused_internal_params(Context *ctx, bool verbose) {
 		int num_class_modified = 0;
 		for (auto &item : classes_) {
 			if (item->remove_unused_internal_parameters(ctx)) {
+			    if (verbose) {
+			      std::cout << "Remove unused internal params: " << item->hash(ctx) << std::endl;
+			    }
 				num_class_modified++;
 			}
 		}
 		return num_class_modified;
 	}
 
-	int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx) {
+	int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx, bool verbose) {
 		std::vector< EquivalenceClass * > classes_to_remove;
 		std::vector< std::unique_ptr< EquivalenceClass > > classes_to_insert;
 		for (auto &item : classes_) {
@@ -666,6 +714,10 @@ namespace quartz {
 				}
 			}
 
+			if (verbose) {
+			  std::cout << "Remove unused qubits and input params: " << item->hash(ctx) << std::endl;
+			}
+
 			if (keep_dag_class) {
 				// Construct a new DAG class
 				classes_to_insert.push_back(
@@ -729,6 +781,9 @@ namespace quartz {
 							set_possible_class(other_hash, new_dag_class.get());
 						}
 					}
+					if (verbose) {
+                      std::cout << "ECC " << item->hash(ctx) << " -> new ECC " << new_dag_class->hash(ctx) << std::endl;
+                    }
 				}
 			}
 		}
@@ -765,13 +820,16 @@ namespace quartz {
 		return (int)classes_to_remove.size();
 	}
 
-	int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx) {
+	int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx, bool verbose) {
 		int num_classes_modified = 0;
 		for (auto &item : classes_) {
 			std::unordered_set< DAGHashType > hash_values_to_remove;
 			if (item->remove_common_first_or_last_gates(
 			        ctx, hash_values_to_remove)) {
 				num_classes_modified++;
+				if (verbose) {
+				  std::cout << "Remove common first of last gates: ECC " << item->hash(ctx) << " modified." << std::endl;
+				}
 				for (const auto &hash_value : hash_values_to_remove) {
 					remove_possible_class(hash_value, item.get());
 				}
@@ -780,7 +838,11 @@ namespace quartz {
 		return num_classes_modified;
 	}
 
-	int EquivalenceSet::remove_parameter_permutations(Context *ctx) {
+	int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
+	    // This function needs a deterministic order of |classes_| in order for
+	    // the result to be reproducible.
+	    // Therefore, we sort the ECCs here.
+	    std::sort(classes_.begin(), classes_.end(), UniquePtrEquivalenceClassComparator());
 		std::vector< EquivalenceClass * > classes_to_remove;
 		for (auto &item : classes_) {
 			if (item->size() == 0) {
@@ -809,10 +871,10 @@ namespace quartz {
 				param_permutation[i] = i;
 			}
 			bool found_permuted_equivalence = false;
-			while (std::next_permutation(param_permutation.begin(),
-			                             param_permutation.end())) {
-				// Check all permutations except for the identity.
-				EquivalenceClass *permuted_class = nullptr;
+			do {
+				// Check all permutations including the identity (because
+				// we want to merge ECCs with the same DAG).
+                std::set<EquivalenceClass *> permuted_classes;
 				std::vector< std::unique_ptr< DAG > > permuted_dags;
 				permuted_dags.reserve(dags.size());
 				for (auto &dag : dags) {
@@ -820,28 +882,47 @@ namespace quartz {
 					    qubit_permutation, param_permutation));
 				}
 				for (auto &permuted_dag : permuted_dags) {
-					permuted_class =
-					    get_containing_class(ctx, permuted_dag.get());
-					if (permuted_class) {
-						// Found the permuted class.
-						break;
-					}
+                    for (const auto &permuted_class : get_containing_class(ctx, permuted_dag.get())) {
+                      permuted_classes.insert(permuted_class);
+                    }
 				}
-				if (permuted_class && permuted_class != item.get()) {
+                EquivalenceClass *permuted_class = nullptr;
+				for (auto &c : permuted_classes) {
+				  if (c != item.get() && (!permuted_class || EquivalenceClass::less_than(*c, *permuted_class))) {
+				    permuted_class = c;
+				  }
+				}
+				if (permuted_class) {
 					found_permuted_equivalence = true;
+                    if (verbose) {
+                      std::cout << "Remove parameter permutations: found ECC " << permuted_class->hash(ctx) << std::endl;
+                      for (auto &dag : permuted_class->get_all_dags()) {
+                        std::cout << "  " << dag->to_json() << std::endl;
+                      }
+                    }
 					// Update the permuted class using this class.
 					for (auto &permuted_dag : permuted_dags) {
 						if (!permuted_class->contains(*permuted_dag)) {
+						    if (verbose) {
+                              std::cout << "Remove parameter permutations: insert " << permuted_dag->to_json() << std::endl;
+						    }
 							insert(ctx, permuted_class,
 							       std::move(permuted_dag));
 						}
 					}
 					break;
 				}
-			}
+            } while (std::next_permutation(param_permutation.begin(),
+                                           param_permutation.end()));
 			if (found_permuted_equivalence) {
 				// Remove this equivalence class.
 				classes_to_remove.push_back(item.get());
+				if (verbose) {
+				  std::cout << "Remove parameter permutations: remove " << item->hash(ctx) << std::endl;
+                  for (auto &dag : dags) {
+                    std::cout << "  " << dag->to_json() << std::endl;
+                  }
+				}
 				for (auto &dag : dags) {
 					remove_possible_class(dag->hash(ctx), item.get());
 					for (const auto &other_hash : dag->other_hash_values()) {
@@ -983,12 +1064,13 @@ namespace quartz {
 		}
 	}
 
-	EquivalenceClass *EquivalenceSet::get_containing_class(Context *ctx,
+	std::vector<EquivalenceClass *> EquivalenceSet::get_containing_class(Context *ctx,
 	                                                       DAG *dag) const {
+	    std::set<EquivalenceClass *> result;
 		auto possible_classes = get_possible_classes(dag->hash(ctx));
 		for (auto &equiv_class : possible_classes) {
 			if (equiv_class->contains(*dag)) {
-				return equiv_class;
+				result.insert(equiv_class);
 			}
 		}
 		auto possible_class_set = std::unordered_set< EquivalenceClass * >(
@@ -1000,12 +1082,12 @@ namespace quartz {
 					// not cached
 					possible_class_set.insert(equiv_class);
 					if (equiv_class->contains(*dag)) {
-						return equiv_class;
+                        result.insert(equiv_class);
 					}
 				}
 			}
 		}
-		return nullptr;
+		return std::vector<EquivalenceClass *>(result.begin(), result.end());
 	}
 
 	void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,

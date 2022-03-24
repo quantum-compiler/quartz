@@ -94,7 +94,6 @@ int Dataset::remove_singletons(Context *ctx) {
     auto find_other = dataset.find(it_hash_value - 1);
     if (find_other != dataset.end() && !find_other->second.empty()) {
       found_possible_equivalence = true;
-      break;
     }
     if (found_possible_equivalence) {
       it++;

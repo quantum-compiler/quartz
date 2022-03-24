@@ -189,7 +189,7 @@ public:
            const std::string &equiv_file_name, bool use_simulated_annealing,
            bool enable_early_stop, bool use_rotation_merging_in_searching,
            GateType target_rotation, std::string circuit_name = "",
-           int timeout = INT32_MAX);
+           int timeout = 86400/*1 day*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   void to_qasm(const std::string &save_filename, bool print_result,

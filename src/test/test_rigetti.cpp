@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
   auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
       0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
-      GateType::rz);
+      GateType::rz, fn);
   //   graph_after_h_cz_merge->to_qasm(
   //       "circuit/voqc-benchmarks/after_h_cz_merge.qasm", false, false);
 
@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
   // Optimization
   auto graph_after_search = graph_rigetti->optimize(
       0.999, 0, false, &union_ctx_1, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::rz);
+      /*rotation_merging_in_searching*/ false, GateType::rz, fn);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
             << " on Rigetti gate set." << std::endl

@@ -1310,14 +1310,14 @@ std::shared_ptr<Graph> Graph::optimize(
         std::vector<std::shared_ptr<Graph>> new_candidates;
         xfer->run(0, subGraph.get(), new_candidates, hashmap, bestCost * alpha,
                   2 * maxNumOps, enable_early_stop, stop_search);
-        auto front_gate_count = candidates.top()->gate_count();
+        // auto front_gate_count = candidates.top()->gate_count();
         for (auto &candidate : new_candidates) {
           candidates.push(candidate);
         }
-        auto new_front_gate_count = candidates.top()->gate_count();
-        if (new_front_gate_count < front_gate_count) {
-          good_xfers.push_back(xfer);
-        }
+        // auto new_front_gate_count = candidates.top()->gate_count();
+        // if (new_front_gate_count < front_gate_count) {
+        //   good_xfers.push_back(xfer);
+        //   }
       }
     }
   }
@@ -1331,7 +1331,7 @@ std::shared_ptr<Graph> Graph::optimize(
   //   }
   bestGraph->constant_and_rotation_elimination();
   return bestGraph;
-}
+} // namespace quartz
 
 std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   // Transform ccz to t, an naive solution
@@ -1573,5 +1573,4 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
     }
   }
 }
-
 }; // namespace quartz

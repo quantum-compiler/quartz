@@ -1293,7 +1293,8 @@ std::shared_ptr<Graph> Graph::optimize(
                   .count() /
               1000.0 >
           timeout) {
-        std::cout << "Timeout. Program terminated." << std::endl;
+        std::cout << "Timeout. Program terminated. Best gate count is "
+                  << bestCost << std::endl;
         exit(1);
       }
       fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",

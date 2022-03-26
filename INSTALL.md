@@ -16,21 +16,34 @@ Quartz can be built from source code using the following instructions.
 git clone --recursive https://github.com/quantum-compiler/quartz.git
 cd quartz
 ```
-The `QUARTZ_HOME` environment is used for building and running Quartz. You can add the following line in `~/.bashrc`.
-```
-export QUARTZ_HOME=/path/to/quartz
-```
 
 * Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`. 
 ```
 mkdir build; 
 cd build; 
 cmake ..
-sudo make install
+make install
 ```
+
+Note that line 3 in the example will have the runtime library and include files installed into the default path `/usr/local/`. To modify the install path, you can set the path explicitly in line 3, for example:
+
+```
+cmake -D CMAKE_INSTALL_PREFIX:PATH=~/opt/ ..
+```
+
 
 * Install the Quartz python package.
 ```
 cd ../python
-python setup.py install
+python setup.py build_ext --inplace install
 ```
+
+* To use `quartz` library in python, you should make sure the directory where you install `quartz` runtime library, that is `libquartz_runtime.so`, is in python's searching directories. 
+
+You can add:
+
+```
+export LD_LIBRARY_PATH=/your/path/:$LD_LIBRARY_PATH
+```
+
+to `~/.bashrc`.

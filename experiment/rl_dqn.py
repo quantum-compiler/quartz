@@ -18,7 +18,8 @@ class QAgent:
                  a_size,
                  context,
                  f=None,
-                 pretrained_model=None):
+                 pretrained_model=None,
+                 use_cuda=False):
         torch.manual_seed(42)
         if pretrained_model != None:
             self.q_net = copy.deepcopy(pretrained_model)
@@ -31,6 +32,16 @@ class QAgent:
         self.gamma = gamma
         self.context = context
         self.f = f
+        if use_cuda:
+            self.use_cuda()
+            self.cuda = True
+        else:
+            self.cuda = False
+
+    def use_cuda(self):
+        self.q_net.cuda()
+        self.target_net.cuda()
+        self.cuda = True
 
     def select_a(self, g, dgl_g, e):
         a_size = self.a_size
@@ -51,6 +62,8 @@ class QAgent:
             node = torch.tensor(node)
 
         else:
+            if self.cuda:
+                dgl_g = dgl_g.to('cuda:0')
             with torch.no_grad():
                 pred = self.q_net(dgl_g)
             Qs, As = torch.max(pred, dim=1)
@@ -67,13 +80,19 @@ class QAgent:
         for i in range(batch_size):
             s, node, a, r, s_next = data.get_data()
 
+            if self.cuda:
+                s = s.to('cuda:0')
             pred = self.q_net(s)
             pred_r = pred[node][a]
             #s_a = s_as.gather(1, a)
 
             if s_next == None:
                 target_r = torch.tensor(-3.0)
+                if self.cuda:
+                    target_r = target_r.cuda()
             else:
+                if self.cuda:
+                    s_next = s_next.to('cuda:0')
                 q_next = self.target_net(s_next).detach()
                 # q_next_r = q_next[node][a]
                 q_next_r = torch.max(q_next)
@@ -105,7 +124,7 @@ class QAgent:
 
 class QData:
     def __init__(self):
-        self.data = deque(maxlen=2000)
+        self.data = deque(maxlen=10000)
         self.hash_map = {}
 
     def add_data(self, d):
@@ -149,6 +168,7 @@ def train(*,
           target_update_interval=1,
           log_fn='',
           pretrained_model=None,
+          use_cuda=False,
           **kwargs):
 
     # Prepare for log
@@ -172,6 +192,8 @@ def train(*,
                        context=context,
                        f=f,
                        pretrained_model=pretrained_model)
+    if use_cuda:
+        agent.use_cuda()
 
     data = QData()
 
@@ -218,13 +240,16 @@ def train(*,
             losses += loss
 
         if epsilon > 0.05:
-            epsilon -= 0.0001
+            epsilon -= 0.001
 
         if i % target_update_interval == 0:
             agent.target_net.load_state_dict(agent.q_net.state_dict())
 
         with torch.no_grad():
-            pred = agent.q_net(init_graph.to_dgl_graph())
+            if use_cuda:
+                pred = agent.q_net(init_graph.to_dgl_graph().to('cuda:0'))
+            else:
+                pred = agent.q_net(init_graph.to_dgl_graph())
             _, As = torch.max(pred, dim=1)
             print_log(As)
             if 'valid_xfer_dict' in kwargs:
@@ -232,7 +257,7 @@ def train(*,
                 valid_xfer_dict = kwargs['valid_xfer_dict']
                 for k in range(len(As)):
                     a = As[k]
-                    if a in valid_xfer_dict[k]:
+                    if a in valid_xfer_dict[str(k)]:
                         correct_cnt += 1
                 print_log(f'correct count is {correct_cnt}')
                 correct_cnts.append(correct_cnt)

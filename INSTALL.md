@@ -33,10 +33,13 @@ cmake -D CMAKE_INSTALL_PREFIX:PATH=~/opt/ ..
 
 
 * Install the Quartz python package.
+
 ```
 cd ../python
 python setup.py build_ext --inplace install
 ```
+
+Note that if you changed the install directory in the last step, you have to modified `include_dirs` and `library_dirs` in `setup.py`.
 
 * To use `quartz` library in python, you should make sure the directory where you install `quartz` runtime library, that is `libquartz_runtime.so`, is in python's searching directories. 
 

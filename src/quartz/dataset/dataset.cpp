@@ -1,9 +1,13 @@
 #include "dataset.h"
+#include "equivalence_set.h"
 
+#include <vector>
+#include <unordered_map>
 #include <cassert>
 #include <fstream>
 #include <iomanip>
 #include <mutex>
+#include "omp.h"
 
 namespace quartz
 {
@@ -199,13 +203,61 @@ namespace quartz
     }
 
     void Dataset::find_equivalences(Context *ctx) {
-        /* iterate over every (hashtag, dags), check whether the dags are really equivalent
-         * return a dict like {'hashtag_index_1': [dags], ...},
+        /*
+         * iterate over every (hashtag, dags), check whether the dags are really equivalent
+         * get info like {'hashtag_index_1': [dags], ...}
          * each key is mapped to a list containing real equivalent dags
+         * build ec_classes: [ class_0: [dag_0, dag_1], ... ]
          */
-        for (const auto&[hashtag, dags]: dataset) {
-
+        std::vector< std::vector<std::pair<DAGHashType, unsigned>> > class_hashes(dataset.size());
+        std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
+        // convert unordered_map obj dataset to vector to enable parallelization
+        std::vector<std::pair< DAGHashType, std::vector<std::unique_ptr<DAG>>* >> vec_dataset;
+        for (auto& [hash, dags] : dataset) {
+            vec_dataset.emplace_back(hash, &dags);
         }
+
+        #pragma omp parallel for default(none) shared(vec_dataset, class_hashes, classes)
+        for (size_t i = 0; i < vec_dataset.size(); i++) {
+            // build vector<EquivalenceClass> at classes[i]
+            DAGHashType hashtag = vec_dataset[i].first;
+            std::vector<std::unique_ptr<DAG>>* dags = vec_dataset[i].second;
+            // more than one dag, need to check if they are really equivalent
+            std::vector<std::pair<DAGHashType, unsigned>>& this_class_hashes = class_hashes[i];
+            std::vector<std::unique_ptr<EquivalenceClass>>& this_eccs = classes[i];
+            auto insert_ecc_with_dag = [&](const std::unique_ptr<DAG>& dag) {
+                this_class_hashes.emplace_back(hashtag, this_class_hashes.size());
+                auto ecc = std::make_unique<EquivalenceClass>();
+                // ATTENTION : copy construct a dag
+                ecc->insert(std::make_unique<DAG>(*dag));
+                this_eccs.emplace_back(std::move(ecc));
+            };
+            for (const auto& dag : *dags) {
+                if (this_class_hashes.empty()) {
+                    // the first one, no need to check equivalence with others
+                    insert_ecc_with_dag(dag);
+                }
+                else {
+                    // check equivalence between dag and inserted ones
+                    bool found_equivalent_one = false;
+                    for (auto& inserted_ecc : this_eccs) {
+                        DAG* other_dag = inserted_ecc->get_representative();
+                        if (true /* TODO Colin : equivalent(dag, other_dag) */) {
+                            found_equivalent_one = true;
+                            // ATTENTION : copy construct a dag
+                            inserted_ecc->insert(std::make_unique<DAG>(*dag));
+                            break;
+                        }
+                    } // for this_eccs
+                    if (!found_equivalent_one) {
+                        // non-equivalent dag with the same hash, build a new ecc
+                        insert_ecc_with_dag(dag);
+                    }
+                }
+            } // for dags
+        } // for vec_dataset (paralleled)
+
+
     }
 
 } // namespace quartz

@@ -21,15 +21,14 @@ def config_cython():
         for fn in os.listdir(path):
             if not fn.endswith(".pyx"):
                 continue
-            ret.append(Extension(
-                "quartz.%s" % fn[:-4],
-                ["%s/%s" % (path, fn)],
-                include_dirs=["../src/quartz/", "/usr/local/include/"],
-                libraries=["quartz_runtime"],
-                library_dirs=["/usr/local/lib/"],
-                extra_compile_args=["-std=c++17"],
-                extra_link_args=[],
-                language="c++"))
+            ret.append(
+                Extension("quartz.%s" % fn[:-4], ["%s/%s" % (path, fn)],
+                          include_dirs=["../src/quartz/", "~/opt/include/"],
+                          libraries=["quartz_runtime"],
+                          library_dirs=["~/opt/lib/"],
+                          extra_compile_args=["-std=c++17"],
+                          extra_link_args=[],
+                          language="c++"))
         return cythonize(ret, compiler_directives={"language_level": 3})
     except ImportError:
         print("WARNING: cython is not installed!!!")
@@ -38,12 +37,13 @@ def config_cython():
 
 setup_args = {}
 
-setup(name='quartz',
-      version="0.1.0",
-      description="Quartz: Superoptimization of Quantum Circuits",
-      zip_safe=False,
-      install_requires=[],
-      packages=find_packages(),
-      url='https://github.com/quantum-compiler/quartz',
-      ext_modules=config_cython(),
-      )
+setup(
+    name='quartz',
+    version="0.1.0",
+    description="Quartz: Superoptimization of Quantum Circuits",
+    zip_safe=False,
+    install_requires=[],
+    packages=find_packages(),
+    url='https://github.com/quantum-compiler/quartz',
+    ext_modules=config_cython(),
+)

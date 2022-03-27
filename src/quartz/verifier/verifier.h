@@ -3,6 +3,7 @@
 #include "../context/context.h"
 #include "../dataset/equivalence_set.h"
 #include "../dag/dag.h"
+#include "dataset/dataset.h"
 
 namespace quartz {
 	// Verify if two circuits are equivalent and other things about DAGs.
@@ -21,6 +22,8 @@ namespace quartz {
 		// Check if the DAG is redundant (equivalence opportunities have already
 		// been covered by smaller circuits).
 		bool redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag);
+
+    private:
 	};
 
 } // namespace quartz

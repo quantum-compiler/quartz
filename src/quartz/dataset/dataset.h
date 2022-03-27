@@ -32,6 +32,8 @@ namespace quartz {
 		// Make this Dataset a brand new one.
 		void clear();
 
+        void find_equivalences(Context* ctx);
+
 		std::unordered_map< DAGHashType, std::vector< std::unique_ptr< DAG > > >
 		    dataset;
 	};

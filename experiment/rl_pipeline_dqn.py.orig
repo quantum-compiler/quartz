@@ -1,0 +1,333 @@
+import quartz
+import matplotlib.pyplot as plt
+<<<<<<< HEAD
+import rl_dqn
+import json
+
+experiment_name = "rl_dqn_" + "pos_data_init_sample_"
+
+=======
+from concurrent.futures import ProcessPoolExecutor
+from gnn import QGNN
+import rl_dqn
+import dgl
+import torch
+import json
+
+>>>>>>> Added some files
+quartz_context = quartz.QuartzContext(
+    gate_set=['h', 'cx', 't', 'tdg'],
+    filename='../bfs_verified_simplified.json')
+parser = quartz.PyQASMParser(context=quartz_context)
+<<<<<<< HEAD
+
+init_dag = parser.load_qasm(
+    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
+init_dgl_graph = init_graph.to_dgl_graph()
+
+# Get valid xfer dict
+=======
+my_dag = parser.load_qasm(filename="near_56.qasm")
+init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
+
+# Pretraining using tof_3 circuit
+# Preparaing data
+
+# xfers_reward = [
+#     xfer.src_gate_count - xfer.dst_gate_count
+#     for xfer in quartz_context.get_xfers()
+# ]
+# xfers_reward = torch.tensor(xfers_reward, dtype=torch.float)
+# xfers_reward_mask = xfers_reward > 0
+
+# def get_dataset(i):
+#     dag_i = parser.load_qasm(filename="barenco_tof_3_opt_path/subst_history_" +
+#                              str(i) + ".qasm")
+#     graph = quartz.PyGraph(context=quartz_context, dag=dag_i)
+#     dgl_graph = graph.to_dgl_graph()
+#     appliable_xfer_matrix = graph.get_available_xfers_matrix(
+#         context=quartz_context)
+#     appliable_xfer_matrix = torch.tensor(appliable_xfer_matrix,
+#                                          dtype=torch.float)
+#     # appliable_xfer_matrix = torch.tensor(appliable_xfer_matrix,dtype=torch.float)
+#     # appliable_xfer_matrix = torch.subtract(appliable_xfer_matrix, 1)
+#     # for i in range(appliable_xfer_matrix.shape[0]):
+#     #     pos_reward_mask = torch.logical_and(appliable_xfer_matrix[i] == 0, xfers_reward_mask)
+#     #     appliable_xfer_matrix[i][pos_reward_mask] = 1
+#     # appliable_xfer_matrix = torch.multiply(appliable_xfer_matrix, 2)
+#     # appliable_xfer_matrix = torch.subtract(appliable_xfer_matrix, 1)
+#     dgl_graph.ndata['label'] = appliable_xfer_matrix.clone().detach()
+#     return dgl_graph
+
+# idx_list = list(range(40))
+# with ProcessPoolExecutor(max_workers=32) as executor:
+#     results = executor.map(get_dataset, idx_list)
+
+# opt_path_dgls = [r for r in results]
+
+# def weighted_mse_loss(input, target, weight):
+#     return (weight * (input - target)**2).mean()
+
+# def train_supervised(g, model, lr=0.01, epochs=20):
+#     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+#     all_logits = []
+#     best_val_acc = 0
+#     best_test_acc = 0
+
+#     features = g.ndata['gate_type']
+
+#     labels = g.ndata['label']
+#     train_mask = g.ndata['train_mask']
+#     val_mask = g.ndata['val_mask']
+#     test_mask = g.ndata['test_mask']
+#     num_pos = torch.sum((labels[train_mask] == 1).float())
+#     num_neg = torch.sum((labels[train_mask] == 0).float())
+
+#     weight = labels[train_mask]
+#     w_pos = torch.log(num_neg + 1) + 1
+#     w_neg = torch.log(num_pos + 1) + 1
+#     # w_pos = (num_neg + num_pos) / num_pos / 2
+#     # w_neg = (num_neg + num_pos) / num_neg / 2
+#     # w_pos_normalized, w_neg_normalized = w_pos/ (w_pos + w_neg), w_neg / (w_pos + w_neg)
+#     # print(w_pos_normalized, w_neg_normalized)
+#     weight[labels[train_mask] == 1] = w_pos
+#     weight[labels[train_mask] == 0] = w_neg
+#     print(w_pos, w_neg)
+#     # print(weight)
+
+#     losses = []
+#     for e in range(epochs):
+#         # Forward
+#         logits = model(g)
+
+#         # Compute loss
+#         # Note that we should only compute the losses of the nodes in the training set,
+#         # i.e. with train_mask 1.
+#         #print(logits)
+
+#         # loss = torch.nn.MSELoss()(logits[train_mask], labels[train_mask])
+#         loss = weighted_mse_loss(logits[train_mask], labels[train_mask],
+#                                  weight)
+#         losses.append(loss.item())
+#         # loss = torch.nn.CrossEntropyLoss()(logits[train_mask], labels[train_mask])
+#         pred = logits > 0.5
+
+#         # Compute accuracy on training/validation/test
+#         train_acc = (pred[train_mask] == labels[train_mask]).float().mean()
+#         val_acc = (pred[val_mask] == labels[val_mask]).float().mean()
+#         test_acc = (pred[test_mask] == labels[test_mask]).float().mean()
+
+#         train_recall = torch.sum((torch.logical_and(
+#             (pred[train_mask] == 1),
+#             (labels[train_mask] == 1))).float()) / torch.sum(
+#                 (labels[train_mask] == 1).float())
+#         val_recall = torch.sum(
+#             (torch.logical_and((pred[val_mask] == 1),
+#                                (labels[val_mask] == 1))).float()) / torch.sum(
+#                                    (labels[val_mask] == 1).float())
+#         test_recall = torch.sum(
+#             (torch.logical_and((pred[test_mask] == 1),
+#                                (labels[test_mask] == 1))).float()) / torch.sum(
+#                                    (labels[test_mask] == 1).float())
+
+#         # Save the best validation accuracy and the corresponding test accuracy.
+#         if best_val_acc < val_acc:
+#             best_val_acc = val_acc
+#             best_test_acc = test_acc
+
+#         # Backward
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
+#         all_logits.append(logits.detach())
+
+#         # TODO: print out false negative
+#         if e % 1 == 0:
+#             print(
+#                 'In epoch {}, loss: {:.5f}, train acc: {:.5f}, train recall: {:.5f}, val acc: {:.5f} (best {:.5f}), val recall: {:.5f}, test acc: {:.5f} (best {:.5f}), test recall: {:.5f}'
+#                 .format(e, loss, train_acc, train_recall, val_acc,
+#                         best_val_acc, val_recall, test_acc, best_test_acc,
+#                         test_recall))
+
+#     return losses
+
+# def test(*, filename):
+#     test_dag = parser.load_qasm(filename=filename)
+#     test_graph = quartz.PyGraph(context=quartz_context, dag=test_dag)
+#     test_graph_dgl = test_graph.to_dgl_graph()
+#     appliable_xfer_matrix = test_graph.get_available_xfers_matrix(
+#         context=quartz_context)
+#     test_graph_dgl.ndata['label'] = torch.tensor(appliable_xfer_matrix,
+#                                                  dtype=torch.float)
+#     labels = test_graph_dgl.ndata['label']
+
+#     with torch.no_grad():
+#         logits = model(test_graph_dgl)
+#         pred = logits > 0.5
+#         test_acc = (pred == labels).float().mean()
+#         print(f"test_acc: {test_acc:.6f}")
+
+# # Pretraining
+# from random import sample
+# import matplotlib.pyplot as plt
+# import numpy as np
+
+# bg = dgl.batch(opt_path_dgls)
+# node_cnt = bg.num_nodes()
+# l = list(range(node_cnt))
+# train_rate = 0.7
+# val_rate = 0.15
+
+# train_num = int(node_cnt * train_rate)
+# val_num = int(node_cnt * val_rate)
+# test_num = node_cnt - train_num - val_num
+
+# train_sample = sample(l, train_num)
+# node_left = [n for n in l if n not in train_sample]
+# val_sample = sample(node_left, val_num)
+# test_sample = [n for n in node_left if n not in val_sample]
+
+# train_mask = [0] * node_cnt
+# val_mask = [0] * node_cnt
+# test_mask = [0] * node_cnt
+
+# for i in range(node_cnt):
+#     if i in train_sample:
+#         train_mask[i] = 1
+#     elif i in val_sample:
+#         val_mask[i] = 1
+#     elif i in test_sample:
+#         test_mask[i] = 1
+#     else:
+#         assert False
+
+# bg.ndata['train_mask'] = torch.tensor(train_mask, dtype=torch.bool)
+# bg.ndata['val_mask'] = torch.tensor(val_mask, dtype=torch.bool)
+# bg.ndata['test_mask'] = torch.tensor(test_mask, dtype=torch.bool)
+
+# lr = 0.02
+# epoches = 40
+# model = QGNN(26, 128, quartz_context.num_xfers, 128)
+# losses = train_supervised(bg, model, lr=lr, epochs=epoches)
+
+# x = list(range(0, epoches))
+# fig, ax = plt.subplots()
+# ax.plot(x, losses)
+# ax.set(ylim=(0, 1))
+# plt.show()
+
+# Get predicted reward
+init_dag = parser.load_qasm(filename="near_56.qasm")
+init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
+init_dgl_graph = init_graph.to_dgl_graph()
+
+# with torch.no_grad():
+#     logits = model(dgl_graph_39)
+
+# Get predicted reward for certain action
+>>>>>>> Added some files
+# all_nodes = init_graph.all_nodes()
+# i = 0
+# valid_xfer_dict = {}
+# for node in all_nodes:
+#     valid_xfer_dict[i] = init_graph.available_xfers(context=quartz_context,
+#                                                     node=node)
+#     print(f'{i}: {valid_xfer_dict[i]}')
+#     i += 1
+
+# with open('valid_xfer_dict.json', 'w') as f:
+#     json.dump(valid_xfer_dict, f)
+
+with open('valid_xfer_dict.json', 'r') as f:
+    valid_xfer_dict = json.load(f)
+
+<<<<<<< HEAD
+# RL training
+seq_lens, correct_cnts, rewards = rl_dqn.train(
+    lr=5e-3,
+    gamma=0.999,
+    replay_times=20,
+    a_size=quartz_context.num_xfers,
+    episodes=1000,
+    epsilon=0.5,
+    epsilon_decay=0.0003,
+    train_epoch=10,
+    max_seq_len=30,
+    batch_size=20,
+    context=quartz_context,
+    init_graph=init_graph,
+    target_update_interval=5,
+    log_fn=f"log/{experiment_name}_log.txt",
+    valid_xfer_dict=valid_xfer_dict,
+    use_cuda=True,
+    pos_data_init=True,
+    pos_data_sampling=True,
+    pos_data_sampling_rate=0.1)
+=======
+print(valid_xfer_dict)
+
+# RL training
+seq_lens, correct_cnts = rl_dqn.train(lr=5e-3,
+                                      gamma=0.999,
+                                      replay_times=20,
+                                      a_size=quartz_context.num_xfers,
+                                      episodes=500,
+                                      epsilon=0.5,
+                                      train_epoch=10,
+                                      max_seq_len=20,
+                                      batch_size=10,
+                                      context=quartz_context,
+                                      init_graph=init_graph,
+                                      target_update_interval=5,
+                                      log_fn="rl_dqn_near_56.txt",
+                                      valid_xfer_dict=valid_xfer_dict,
+                                      use_cuda=True)
+>>>>>>> Added some files
+
+fig, ax = plt.subplots()
+ax.plot(seq_lens)
+plt.title("sequence length - training epochs")
+<<<<<<< HEAD
+plt.savefig(f'figures/{experiment_name}_seqlen.png')
+=======
+plt.savefig('seqlen.png')
+>>>>>>> Added some files
+
+fig, ax = plt.subplots()
+ax.plot(correct_cnts)
+plt.title("correct counts - training epochs")
+<<<<<<< HEAD
+plt.savefig(f'figures/{experiment_name}_corrcnt.png')
+
+fig, ax = plt.subplots()
+ax.plot(rewards)
+plt.title("rewards - training epochs")
+plt.savefig(f'figures/{experiment_name}_rewards.png')
+
+
+def find_number(fn, n):
+    with open(fn, 'r') as f:
+        for l in f:
+            if l[:2] == str(n):
+                print(f"{n} found!")
+                return
+    print(f"{n} not found!")
+
+
+find_number(f"log/{experiment_name}_log.txt", 56)
+=======
+plt.savefig('corrcnt.png')
+
+
+def find_56(fn):
+    with open(fn, 'r') as f:
+        for l in f:
+            if l[:2] == 56:
+                print("56 found!")
+                return
+    print("56 not found!")
+
+
+find_56("RL.txt")
+>>>>>>> Added some files

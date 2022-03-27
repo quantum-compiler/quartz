@@ -60,6 +60,9 @@ plt.savefig(f'figures/{experiment_name}_seqlen.png')
 
 fig, ax = plt.subplots()
 ax.plot(correct_cnts)
+
+fig, ax = plt.subplots()
+ax.plot(correct_cnts)
 plt.title("correct counts - training epochs")
 plt.savefig(f'figures/{experiment_name}_corrcnt.png')
 

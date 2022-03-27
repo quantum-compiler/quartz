@@ -1,4 +1,5 @@
 import quartz
+<<<<<<< HEAD
 import time
 import heapq
 from concurrent.futures import ProcessPoolExecutor
@@ -18,6 +19,8 @@ def check(graph):
     return Statevector.from_instruction(qc_origin).equiv(
         Statevector.from_instruction(qc_optimized))
 
+=======
+>>>>>>> Added some files
 
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
@@ -25,6 +28,7 @@ quartz_context = quartz.QuartzContext(
 parser = quartz.PyQASMParser(context=quartz_context)
 my_dag = parser.load_qasm(
     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+<<<<<<< HEAD
 init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
 
 candidate_hq = []
@@ -86,3 +90,6 @@ while candidate_hq != [] and budget >= 0 and not finish:
                     )
 
 buffer.save_data()
+=======
+my_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
+>>>>>>> Added some files

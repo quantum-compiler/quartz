@@ -283,7 +283,7 @@ namespace quartz
                 using PhaseIDToDags = std::unordered_map<PhaseShiftIdType, std::vector<const DAG*>>;
                 std::unordered_map< DAGHashType, PhaseIDToDags > other_hashtags;
                 for (const DAG* const dag : dags) { //
-                    for (const auto [other_hash, phaseShiftId]
+                    for (const auto& [other_hash, phaseShiftId]
                             : dag->other_hash_values_with_phase_shift_id()) {
                         if (phaseShiftId == kNoPhaseShift)
                             other_hashtags[other_hash][phaseShiftId] = std::vector<const DAG*>();
@@ -352,7 +352,7 @@ namespace quartz
                                 else
                                     input_param_tried = true;
                             }
-                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint) */) {
+                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint, phase_id) */) {
                                 equivalence_found = true;
                                 break;
                             }

@@ -209,13 +209,14 @@ namespace quartz
          * each key is mapped to a list containing real equivalent dags
          * build ec_classes: [ class_0: [dag_0, dag_1], ... ]
          */
-        std::vector< std::vector<std::pair<DAGHashType, unsigned>> > class_hashes(dataset.size());
-        std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
         // convert unordered_map obj dataset to vector to enable parallelization
         std::vector<std::pair< DAGHashType, std::vector<std::unique_ptr<DAG>>* >> vec_dataset;
+        vec_dataset.reserve(dataset.size());
         for (auto& [hash, dags] : dataset) {
             vec_dataset.emplace_back(hash, &dags);
         }
+        std::vector< std::vector<EquivClassTag> > class_hashes(dataset.size());
+        std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
 
         #pragma omp parallel for default(none) shared(vec_dataset, class_hashes, classes)
         for (size_t i = 0; i < vec_dataset.size(); i++) {
@@ -223,7 +224,7 @@ namespace quartz
             DAGHashType hashtag = vec_dataset[i].first;
             std::vector<std::unique_ptr<DAG>>* dags = vec_dataset[i].second;
             // more than one dag, need to check if they are really equivalent
-            std::vector<std::pair<DAGHashType, unsigned>>& this_class_hashes = class_hashes[i];
+            std::vector<EquivClassTag>& this_class_hashes = class_hashes[i];
             std::vector<std::unique_ptr<EquivalenceClass>>& this_eccs = classes[i];
             auto insert_ecc_with_dag = [&](const std::unique_ptr<DAG>& dag) {
                 this_class_hashes.emplace_back(hashtag, this_class_hashes.size());
@@ -242,20 +243,132 @@ namespace quartz
                     bool found_equivalent_one = false;
                     for (auto& inserted_ecc : this_eccs) {
                         DAG* other_dag = inserted_ecc->get_representative();
-                        if (true /* TODO Colin : equivalent(dag, other_dag) */) {
+                        if (true /* TODO Colin : equivalent(dag, other_dag, parameters_for_fingerprint) */) {
                             found_equivalent_one = true;
                             // ATTENTION : copy construct a dag
                             inserted_ecc->insert(std::make_unique<DAG>(*dag));
                             break;
                         }
-                    } // for this_eccs
+                    } // end for this_eccs
                     if (!found_equivalent_one) {
                         // non-equivalent dag with the same hash, build a new ecc
                         insert_ecc_with_dag(dag);
                     }
                 }
-            } // for dags
-        } // for vec_dataset (paralleled)
+            } // end for dags
+        } // end for vec_dataset (paralleled)
+
+
+        /*
+         * find equivalences with different hash
+         * 1. iterate over all (hashtag, dags)in class_hashes, classes
+         * 2. build a dict: (other_hashtags) { other_hash: { phase: [dags] } }
+         * 3. build dags_to_verify and do the verification
+         * 4. store the result in equiv_edges
+         */
+        // ATTENTION Colin : Is PairHash safe?
+        std::unordered_map< EquivClassTag, std::vector<EquivClassTag>, PairHash > equiv_edges;
+        for (size_t i = 0; i < classes.size(); i++) {
+            for (size_t j = 0; j < classes[i].size(); j++) {
+            // iterate over each ecc
+                const EquivClassTag hashtag = class_hashes[i][j];
+                const EquivalenceClass* const ecc = classes[i][j].get();
+                const std::vector<DAG*> dags = ecc->get_all_dags();
+                /*
+                 * |other_hashtags[other_hash][None]| indicates if it's possible that a DAG with |other_hash|
+                 *      is equivalent with a DAG with |hashtag| without phase shifts.
+                 * |other_hashtags[other_hash][phase_shift_id]| is a list of DAGs with |hashtag| that can be equivalent
+                 *      to a DAG with |other_hash| under phase shift |phase_shift_id|.
+                 */
+                using PhaseIDToDags = std::unordered_map<PhaseShiftIdType, std::vector<const DAG*>>;
+                std::unordered_map< DAGHashType, PhaseIDToDags > other_hashtags;
+                for (const DAG* const dag : dags) { //
+                    for (const auto [other_hash, phaseShiftId]
+                            : dag->other_hash_values_with_phase_shift_id()) {
+                        if (phaseShiftId == kNoPhaseShift)
+                            other_hashtags[other_hash][phaseShiftId] = std::vector<const DAG*>();
+                        else
+                            other_hashtags[other_hash][phaseShiftId].push_back(dag);
+                    }
+                } // end for dags
+
+                /*
+                 * build dags_to_verify
+                 * dags_to_verify[0]: representative of another ecc
+                 * dags_to_verify[1]: EquivClassTag of the other ecc
+                 * dags_to_verify[2]: dags to verify in { phase_id: [dag_x, ...] } of this ecc
+                 */
+                std::vector<
+                        std::tuple<const DAG*, EquivClassTag, PhaseIDToDags>
+                > dags_to_verify;
+                for (auto& [other_hash, phaseIDToDags] : other_hashtags) {
+//                for (auto it = other_hashtags.begin(); it != other_hashtags.end(); it++) {
+//                    const DAGHashType other_hash = it->first;
+//                    PhaseIDToDags& phaseIDToDags = it->second;
+                    // try to find other_hash in dataset
+                    // if not found, no need to consider equivalence of dags in phaseIDToDags
+                    if (dataset.find(other_hash) != dataset.end()) {
+                        // find the ecc having other_hash classed and class_hashes
+                        size_t loc = 0;
+                        for (loc = 0; loc < class_hashes.size(); loc++) {
+                            if (class_hashes[loc].front().first == other_hash)
+                                break;
+                        }
+                        assert(loc < class_hashes.size()); // must be found
+                        for (size_t k = 0; k < class_hashes[loc].size(); k++) {
+                            const EquivClassTag& other_hashtag = class_hashes[loc][k];
+                            const DAG* rep_dag = classes[loc][k]->get_representative();
+                            dags_to_verify.emplace_back(rep_dag, other_hashtag, std::move(phaseIDToDags));
+                            assert(!std::get<2>(dags_to_verify.back()).empty()); // ATTENTION Colin : clang-tidy
+                        }
+                    }
+                } // end for other_hashtags
+
+                // verify equivalence in dags_to_verify
+                for (const auto& [other_rep_dag, other_ecctag, phaseIDToDags] : dags_to_verify) {
+                    bool equivalence_found = false;
+                    for (const auto& it : phaseIDToDags) {
+                        if (it.first == kNoPhaseShift) {
+                            equivalence_found = false;
+                            /* TODO Colin : equivalent(ecc->get_representative(), other_rep_dag, parameters_for_fingerprint) */
+                            break;
+                        }
+                    }
+                    // only need to find one equivalence
+                    if (!equivalence_found) for (const auto& [phase_id, possible_dags] : phaseIDToDags) {
+                        if (phase_id == kNoPhaseShift)
+                            continue;
+                        bool input_param_tried = false;
+                        for (const DAG* dag : possible_dags) {
+                            const int dag_n_input_params = dag->get_num_input_parameters();
+                            const int dag_n_tot_params = dag->get_num_total_parameters();
+                            const bool fixed_for_all_dags =
+                                (0 <= phase_id && phase_id < dag_n_input_params) ||
+                                (dag_n_tot_params <= phase_id && phase_id < dag_n_tot_params + dag_n_input_params) ||
+                                (kCheckPhaseShiftOfPiOver4Index < phase_id && phase_id < kCheckPhaseShiftOfPiOver4Index + 8);
+                            if (fixed_for_all_dags) {
+                                if (input_param_tried)
+                                    continue;
+                                else
+                                    input_param_tried = true;
+                            }
+                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint) */) {
+                                equivalence_found = true;
+                                break;
+                            }
+                        } // end for possible_dags
+                        if (equivalence_found)
+                            break;
+                    } // end (if) for phaseIDToDags
+                    if (equivalence_found) {
+                        // store found equivalence info (other_ecctag, hashtag)
+                        equiv_edges[hashtag].emplace_back(other_ecctag);
+                        equiv_edges[other_ecctag].emplace_back(hashtag);
+                    }
+                } // end for dags_to_verify
+            // iterate over each ecc
+            }
+        } // end iterate over each ecc
 
 
     }

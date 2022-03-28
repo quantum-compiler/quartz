@@ -181,8 +181,6 @@ namespace quartz {
 		}
 		clear();
 
-		// Equivalences between equivalence classes with different hash values.
-		using EquivClassTag = std::pair< DAGHashType, int >;
 		// This vector stores edges in an undirected graph with nodes being
 		// equivalence classes.
 		std::unordered_map< EquivClassTag, std::vector< EquivClassTag >,

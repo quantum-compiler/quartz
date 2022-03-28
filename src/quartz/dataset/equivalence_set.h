@@ -10,6 +10,8 @@
 #include <unordered_map>
 
 namespace quartz {
+    typedef std::pair< DAGHashType, unsigned > EquivClassTag;
+
 	class EquivalenceSet;
 
 	class EquivalenceClass {

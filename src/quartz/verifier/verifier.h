@@ -7,6 +7,7 @@
 #include "z3++.h"
 
 namespace quartz {
+    typedef std::vector<z3::expr> Z3ExprVec;
     typedef std::pair<z3::expr_vector, z3::expr_vector> Z3ExprVecPair;
     typedef std::pair<z3::expr, z3::expr> Z3ExprPair;
     typedef std::vector<Z3ExprPair> Z3ExprPairVec;
@@ -14,7 +15,7 @@ namespace quartz {
 	class Verifier {
 	public:
 		bool equivalent(const Context* ctx, const DAG* dag1, const DAG* dag2,
-                        PhaseShiftIdType phase_id, bool check_phase_shift_by_z3);
+                        PhaseShiftIdType phase_shift_id, bool check_phase_shift_by_z3);
 		// On-the-fly equivalence checking while generating circuits
 		bool equivalent_on_the_fly(Context *ctx, DAG *circuit1, DAG *circuit2);
 
@@ -30,14 +31,22 @@ namespace quartz {
 
     private:
 
-        auto evaluate_dag(const DAG* dag, const Z3ExprVecPair& input_dist,
-                          const Z3ExprVecPair& input_params, bool use_z3);
+        std::pair<Z3ExprPairVec, Z3ExprPairVec>
+        evaluate_dag(const DAG* dag, const Z3ExprPairVec& input_dist,
+                     const Z3ExprPairVec& input_params, bool use_z3 = true);
+
+        Z3ExprPairVec phase_shift_by_id(const Z3ExprPairVec& vec, const DAG* dag,
+                                        PhaseShiftIdType phase_shift_id, const Z3ExprPairVec all_params);
 
 	};
 
     namespace z3Utils {
-        Z3ExprPairVec input_dist_by_z3(z3::context& ctx, z3::solver& solver, int num_qubits);
-        Z3ExprPairVec input_params_by_z3(z3::context& ctx, z3::solver& solver, int num_params);
+
+        std::pair<Z3ExprPairVec, z3::expr>
+        input_dist_by_z3(z3::context& ctx, int num_qubits);
+
+        std::pair<Z3ExprPairVec, z3::expr>
+        input_params_by_z3(z3::context& ctx, int num_params);
 
         z3::expr angle(const z3::expr& cos, const z3::expr& sin);
         z3::expr angle(const Z3ExprPair& expr);

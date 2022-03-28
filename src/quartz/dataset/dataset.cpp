@@ -296,7 +296,7 @@ namespace quartz
                  * build dags_to_verify
                  * dags_to_verify[0]: representative of another ecc
                  * dags_to_verify[1]: EquivClassTag of the other ecc
-                 * dags_to_verify[2]: dags to verify in { phase_id: [dag_x, ...] } of this ecc
+                 * dags_to_verify[2]: dags to verify in { phase_shift_id: [dag_x, ...] } of this ecc
                  */
                 std::vector<
                         std::tuple<const DAG*, EquivClassTag, PhaseIDToDags>
@@ -335,24 +335,24 @@ namespace quartz
                         }
                     }
                     // only need to find one equivalence
-                    if (!equivalence_found) for (const auto& [phase_id, possible_dags] : phaseIDToDags) {
-                        if (phase_id == kNoPhaseShift)
+                    if (!equivalence_found) for (const auto& [phase_shift_id, possible_dags] : phaseIDToDags) {
+                        if (phase_shift_id == kNoPhaseShift)
                             continue;
                         bool input_param_tried = false;
                         for (const DAG* dag : possible_dags) {
                             const int dag_n_input_params = dag->get_num_input_parameters();
                             const int dag_n_tot_params = dag->get_num_total_parameters();
                             const bool fixed_for_all_dags =
-                                (0 <= phase_id && phase_id < dag_n_input_params) ||
-                                (dag_n_tot_params <= phase_id && phase_id < dag_n_tot_params + dag_n_input_params) ||
-                                (kCheckPhaseShiftOfPiOver4Index < phase_id && phase_id < kCheckPhaseShiftOfPiOver4Index + 8);
+                                (0 <= phase_shift_id && phase_shift_id < dag_n_input_params) ||
+                                (dag_n_tot_params <= phase_shift_id && phase_shift_id < dag_n_tot_params + dag_n_input_params) ||
+                                (kCheckPhaseShiftOfPiOver4Index < phase_shift_id && phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8);
                             if (fixed_for_all_dags) {
                                 if (input_param_tried)
                                     continue;
                                 else
                                     input_param_tried = true;
                             }
-                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint, phase_id) */) {
+                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint, phase_shift_id) */) {
                                 equivalence_found = true;
                                 break;
                             }

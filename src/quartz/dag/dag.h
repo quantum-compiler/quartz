@@ -128,6 +128,8 @@ namespace quartz {
 
 		static bool same_gate(DAGHyperEdge *edge1, DAGHyperEdge *edge2);
 
+        const ComplexType& get_original_fingerprint() const { return original_fingerprint_; };
+
 	private:
 		void clone_from(const DAG &other,
 		                const std::vector< int > &qubit_permutation,

@@ -78,57 +78,105 @@ namespace quartz {
 	}
 
     bool Verifier::equivalent(
-            const Context* const ctx, const DAG* const dag1, const DAG* const dag2,
-            const PhaseShiftIdType phase_id, bool check_phase_shift_by_z3=false) {
+            const Context* const context, const DAG* const dag1, const DAG* const dag2,
+            const PhaseShiftIdType phase_shift_id, bool check_phase_shift_by_z3=false) {
         // check num_quibits
         if (dag1->get_num_qubits() != dag2->get_num_qubits())
             return false;
 
         const int num_qubits = dag1->get_num_qubits();
         const int num_params = std::max(dag1->get_num_input_parameters(), dag2->get_num_input_parameters());
+        z3::context ctx;
+        z3::solver solver(ctx);
 
         if (check_phase_shift_by_z3) {
-
+            // TODO Colin
         }
         else {
-            z3::context ctx;
-            z3::solver solver(ctx);
-            auto input_dist_pair = z3Utils::input_dist_by_z3(ctx, solver, num_qubits);
-            auto input_param_pair = z3Utils::input_params_by_z3(ctx, solver, num_params);
-
+            z3::expr constraint(ctx.bool_val(true));
+            auto [input_dist, cstr1] = z3Utils::input_dist_by_z3(ctx, num_qubits);
+            constraint = constraint && cstr1;
+            auto [input_param, cstr2] = z3Utils::input_params_by_z3(ctx, num_params);
+            constraint = constraint && cstr2;
+            auto [output_vec1, all_params] =
+                    evaluate_dag(dag1, input_dist, input_param);
+            const auto [output_vec2, _] =
+                    evaluate_dag(dag2, input_dist, input_param);
+            if (phase_shift_id != kNoPhaseShift) {
+                // Phase factor is provided in generator; We shift dag1 here
+                output_vec1 = phase_shift_by_id(output_vec1, dag1, phase_shift_id, all_params);
+                // TODO Colin output_vec1 == output_vec2
+                solver.add(constraint);
+            }
+            else {
+                // Figure out the phase factor here
+                const auto params_for_fp = context->get_all_generated_parameters();
+                assert(params_for_fp.size() >= num_params);
+                const auto goal_phase_factor =
+                        dag1->get_original_fingerprint() / dag2->get_original_fingerprint();
+                const bool res = true; // TODO Colin : search_phase_factor_to_check_equivalence
+                return res;
+            }
         }
-
-
-        return false;
+        const auto res = solver.check();
+        assert(res != z3::unknown);
+        return res;
     }
 
-    auto Verifier::evaluate_dag(const DAG* const dag, const Z3ExprVecPair& input_dist,
-                      const Z3ExprVecPair& input_params, bool use_z3) {
+    std::pair<Z3ExprPairVec, Z3ExprPairVec>
+    Verifier::evaluate_dag(const DAG* const dag, const Z3ExprPairVec& input_dist,
+                           const Z3ExprPairVec& _input_params, bool use_z3/*=true*/) {
         const int num_input_params = dag->get_num_input_parameters();
         const int num_tot_params = dag->get_num_total_parameters();
-        assert(input_params.first.size() > num_input_params);
+        assert(_input_params.size() >= num_input_params);
+        Z3ExprPairVec tot_params(_input_params);
+        tot_params.resize(num_tot_params);
+        Z3ExprPairVec output_dist(input_dist);
 
-        // iterate edges to iterate (gate, output_nodes, input_nodes)
+        // iterate gates by iterating edges
         for (const auto& edge : dag->edges) {
             // 1. read input
+            Z3ExprPairVec input_params;
+            std::vector<int> input_qubit_indices;
             for (const DAGNode* const input_node : edge->input_nodes) {
-
-            }
+                if (input_node->is_parameter()) {
+                    // ATTENTION Colin : copy a z3:expr is OK for the solver?
+                    input_params.emplace_back(tot_params[input_node->index]);
+                }
+                else {
+                    assert(input_node->is_qubit());
+                    input_qubit_indices.emplace_back(input_node->index);
+                }
+            } // end for edge->input_nodes
             // 2. judge gate type, read output and compute
             if (edge->gate->is_parameter_gate()) {
-
+                // output a parameter to
+                const int output_param_index = edge->output_nodes.front()->index;
+                // TODO Colin : compute(edge->gate, input_params)
+                tot_params[output_param_index] = input_params[0];
             }
             else {
                 assert(edge->gate->is_quantum_gate());
+                if (use_z3) {
+                    // TODO Colin : apply_matrix(edge->gate, input_params)
+                }
+                else {
 
+                }
             }
-        }
+        } // dag->edges
+        return std::make_pair(output_dist, tot_params);
+    }
 
+    Z3ExprPairVec phase_shift_by_id(
+            const Z3ExprPairVec& vec, const DAG* dag,
+            PhaseShiftIdType phase_shift_id, const Z3ExprPairVec all_params) {
+        // TODO Colin
     }
 
     namespace z3Utils {
-        Z3ExprPairVec input_dist_by_z3(
-                z3::context& ctx, z3::solver& solver, const int num_qubits) {
+        std::pair<Z3ExprPairVec, z3::expr>
+        input_dist_by_z3(z3::context& ctx, const int num_qubits) {
             const int vec_size = (1 << num_qubits);
             Z3ExprPairVec input_dist;
             z3::expr sum_modulus = ctx.real_val(0);
@@ -143,12 +191,14 @@ namespace quartz {
                 sum_modulus = sum_modulus + input_dist.back().first * input_dist.back().first
                               + input_dist.back().second * input_dist.back().second;
             }
-            solver.add(sum_modulus);
-            return input_dist;
+            z3::expr constraint(ctx);
+            constraint = sum_modulus == 1;
+            return std::make_pair(input_dist, constraint);
         }
 
-        Z3ExprPairVec input_params_by_z3(
-                z3::context& ctx, z3::solver& solver, const int num_params) {
+        std::pair<Z3ExprPairVec, z3::expr>
+        input_params_by_z3(z3::context& ctx, const int num_params) {
+            z3::expr constraint(ctx.bool_val(true));
             Z3ExprPairVec input_params;
             for (int i = 0; i < num_params; i++) {
                 const auto cos_name = "cos_" + std::to_string(i);
@@ -157,9 +207,9 @@ namespace quartz {
                     ctx.real_const(cos_name.c_str()),
                     ctx.real_const(sin_name.c_str())
                 ));
-                solver.add(angle(input_params.back()));
+                constraint = constraint && angle(input_params.back());
             }
-            return input_params;
+            return std::make_pair(input_params, constraint);
         }
 
         z3::expr angle(const z3::expr& cos, const z3::expr& sin) {
@@ -167,7 +217,7 @@ namespace quartz {
         }
 
         z3::expr angle(const Z3ExprPair& expr) {
-            return expr.first * expr.first + expr.second * expr.second;
+            return expr.first * expr.first + expr.second * expr.second == 1;
         }
     }
 

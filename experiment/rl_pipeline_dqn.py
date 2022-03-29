@@ -1,11 +1,9 @@
 import quartz
 import matplotlib.pyplot as plt
-from concurrent.futures import ProcessPoolExecutor
-from gnn import QGNN
 import rl_dqn
-import dgl
-import torch
 import json
+
+experiment_name = "rl_dqn_" + "pos_data_init"
 
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
@@ -36,9 +34,9 @@ with open('valid_xfer_dict.json', 'r') as f:
 # RL training
 seq_lens, correct_cnts = rl_dqn.train(lr=5e-3,
                                       gamma=0.999,
-                                      replay_times=10,
+                                      replay_times=20,
                                       a_size=quartz_context.num_xfers,
-                                      episodes=2000,
+                                      episodes=1000,
                                       epsilon=0.5,
                                       epsilon_decay=0.00025,
                                       train_epoch=10,
@@ -47,19 +45,20 @@ seq_lens, correct_cnts = rl_dqn.train(lr=5e-3,
                                       context=quartz_context,
                                       init_graph=init_graph,
                                       target_update_interval=5,
-                                      log_fn="rl_dqn_2000.txt",
+                                      log_fn=f"log/{experiment_name}_log.txt",
                                       valid_xfer_dict=valid_xfer_dict,
-                                      use_cuda=True)
+                                      use_cuda=True,
+                                      use_pos_data=True)
 
 fig, ax = plt.subplots()
 ax.plot(seq_lens)
 plt.title("sequence length - training epochs")
-plt.savefig('seqlen.png')
+plt.savefig(f'figures/{experiment_name}_seqlen.png')
 
 fig, ax = plt.subplots()
 ax.plot(correct_cnts)
 plt.title("correct counts - training epochs")
-plt.savefig('corrcnt.png')
+plt.savefig(f'figures/{experiment_name}_corrcnt.png')
 
 
 def find_number(fn, n):
@@ -71,4 +70,4 @@ def find_number(fn, n):
     print(f"{n} not found!")
 
 
-find_number("rl_dqn_near_56.txt", 56)
+find_number(f"log/{experiment_name}_log.txt", 56)

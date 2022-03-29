@@ -5,6 +5,7 @@ from gnn import QGNN
 import random
 from collections import deque
 from tqdm import tqdm
+from pos_data import PosRewardData
 
 # Constant
 gate_type_num = 26
@@ -131,28 +132,39 @@ class QData:
         self.hash_map = {}
 
     def add_data(self, d):
-        # self.data.append(d)
         if d[4] == None:
             d_0_hash = d[0].hash()
             if d_0_hash not in self.hash_map:
-                self.hash_map[d_0_hash] = d[0]
+                self.hash_map[d_0_hash] = d[0].to_dgl_graph()
             self.data.append((d_0_hash, d[1], d[2], d[3], None))
         else:
             d_0_hash = d[0].hash()
             d_4_hash = d[4].hash()
             if d_0_hash not in self.hash_map:
-                self.hash_map[d_0_hash] = d[0]
+                self.hash_map[d_0_hash] = d[0].to_dgl_graph()
             if d_4_hash not in self.hash_map:
-                self.hash_map[d_4_hash] = d[4]
+                self.hash_map[d_4_hash] = d[4].to_dgl_graph()
             self.data.append((d_0_hash, d[1], d[2], d[3], d_4_hash))
+
+    def add_data_dgl(self, d):
+        if d[5] == None:
+            if d[1] not in self.hash_map:
+                self.hash_map[d[1]] = d[0]
+            self.data.append((d[1], d[2], d[3], d[4], None))
+
+        else:
+            if d[1] not in self.hash_map:
+                self.hash_map[d[1]] = d[0]
+            if d[6] not in self.hash_map:
+                self.hash_map[d[6]] = d[5]
+            self.data.append((d[1], d[2], d[3], d[4], d[6]))
 
     def get_data(self):
         s = random.choice(self.data)
         # print(s)
         if s[4] == None:
-            return self.hash_map[s[0]].to_dgl_graph(), s[1], s[2], s[3], None
-        return self.hash_map[s[0]].to_dgl_graph(
-        ), s[1], s[2], s[3], self.hash_map[s[4]].to_dgl_graph()
+            return self.hash_map[s[0]], s[1], s[2], s[3], None
+        return self.hash_map[s[0]], s[1], s[2], s[3], self.hash_map[s[4]]
 
 
 # RL training
@@ -173,6 +185,7 @@ def train(*,
           log_fn='',
           pretrained_model=None,
           use_cuda=False,
+          use_pos_data=False,
           **kwargs):
 
     # Prepare for log
@@ -200,6 +213,11 @@ def train(*,
         agent.use_cuda()
 
     data = QData()
+    if use_pos_data:
+        pos_data = PosRewardData()
+        pos_data.load_data()
+        for d in pos_data.all_data():
+            data.add_data(list(d))
 
     average_seq_lens = []
     correct_cnts = []

@@ -51,7 +51,6 @@ seq_lens, correct_cnts, rewards = rl_dqn.train(
     use_cuda=True,
     pos_data_init=True,
     pos_data_sampling=True,
-    pos_data_sampling_rate=0.1)
 
 fig, ax = plt.subplots()
 ax.plot(seq_lens)

@@ -14,7 +14,8 @@ namespace quartz {
 	public:
 		bool equivalent(
             const Context* ctx, const DAG* dag1, const DAG* dag2,
-            PhaseShiftIdType phase_shift_id, bool check_phase_shift_by_z3, bool dont_invoke_z3
+            std::vector<ParamType> params_for_fp, PhaseShiftIdType phase_shift_id,
+            bool check_phase_shift_by_z3 = false, bool dont_invoke_z3 = false
         );
 		// On-the-fly equivalence checking while generating circuits
 		bool equivalent_on_the_fly(Context *ctx, DAG *circuit1, DAG *circuit2);
@@ -30,7 +31,7 @@ namespace quartz {
 		bool redundant(Context *ctx, const EquivalenceSet *eqs, const DAG* dag);
 
     private:
-        Z3ExprPairVec phase_shift_by_id(const Z3ExprPairVec& vec, const DAG* dag,
+        Z3ExprPairVec phase_shift_by_id(z3::context& z3ctx, const Z3ExprPairVec& vec, const DAG* dag,
                                         PhaseShiftIdType phase_shift_id, const Z3ExprPairVec& all_params);
 
         std::vector<ParamType> gen_rand_params(int num_params);

@@ -1,5 +1,6 @@
 #include "dataset.h"
 #include "equivalence_set.h"
+#include "verifier/verifier.h"
 
 #include <vector>
 #include <unordered_map>
@@ -200,7 +201,10 @@ namespace quartz
                         DAG> > >();
     }
 
-    void Dataset::find_equivalences(Context *ctx) {
+    void Dataset::find_equivalences(
+        Context *ctx, const bool check_phase_shift_by_z3, const bool dont_invoke_z3
+    ) {
+        static Verifier verifier;
         /*
          * iterate over every (hashtag, dags), check whether the dags are really equivalent
          * get info like {'hashtag_index_1': [dags], ...}
@@ -217,7 +221,7 @@ namespace quartz
         std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
 
         #pragma omp parallel for schedule(runtime) default(none) \
-            shared(vec_dataset, class_hashes, classes)
+            shared(vec_dataset, class_hashes, classes, verifier, ctx, check_phase_shift_by_z3, dont_invoke_z3)
         for (size_t i = 0; i < vec_dataset.size(); i++) {
             // build vector<EquivalenceClass> at classes[i]
             DAGHashType hashtag = vec_dataset[i].first;
@@ -242,21 +246,24 @@ namespace quartz
                     bool found_equivalent_one = false;
                     for (auto& inserted_ecc : this_eccs) {
                         DAG* other_dag = inserted_ecc->get_representative();
-                        if (true /* TODO Colin : equivalent(dag, other_dag, parameters_for_fingerprint) */) {
-                            found_equivalent_one = true;
+                        found_equivalent_one = verifier.equivalent(
+                            ctx, dag.get(), other_dag,
+                            ctx->get_all_generated_parameters(),
+                            kNoPhaseShift, check_phase_shift_by_z3, dont_invoke_z3
+                        );
+                        if (found_equivalent_one) {
                             // ATTENTION : copy construct a dag
                             inserted_ecc->insert(std::make_unique<DAG>(*dag));
                             break;
                         }
                     } // end for this_eccs
                     if (!found_equivalent_one) {
-                        // non-equivalent dag with the same hash, build a new ecc
+                        // dag is a non-equivalent one with the same hash, build a new ecc
                         insert_ecc_with_dag(dag);
                     }
                 }
             } // end for dags
         } // end for vec_dataset (paralleled)
-
 
         /*
          * find equivalences with different hash
@@ -265,10 +272,9 @@ namespace quartz
          * 3. build dags_to_verify and do the verification
          * 4. store the result in equiv_edges
          */
-        // ATTENTION Colin : Is PairHash safe?
         std::unordered_map< EquivClassTag, std::vector<EquivClassTag>, PairHash > equiv_edges;
         #pragma omp parallel for schedule(runtime) default(none) \
-            shared(classes, class_hashes, equiv_edges)
+            shared(classes, class_hashes, equiv_edges, ctx, verifier, check_phase_shift_by_z3, dont_invoke_z3)
         for (size_t i = 0; i < classes.size(); i++) {
             for (size_t j = 0; j < classes[i].size(); j++) {
             // iterate over each ecc
@@ -303,9 +309,6 @@ namespace quartz
                         std::tuple<const DAG*, EquivClassTag, PhaseIDToDags>
                 > dags_to_verify;
                 for (auto& [other_hash, phaseIDToDags] : other_hashtags) {
-//                for (auto it = other_hashtags.begin(); it != other_hashtags.end(); it++) {
-//                    const DAGHashType other_hash = it->first;
-//                    PhaseIDToDags& phaseIDToDags = it->second;
                     // try to find other_hash in dataset
                     // if not found, no need to consider equivalence of dags in phaseIDToDags
                     if (dataset.find(other_hash) != dataset.end()) {
@@ -330,8 +333,11 @@ namespace quartz
                     bool equivalence_found = false;
                     for (const auto& it : phaseIDToDags) {
                         if (it.first == kNoPhaseShift) {
-                            equivalence_found = false;
-                            /* TODO Colin : equivalent(ecc->get_representative(), other_rep_dag, parameters_for_fingerprint) */
+                            equivalence_found = verifier.equivalent(
+                                ctx, ecc->get_representative(), other_rep_dag,
+                                ctx->get_all_generated_parameters(), kNoPhaseShift,
+                                check_phase_shift_by_z3, dont_invoke_z3
+                            );
                             break;
                         }
                     }
@@ -339,6 +345,7 @@ namespace quartz
                     if (!equivalence_found) for (const auto& [phase_shift_id, possible_dags] : phaseIDToDags) {
                         if (phase_shift_id == kNoPhaseShift)
                             continue;
+                        // Pruning: we only need to try each input parameter once.
                         bool input_param_tried = false;
                         for (const DAG* dag : possible_dags) {
                             const int dag_n_input_params = dag->get_num_input_parameters();
@@ -353,8 +360,12 @@ namespace quartz
                                 else
                                     input_param_tried = true;
                             }
-                            if (false /*TODO Colin : equivalent(dag, other_rep_dag, parameters_for_fingerprint, phase_shift_id) */) {
-                                equivalence_found = true;
+                            equivalence_found = verifier.equivalent(
+                                ctx, dag, other_rep_dag,
+                                ctx->get_all_generated_parameters(),
+                                phase_shift_id, check_phase_shift_by_z3, dont_invoke_z3
+                            );
+                            if (equivalence_found) {
                                 break;
                             }
                         } // end for possible_dags
@@ -371,9 +382,8 @@ namespace quartz
                     }
                 } // end for dags_to_verify
             // iterate over each ecc
-            }
-        } // end iterate over each ecc
-
+            } // end for j
+        } // end iterate over each ecc (for i)
 
     }
 

@@ -34,7 +34,7 @@ namespace quartz {
 		dags_ = std::move(dags);
 	}
 
-	DAG *EquivalenceClass::get_representative() {
+	DAG *EquivalenceClass::get_representative() const {
 		assert(!dags_.empty());
 		return dags_[0].get();
 	}

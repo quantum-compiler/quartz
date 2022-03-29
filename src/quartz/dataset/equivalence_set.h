@@ -32,7 +32,7 @@ namespace quartz {
 		void set_dags(std::vector< std::unique_ptr< DAG > > dags);
 
 		// The first DAG is the representative.
-		DAG *get_representative();
+		DAG *get_representative() const;
 
 		// Returns whether this equivalence class contains (a DAG fully
 		// equivalent to) |dag|.

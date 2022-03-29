@@ -80,8 +80,8 @@ namespace quartz {
 
     bool Verifier::equivalent(
             const Context* const context, const DAG* const dag1, const DAG* const dag2,
-            const PhaseShiftIdType phase_shift_id,
-            const bool check_phase_shift_by_z3=false, const bool dont_invoke_z3=false
+            const std::vector<ParamType> params_for_fp, const PhaseShiftIdType phase_shift_id,
+            const bool check_phase_shift_by_z3, const bool dont_invoke_z3
     ) {
         // check num_quibits
         if (dag1->get_num_qubits() != dag2->get_num_qubits())
@@ -94,6 +94,7 @@ namespace quartz {
 
         if (check_phase_shift_by_z3) {
             // TODO Colin
+            assert(false);
         }
         else {
             z3::expr constraint(z3ctx.bool_val(true));
@@ -105,13 +106,12 @@ namespace quartz {
             const auto output_vec2 = dag2->evaluate(input_dist, input_params).first;
             if (phase_shift_id != kNoPhaseShift) {
                 // Phase factor is provided in generator; We shift dag1 here
-                output_vec1 = phase_shift_by_id(output_vec1, dag1, phase_shift_id, all_params);
+                output_vec1 = phase_shift_by_id(z3ctx, output_vec1, dag1, phase_shift_id, all_params);
                 solver.add(constraint);
                 solver.add(! z3Utils::eq(z3ctx, output_vec1, output_vec2));
             } // goto CHECK
             else {
                 // Figure out the phase factor here
-                const auto params_for_fp = context->get_all_generated_parameters();
                 assert(params_for_fp.size() >= num_params);
                 const auto goal_phase_factor =
                         dag1->get_original_fingerprint() / dag2->get_original_fingerprint();
@@ -129,7 +129,7 @@ namespace quartz {
         // CHECK
         const auto res = solver.check();
         assert(res != z3::unknown);
-        return res;
+        return res == z3::unsat;
     }
 
     bool Verifier::search_phase_factor(
@@ -206,6 +206,7 @@ namespace quartz {
                 solver.add(expression);
                 const auto output_vec2_shifted = z3Utils::shift(output_vec2, cur_phase_factor_symb);
                 solver.add(! z3Utils::eq(z3ctx, output_vec1, output_vec2_shifted));
+                // ATTENTION Colin : try to reduce it!
                 solver.set(":timeout", 30000u); // timeout after 30s
                 const auto res = solver.check();
                 assert(res != z3::unknown);
@@ -214,10 +215,9 @@ namespace quartz {
         }
         // Search for the parameter |current_param_id|
         else {
-            // kPhaseFactorCoeffs = [0, 1, -1, 2, -2]
-//            const std::vector<ComplexType> kPhaseFactorCoeffs{
-//                {0, 0}, {1, 0}, {-1, 0}, {2, 0}, {-2, 0}
-//            };
+            /* const std::vector<ComplexType> kPhaseFactorCoeffs{
+                {0, 0}, {1, 0}, {-1, 0}, {2, 0}, {-2, 0}
+            }; */
             const std::vector<int> kPhaseFactorCoeffs{ 0, 1, -1, 2, -2 };
             for (const auto& coeff : kPhaseFactorCoeffs) {
                 auto new_phase_factor_for_fp = cur_phase_factor_for_fp;
@@ -253,10 +253,33 @@ namespace quartz {
     }
 
     Z3ExprPairVec Verifier::phase_shift_by_id(
-            const Z3ExprPairVec& vec, const DAG* dag,
+            z3::context& z3ctx, const Z3ExprPairVec& vec, const DAG* dag,
             PhaseShiftIdType phase_shift_id, const Z3ExprPairVec& all_params) {
-        // TODO Colin
-        return vec;
+        const int num_tot_params = dag->get_num_total_parameters();
+        Z3ExprPair phase{ z3ctx.real_val(0), z3ctx.real_val(0) };
+        if (kCheckPhaseShiftOfPiOver4Index < phase_shift_id && phase_shift_id < kCheckPhaseShiftOfPiOver4Index + 8) {
+            const Z3ExprVec kPhaseFactorConstantCosTable{
+                z3ctx.real_val(1), z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(0), - z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(-1), - z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(0), z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+            };
+            const Z3ExprVec kPhaseFactorConstantSinTable{
+                z3ctx.real_val(0), z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(1), z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(0), - z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+                z3ctx.real_val(-1), - z3ctx.real_val(1) / z3Utils::pow(z3ctx, "2", "1/2"),
+            };
+            const PhaseShiftIdType k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index;
+            phase = Z3ExprPair{ kPhaseFactorConstantCosTable[k], kPhaseFactorConstantSinTable[k] };
+        }
+        else if (phase_shift_id < num_tot_params) {
+            phase = all_params.at(phase_shift_id);
+        }
+        else {
+            phase = z3Utils::neg(all_params.at(phase_shift_id - num_tot_params));
+        }
+        return z3Utils::shift(vec, phase);
     }
 
     std::vector<ParamType> Verifier::gen_rand_params(const int num_params) {

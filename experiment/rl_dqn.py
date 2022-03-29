@@ -28,6 +28,8 @@ class QAgent:
         self.target_net = copy.deepcopy(self.q_net)
         self.loss_fn = torch.nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=lr)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(
+            self.optimizer, 100, 0.90)
         self.a_size = a_size
         self.gamma = gamma
         self.context = context
@@ -48,7 +50,7 @@ class QAgent:
 
         if random.random() < e:
             node = np.random.randint(0, dgl_g.num_nodes())
-            # A = np.random.randint(0, a_size)
+            A = np.random.randint(0, a_size)
             xfers = g.available_xfers(context=self.context,
                                       node=g.get_node_from_id(id=node))
             if xfers != []:
@@ -58,6 +60,7 @@ class QAgent:
                 A = np.random.randint(0, a_size)
                 self.print_log(
                     f'randomly select node {node} and xfer {A} (unavailable)')
+            # self.print_log(f'randomly select node {node} and xfer {A}')
             A = torch.tensor(A)
             node = torch.tensor(node)
 
@@ -160,6 +163,7 @@ def train(*,
           replay_times,
           episodes,
           epsilon,
+          epsilon_decay,
           train_epoch,
           context,
           init_graph,
@@ -238,9 +242,10 @@ def train(*,
         for j in range(train_epoch):
             loss = agent.train(data, batch_size)
             losses += loss
+            agent.scheduler.step()
 
         if epsilon > 0.05:
-            epsilon -= 0.001
+            epsilon -= epsilon_decay
 
         if i % target_update_interval == 0:
             agent.target_net.load_state_dict(agent.q_net.state_dict())

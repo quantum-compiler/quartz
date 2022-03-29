@@ -29,6 +29,13 @@ namespace quartz {
 		std::unordered_map<
 		    float, std::unordered_map< float, std::unique_ptr< Matrix< 2 > > > >
 		    cached_matrices;
+
+        Z3ExprMat get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params) override {
+            using namespace z3Utils;
+            return Z3ExprMat {
+                    // TODO Colin
+            };
+        }
 	};
 
 } // namespace quartz

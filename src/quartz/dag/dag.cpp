@@ -480,7 +480,7 @@ namespace quartz {
     }
 
     std::pair<Z3ExprPairVec, Z3ExprPairVec>
-    DAG::evaluate(const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const {
+    DAG::evaluate(z3::context& z3ctx, const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const {
         const int num_input_params = this->get_num_input_parameters();
         const int num_tot_params = this->get_num_total_parameters();
         assert(_input_params.size() >= num_input_params);
@@ -512,15 +512,17 @@ namespace quartz {
             if (edge->gate->is_parameter_gate()) {
                 // output a parameter to
                 const int output_param_index = edge->output_nodes.front()->index;
-                // TODO Colin : compute(edge->gate, input_params)
-                tot_params[output_param_index] = input_params[0];
+                tot_params[output_param_index] = edge->gate->compute(input_params);
             }
             else {
                 assert(edge->gate->is_quantum_gate());
-                // TODO Colin : apply_matrix(edge->gate, input_params)
-
+                output_dist = z3Utils::apply_matrix(
+                    z3ctx, output_dist,
+                    edge->gate->get_matrix(z3ctx, input_params),
+                    input_qubit_indices
+                );
             }
-        } // dag->edges
+        } // end for edge
         return { output_dist, tot_params };
     }
 

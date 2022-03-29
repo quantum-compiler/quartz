@@ -5,8 +5,21 @@ namespace quartz {
     typedef std::pair<z3::expr_vector, z3::expr_vector> Z3ExprVecPair;
     typedef std::pair<z3::expr, z3::expr> Z3ExprPair;
     typedef std::vector<Z3ExprPair> Z3ExprPairVec;
+    typedef std::vector<Z3ExprPairVec> Z3ExprMat;
 
     namespace z3Utils {
+
+        inline Z3ExprPair c0(z3::context& z3ctx) {
+            return { z3ctx.real_val(0), z3ctx.real_val(0) };
+        }
+
+        inline Z3ExprPair c1(z3::context& z3ctx) {
+            return { z3ctx.real_val(1), z3ctx.real_val(0) };
+        }
+
+        inline Z3ExprPair cm1(z3::context& z3ctx) {
+            return { z3ctx.real_val(-1), z3ctx.real_val(0) };
+        }
 
         inline z3::expr angle(const z3::expr& cos, const z3::expr& sin) {
             return cos * cos + sin * sin == 1;
@@ -18,6 +31,16 @@ namespace quartz {
 
         inline z3::expr pow(z3::context& z3ctx, const char* _a, const char* _b) {
             return z3::pw(z3ctx.real_val(_a), z3ctx.real_val(_b));
+        }
+
+        inline Z3ExprPair c1_over_sqrt2(z3::context& z3ctx) {
+            return Z3ExprPair{ z3ctx.real_val(1) / pow(z3ctx, "2", "1/2"),
+                               z3ctx.real_val(0) };
+        }
+
+        inline Z3ExprPair cm1_over_sqrt2(z3::context& z3ctx) {
+            return Z3ExprPair{ z3ctx.real_val(-1) / pow(z3ctx, "2", "1/2"),
+                               z3ctx.real_val(0) };
         }
 
         inline Z3ExprPair add(const Z3ExprPair& _a, const Z3ExprPair& _b) {
@@ -95,6 +118,57 @@ namespace quartz {
                 constraint = constraint && angle(input_params.back());
             }
             return std::make_pair(input_params, constraint);
+        }
+
+        inline Z3ExprPairVec apply_matrix(
+            z3::context& z3ctx, const Z3ExprPairVec& input,
+            const Z3ExprMat& mat, const std::vector<int>& qubit_indices
+        ) {
+            const size_t num_state = input.size();
+            assert(1 <= qubit_indices.size() && qubit_indices.size() <= 2);
+            assert((1 << qubit_indices.size()) == mat.size());
+            assert(mat.size() <= num_state);
+            assert(num_state % mat.size() == 0);
+            /* for (const auto& row : mat) {
+                assert(row.size() == mat.size());
+            } */
+            /* for (const int index : qubit_indices) {
+                assert(1 <= (1 << index) && (1 << index) < num_state);
+            } */
+            Z3ExprPairVec output(input);
+
+            for (size_t i = 0; i < num_state; i++) {
+                bool already_applied = false;
+                for (const int index : qubit_indices) {
+                    if (i & (1 << index))
+                        already_applied = true;
+                }
+                if (!already_applied) {
+                    std::vector<int> cur_indices;
+                    for (size_t j = 0; j < mat.size(); j++) {
+                        size_t cur_index = i;
+                        for (size_t k = 0; k < qubit_indices.size(); k++) {
+                            if (j & (1 << k))
+                                cur_index ^= (1 << qubit_indices[k]);
+                        }
+                        cur_indices.emplace_back(cur_index);
+                    } // end for j
+
+                    for (size_t r = 0; r < mat.size(); r++) {
+                        Z3ExprPair tmp(c0(z3ctx));
+                        for (size_t k = 0; k < mat.size(); k++) {
+                            tmp.first = tmp.first
+                                    + mat[r][k].first * input[cur_indices[k]].first
+                                    - mat[r][k].second * input[cur_indices[k]].second;
+                            tmp.second = tmp.second
+                                    + mat[r][k].first * input[cur_indices[k]].second
+                                    - mat[r][k].second * input[cur_indices[k]].first;
+                        } // end for k
+                        output[cur_indices[r]] = tmp;
+                    } // end for r
+                } // end if
+            } // end for i
+            return output;
         }
 
     }

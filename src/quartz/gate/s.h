@@ -11,5 +11,12 @@ namespace quartz {
 
 		MatrixBase *get_matrix() override { return &mat; }
 		Matrix< 2 > mat;
+
+        Z3ExprMat get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params) override {
+            using namespace z3Utils;
+            return Z3ExprMat {
+                    // TODO Colin
+            };
+        }
 	};
 } // namespace quartz

@@ -24,6 +24,17 @@ namespace quartz {
 		}
 		std::unordered_map< float, std::unique_ptr< Matrix< 2 > > >
 		    cached_matrices;
-	};
+
+        Z3ExprMat get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params) override {
+            using namespace z3Utils;
+            assert(params.size() == 1);
+            const auto& cos = params[0].first;
+            const auto& sin = params[0].first;
+            return Z3ExprMat {
+                { Z3ExprPair{cos, -sin}, c0(z3ctx) },
+                { c0(z3ctx), Z3ExprPair{cos, sin} },
+            };
+        }
+    };
 
 } // namespace quartz

@@ -19,6 +19,34 @@ namespace quartz {
 		           {0, 0, 0, 0, 0, 0, 0, -1}}) {}
 		MatrixBase *get_matrix() override { return &mat; }
 		Matrix< 8 > mat;
+
+        Z3ExprMat get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params) override {
+            using namespace z3Utils;
+            return Z3ExprMat {
+                {c1(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(
+                        z3ctx), c0(
+                        z3ctx) },
+                {c0(z3ctx), c1(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(
+                        z3ctx),                                                                                                          c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c1(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(
+                        z3ctx),                                                                                                          c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c0(z3ctx), c1(z3ctx), c0(z3ctx), c0(z3ctx), c0(
+                        z3ctx),                                                               c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c1(z3ctx), c0(z3ctx), c0(
+                        z3ctx),                                                               c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c1(z3ctx), c0(
+                        z3ctx),                                                               c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c1(z3ctx), c0(
+                        z3ctx) },
+                {c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(z3ctx), c0(
+                        z3ctx), cm1(z3ctx) },
+            };
+        }
 	};
 
 } // namespace quartz

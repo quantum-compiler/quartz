@@ -52,7 +52,7 @@ namespace quartz {
         evaluate(const Vector& input_dist, const std::vector<ParamType>& input_params) const;
 
         [[nodiscard]] std::pair<Z3ExprPairVec, Z3ExprPairVec>
-        evaluate(const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const;
+        evaluate(z3::context& z3ctx, const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const;
 
 		[[nodiscard]] int get_num_qubits() const;
 		[[nodiscard]] int get_num_input_parameters() const;

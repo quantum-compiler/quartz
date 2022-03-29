@@ -2,6 +2,7 @@
 
 #include "../math/matrix.h"
 #include "gate_utils.h"
+#include "utils/z3Utils.h"
 
 #include <iostream>
 #include <memory>
@@ -14,7 +15,9 @@ namespace quartz {
 		Gate(GateType tp, int num_qubits, int num_parameters);
 		virtual MatrixBase *get_matrix();
 		virtual MatrixBase *get_matrix(const std::vector< ParamType > &params);
+        virtual Z3ExprMat get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params);
 		virtual ParamType compute(const std::vector< ParamType > &input_params);
+        virtual Z3ExprPair compute(const Z3ExprPairVec& input_params);
 		[[nodiscard]] virtual bool
 		is_commutative() const; // for traditional gates
 		[[nodiscard]] int get_num_qubits() const;

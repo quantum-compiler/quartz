@@ -102,8 +102,8 @@ namespace quartz {
             constraint = constraint && cstr1;
             auto [input_params, cstr2] = z3Utils::input_params_by_z3(z3ctx, num_params);
             constraint = constraint && cstr2;
-            auto [output_vec1, all_params] = dag1->evaluate(input_dist, input_params);
-            const auto output_vec2 = dag2->evaluate(input_dist, input_params).first;
+            auto [output_vec1, all_params] = dag1->evaluate(z3ctx, input_dist, input_params);
+            const auto output_vec2 = dag2->evaluate(z3ctx, input_dist, input_params).first;
             if (phase_shift_id != kNoPhaseShift) {
                 // Phase factor is provided in generator; We shift dag1 here
                 output_vec1 = phase_shift_by_id(z3ctx, output_vec1, dag1, phase_shift_id, all_params);

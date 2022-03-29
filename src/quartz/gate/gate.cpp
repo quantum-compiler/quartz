@@ -14,10 +14,22 @@ namespace quartz {
 		return get_matrix();
 	}
 
+    Z3ExprMat Gate::get_matrix(z3::context& z3ctx, const Z3ExprPairVec& params) {
+        // Default: no matrix (for parameter gates).
+        assert(false);
+        return Z3ExprMat{};
+    }
+
 	ParamType Gate::compute(const std::vector< ParamType > &input_params) {
 		// Default: do no computation (for quantum gates).
 		return 0;
 	}
+
+    Z3ExprPair Gate::compute(const Z3ExprPairVec& input_params) {
+        // Default: do no computation (for quantum gates).
+        assert(false);
+        return input_params.front();
+    }
 
 	bool Gate::is_commutative() const { return false; }
 

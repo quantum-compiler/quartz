@@ -8,10 +8,16 @@ namespace quartz {
 	public:
 		NegGate()
 		    : Gate(GateType::neg, 0 /*num_qubits*/, 1 /*num_parameters*/) {}
-		ParamType
+
+        ParamType
 		compute(const std::vector< ParamType > &input_params) override {
 			assert(input_params.size() == 1);
 			return -input_params[0];
 		}
+
+        Z3ExprPair compute(const Z3ExprPairVec& input_params) override {
+            assert(input_params.size() == 1);
+            return z3Utils::neg(input_params[0]);
+        }
 	};
 } // namespace quartz

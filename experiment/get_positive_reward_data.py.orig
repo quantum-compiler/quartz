@@ -1,5 +1,4 @@
 import quartz
-<<<<<<< HEAD
 import time
 import heapq
 from concurrent.futures import ProcessPoolExecutor
@@ -8,7 +7,43 @@ import json
 from dgl import save_graphs, load_graphs
 from qiskit.quantum_info import Statevector
 from qiskit import QuantumCircuit
+<<<<<<< HEAD
 from pos_data import PosRewardData
+=======
+
+
+class ReplayBuffer:
+    def __init__(self, maxlen=500) -> None:
+        self.from_graphs = []
+        self.node_ids = []
+        self.xfer_ids = []
+        self.rewards = []
+        self.to_graphs = []
+        self.data_cnt = 0
+        self.maxlen = maxlen
+
+    def add_data(self, from_graph, node_id, xfer_id, reward, to_graph):
+        if self.data_cnt < self.maxlen:
+            self.from_graphs.append(from_graph)
+            self.node_ids.append(node_id)
+            self.xfer_ids.append(xfer_id)
+            self.rewards.append(reward)
+            self.to_graphs.append(to_graph)
+            self.data_cnt += 1
+            return True
+        else:
+            return False
+
+    def save_data(self):
+        save_graphs('from_graphs.dat', self.from_graphs)
+        save_graphs('to_graphs.dat', self.to_graphs)
+        other_info = {}
+        other_info['node_ids'] = self.node_ids
+        other_info['xfer_ids'] = self.xfer_ids
+        other_info['rewards'] = self.rewards
+        with open('node_xfer_reward.json', 'w') as f:
+            json.dump(other_info, f)
+>>>>>>> Added python file to get positive-reward data point
 
 
 def check(graph):
@@ -19,8 +54,6 @@ def check(graph):
     return Statevector.from_instruction(qc_origin).equiv(
         Statevector.from_instruction(qc_optimized))
 
-=======
->>>>>>> Added some files
 
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
@@ -28,7 +61,6 @@ quartz_context = quartz.QuartzContext(
 parser = quartz.PyQASMParser(context=quartz_context)
 my_dag = parser.load_qasm(
     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
-<<<<<<< HEAD
 init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
 
 candidate_hq = []
@@ -40,7 +72,11 @@ best_gate_cnt = init_graph.gate_count
 
 budget = 5_000_000
 
+<<<<<<< HEAD
 buffer = PosRewardData(50)
+=======
+buffer = ReplayBuffer(50)
+>>>>>>> Added python file to get positive-reward data point
 finish = False
 start = time.time()
 
@@ -75,11 +111,17 @@ while candidate_hq != [] and budget >= 0 and not finish:
                     best_graph = new_graph
                     best_gate_cnt = new_cnt
                 if new_cnt < first_cnt:
+<<<<<<< HEAD
                     if buffer.add_data(first_candidate.to_dgl_graph(),
                                        first_candidate.hash(), i, xfer,
                                        first_cnt - new_cnt,
                                        new_graph.to_dgl_graph(),
                                        new_graph.hash()):
+=======
+                    if buffer.add_data(first_candidate.to_dgl_graph(), i, xfer,
+                                       first_cnt - new_cnt,
+                                       new_graph.to_dgl_graph()):
+>>>>>>> Added python file to get positive-reward data point
                         print(f'Collected data count: {buffer.data_cnt}')
                     else:
                         finish = True
@@ -89,7 +131,8 @@ while candidate_hq != [] and budget >= 0 and not finish:
                         f'{budget}: minimum gate count is {best_gate_cnt}, after {time.time() - start:.2f} seconds'
                     )
 
+<<<<<<< HEAD
 buffer.save_data()
 =======
-my_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
->>>>>>> Added some files
+buffer.save_data()
+>>>>>>> Added python file to get positive-reward data point

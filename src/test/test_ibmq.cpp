@@ -29,7 +29,7 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
 
 int main(int argc, char **argv) {
   std::string input_fn, output_fn;
-  std::string eqset_fn = "../IBM_3_3_complete_ECC_set.json";
+  std::string eqset_fn = "../IBM_4_3_complete_ECC_set.json";
   bool simulated_annealing = false;
   bool early_stop = false;
   bool disable_search = false;

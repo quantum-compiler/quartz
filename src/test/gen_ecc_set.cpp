@@ -23,6 +23,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                true, &equiv_set, unique_parameters, /*verbose=*/
                false);
   std::cout << "*** ch(" << file_prefix.substr(0, file_prefix.size() - 5)
+            << ",q=" << file_prefix[file_prefix.size() - 2]
             << ") = "
             << dataset1.num_total_dags() - 1 /*exclude the empty circuit*/
             << std::endl;

@@ -1,4 +1,55 @@
 import quartz
+import time
+import heapq
+from concurrent.futures import ProcessPoolExecutor
+import copy
+import json
+from dgl import save_graphs, load_graphs
+from qiskit.quantum_info import Statevector
+from qiskit import QuantumCircuit
+
+
+class ReplayBuffer:
+    def __init__(self, maxlen=500) -> None:
+        self.from_graphs = []
+        self.node_ids = []
+        self.xfer_ids = []
+        self.rewards = []
+        self.to_graphs = []
+        self.data_cnt = 0
+        self.maxlen = maxlen
+
+    def add_data(self, from_graph, node_id, xfer_id, reward, to_graph):
+        if self.data_cnt < self.maxlen:
+            self.from_graphs.append(from_graph)
+            self.node_ids.append(node_id)
+            self.xfer_ids.append(xfer_id)
+            self.rewards.append(reward)
+            self.to_graphs.append(to_graph)
+            self.data_cnt += 1
+            return True
+        else:
+            return False
+
+    def save_data(self):
+        save_graphs('from_graphs.dat', self.from_graphs)
+        save_graphs('to_graphs.dat', self.to_graphs)
+        other_info = {}
+        other_info['node_ids'] = self.node_ids
+        other_info['xfer_ids'] = self.xfer_ids
+        other_info['rewards'] = self.rewards
+        with open('node_xfer_reward.json', 'w') as f:
+            json.dump(other_info, f)
+
+
+def check(graph):
+    graph.to_qasm(filename='best.qasm')
+    qc_origin = QuantumCircuit.from_qasm_file(
+        'barenco_tof_3_opt_path/subst_history_39.qasm')
+    qc_optimized = QuantumCircuit.from_qasm_file('best.qasm')
+    return Statevector.from_instruction(qc_origin).equiv(
+        Statevector.from_instruction(qc_optimized))
+
 
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
@@ -6,4 +57,62 @@ quartz_context = quartz.QuartzContext(
 parser = quartz.PyQASMParser(context=quartz_context)
 my_dag = parser.load_qasm(
     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
-my_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
+init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
+
+candidate_hq = []
+heapq.heappush(candidate_hq, init_graph)
+hash_set = set()
+hash_set.add(init_graph.hash())
+best_graph = init_graph
+best_gate_cnt = init_graph.gate_count
+
+budget = 5_000_000
+
+buffer = ReplayBuffer(50)
+finish = False
+start = time.time()
+
+while candidate_hq != [] and budget >= 0 and not finish:
+    first_candidate = heapq.heappop(candidate_hq)
+    all_nodes = first_candidate.all_nodes()
+    first_cnt = first_candidate.gate_count
+
+    def ax(i):
+        node = all_nodes[i]
+        return first_candidate.available_xfers(context=quartz_context,
+                                               node=node)
+
+    with ProcessPoolExecutor(max_workers=64) as executor:
+        results = executor.map(ax, list(range(len(all_nodes))), chunksize=2)
+        appliable_xfers_nodes = []
+        for r in results:
+            appliable_xfers_nodes.append(r)
+
+    for i in range(len(all_nodes)):
+        node = all_nodes[i]
+        appliable_xfers = appliable_xfers_nodes[i]
+        for xfer in appliable_xfers:
+            new_graph = first_candidate.apply_xfer(
+                xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
+            new_hash = new_graph.hash()
+            if new_hash not in hash_set:
+                hash_set.add(new_hash)
+                heapq.heappush(candidate_hq, new_graph)
+                new_cnt = new_graph.gate_count
+                if new_cnt < best_gate_cnt:
+                    best_graph = new_graph
+                    best_gate_cnt = new_cnt
+                if new_cnt < first_cnt:
+                    if buffer.add_data(first_candidate.to_dgl_graph(), i, xfer,
+                                       first_cnt - new_cnt,
+                                       new_graph.to_dgl_graph()):
+                        print(f'Collected data count: {buffer.data_cnt}')
+                    else:
+                        finish = True
+                budget -= 1
+                if budget % 10_000 == 0:
+                    print(
+                        f'{budget}: minimum gate count is {best_gate_cnt}, after {time.time() - start:.2f} seconds'
+                    )
+
+buffer.save_data()

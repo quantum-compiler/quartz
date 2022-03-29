@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
   auto graph_before_h_cz_merge = new_graph->context_shift(
       &dst_ctx, &cz_ctx, &union_ctx_0, &cx_2_cz, false);
   auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
-      0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
+      0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set_modified.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
       GateType::rz, fn);
   //   graph_after_h_cz_merge->to_qasm(

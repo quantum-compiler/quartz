@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iomanip>
 #include <mutex>
-#include "omp.h"
 
 namespace quartz
 {
@@ -185,9 +184,8 @@ namespace quartz
     bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
         const auto hash_value = dag->hash(ctx);
         bool ret;
-        static std::mutex lock_dataset; // TODO Colin : replace it with OMP "lock"
+        #pragma omp critical (insert_to_dataset)
         {
-            std::lock_guard<std::mutex> lg_dataset(lock_dataset);
             ret = dataset.count(hash_value) == 0;
             dataset[hash_value].push_back(std::move(dag));
         }
@@ -218,7 +216,8 @@ namespace quartz
         std::vector< std::vector<EquivClassTag> > class_hashes(dataset.size());
         std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
 
-        #pragma omp parallel for default(none) shared(vec_dataset, class_hashes, classes)
+        #pragma omp parallel for schedule(runtime) default(none) \
+            shared(vec_dataset, class_hashes, classes)
         for (size_t i = 0; i < vec_dataset.size(); i++) {
             // build vector<EquivalenceClass> at classes[i]
             DAGHashType hashtag = vec_dataset[i].first;
@@ -268,6 +267,8 @@ namespace quartz
          */
         // ATTENTION Colin : Is PairHash safe?
         std::unordered_map< EquivClassTag, std::vector<EquivClassTag>, PairHash > equiv_edges;
+        #pragma omp parallel for schedule(runtime) default(none) \
+            shared(classes, class_hashes, equiv_edges)
         for (size_t i = 0; i < classes.size(); i++) {
             for (size_t j = 0; j < classes[i].size(); j++) {
             // iterate over each ecc
@@ -362,8 +363,11 @@ namespace quartz
                     } // end (if) for phaseIDToDags
                     if (equivalence_found) {
                         // store found equivalence info (other_ecctag, hashtag)
-                        equiv_edges[hashtag].emplace_back(other_ecctag);
-                        equiv_edges[other_ecctag].emplace_back(hashtag);
+                        #pragma omp critical (add_to_equiv_edges)
+                        {
+                            equiv_edges[hashtag].emplace_back(other_ecctag);
+                            equiv_edges[other_ecctag].emplace_back(hashtag);
+                        }
                     }
                 } // end for dags_to_verify
             // iterate over each ecc

@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <chrono>
-#include <omp.h>
 
 namespace quartz {
 	void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
@@ -366,53 +365,60 @@ namespace quartz {
 		}
 	}
 
+    void Generator::try_to_add_to_result(
+            const DAG* const new_dag, Dataset& dataset,
+            std::vector<DAG*>* const new_representatives, const EquivalenceSet* equiv_set,
+            const bool verify_equivalences, const bool unique_parameters
+    ) {
+        // A new DAG with |current_max_num_gates| + 1 gates.
+        assert(verify_equivalences);
+        if (verify_equivalences) {
+            assert(equiv_set);
+            if (!verifier_.redundant(context, equiv_set, new_dag)) {
+                auto new_new_dag = std::make_unique< DAG >(*new_dag);
+                auto new_new_dag_ptr = new_new_dag.get();
+                dataset.insert(context, std::move(new_new_dag));
+                if (new_representatives) {
+                    // Warning: this is not the new representatives -- only
+                    // the new DAGs.
+                    #pragma omp critical (try_to_add_to_result_1)
+                    new_representatives->push_back(new_new_dag_ptr);
+                }
+            }
+        }
+        else {
+            // If we will not verify the equivalence later, we should update
+            // the representatives in the context now.
+            if (verifier_.redundant(context, new_dag)) {
+                return;
+            }
+            bool ret = dataset.insert(context, std::make_unique< DAG >(*new_dag));
+            // Presuming different hash values imply different DAGs.
+            if (ret) {
+                // The DAG's hash value is new to the dataset.
+                // Note: this is the second instance of DAG we create in
+                // this function.
+                auto rep = std::make_unique< DAG >(*new_dag);
+                auto rep_ptr = rep.get();
+                context->set_representative(std::move(rep));
+                if (new_representatives) {
+                    #pragma omp critical (try_to_add_to_result_2)
+                    new_representatives->push_back(rep_ptr);
+                }
+            }
+        }
+    }
+
 	void Generator::bfs(const std::vector< std::vector< DAG * > > &dags,
 	                    int max_num_param_gates, Dataset &dataset,
 	                    std::vector< DAG * > *new_representatives,
 	                    bool verify_equivalences,
 	                    const EquivalenceSet *equiv_set,
                         bool unique_parameters) {
-		auto try_to_add_to_result = [&](DAG *new_dag) {
-			// A new DAG with |current_max_num_gates| + 1 gates.
-            assert(verify_equivalences);
-			if (verify_equivalences) {
-				assert(equiv_set);
-				if (!verifier_.redundant(context, equiv_set, new_dag)) {
-					auto new_new_dag = std::make_unique< DAG >(*new_dag);
-					auto new_new_dag_ptr = new_new_dag.get();
-					dataset.insert(context, std::move(new_new_dag));
-					if (new_representatives) {
-						// Warning: this is not the new representatives -- only
-						// the new DAGs.
-						new_representatives->push_back(new_new_dag_ptr);
-					}
-				}
-			}
-			else {
-				// If we will not verify the equivalence later, we should update
-				// the representatives in the context now.
-				if (verifier_.redundant(context, new_dag)) {
-					return;
-				}
-				bool ret =
-				    dataset.insert(context, std::make_unique< DAG >(*new_dag));
-				// Presuming different hash values imply different DAGs.
-				if (ret) {
-					// The DAG's hash value is new to the dataset.
-					// Note: this is the second instance of DAG we create in
-					// this function.
-					auto rep = std::make_unique< DAG >(*new_dag);
-					auto rep_ptr = rep.get();
-					context->set_representative(std::move(rep));
-					if (new_representatives) {
-						new_representatives->push_back(rep_ptr);
-					}
-				}
-			}
-		};
         std::cout << "---- BFS: dags.back().size() = " << dags.back().size() << std::endl;
         auto start_time = std::chrono::system_clock::now();
-#pragma omp parallel for
+        #pragma omp parallel for schedule(runtime) default(none) \
+            shared(dags, dataset, new_representatives, equiv_set, verify_equivalences, unique_parameters)
 		for (auto &dag : dags.back()) {
 		    InputParamMaskType input_param_usage_mask;
 		    std::vector<InputParamMaskType> input_param_masks;
@@ -428,17 +434,18 @@ namespace quartz {
 					// Case: 1-qubit operators
 					for (int i = 0; i < dag->get_num_qubits(); i++) {
 						qubit_indices.push_back(i);
-						auto
-						    search_parameters = [&](int num_remaining_parameters,
-						                            const InputParamMaskType &current_usage_mask,
-						                            auto &
-						                                search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+						auto search_parameters = [&](int num_remaining_parameters,
+                            const InputParamMaskType &current_usage_mask,
+                            auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
 							    if (num_remaining_parameters == 0) {
 								    bool ret = dag->add_gate(qubit_indices,
 								                             parameter_indices,
 								                             gate, nullptr);
 								    assert(ret);
-								    try_to_add_to_result(dag);
+                                    try_to_add_to_result(
+                                        dag, dataset, new_representatives, equiv_set,
+                                        verify_equivalences, unique_parameters
+                                    );
 								    ret = dag->remove_last_gate();
 								    assert(ret);
 								    return;
@@ -488,7 +495,10 @@ namespace quartz {
 								                         parameter_indices,
 								                         gate, nullptr);
 								assert(ret);
-								try_to_add_to_result(dag);
+								try_to_add_to_result(
+                                    dag, dataset, new_representatives, equiv_set,
+                                    verify_equivalences, unique_parameters
+                                );
 								ret = dag->remove_last_gate();
 								assert(ret);
 								qubit_indices.pop_back();

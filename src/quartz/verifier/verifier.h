@@ -1,21 +1,21 @@
 #pragma once
 
+#include "z3++.h"
+
 #include "../context/context.h"
 #include "../dataset/equivalence_set.h"
 #include "../dag/dag.h"
 #include "dataset/dataset.h"
-#include "z3++.h"
+#include "utils/z3Utils.h"
 
 namespace quartz {
-    typedef std::vector<z3::expr> Z3ExprVec;
-    typedef std::pair<z3::expr_vector, z3::expr_vector> Z3ExprVecPair;
-    typedef std::pair<z3::expr, z3::expr> Z3ExprPair;
-    typedef std::vector<Z3ExprPair> Z3ExprPairVec;
 	// Verify if two circuits are equivalent and other things about DAGs.
 	class Verifier {
 	public:
-		bool equivalent(const Context* ctx, const DAG* dag1, const DAG* dag2,
-                        PhaseShiftIdType phase_shift_id, bool check_phase_shift_by_z3);
+		bool equivalent(
+            const Context* ctx, const DAG* dag1, const DAG* dag2,
+            PhaseShiftIdType phase_shift_id, bool check_phase_shift_by_z3, bool dont_invoke_z3
+        );
 		// On-the-fly equivalence checking while generating circuits
 		bool equivalent_on_the_fly(Context *ctx, DAG *circuit1, DAG *circuit2);
 
@@ -23,33 +23,28 @@ namespace quartz {
 		// been covered by smaller circuits).
 		// This function assumes that two DAGs are equivalent iff they share the
 		// same hash value.
-		bool redundant(Context *ctx, DAG *dag);
+		bool redundant(Context *ctx, const DAG* dag);
 
 		// Check if the DAG is redundant (equivalence opportunities have already
 		// been covered by smaller circuits).
-		bool redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag);
+		bool redundant(Context *ctx, const EquivalenceSet *eqs, const DAG* dag);
 
     private:
-
-        std::pair<Z3ExprPairVec, Z3ExprPairVec>
-        evaluate_dag(const DAG* dag, const Z3ExprPairVec& input_dist,
-                     const Z3ExprPairVec& input_params, bool use_z3 = true);
-
         Z3ExprPairVec phase_shift_by_id(const Z3ExprPairVec& vec, const DAG* dag,
-                                        PhaseShiftIdType phase_shift_id, const Z3ExprPairVec all_params);
+                                        PhaseShiftIdType phase_shift_id, const Z3ExprPairVec& all_params);
 
+        std::vector<ParamType> gen_rand_params(int num_params);
+
+        bool search_phase_factor(
+            const Context* context, z3::context& z3ctx,
+            const DAG* dag1, const DAG* dag2, const z3::expr& expression,
+            const Z3ExprPairVec& output_vec1, const Z3ExprPairVec& output_vec2,
+            bool dont_invoke_z3, const Z3ExprPairVec& params_symb,
+            const std::vector<ParamType>& params_for_fp, int num_params,
+            const ComplexType& goal_phase_factor, int cur_param_id,
+            const Z3ExprPair& cur_phase_factor_symb,
+            const ComplexType& cur_phase_factor_for_fp
+        );
 	};
-
-    namespace z3Utils {
-
-        std::pair<Z3ExprPairVec, z3::expr>
-        input_dist_by_z3(z3::context& ctx, int num_qubits);
-
-        std::pair<Z3ExprPairVec, z3::expr>
-        input_params_by_z3(z3::context& ctx, int num_params);
-
-        z3::expr angle(const z3::expr& cos, const z3::expr& sin);
-        z3::expr angle(const Z3ExprPair& expr);
-    }
 
 } // namespace quartz

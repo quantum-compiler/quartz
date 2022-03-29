@@ -15,6 +15,8 @@ namespace quartz {
 		explicit Vector(std::vector< ComplexType > &&data) : data_(data) {}
 		ComplexType &operator[](int x) { return data_[x]; }
 		const ComplexType &operator[](int x) const { return data_[x]; }
+        ComplexType& at(size_t i) { return data_.at(i); }
+        [[nodiscard]] const ComplexType& at(size_t i) const { return data_.at(i); }
 		[[nodiscard]] int size() const { return (int)data_.size(); }
 		bool apply_matrix(MatrixBase *mat,
 		                  const std::vector< int > &qubit_indices);

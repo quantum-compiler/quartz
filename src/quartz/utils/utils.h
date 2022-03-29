@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cmath>
 #include <complex>
+#include "z3++.h"
 using ParamType = double;
 #ifdef USE_ARBLIB
 #include "arb_complex.h"
@@ -28,6 +30,10 @@ namespace quartz {
 	constexpr PhaseShiftIdType kNoPhaseShift = -1;
 	constexpr bool kCheckPhaseShiftOfPiOver4 = true;
 	constexpr int kCheckPhaseShiftOfPiOver4Index = 10000; // not used now
+    constexpr int kPhaseFactorConstantCoeffMin = 0;
+    constexpr int kPhaseFactorConstantCoeffMax = 7;
+    constexpr double kPhaseFactorConstant = M_PI_4; // pi / 4
+    constexpr double kPhaseFactorEpsilon = 1e-6;
 
 	struct PairHash {
 	public:

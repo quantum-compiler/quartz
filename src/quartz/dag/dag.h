@@ -5,6 +5,7 @@
 #include "../utils/utils.h"
 #include "../gate/gate.h"
 #include "../math/vector.h"
+#include "utils/z3Utils.h"
 
 #include <istream>
 #include <string>
@@ -46,6 +47,13 @@ namespace quartz {
 		         const std::vector< ParamType > &input_parameters,
 		         Vector &output_dis,
 		         std::vector< ParamType > *parameter_values = nullptr) const;
+
+        [[nodiscard]] std::pair<Vector, std::vector<ParamType>>
+        evaluate(const Vector& input_dist, const std::vector<ParamType>& input_params) const;
+
+        [[nodiscard]] std::pair<Z3ExprPairVec, Z3ExprPairVec>
+        evaluate(const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const;
+
 		[[nodiscard]] int get_num_qubits() const;
 		[[nodiscard]] int get_num_input_parameters() const;
 		[[nodiscard]] int get_num_total_parameters() const;

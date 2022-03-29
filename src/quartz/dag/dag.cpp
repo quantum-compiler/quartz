@@ -471,6 +471,59 @@ namespace quartz {
 		return true;
 	}
 
+    std::pair<Vector, std::vector<ParamType>>
+    DAG::evaluate(const Vector& input_dist, const std::vector<ParamType>& input_params) const {
+        Vector output_dist;
+        std::vector<ParamType> tot_params;
+        assert(evaluate(input_dist, input_params, output_dist, &tot_params));
+        return { output_dist, tot_params };
+    }
+
+    std::pair<Z3ExprPairVec, Z3ExprPairVec>
+    DAG::evaluate(const Z3ExprPairVec& input_dist, const Z3ExprPairVec& _input_params) const {
+        const int num_input_params = this->get_num_input_parameters();
+        const int num_tot_params = this->get_num_total_parameters();
+        assert(_input_params.size() >= num_input_params);
+        Z3ExprPairVec tot_params(_input_params);
+        while (num_tot_params > tot_params.size()) {
+            // assert(_input_params.size() > 0) if num_tot_params > tot_params.size()
+            // since we can not generate new parameters without any input param
+            tot_params.emplace_back(_input_params.front()); // just some placeholders
+        }
+        // tot_params.resize(num_tot_params);
+        Z3ExprPairVec output_dist(input_dist);
+
+        // iterate gates by iterating edges
+        for (const auto& edge : this->edges) {
+            // 1. read input
+            Z3ExprPairVec input_params;
+            std::vector<int> input_qubit_indices;
+            for (const DAGNode* const input_node : edge->input_nodes) {
+                if (input_node->is_parameter()) {
+                    // ATTENTION Colin : copy a z3:expr is OK for the solver?
+                    input_params.emplace_back(tot_params[input_node->index]);
+                }
+                else {
+                    assert(input_node->is_qubit());
+                    input_qubit_indices.emplace_back(input_node->index);
+                }
+            } // end for edge->input_nodes
+            // 2. judge gate type, read output and compute
+            if (edge->gate->is_parameter_gate()) {
+                // output a parameter to
+                const int output_param_index = edge->output_nodes.front()->index;
+                // TODO Colin : compute(edge->gate, input_params)
+                tot_params[output_param_index] = input_params[0];
+            }
+            else {
+                assert(edge->gate->is_quantum_gate());
+                // TODO Colin : apply_matrix(edge->gate, input_params)
+
+            }
+        } // dag->edges
+        return { output_dist, tot_params };
+    }
+
 	int DAG::get_num_qubits() const { return num_qubits; }
 
 	int DAG::get_num_input_parameters() const { return num_input_parameters; }

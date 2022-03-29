@@ -72,6 +72,12 @@ namespace quartz {
 		                         std::vector< int > &params_used_times,
 		                         std::vector< std::unique_ptr< DAG > > &result);
 
+        void try_to_add_to_result(
+                const DAG* new_dag, Dataset& dataset,
+                std::vector<DAG*>* new_representatives, const EquivalenceSet* equiv_set,
+                bool verify_equivalences, bool unique_parameters
+        );
+
 		Context *context;
 		Verifier verifier_;
 	};

@@ -215,7 +215,7 @@ std::cout << "--------** solver checked end in " << duration_solver << "ms" << s
                 const auto output_vec2_shifted = z3Utils::shift(output_vec2, cur_phase_factor_symb);
                 solver.add(! z3Utils::eq(z3ctx, output_vec1, output_vec2_shifted));
                 // ATTENTION Colin : try to reduce it!
-                solver.set(":timeout", 30000u); // timeout after 30s
+                // solver.set(":timeout", 30000u); // timeout after 30s
                 const auto res = solver.check();
                 assert(res != z3::unknown);
                 return res == z3::unsat;

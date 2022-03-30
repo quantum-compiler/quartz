@@ -18,8 +18,11 @@ namespace quartz {
 	public:
 		// Returns all DAGs in this equivalence class.
 		[[nodiscard]] std::vector< DAG * > get_all_dags() const;
+        const std::vector< std::unique_ptr<DAG> >& get_dags_ptr() const;
 
 		void insert(std::unique_ptr< DAG > dag);
+
+        void append(std::vector< std::unique_ptr<DAG> > dags);
 
 		[[nodiscard]] int size() const;
 		void reserve(std::size_t new_cap);
@@ -143,6 +146,13 @@ namespace quartz {
 		// nullptr.
 		[[nodiscard]] EquivalenceClass *get_containing_class(Context *ctx,
 		                                                     DAG *dag) const;
+
+        void load_data(
+            Context* ctx,
+            std::vector<std::unique_ptr<EquivalenceClass>>&& _classes,
+            std::unordered_map< DAGHashType, std::set<EquivalenceClass*> >&& _possible_classes,
+            std::vector<DAG*>* new_representatives
+        );
 
 	private:
 		void set_possible_class(const DAGHashType &hash_value,

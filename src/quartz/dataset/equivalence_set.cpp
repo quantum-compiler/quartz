@@ -15,9 +15,19 @@ namespace quartz {
 		return result;
 	}
 
+    const std::vector< std::unique_ptr<DAG> >& EquivalenceClass::get_dags_ptr() const {
+        return dags_;
+    }
+
 	void EquivalenceClass::insert(std::unique_ptr< DAG > dag) {
 		dags_.push_back(std::move(dag));
 	}
+
+    void EquivalenceClass::append(std::vector< std::unique_ptr<DAG> > dags) {
+        for (auto& dag : dags) {
+            dags_.emplace_back(std::move(dag));
+        }
+    }
 
 	int EquivalenceClass::size() const { return (int)dags_.size(); }
 
@@ -160,6 +170,65 @@ namespace quartz {
 		}
 		return num_dag_modified;
 	}
+
+    void EquivalenceSet::load_data(
+        Context* ctx,
+        std::vector<std::unique_ptr<EquivalenceClass>>&& _classes,
+        std::unordered_map< DAGHashType, std::set<EquivalenceClass*> >&& _possible_classes,
+        std::vector<DAG*>* const new_representatives
+    ) {
+        // If the current equivalence set is not empty, keep the
+        // representatives.
+        std::vector< std::unique_ptr< DAG > > representatives;
+        representatives.reserve(classes_.size());
+        for (auto &item : classes_) {
+            auto dags = item->extract();
+            if (!dags.empty()) {
+                representatives.push_back(std::move(dags[0]));
+            }
+        }
+        clear();
+        classes_ = std::move(_classes);
+        possible_classes_ = std::move(_possible_classes);
+
+        // Move all previous representatives to the beginning of the
+        // corresponding equivalence class, and find new representatives.
+        std::unordered_set< EquivalenceClass * > existing_classes;
+        for (auto &rep : representatives) {
+            EquivalenceClass *found_equiv_class = nullptr;
+            for (auto &equiv_class : get_possible_classes(rep->hash(ctx))) {
+                if (equiv_class->set_as_representative(*rep)) {
+                    found_equiv_class = equiv_class;
+                    break;
+                }
+            }
+            if (!found_equiv_class) {
+                for (const auto &other_hash_value : rep->other_hash_values()) {
+                    for (auto &equiv_class :
+                            get_possible_classes(other_hash_value)) {
+                        if (equiv_class->set_as_representative(*rep)) {
+                            found_equiv_class = equiv_class;
+                            break;
+                        }
+                    }
+                    if (found_equiv_class) {
+                        break;
+                    }
+                }
+            }
+            if (new_representatives) {
+                existing_classes.insert(found_equiv_class);
+            }
+        }
+        if (new_representatives) {
+            for (auto &item : classes_) {
+                if (existing_classes.count(item.get()) == 0) {
+                    // A new equivalence class.
+                    new_representatives->push_back(item->get_representative());
+                }
+            }
+        }
+    }
 
 	bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
 	                               std::vector< DAG * > *new_representatives) {

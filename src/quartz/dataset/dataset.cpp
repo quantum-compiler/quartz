@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <queue>
 #include <cassert>
 #include <fstream>
 #include <iomanip>
@@ -201,20 +202,25 @@ namespace quartz
                         DAG> > >();
     }
 
-    void Dataset::find_equivalences(
+    /*
+     * iterate over every (hashtag, dags), check whether the dags are really equivalent
+     * get info like {'hashtag_index_1': [dags], ...}
+     * each key is mapped to a list containing real equivalent dags
+     * build merged ec_classes: [ class_0: [dag_0, dag_1], ... ]
+     * and possible_classes map
+     * for equiv_set's usage
+     */
+    std::pair<
+        std::vector<std::unique_ptr<EquivalenceClass>>,
+        std::unordered_map< DAGHashType, std::set<EquivalenceClass*> >
+    > Dataset::find_equivalences(
         Context *ctx, const bool check_phase_shift_by_z3, const bool dont_invoke_z3
     ) {
         static Verifier verifier;
-        /*
-         * iterate over every (hashtag, dags), check whether the dags are really equivalent
-         * get info like {'hashtag_index_1': [dags], ...}
-         * each key is mapped to a list containing real equivalent dags
-         * build ec_classes: [ class_0: [dag_0, dag_1], ... ]
-         */
         // convert unordered_map obj dataset to vector to enable parallelization
-        std::vector<std::pair< DAGHashType, std::vector<std::unique_ptr<DAG>>* >> vec_dataset;
+        std::vector<std::pair< DAGHashType, const std::vector<std::unique_ptr<DAG>>* >> vec_dataset;
         vec_dataset.reserve(dataset.size());
-        for (auto& [hash, dags] : dataset) {
+        for (const auto& [hash, dags] : dataset) {
             vec_dataset.emplace_back(hash, &dags);
         }
         std::vector< std::vector<EquivClassTag> > class_hashes(dataset.size());
@@ -225,7 +231,7 @@ namespace quartz
         for (size_t i = 0; i < vec_dataset.size(); i++) {
             // build vector<EquivalenceClass> at classes[i]
             DAGHashType hashtag = vec_dataset[i].first;
-            std::vector<std::unique_ptr<DAG>>* dags = vec_dataset[i].second;
+            const std::vector<std::unique_ptr<DAG>>* dags = vec_dataset[i].second;
             // more than one dag, need to check if they are really equivalent
             std::vector<EquivClassTag>& this_class_hashes = class_hashes[i];
             std::vector<std::unique_ptr<EquivalenceClass>>& this_eccs = classes[i];
@@ -277,7 +283,7 @@ namespace quartz
             shared(classes, class_hashes, equiv_edges, ctx, verifier, check_phase_shift_by_z3, dont_invoke_z3)
         for (size_t i = 0; i < classes.size(); i++) {
             for (size_t j = 0; j < classes[i].size(); j++) {
-            // iterate over each ecc
+                // iterate over each ecc
                 const EquivClassTag hashtag = class_hashes[i][j];
                 const EquivalenceClass* const ecc = classes[i][j].get();
                 const std::vector<DAG*> dags = ecc->get_all_dags();
@@ -381,10 +387,81 @@ namespace quartz
                         }
                     }
                 } // end for dags_to_verify
-            // iterate over each ecc
+                // iterate over each ecc
             } // end for j
         } // end iterate over each ecc (for i)
 
+        /*
+         * 1. BFS to label each connected component in equiv_edges
+         *    use a map< EquivClassTag, id > to store the result
+         * 2. merge classes and create map possible_classess
+         */
+        std::unordered_map< EquivClassTag, unsigned, PairHash > ecc_ids;
+        unsigned num_components = 0;
+        for (const auto& [start, neighbors] : equiv_edges) {
+            if (ecc_ids.count(start) < 1) {
+                // not labeled
+                std::queue<EquivClassTag> to_visit;
+                ecc_ids[start] = num_components; // label it!
+                to_visit.emplace(start);
+                while (!to_visit.empty()) {
+                    const auto node = to_visit.front();
+                    to_visit.pop();
+                    for (const auto& next_node : neighbors) {
+                        if (ecc_ids.count(next_node) < 1) { // not labeled
+                            // give it the same id and visit it later
+                            ecc_ids[next_node] = num_components;
+                            to_visit.emplace(next_node);
+                        }
+                    } // end for next_node
+                } // end while to_visit
+            } // end if
+            num_components++;
+        } // end for equiv_edges
+
+        std::vector<int> id2pos(num_components, -1);
+        std::vector<std::unique_ptr<EquivalenceClass>> merged_classes;
+        std::unordered_map< DAGHashType, std::set<EquivalenceClass*> > possible_classes;
+        for (size_t i = 0; i < classes.size(); i++) {
+            for (size_t j = 0; j < classes[i].size(); j++) {
+                EquivalenceClass* merged_ecc(nullptr);
+                // iterate over each ecc
+                const EquivClassTag hashtag = class_hashes[i][j];
+                auto ecc = std::move(classes[i][j]);
+                if (ecc_ids.count(hashtag) > 0) {
+                    // ecc is in a non-trivial connected component
+                    const unsigned ecc_id = ecc_ids[hashtag];
+                    if (id2pos[ecc_id] > -1) {
+                        // the component is already in merged_classes
+                        // merge this ecc to the existed one
+                        auto& existed_ecc = merged_classes[id2pos[ecc_id]];
+                        existed_ecc->append(ecc->extract());
+                        merged_ecc = existed_ecc.get();
+                    }
+                    else {
+                        // not existed, move ecc into merged_classes
+                        id2pos[ecc_id] = static_cast<int>(merged_classes.size());
+                        merged_classes.emplace_back(std::move(ecc));
+                        merged_ecc = merged_classes.back().get();
+                    }
+                }
+                else {
+                    // move ecc into merged_classes
+                    merged_classes.emplace_back(std::move(ecc));
+                    merged_ecc = merged_classes.back().get();
+                }
+                // iterate over dags to set possible_classess
+                for (const auto& dag : merged_ecc->get_dags_ptr()) {
+                    possible_classes[hashtag.first].emplace(merged_ecc);
+                    for (const auto& other_hash_value : dag->other_hash_values()) {
+                        possible_classes[other_hash_value].emplace(merged_ecc);
+                    }
+                }
+                // iterate over each ecc
+            } // end for j
+        } // end iterate over each ecc (for i)
+
+        return {std::move(merged_classes), std::move(possible_classes) };
     }
 
 } // namespace quartz

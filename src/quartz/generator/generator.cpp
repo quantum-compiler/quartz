@@ -77,27 +77,54 @@ namespace quartz {
 				if (num_gates == max_num_quantum_gates) {
 					break;
 				}
-				bool ret =
+
+                // C++ verifer
+//                /*
+                std::cout << "-------- find_equivalences start!" << std::endl;
+                auto start_verify = std::chrono::high_resolution_clock::now();
+
+                auto [classes, possible_classes] =
+                        dataset->find_equivalences(context, false, false);
+                equiv_set->load_data(
+                    context, std::move(classes),
+                    std::move(possible_classes), &dags_to_search
+                );
+
+                auto end_verify = std::chrono::high_resolution_clock::now();
+                *record_verification_time += (end_verify - start_verify);
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_verify - start_verify).count();
+                std::cout << "-------- find_equivalences end in " << duration << "ms" << std::endl;
+//                */
+                // C++ verifer
+
+                // python and c++
+                /*
+				decltype(std::chrono::steady_clock::now()) start_verify;
+				if (record_verification_time) {
+                    start_verify = std::chrono::steady_clock::now();
+				}
+                 bool ret =
 				    dataset->save_json(context, "tmp_before_verify.json");
 				assert(ret);
 
-				decltype(std::chrono::steady_clock::now()) start;
-				if (record_verification_time) {
-				  start = std::chrono::steady_clock::now();
-				}
 				// Assume working directory is cmake-build-debug/ here.
 				system("python src/python/verifier/verify_equivalences.py "
 				       "tmp_before_verify.json tmp_after_verify.json");
                 if (record_verification_time) {
                   auto end = std::chrono::steady_clock::now();
-                  *record_verification_time += end - start;
+                  *record_verification_time += end - start_verify;
                 }
 
 				dags_to_search.clear();
 				ret = equiv_set->load_json(context, "tmp_after_verify.json",
 				                           &dags_to_search);
 				assert(ret);
-				for (auto &dag : dags_to_search) {
+                auto end_verify = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_verify - start_verify).count();
+                std::cout << "-------- find_equivalences end in " << duration << "ms" << std::endl;
+                // python and c++
+                */
+                for (auto &dag : dags_to_search) {
 					auto new_dag = std::make_unique< DAG >(*dag);
 					dag = new_dag.get();
 					dag_holder.push_back(std::move(new_dag));

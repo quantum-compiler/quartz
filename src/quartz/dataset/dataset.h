@@ -2,6 +2,7 @@
 
 #include "../context/context.h"
 #include "../dag/dag.h"
+#include "equivalence_set.h"
 
 #include <unordered_set>
 
@@ -32,7 +33,10 @@ namespace quartz {
 		// Make this Dataset a brand new one.
 		void clear();
 
-        void find_equivalences(Context* ctx, bool check_phase_shift_by_z3 = false, bool dont_invoke_z3 = false);
+        std::pair<
+            std::vector<std::unique_ptr<EquivalenceClass>>,
+            std::unordered_map< DAGHashType, std::set<EquivalenceClass*> >
+        > find_equivalences(Context* ctx, bool check_phase_shift_by_z3 = false, bool dont_invoke_z3 = false);
 
 		std::unordered_map< DAGHashType, std::vector< std::unique_ptr< DAG > > >
 		    dataset;

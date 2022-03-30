@@ -14,7 +14,7 @@ namespace quartz {
 	public:
 		bool equivalent(
             const Context* ctx, const DAG* dag1, const DAG* dag2,
-            std::vector<ParamType> params_for_fp, PhaseShiftIdType phase_shift_id,
+            const std::vector<ParamType>& params_for_fp, PhaseShiftIdType phase_shift_id,
             bool check_phase_shift_by_z3 = false, bool dont_invoke_z3 = false
         );
 		// On-the-fly equivalence checking while generating circuits

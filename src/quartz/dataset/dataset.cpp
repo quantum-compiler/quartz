@@ -8,7 +8,6 @@
 #include <cassert>
 #include <fstream>
 #include <iomanip>
-#include <mutex>
 
 namespace quartz
 {
@@ -216,6 +215,7 @@ namespace quartz
     > Dataset::find_equivalences(
         Context *ctx, const bool check_phase_shift_by_z3, const bool dont_invoke_z3
     ) {
+        z3::set_param("parallel.enable", true);
         static Verifier verifier;
         // convert unordered_map obj dataset to vector to enable parallelization
         std::vector<std::pair< DAGHashType, const std::vector<std::unique_ptr<DAG>>* >> vec_dataset;
@@ -226,8 +226,13 @@ namespace quartz
         std::vector< std::vector<EquivClassTag> > class_hashes(dataset.size());
         std::vector< std::vector<std::unique_ptr<EquivalenceClass>> > classes(dataset.size());
 
+std::cout << "------** build classes start! vec_dataset.size: " << vec_dataset.size() << std::endl;
+auto start_build_class = std::chrono::high_resolution_clock::now();
+std::vector<decltype(start_build_class-start_build_class)> clone_times(vec_dataset.size(), start_build_class-start_build_class);
+std::vector<decltype(start_build_class-start_build_class)> verify_times(vec_dataset.size(), start_build_class-start_build_class);
+
         #pragma omp parallel for schedule(runtime) default(none) \
-            shared(vec_dataset, class_hashes, classes, verifier, ctx, check_phase_shift_by_z3, dont_invoke_z3)
+            shared(verify_times, clone_times, vec_dataset, class_hashes, classes, verifier, ctx, check_phase_shift_by_z3, dont_invoke_z3)
         for (size_t i = 0; i < vec_dataset.size(); i++) {
             // build vector<EquivalenceClass> at classes[i]
             DAGHashType hashtag = vec_dataset[i].first;
@@ -270,6 +275,10 @@ namespace quartz
                 }
             } // end for dags
         } // end for vec_dataset (paralleled)
+
+auto end_build_class = std::chrono::high_resolution_clock::now();
+auto duration_build_class = std::chrono::duration_cast<std::chrono::milliseconds>(end_build_class - start_build_class).count();
+std::cout << "------** build class end in " << duration_build_class << "ms" << std::endl;
 
         /*
          * find equivalences with different hash
@@ -329,7 +338,7 @@ namespace quartz
                             const EquivClassTag& other_hashtag = class_hashes[loc][k];
                             const DAG* rep_dag = classes[loc][k]->get_representative();
                             dags_to_verify.emplace_back(rep_dag, other_hashtag, std::move(phaseIDToDags));
-                            assert(!std::get<2>(dags_to_verify.back()).empty()); // ATTENTION Colin : clang-tidy
+                            assert(!std::get<2>(dags_to_verify.back()).empty()); // ATTENTION Colin : clang-tidy about phaseIDToDags
                         }
                     }
                 } // end for other_hashtags
@@ -380,6 +389,7 @@ namespace quartz
                     } // end (if) for phaseIDToDags
                     if (equivalence_found) {
                         // store found equivalence info (other_ecctag, hashtag)
+                        // ATTENTION Colin maybe slow!
                         #pragma omp critical (add_to_equiv_edges)
                         {
                             equiv_edges[hashtag].emplace_back(other_ecctag);

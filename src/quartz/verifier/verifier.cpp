@@ -79,9 +79,9 @@ namespace quartz {
 	}
 
     bool Verifier::equivalent(
-            const Context* const context, const DAG* const dag1, const DAG* const dag2,
-            const std::vector<ParamType> params_for_fp, const PhaseShiftIdType phase_shift_id,
-            const bool check_phase_shift_by_z3, const bool dont_invoke_z3
+        const Context* const context, const DAG* const dag1, const DAG* const dag2,
+        const std::vector<ParamType>& params_for_fp, const PhaseShiftIdType phase_shift_id,
+        const bool check_phase_shift_by_z3, const bool dont_invoke_z3
     ) {
         // check num_quibits
         if (dag1->get_num_qubits() != dag2->get_num_qubits())
@@ -117,17 +117,25 @@ namespace quartz {
                         dag1->get_original_fingerprint() / dag2->get_original_fingerprint();
                 const Z3ExprPair cur_phase_factor_symb{ z3ctx.real_val(1), z3ctx.real_val(0) };
                 const ComplexType cur_phase_factor_for_fp = { 0, 0 };
+auto start_search = std::chrono::high_resolution_clock::now();
                 const bool res = search_phase_factor(
                     context, z3ctx, dag1, dag2, constraint,
                     output_vec1, output_vec2, dont_invoke_z3,
                     input_params, params_for_fp, num_params, goal_phase_factor,
                     0, cur_phase_factor_symb, cur_phase_factor_for_fp
                 );
+auto end_search = std::chrono::high_resolution_clock::now();
+auto duration_search = std::chrono::duration_cast<std::chrono::milliseconds>(end_search - start_search).count();
+//std::cout << "--------** search factor end in " << duration_search << "ms" << std::endl;
                 return res;
             }
         }
         // CHECK
+auto start_solver = std::chrono::high_resolution_clock::now();
         const auto res = solver.check();
+auto end_solver = std::chrono::high_resolution_clock::now();
+auto duration_solver = std::chrono::duration_cast<std::chrono::milliseconds>(end_solver - start_solver).count();
+std::cout << "--------** solver checked end in " << duration_solver << "ms" << std::endl;
         assert(res != z3::unknown);
         return res == z3::unsat;
     }

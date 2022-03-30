@@ -80,7 +80,7 @@ namespace quartz {
 
                 // C++ verifer
 //                /*
-                std::cout << "-------- find_equivalences start!" << std::endl;
+                std::cout << "------ find_equivalences start!" << std::endl;
                 auto start_verify = std::chrono::high_resolution_clock::now();
 
                 auto [classes, possible_classes] =
@@ -93,7 +93,7 @@ namespace quartz {
                 auto end_verify = std::chrono::high_resolution_clock::now();
                 *record_verification_time += (end_verify - start_verify);
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_verify - start_verify).count();
-                std::cout << "-------- find_equivalences end in " << duration << "ms" << std::endl;
+                std::cout << "------ find_equivalences end in " << duration << "ms" << std::endl;
 //                */
                 // C++ verifer
 
@@ -101,6 +101,7 @@ namespace quartz {
                 /*
 				decltype(std::chrono::steady_clock::now()) start_verify;
 				if (record_verification_time) {
+                    std::cout << "------ find_equivalences start!" << std::endl;
                     start_verify = std::chrono::steady_clock::now();
 				}
                  bool ret =
@@ -121,7 +122,7 @@ namespace quartz {
 				assert(ret);
                 auto end_verify = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_verify - start_verify).count();
-                std::cout << "-------- find_equivalences end in " << duration << "ms" << std::endl;
+                std::cout << "------ find_equivalences end in " << duration << "ms" << std::endl;
                 // python and c++
                 */
                 for (auto &dag : dags_to_search) {

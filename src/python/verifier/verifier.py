@@ -6,6 +6,7 @@ is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
+import time
 import multiprocessing as mp
 import math
 import z3
@@ -271,7 +272,10 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
             output_vec2, current_phase_factor_symbolic)
         solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
         solver.set("timeout", 30000)  # timeout after 30s
+        # start_check = time.monotonic_ns()
         result = solver.check()
+        # end_check = time.monotonic_ns()
+        # print(f'------** solver ended in {(end_check - start_check) / 1e6} ms')
         if result != z3.unsat:
             print(
                 f'z3 returns {result} for the following equivalence which passed random testing:')
@@ -445,7 +449,6 @@ def find_equivalences(input_file, output_file, print_basic_info=True, verbose=Fa
     num_hashtags = 0
     num_dags = 0
     num_potential_equivalences = 0
-    import time
     t_start = time.monotonic()
     num_different_dags_with_same_hash = {}
     print(

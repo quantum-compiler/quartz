@@ -1287,7 +1287,7 @@ namespace quartz {
 		result->clone_from(*this, qubit_permutation, param_permutation);
 		return result;
 	}
-
+    // TODO Colin : check
 	void DAG::clone_from(const DAG &other,
 	                     const std::vector< int > &qubit_permutation,
 	                     const std::vector< int > &param_permutation) {

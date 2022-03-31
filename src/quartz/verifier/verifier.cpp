@@ -132,7 +132,8 @@ auto duration_search = std::chrono::duration_cast<std::chrono::milliseconds>(end
         }
         // CHECK
 auto start_solver = std::chrono::high_resolution_clock::now();
-        const auto res = solver.check();
+        // const auto res = solver.check();
+        const auto res = z3Utils::check_in_shell(solver);
 auto end_solver = std::chrono::high_resolution_clock::now();
 auto duration_solver = std::chrono::duration_cast<std::chrono::milliseconds>(end_solver - start_solver).count();
 std::cout << "--------** solver checked end in " << duration_solver << "ms" << std::endl;
@@ -216,7 +217,8 @@ std::cout << "--------** solver checked end in " << duration_solver << "ms" << s
                 solver.add(! z3Utils::eq(z3ctx, output_vec1, output_vec2_shifted));
                 // ATTENTION Colin : try to reduce it!
                 // solver.set(":timeout", 30000u); // timeout after 30s
-                const auto res = solver.check();
+                // const auto res = solver.check();
+                const auto res = z3Utils::check_in_shell(solver);
                 assert(res != z3::unknown);
                 return res == z3::unsat;
             }

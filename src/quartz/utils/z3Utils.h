@@ -53,7 +53,7 @@ namespace raymii {
              * of command. Empty if command failed (or has no output). If you want stderr,
              * use shell redirection (2&>1).
              */
-        static CommandResult exec(const std::string &command) {
+        CommandResult exec(const std::string &command) {
             int exitcode = 0;
             std::array<char, 1048576> buffer {};
             std::string result;
@@ -258,20 +258,30 @@ namespace quartz {
         inline z3::check_result check_in_shell(const z3::solver& solver) {
             std::stringstream str_to_check;
             // echo "something" | z3 -in
-            str_to_check << solver << "(check-sat)\n | z3 -in";
-            const raymii::CommandResult cmd_res = raymii::Command::exec(str_to_check.str());
+            str_to_check << "echo '" << solver << "(check-sat)' | z3 -in parallel.enable=true parallel.threads.max=16 2>&1";
+//            const auto start_1 = std::chrono::high_resolution_clock::now();
+            const raymii::CommandResult cmd_res = raymii::Command().exec(str_to_check.str());
+//            const auto end_1 = std::chrono::high_resolution_clock::now();
+//            const auto duration_1 = std::chrono::duration_cast<std::chrono::milliseconds>(end_1 - start_1).count();
+//            std::cout << "------** check_in_shell in " << duration_1 << " ms" << std::endl;
             if (cmd_res.exitstatus != 0) {
                 // z3 exit with error!
+                std::cout << "Command to exec:\n" << str_to_check.str() << "\nEnd command to exec" << std::endl;
+                std::cout << "cmd_res:\n" << cmd_res << "cmd_res end" << std::endl;
                 return z3::unknown;
             }
             else {
                 if (cmd_res.output.front() == 'u')
                     return z3::unsat;
-                else
+                else if (cmd_res.output.front() == 's')
                     return z3::sat;
+                else {
+                    std::cout << "Unexpected output:\n" << cmd_res.output << "\nEnd output" << std::endl;
+                    assert(false);
+                }
             }
         }
 
-    }
+    } // namespace z3Utils
 
-}
+} // namespace quartz

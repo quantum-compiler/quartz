@@ -8,6 +8,7 @@
 #include <cassert>
 #include <fstream>
 #include <iomanip>
+#include <chrono>
 
 namespace quartz
 {

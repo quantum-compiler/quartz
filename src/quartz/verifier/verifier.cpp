@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 
 namespace quartz {
 	bool Verifier::equivalent_on_the_fly(Context *ctx, DAG *circuit1,

@@ -69,7 +69,7 @@ add_library(quartz_runtime SHARED ${QUARTZ_SRCS})
 
 target_compile_features(quartz_runtime PUBLIC cxx_std_17)
 
-target_link_libraries(quartz_runtime ${QUARTZ_LINK_LIBS})
+target_link_libraries(quartz_runtime LINK_PUBLIC ${QUARTZ_LINK_LIBS})
 
 target_include_directories(quartz_runtime
   PUBLIC ${PROJECT_SOURCE_DIR}/src)
@@ -87,9 +87,16 @@ else()
 endif()
 
 # z3
-include_directories(/Users/colin/miniconda3/include)
-find_library(Z3_LIB libz3.dylib /Users/colin/miniconda3/lib)
-target_link_libraries(quartz_runtime LINK_PUBLIC ${Z3_LIB})
+if (NOT_LINUX)
+    message("build on macOS, link z3 lib")
+    include_directories(/Users/colin/miniconda3/include)
+    find_library(Z3_LIB libz3.dylib /Users/colin/miniconda3/lib)
+    target_link_libraries(quartz_runtime LINK_PUBLIC ${Z3_LIB})
+else()
+    include_directories(/home/jinjun/miniconda3/include)
+    find_library(Z3_LIB libz3.so /home/jinjun/miniconda3/lib)
+    target_link_libraries(quartz_runtime LINK_PUBLIC ${Z3_LIB})
+endif()
 
 #install library
 install(TARGETS quartz_runtime

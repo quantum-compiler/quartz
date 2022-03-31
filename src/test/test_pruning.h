@@ -36,6 +36,15 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       std::cout << "Representative pruning: use generated file."
                 << std::endl;
       fin.close();
+      equiv_set.clear();
+      start = std::chrono::steady_clock::now();
+      system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
+              "pruning_unverified.json " + file_prefix + "pruning.json")
+                     .c_str());
+      end = std::chrono::steady_clock::now();
+      equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+      running_time_with_all_pruning_techniques += end - start;
+      verification_time += end - start;
     } else {
       if (fin.is_open()) {
         fin.close();
@@ -65,7 +74,9 @@ void test_pruning(const std::vector<GateType> &supported_gates,
       std::cout << num_singletons << " singletons removed." << std::endl;
 
       start = std::chrono::steady_clock::now();
-      dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
+      // dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
+      auto [classes, possible_classes] =
+        dataset1.find_equivalences(&ctx, false, false);
       end = std::chrono::steady_clock::now();
       running_time_with_all_pruning_techniques += end - start;
       std::cout << std::dec << "Representative pruning: json saved in "
@@ -74,19 +85,13 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                     .count() /
                     1000.0
                 << " seconds." << std::endl;
-
+      equiv_set.load_data(
+        &ctx, std::move(classes),
+        std::move(possible_classes)
+      );
       dataset1.clear();
     }
 
-    equiv_set.clear();
-    start = std::chrono::steady_clock::now();
-    system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
-        "pruning_unverified.json " + file_prefix + "pruning.json")
-               .c_str());
-    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
-    end = std::chrono::steady_clock::now();
-    running_time_with_all_pruning_techniques += end - start;
-    verification_time += end - start;
     std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1) << " Verification Time (s): "
               << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                   verification_time)

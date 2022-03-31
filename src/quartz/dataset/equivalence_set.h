@@ -151,7 +151,7 @@ namespace quartz {
             Context* ctx,
             std::vector<std::unique_ptr<EquivalenceClass>>&& _classes,
             std::unordered_map< DAGHashType, std::set<EquivalenceClass*> >&& _possible_classes,
-            std::vector<DAG*>* new_representatives
+            std::vector<DAG*>* new_representatives = nullptr
         );
 
 	private:

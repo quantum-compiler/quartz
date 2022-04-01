@@ -1,4 +1,5 @@
 import json
+import random
 from dgl import save_graphs, load_graphs
 
 
@@ -60,6 +61,12 @@ class PosRewardData:
                          self.node_ids[i], self.xfer_ids[i], self.rewards[i],
                          self.to_graphs[i], self.to_graph_hashes[i]))
         return data
+
+    def sample(self):
+        idx = random.choice(list(range(self.data_cnt)))
+        return (self.from_graphs[idx], self.from_graph_hashes[idx],
+                self.node_ids[idx], self.xfer_ids[idx], self.rewards[idx],
+                self.to_graphs[idx], self.to_graph_hashes[idx])
 
 
 # p = PosRewardData()

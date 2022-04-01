@@ -91,7 +91,7 @@ class QAgent:
             #s_a = s_as.gather(1, a)
 
             if s_next == None:
-                target_r = torch.tensor(-3.0)
+                target_r = torch.tensor(-5.0)
                 if self.cuda:
                     target_r = target_r.cuda()
             else:
@@ -131,40 +131,50 @@ class QData:
         self.data = deque(maxlen=10000)
         self.hash_map = {}
 
+    # def add_data(self, d):
+    #     if d[4] == None:
+    #         d_0_hash = d[0].hash()
+    #         if d_0_hash not in self.hash_map:
+    #             self.hash_map[d_0_hash] = d[0].to_dgl_graph()
+    #         self.data.append((d_0_hash, d[1], d[2], d[3], None))
+    #     else:
+    #         d_0_hash = d[0].hash()
+    #         d_4_hash = d[4].hash()
+    #         if d_0_hash not in self.hash_map:
+    #             self.hash_map[d_0_hash] = d[0].to_dgl_graph()
+    #         if d_4_hash not in self.hash_map:
+    #             self.hash_map[d_4_hash] = d[4].to_dgl_graph()
+    #         self.data.append((d_0_hash, d[1], d[2], d[3], d_4_hash))
+
     def add_data(self, d):
-        if d[4] == None:
-            d_0_hash = d[0].hash()
-            if d_0_hash not in self.hash_map:
-                self.hash_map[d_0_hash] = d[0].to_dgl_graph()
-            self.data.append((d_0_hash, d[1], d[2], d[3], None))
-        else:
-            d_0_hash = d[0].hash()
-            d_4_hash = d[4].hash()
-            if d_0_hash not in self.hash_map:
-                self.hash_map[d_0_hash] = d[0].to_dgl_graph()
-            if d_4_hash not in self.hash_map:
-                self.hash_map[d_4_hash] = d[4].to_dgl_graph()
-            self.data.append((d_0_hash, d[1], d[2], d[3], d_4_hash))
+        self.data.append(d)
+
+    # def add_data_dgl(self, d):
+    #     if d[5] == None:
+    #         if d[1] not in self.hash_map:
+    #             self.hash_map[d[1]] = d[0]
+    #         self.data.append((d[1], d[2], d[3], d[4], None))
+
+    #     else:
+    #         if d[1] not in self.hash_map:
+    #             self.hash_map[d[1]] = d[0]
+    #         if d[6] not in self.hash_map:
+    #             self.hash_map[d[6]] = d[5]
+    #         self.data.append((d[1], d[2], d[3], d[4], d[6]))
 
     def add_data_dgl(self, d):
-        if d[5] == None:
-            if d[1] not in self.hash_map:
-                self.hash_map[d[1]] = d[0]
-            self.data.append((d[1], d[2], d[3], d[4], None))
+        self.data.append((d[0], d[2], d[3], d[4], d[5]))
 
-        else:
-            if d[1] not in self.hash_map:
-                self.hash_map[d[1]] = d[0]
-            if d[6] not in self.hash_map:
-                self.hash_map[d[6]] = d[5]
-            self.data.append((d[1], d[2], d[3], d[4], d[6]))
+    # def get_data(self):
+    #     s = random.choice(self.data)
+    #     # print(s)
+    #     if s[4] == None:
+    #         return self.hash_map[s[0]], s[1], s[2], s[3], None
+    #     return self.hash_map[s[0]], s[1], s[2], s[3], self.hash_map[s[4]]
 
     def get_data(self):
         s = random.choice(self.data)
-        # print(s)
-        if s[4] == None:
-            return self.hash_map[s[0]], s[1], s[2], s[3], None
-        return self.hash_map[s[0]], s[1], s[2], s[3], self.hash_map[s[4]]
+        return s
 
 
 # RL training
@@ -185,7 +195,8 @@ def train(*,
           log_fn='',
           pretrained_model=None,
           use_cuda=False,
-          use_pos_data=False,
+          pos_data_init=False,
+          pos_data_sampling=False,
           **kwargs):
 
     # Prepare for log
@@ -213,20 +224,32 @@ def train(*,
         agent.use_cuda()
 
     data = QData()
-    if use_pos_data:
-        pos_data = PosRewardData()
-        pos_data.load_data()
+    pos_data = PosRewardData()
+    pos_data.load_data()
+    if pos_data_init:
         for d in pos_data.all_data():
-            data.add_data(list(d))
+            data.add_data_dgl(d)
+
+    if pos_data_sampling:
+        assert 'pos_data_sampling_rate' in kwargs
+        pos_sampling_times = int(kwargs['pos_data_sampling_rate'] *
+                                 replay_times)
 
     average_seq_lens = []
     correct_cnts = []
+    average_rewards = []
 
     for i in tqdm(range(episodes)):
         rewards = 0
         losses = 0
         average_seq_len = 0
+        if pos_data_sampling:
+            for j in range(pos_sampling_times):
+                d = pos_data.sample()
+                data.add_data_dgl(d)
+
         for j in range(replay_times):
+
             count = 0
             end = False
             g = init_graph
@@ -240,22 +263,27 @@ def train(*,
 
                 if new_g == None:
                     end = True
-                    data.add_data([g, node, A, torch.tensor(-3), None])
+                    data.add_data((dgl_g, node, A, torch.tensor(-5), None))
                     print_log("end")
 
                 else:
                     reward = g.gate_count - new_g.gate_count
 
-                    data.add_data([g, node, A, torch.tensor(reward), new_g])
+                    data.add_data((dgl_g, node, A, torch.tensor(reward),
+                                   new_g.to_dgl_graph()))
 
                     g = new_g
                     rewards += reward
+                    if reward > 0:
+                        print_log("Reduced!")
                     print_log(g.gate_count)
 
             average_seq_len += count
         average_seq_len /= replay_times
         average_seq_lens.append(average_seq_len)
+        average_rewards.append(rewards / replay_times)
         print_log(f"average sequence length: {average_seq_len}")
+        print_log(f"average total reward: {rewards / replay_times}")
 
         for j in range(train_epoch):
             loss = agent.train(data, batch_size)
@@ -291,6 +319,6 @@ def train(*,
         f.close()
 
     if 'valid_xfer_dict' in kwargs:
-        return average_seq_lens, correct_cnts
+        return average_seq_lens, correct_cnts, average_rewards
 
-    return average_seq_lens
+    return average_seq_lens, average_rewards

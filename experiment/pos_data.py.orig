@@ -1,8 +1,10 @@
 import json
-<<<<<<< HEAD
 import random
+<<<<<<< HEAD
+from dgl import save_graphs, load_graphs
+
 =======
->>>>>>> Modified replay buffer to enable manually add positive-reward data
+>>>>>>> Added positive-reward
 from dgl import save_graphs, load_graphs
 
 
@@ -65,15 +67,13 @@ class PosRewardData:
                          self.to_graphs[i], self.to_graph_hashes[i]))
         return data
 
-<<<<<<< HEAD
     def sample(self):
         idx = random.choice(list(range(self.data_cnt)))
         return (self.from_graphs[idx], self.from_graph_hashes[idx],
                 self.node_ids[idx], self.xfer_ids[idx], self.rewards[idx],
                 self.to_graphs[idx], self.to_graph_hashes[idx])
 
-=======
->>>>>>> Modified replay buffer to enable manually add positive-reward data
+
 
 # p = PosRewardData()
 # p.load_data()

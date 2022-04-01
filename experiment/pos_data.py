@@ -64,6 +64,12 @@ class PosRewardData:
                          self.to_graphs[i], self.to_graph_hashes[i]))
         return data
 
+    def sample(self):
+        idx = random.choice(list(range(self.data_cnt)))
+        return (self.from_graphs[idx], self.from_graph_hashes[idx],
+                self.node_ids[idx], self.xfer_ids[idx], self.rewards[idx],
+                self.to_graphs[idx], self.to_graph_hashes[idx])
+
 
 
 # p = PosRewardData()

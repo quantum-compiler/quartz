@@ -13,6 +13,7 @@ def extract_results(filename):
     result = {}
     for line in content:
         line = line.strip()
+        data = line.split()
         if flag:
             pos = line.find(':')
             pos2 = line.find(',', pos)
@@ -29,6 +30,13 @@ def extract_results(filename):
             key = line[pos2 + 1:pos]
         else:
             flag = False
+        if len(data) >= 2 and data[1] == 'Timeout.':
+            key = data[0].split('.')[0]
+            val = data[-1]
+            result[key] = val
+            tot_gate += int(data[-1])
+            gate_product *= int(data[-1])
+            tot_time += 86400  # 1-day timeout
     for k, v in natsorted(result.items()):
         print(k.ljust(15), v)
     print('tot_gate =', tot_gate)

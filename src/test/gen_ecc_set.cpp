@@ -98,8 +98,8 @@ int main() {
   gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
                GateType::add},
               "IBM_4_3_", true, 3, 4, 4);
-  for (int n = 1; n <= 7; n++) {
-    for (int q = 1; q <= 4 - (n == 7); q++) {
+  for (int n = 1; n <= 8; n++) {
+    for (int q = 1; q <= 4 - (n >= 7); q++) {
       std::string file_prefix = "Nam_";
       file_prefix += std::to_string(n);
       file_prefix += "_";

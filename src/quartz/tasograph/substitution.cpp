@@ -425,8 +425,7 @@ void GraphXfer::match(OpX *srcOp, Op op, const Graph *graph) {
       // Input TensorX
       // Update mappedInputs
       std::set<Edge, EdgeCompare> list = graph->inEdges.find(op)->second;
-      std::set<Edge, EdgeCompare>::const_iterator it2;
-      for (it2 = list.begin(); it2 != list.end(); it2++) {
+      for (auto it2 = list.cbegin(); it2 != list.cend(); it2++) {
         Edge e = *it2;
         if (e.dstIdx == (int)i) {
           mappedInputs.insert(

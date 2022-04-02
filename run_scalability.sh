@@ -1,4 +1,4 @@
-./run_nam.sh ../Nam_1_1_complete_ECC_set.json > scalability_11.txt &
+./run_nam.sh ../Nam_1_1_complete_ECC_set.json > scalability_11.txt
 ./run_nam.sh ../Nam_2_1_complete_ECC_set.json > scalability_21.txt &
 ./run_nam.sh ../Nam_2_2_complete_ECC_set.json > scalability_22.txt &
 ./run_nam.sh ../Nam_2_3_complete_ECC_set.json > scalability_23.txt &

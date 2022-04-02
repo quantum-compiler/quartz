@@ -29,7 +29,7 @@ void parse_args(char **argv, int argc, bool &simulated_annealing,
 
 int main(int argc, char **argv) {
   std::string input_fn, output_fn;
-  std::string eqset_fn = "../Rigetti_5_3_complete_ECC_set.json";
+  std::string eqset_fn = "../Rigetti_6_3_complete_ECC_set.json";
   bool simulated_annealing = false;
   bool early_stop = false;
   bool disable_search = false;
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
   auto graph_before_h_cz_merge = new_graph->context_shift(
       &dst_ctx, &cz_ctx, &union_ctx_0, &cx_2_cz, false);
   auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
-      0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set.json",
+      0.999, 0, false, &union_ctx_0, "../H_CZ_2_2_complete_ECC_set_modified.json",
       simulated_annealing, false, /*rotation_merging_in_searching*/ true,
       GateType::rz, fn);
   //   graph_after_h_cz_merge->to_qasm(

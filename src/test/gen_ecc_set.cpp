@@ -23,6 +23,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                true, &equiv_set, unique_parameters, /*verbose=*/
                false);
   std::cout << "*** ch(" << file_prefix.substr(0, file_prefix.size() - 5)
+            << ",q=" << file_prefix[file_prefix.size() - 2]
             << ") = "
             << dataset1.num_total_dags() - 1 /*exclude the empty circuit*/
             << std::endl;
@@ -94,6 +95,9 @@ int main() {
     gen_ecc_set({GateType::rx, GateType::rz, GateType::cz, GateType::add},
                 file_prefix, true, 3, 2, n);
   }
+  gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
+               GateType::add},
+              "IBM_4_3_", true, 3, 4, 4);
   for (int n = 1; n <= 7; n++) {
     for (int q = 1; q <= 4 - (n == 7); q++) {
       std::string file_prefix = "Nam_";
@@ -106,8 +110,5 @@ int main() {
           file_prefix, true, q, 2, n);
     }
   }
-  gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
-               GateType::add},
-              "IBM_4_3_", true, 3, 4, 4);
   return 0;
 }

@@ -95,7 +95,8 @@ void test_pruning(const std::vector<GateType> &supported_gates,
                   .count() /
                   1000.0 << std::endl;
     if (!use_generated_file_if_possible) {
-      std::cout << "### Rn size: "
+      std::cout << "### " << file_prefix.substr(0, file_prefix.size() - 1)
+                << " Rn size: "
                 << equiv_set.num_equivalence_classes() + num_singletons
                 << std::endl;
       Rn = equiv_set.num_equivalence_classes() + num_singletons;

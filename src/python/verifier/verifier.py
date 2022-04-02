@@ -279,8 +279,9 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
                 f'Phase factor for fingerprint is {phase_factor_for_fingerprint}')
             print(f'Goal phase factor is {goal_phase_factor}')
             print(f'Symbolic phase factor is {current_phase_factor_symbolic}')
-            print(f'Solver found {solver.model()}')
-        assert result != z3.unknown
+            print(f'Dags are {dag1} and {dag2}')
+            if result == z3.sat:
+                print(f'Solver found {solver.model()}')
         return result == z3.unsat
 
     # Search for the parameter |current_param_id|

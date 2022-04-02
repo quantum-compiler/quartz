@@ -1435,83 +1435,161 @@ std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {
 // std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
 
 bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
-  for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
-    // Find a match for the given Op
-    if (xfer->can_match(*it, op, this)) {
-      xfer->match(*it, op, this);
-      bool rest_match = _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(),
-                                        op.guid) != nullptr;
-      xfer->unmatch(*it, op, this);
-      if (rest_match)
-        return true;
-    }
+  if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
+    return false;
   }
-  return false;
-}
-
-std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, size_t depth,
-                                              size_t ignore_depth,
-                                              size_t min_guid) const {
-  // The parameter min_guid is the guid of the first mapped Op
-  if (depth == xfer->srcOps.size()) {
-    // Create dst operators
-    bool pass = true;
-    for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
-         ++dst_it) {
-      if (pass) {
-        OpX *dstOp = *dst_it;
-        pass = (pass & xfer->create_new_operator(dstOp, dstOp->mapOp));
+  std::unordered_set<OpX *> mapped_opx;
+  std::deque<std::pair<OpX *, Op>> opx_op_dq;
+  xfer->match(*xfer->srcOps.begin(), op, this);
+  mapped_opx.insert(*xfer->srcOps.begin());
+  opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
+  // If an OpX is mapped to an Op, check whether their corresponding input OpX,
+  // input Op, output OpX, output Op can match. Because the source graphs is
+  // connected, by doing this we can traverse all nodes.
+  bool fail = false;
+  size_t idx = 0;
+  while (idx < opx_op_dq.size()) {
+    auto opx_op_pair = opx_op_dq[idx];
+    idx++;
+    auto opx_ = opx_op_pair.first;
+    auto op_ = opx_op_pair.second;
+    auto num_input = opx_->inputs.size();
+    auto num_output = opx_->outputs.size();
+    // Get all input and output Op of op_ in an ordered list
+    std::vector<Op> input_ops(num_input);
+    std::vector<Op> output_ops(num_output);
+    for (auto &e : inEdges.find(op_)->second) {
+      assert(e.dstIdx < num_input);
+      input_ops[e.dstIdx] = e.srcOp;
+    }
+    for (auto &e : outEdges.find(op_)->second) {
+      assert(e.srcIdx < num_output);
+      output_ops[e.srcIdx] = e.dstOp;
+    }
+    for (size_t i = 0; i < num_input; ++i) {
+      auto input_opx = opx_->inputs[i].op;
+      if (input_opx != nullptr &&
+          mapped_opx.find(input_opx) == mapped_opx.end()) {
+        if (!xfer->can_match(input_opx, input_ops[i], this)) {
+          fail = true;
+          break;
+        } else {
+          xfer->match(input_opx, input_ops[i], this);
+          mapped_opx.insert(input_opx);
+          opx_op_dq.push_back(std::make_pair(input_opx, input_ops[i]));
+        }
       }
     }
-    if (!pass)
-      return std::shared_ptr<Graph>(nullptr);
-    // Check that output tensors with external edges are mapped
-    for (auto mapped_ops_it = xfer->mappedOps.cbegin();
-         mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
-      if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
-        const std::set<Edge, EdgeCompare> &list =
-            outEdges.find(mapped_ops_it->first)->second;
-        for (auto edge_it = list.cbegin(); edge_it != list.cend(); ++edge_it)
-          if (xfer->mappedOps.find(edge_it->dstOp) == xfer->mappedOps.end()) {
-            // dstOp is external, (srcOp, srcIdx) must be in
-            // mappedOutputs
-            TensorX srcTen;
-            srcTen.op = mapped_ops_it->second;
-            srcTen.idx = edge_it->srcIdx;
-            if (xfer->mappedOutputs.find(srcTen) == xfer->mappedOutputs.end()) {
-              return std::shared_ptr<Graph>(nullptr);
-            }
-          }
+    if (fail) {
+      break;
+    }
+    for (size_t i = 0; i < num_output; ++i) {
+      auto output_opx = opx_->outputs[i].op;
+      if (mapped_opx.find(output_opx) == mapped_opx.end()) {
+        if (!xfer->can_match(output_opx, output_ops[i], this)) {
+          fail = true;
+          break;
+        } else {
+          xfer->match(output_opx, output_ops[i], this);
+          mapped_opx.insert(output_opx);
+          opx_op_dq.push_back(std::make_pair(output_opx, output_ops[i]));
+        }
       }
     }
-
-    auto new_graph = xfer->create_new_graph(this);
-    if (new_graph->has_loop()) {
-      new_graph.reset();
-      return new_graph;
-    }
-    return new_graph;
-  }
-  if (depth == ignore_depth) {
-    return _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
-  }
-  OpX *srcOp = xfer->srcOps[depth];
-  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
-    if (it->first.guid < min_guid)
-      continue;
-    if ((xfer->mappedOps.find(it->first) == xfer->mappedOps.end()) &&
-        xfer->can_match(srcOp, it->first, this)) {
-      Op match_op = it->first;
-      // Check mapOutput
-      xfer->match(srcOp, match_op, this);
-      auto new_graph = _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
-      xfer->unmatch(srcOp, match_op, this);
-      if (new_graph != nullptr)
-        return new_graph;
+    if (fail) {
+      break;
     }
   }
-  return std::shared_ptr<Graph>(nullptr);
+  while (!opx_op_dq.empty()) {
+    auto opx_op_pair = opx_op_dq.back();
+    opx_op_dq.pop_back();
+    xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
+  }
+  if (!fail)
+    assert(mapped_opx.size() == xfer->srcOps.size());
+  return !fail;
 }
+
+// bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
+//   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
+//     // Find a match for the given Op
+//     if (xfer->can_match(*it, op, this)) {
+//       xfer->match(*it, op, this);
+//       bool rest_match = _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(),
+//                                         op.guid) != nullptr;
+//       xfer->unmatch(*it, op, this);
+//       if (rest_match)
+//         return true;
+//     }
+//   }
+//   return false;
+// }
+
+// std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, size_t depth,
+//                                               size_t ignore_depth,
+//                                               size_t min_guid) const {
+//   // The parameter min_guid is the guid of the first mapped Op
+//   if (depth == xfer->srcOps.size()) {
+//     // Create dst operators
+//     bool pass = true;
+//     for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
+//          ++dst_it) {
+//       if (pass) {
+//         OpX *dstOp = *dst_it;
+//         pass = (pass & xfer->create_new_operator(dstOp, dstOp->mapOp));
+//       }
+//     }
+//     if (!pass)
+//       return std::shared_ptr<Graph>(nullptr);
+//     // Check that output tensors with external edges are mapped
+//     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
+//          mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
+//       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
+//         const std::set<Edge, EdgeCompare> &list =
+//             outEdges.find(mapped_ops_it->first)->second;
+//         for (auto edge_it = list.cbegin(); edge_it != list.cend(); ++edge_it)
+//           if (xfer->mappedOps.find(edge_it->dstOp) == xfer->mappedOps.end())
+//           {
+//             // dstOp is external, (srcOp, srcIdx) must be in
+//             // mappedOutputs
+//             TensorX srcTen;
+//             srcTen.op = mapped_ops_it->second;
+//             srcTen.idx = edge_it->srcIdx;
+//             if (xfer->mappedOutputs.find(srcTen) ==
+//             xfer->mappedOutputs.end()) {
+//               return std::shared_ptr<Graph>(nullptr);
+//             }
+//           }
+//       }
+//     }
+
+//     auto new_graph = xfer->create_new_graph(this);
+//     if (new_graph->has_loop()) {
+//       new_graph.reset();
+//       return new_graph;
+//     }
+//     return new_graph;
+//   }
+//   if (depth == ignore_depth) {
+//     return _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
+//   }
+//   OpX *srcOp = xfer->srcOps[depth];
+//   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
+//     if (it->first.guid < min_guid)
+//       continue;
+//     if ((xfer->mappedOps.find(it->first) == xfer->mappedOps.end()) &&
+//         xfer->can_match(srcOp, it->first, this)) {
+//       Op match_op = it->first;
+//       // Check mapOutput
+//       xfer->match(srcOp, match_op, this);
+//       auto new_graph = _match_rest_ops(xfer, depth + 1, ignore_depth,
+//       min_guid); xfer->unmatch(srcOp, match_op, this); if (new_graph !=
+//       nullptr)
+//         return new_graph;
+//     }
+//   }
+//   return std::shared_ptr<Graph>(nullptr);
+// }
 
 std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {

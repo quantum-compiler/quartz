@@ -340,6 +340,8 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // the src op and the dst op are mapped, the edge connecting them will
   // be checked. This gauarentee that every edges are checked at the end.
   // Check gate type
+  if (op == Op::INVALID_OP)
+    return false;
   if (srcOp->type != op.ptr->tp)
     return false;
   // Check num input tensors
@@ -374,6 +376,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
             if (e.dstIdx == (int)i) {
               newMapInputs.insert(
                   std::make_pair(in.idx, std::make_pair(e.srcOp, e.srcIdx)));
+              break;
             }
           }
         }
@@ -389,7 +392,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
     // Check output
     for (size_t i = 0; i < srcOp->outputs.size(); i++) {
       TensorX out = srcOp->outputs[i];
-      auto it = mappedOutputs.find(out);
+      auto it = mappedOutputs.find(srcOp->outputs[i]);
       // If out is in mappedOutputs, it represents an external edge,
       // we don't check it here
       if (it == mappedOutputs.end()) {
@@ -401,9 +404,9 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           OpX *output_src_opx = mapped_ops_it->second;
           for (size_t j = 0; j < output_src_opx->inputs.size(); ++j) {
             auto input_tensor = output_src_opx->inputs[j];
-            if (input_tensor.op == out.op && input_tensor.idx == out.idx) {
+            if (input_tensor == srcOp->outputs[i]) {
               found = true;
-              if (!graph->has_edge(srcOp->mapOp, mapped_ops_it->first, i, j)) {
+              if (!graph->has_edge(op, mapped_ops_it->first, i, j)) {
                 return false;
               } else
                 break;

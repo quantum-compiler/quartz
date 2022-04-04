@@ -295,15 +295,16 @@ cdef class PyGraph:
     def xfer_appliable(self, *, PyXfer xfer, PyNode node):
         return self._xfer_appliable(xfer, node)
 
-    def available_xfers(self, *, context, node, output_format="int"):
-        xfers = context.get_xfers()
-        result = []
-        for i in range(len(xfers)):
-            if self._xfer_appliable(xfers[i], node):
-                if output_format in ['int']:
-                    result.append(i)
-                else:
-                    result.append(xfers[i])
+    def available_xfers(self, *, QuartzContext context, PyNode node, output_format="int"):
+        # xfers = context.get_xfers()
+        # result = []
+        # for i in range(len(xfers)):
+        #     if self._xfer_appliable(xfers[i], node):
+        #         if output_format in ['int']:
+        #             result.append(i)
+        #         else:
+        #             result.append(xfers[i])
+        result = deref(self.graph).appliable_xfers(node.node, context.v_xfers)
         return result
                     
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:

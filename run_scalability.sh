@@ -22,3 +22,6 @@
 ./run_nam.sh ../Nam_7_1_complete_ECC_set.json > scalability_71.txt &
 ./run_nam.sh ../Nam_7_2_complete_ECC_set.json > scalability_72.txt &
 ./run_nam.sh ../Nam_7_3_complete_ECC_set.json > scalability_73.txt &
+./run_nam.sh ../Nam_8_1_complete_ECC_set.json > scalability_81.txt &
+./run_nam.sh ../Nam_8_2_complete_ECC_set.json > scalability_82.txt &
+./run_nam.sh ../Nam_8_3_complete_ECC_set.json > scalability_83.txt &

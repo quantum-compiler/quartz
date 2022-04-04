@@ -166,7 +166,7 @@ namespace quartz {
 
         Op srcOp, dstOp;
         int srcIdx, dstIdx;
-        int logical_qubit_idx, physical_qubit_idx;
+        mutable int logical_qubit_idx, physical_qubit_idx;
     };
 
     struct EdgeCompare {

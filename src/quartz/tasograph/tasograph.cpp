@@ -139,12 +139,48 @@ namespace quartz {
 
     void Graph::init_qubit_mapping() {
         // TODO: quartz physical: test this
+
+        // STEP 1: initial mapping
         // TODO: quartz physical: use a better initial mapping
         int qubit_index = 0;
         for (const auto& op_in_edge : inEdges) {
             if (op_in_edge.first.ptr->tp == GateType::input_qubit) {
                 qubit_mapping_table.insert({op_in_edge.first, std::pair<int, int>(qubit_index, qubit_index)});
                 qubit_index += 1;
+            }
+        }
+
+        // STEP 2: propagate through the circuit
+        std::queue<Edge> query_list;
+        // initialize edges directed connected to input_qubits and put them into query list
+        for (const auto& input_qubits_edges: qubit_mapping_table) {
+            auto initial_edge = *(outEdges[input_qubits_edges.first].begin());
+            initial_edge.logical_qubit_idx = input_qubits_edges.second.first;
+            initial_edge.physical_qubit_idx = input_qubits_edges.second.second;
+            query_list.push(initial_edge);
+        }
+        // scan through the circuit until the end
+        while (!query_list.empty()) {
+            // get a mapped edge
+            auto cur_edge = query_list.front();
+            query_list.pop();
+            // set mapping info for its target op
+            auto target_op = cur_edge.dstOp;
+            auto port_idx = cur_edge.dstIdx;
+            if (cur_edge.dstOp != Op::INVALID_OP){
+                // set in edge of target op
+                std::next(inEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+                std::next(inEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+                // set out edge of target op
+                std::next(outEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+                if (target_op.ptr->tp == GateType::swap) {
+                    // note that swap gates have only two inputs
+                    std::next(outEdges[target_op].begin(), 1 - port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+                } else {
+                    std::next(outEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+                }
+                // put out edge into query list
+                query_list.push(*std::next(outEdges[target_op].begin(), port_idx));
             }
         }
     }
@@ -243,7 +279,7 @@ namespace quartz {
         for (const auto &op_out: outEdges) edge_map[op_out.first].out_edges = &op_out.second;
         for (const auto &op_in: inEdges) edge_map[op_in.first].in_edges = &op_in.second;
 
-        //
+        // check correctness on each Op
         for (const auto &op_edge: edge_map) {
             // input_param always passes
             if (op_edge.first.ptr->tp == GateType::input_param) continue;
@@ -262,7 +298,10 @@ namespace quartz {
             }
 
             // other kind of Ops
-            if (op_edge.second.out_edges->size() == 1) {
+            if (op_edge.second.out_edges->empty()) {
+                // case for gates with no output (i.e. final gates)
+                continue;
+            } else if (op_edge.second.out_edges->size() == 1) {
                 // case for one qubit gate
                 auto in_edge = op_edge.second.in_edges->begin();
                 auto out_edge = op_edge.second.out_edges->begin();
@@ -297,7 +336,7 @@ namespace quartz {
                 }
             } else {
                 // Operations on more than 3 qubits are not supported.
-                std::cout << "Detect gates with zero / more than two outputs" << '\n';
+                std::cout << "Detect gates with more than two outputs" << '\n';
                 assert(false);
             }
         }

@@ -432,13 +432,20 @@ namespace quartz {
         return src_graph;
     }
 
-    float Graph::total_cost(void) const {
+    float Graph::total_cost(const std::shared_ptr<DeviceTopologyGraph>& device = nullptr) const {
+        float total_cost = 0;
+        // gate count based cost
         size_t cnt = 0;
         for (const auto &it: inEdges) {
             if (it.first.ptr->is_quantum_gate())
                 cnt++;
         }
-        return (float) cnt;
+        total_cost += (float) cnt;
+        // mapping based cost (only available when device is provided)
+        if (device) {
+
+        }
+        return total_cost;
     }
 
     int Graph::gate_count() const {

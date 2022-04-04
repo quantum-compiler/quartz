@@ -207,7 +207,7 @@ namespace quartz {
 
         bool check_mapping_correctness();
 
-        float total_cost() const;
+        float total_cost(const std::shared_ptr<DeviceTopologyGraph>& device) const;
 
         int gate_count() const;
 
@@ -292,8 +292,6 @@ namespace quartz {
         std::map<Op, ParamType> constant_param_values;
         std::unordered_map<Op, int, OpHash> qubit_2_idx;
 
-        // device topology
-        std::shared_ptr<DeviceTopologyGraph> device_topology_graph;
         // stores the mapping of input_qubit Ops -> <logical, physical idx>
         std::unordered_map<Op, std::pair<int, int>, OpHash> qubit_mapping_table;
     };

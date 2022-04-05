@@ -209,6 +209,8 @@ namespace quartz {
 
         float total_cost() const;
 
+        [[nodiscard]] double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);
+
         int gate_count() const;
 
         size_t get_next_special_op_guid();

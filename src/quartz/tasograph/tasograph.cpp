@@ -1,5 +1,6 @@
 #include "tasograph.h"
 #include "substitution.h"
+#include "device/device.h"
 
 #include <cassert>
 #include <iomanip>
@@ -441,6 +442,43 @@ namespace quartz {
                 cnt++;
         }
         total_cost += (float) cnt;
+        return total_cost;
+    }
+
+    double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device) {
+        double total_cost = 0;
+        // Part1: cost of gates
+        auto gate_count_cost = gate_count();
+        total_cost += gate_count_cost;
+
+        // Part2: cost of swaps
+        // find all initial swap gates
+        std::unordered_set<Op, OpHash> initial_swap_set;
+        for (const auto& input_qubit_mapping : qubit_mapping_table) {
+            auto input_qubit_edge = outEdges[input_qubit_mapping.first].begin();
+            while (input_qubit_edge->dstOp.ptr->tp == GateType::swap) {
+                // store the swap gate and move one step forward
+                initial_swap_set.insert(input_qubit_edge->dstOp);
+                input_qubit_edge = std::next(outEdges[input_qubit_edge->dstOp].begin(), input_qubit_edge->dstIdx);
+            }
+        }
+        // calculate additional swap cost based on qubit distance in device
+        for (const auto& Op_edge : inEdges) {
+            // ignore the gate if it is initial swap
+            if (initial_swap_set.find(Op_edge.first) != initial_swap_set.end()) { continue; }
+            // calculate the min swap cost
+            // we assume that qubit 0 is moved to somewhere adjacent to qubit 1
+            double min_swap_cost = 99999999999;
+            const auto& first_qubit = Op_edge.second.begin();
+            const auto& second_qubit = std::next(Op_edge.second.begin());
+            auto input_neighbours = device->get_input_neighbours(second_qubit->physical_qubit_idx);
+            for (const auto& neighbour : input_neighbours) {
+                double swap_cost = 2 * device->cal_swap_cost(first_qubit->physical_qubit_idx, neighbour);
+                min_swap_cost = std::min(min_swap_cost, swap_cost);
+            }
+            total_cost += min_swap_cost;
+        }
+
         return total_cost;
     }
 

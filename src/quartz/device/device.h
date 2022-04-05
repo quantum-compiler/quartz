@@ -47,7 +47,7 @@ namespace quartz {
 
     enum class DeviceType {
         GenericDevice = 0,
-        SymmetricDevice = 1
+        SymmetricUniformDevice = 1
     };
 
     class DeviceTopologyGraph {
@@ -175,14 +175,14 @@ namespace quartz {
         }
     };
 
-    class SymmetricDevice : public DeviceTopologyGraph {
+    class SymmetricUniformDevice : public DeviceTopologyGraph {
     public:
-        SymmetricDevice() = default;
+        SymmetricUniformDevice() = default;
 
-        explicit SymmetricDevice(int _num_qubits) : DeviceTopologyGraph(_num_qubits) {}
+        explicit SymmetricUniformDevice(int _num_qubits) : DeviceTopologyGraph(_num_qubits) {}
 
         DeviceType device_type() override {
-            return DeviceType::SymmetricDevice;
+            return DeviceType::SymmetricUniformDevice;
         }
 
         void add_edge(int src_idx, int dst_idx) {

@@ -32,7 +32,7 @@ int main() {
     std::cout << "Has 1->3 edge: " << generic_device.has_edge(1, 3) << '\n';
 
     // build a generic device
-    auto symmetric_device = quartz::SymmetricDevice(9);
+    auto symmetric_device = quartz::SymmetricUniformDevice(9);
     symmetric_device.add_qubit();
     symmetric_device.add_edge(0, 1);
     symmetric_device.add_edge(0, 7);

@@ -45,6 +45,11 @@ namespace quartz {
         std::vector<double> swap_cost_cache;
     };
 
+    enum class DeviceType {
+        GenericDevice = 0,
+        SymmetricDevice = 1
+    };
+
     class DeviceTopologyGraph {
     public:
         DeviceTopologyGraph() = default;
@@ -60,11 +65,13 @@ namespace quartz {
             for (const auto &device_qubit: device_qubits) device_qubit->print();
         }
 
+        virtual DeviceType device_type() = 0;
+
         void add_qubit() {
             device_qubits.emplace_back(std::make_shared<DeviceQubit>(num_qubits++));
         }
 
-        void add_edge(int src_idx, int dst_idx, double swap_cost, bool bidirectional = true) {
+        void add_edge(int src_idx, int dst_idx, double swap_cost, bool bidirectional) {
             auto new_edge = std::make_shared<DeviceEdge>(src_idx, dst_idx, swap_cost);
             device_qubits[src_idx]->out_edges.emplace_back(new_edge);
             device_qubits[dst_idx]->in_edges.emplace_back(new_edge);
@@ -78,7 +85,9 @@ namespace quartz {
         [[nodiscard]] bool has_edge(int src_idx, int dst_idx) const {
             return std::any_of(device_qubits[src_idx]->out_edges.begin(),
                                device_qubits[src_idx]->out_edges.end(),
-                               [&dst_idx](const std::shared_ptr<DeviceEdge>& edge){ return edge->dst_idx == dst_idx; });
+                               [&dst_idx](const std::shared_ptr<DeviceEdge> &edge) {
+                                   return edge->dst_idx == dst_idx;
+                               });
         }
 
         [[nodiscard]] double cal_swap_cost(int src_idx, int dst_idx) const {
@@ -89,6 +98,7 @@ namespace quartz {
         }
 
         void cache_swap_cost() const {
+            // This function caches swap cost between all pairs of nodes.
             for (auto src_idx = 0; src_idx < num_qubits; ++src_idx)
                 _cal_swap_cost(src_idx);
         }
@@ -148,10 +158,36 @@ namespace quartz {
             device_qubits[src_idx]->swap_cost_cache = std::move(swap_cost);
         }
 
-    private:
+    protected:
         int num_qubits{0};
         constexpr static double unconnected_swap_penalty = 10000;
         std::vector<std::shared_ptr<DeviceQubit>> device_qubits;
+    };
+
+    class GenericDevice : public DeviceTopologyGraph {
+    public:
+        GenericDevice() = default;
+
+        explicit GenericDevice(int _num_qubits) : DeviceTopologyGraph(_num_qubits) {}
+
+        DeviceType device_type() override {
+            return DeviceType::GenericDevice;
+        }
+    };
+
+    class SymmetricDevice : public DeviceTopologyGraph {
+    public:
+        SymmetricDevice() = default;
+
+        explicit SymmetricDevice(int _num_qubits) : DeviceTopologyGraph(_num_qubits) {}
+
+        DeviceType device_type() override {
+            return DeviceType::SymmetricDevice;
+        }
+
+        void add_edge(int src_idx, int dst_idx) {
+            DeviceTopologyGraph::add_edge(src_idx, dst_idx, 1.0f, true);
+        }
     };
 }
 

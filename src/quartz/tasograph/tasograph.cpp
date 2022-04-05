@@ -432,7 +432,7 @@ namespace quartz {
         return src_graph;
     }
 
-    float Graph::total_cost(const std::shared_ptr<DeviceTopologyGraph>& device = nullptr) const {
+    float Graph::total_cost() const {
         float total_cost = 0;
         // gate count based cost
         size_t cnt = 0;
@@ -441,10 +441,6 @@ namespace quartz {
                 cnt++;
         }
         total_cost += (float) cnt;
-        // mapping based cost (only available when device is provided)
-        if (device) {
-
-        }
         return total_cost;
     }
 

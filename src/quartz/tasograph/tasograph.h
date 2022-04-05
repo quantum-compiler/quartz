@@ -207,7 +207,7 @@ namespace quartz {
 
         bool check_mapping_correctness();
 
-        float total_cost(const std::shared_ptr<DeviceTopologyGraph>& device) const;
+        float total_cost() const;
 
         int gate_count() const;
 

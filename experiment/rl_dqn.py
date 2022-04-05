@@ -288,7 +288,7 @@ def train(*,
         for j in range(train_epoch):
             loss = agent.train(data, batch_size)
             losses += loss
-            agent.scheduler.step()
+        agent.scheduler.step()
 
         if epsilon > 0.05:
             epsilon -= epsilon_decay

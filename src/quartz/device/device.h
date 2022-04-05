@@ -90,6 +90,16 @@ namespace quartz {
                                });
         }
 
+        [[nodiscard]] std::vector<int> get_input_neighbours(int qubit_idx) {
+            auto &edge_list = device_qubits[qubit_idx]->in_edges;
+            std::vector<int> input_neighbour_list;
+            input_neighbour_list.reserve(edge_list.size());
+            for (const auto &edge: edge_list) {
+                input_neighbour_list.emplace_back(edge->src_idx);
+            }
+            return input_neighbour_list;
+        }
+
         [[nodiscard]] double cal_swap_cost(int src_idx, int dst_idx) const {
             // This function calculates the cost of moving a logical qubit from physical
             // qubit with src_idx to the physical qubit with dst_idx using swap gates

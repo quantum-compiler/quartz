@@ -1,5 +1,6 @@
 #include "quartz/device/device.h"
 #include <iostream>
+#include <vector>
 
 int main() {
     // build a generic device
@@ -24,7 +25,7 @@ int main() {
     generic_device.cache_swap_cost();
     // generic_device.print();
     for (int i = 0; i < 1; ++i) {
-        for (int j=0; j < 12; ++j) {
+        for (int j = 0; j < 12; ++j) {
             std::cout << "src: " << i << ", dst: " << j << ", cost: " << generic_device.cal_swap_cost(i, j) << '\n';
         }
     }
@@ -53,10 +54,16 @@ int main() {
     symmetric_device.cache_swap_cost();
     // generic_device.print();
     for (int i = 0; i < 1; ++i) {
-        for (int j=0; j < 12; ++j) {
+        for (int j = 0; j < 12; ++j) {
             std::cout << "src: " << i << ", dst: " << j << ", cost: " << symmetric_device.cal_swap_cost(i, j) << '\n';
         }
     }
     std::cout << "Has 0->1 edge: " << symmetric_device.has_edge(0, 1) << '\n';
     std::cout << "Has 1->3 edge: " << symmetric_device.has_edge(1, 3) << '\n';
+
+    // get neighbours
+    auto neighbours = symmetric_device.get_input_neighbours(7);
+    std::cout << "Neighbours of qubit 7: ";
+    for (auto neighbour: neighbours) { std::cout << neighbour << ' '; }
+    std::cout << '\n';
 };

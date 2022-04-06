@@ -25,7 +25,8 @@ return 0;
 where `{Gate set}` can be `{GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add}` for the Nam gate set,
 `{GateType::u1, GateType::u2, GateType::u3, GateType::cx, GateType::add}` for the IBM gate set,
 `{GateType::rx, GateType::rz, GateType::cz, GateType::add}` for the Rigetti gate set,
-or any gate set you want.
+or any gate set you want. `GateType::add` is to enable using a sum of two input parameters as an input to a parameterized quantum gate.
+See all supported gate types in [gates.inc.h](src/quartz/gate/gates.inc.h).
 
 And then you can run `./gen_ecc_set.sh` to generate the ECC set.
 

@@ -13,7 +13,21 @@ Quartz targets the logical optimization stage in quantum circuit compilation and
 
 ### Generate and verify an ECC set
 
-todo(mingkuan): instructions to generate an (n,q)-complete ECC set
+To generate and verify pre-defined ECC sets, you can simply run `./gen_ecc_set.sh`.
+
+To generate an `(n,q)`-complete ECC set with `m` input parameters for some gate set, 
+you can change the main function in `src/test/gen_ecc_set.cpp` to the following:
+
+```c++
+gen_ecc_set({Gate set}, "{Name of the gate set}_{n}_{q}_", true, q, m, n);
+return 0;
+```
+where `{Gate set}` can be `{GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add}` for the Nam gate set,
+`{GateType::u1, GateType::u2, GateType::u3, GateType::cx, GateType::add}` for the IBM gate set,
+`{GateType::rx, GateType::rz, GateType::cz, GateType::add}` for the Rigetti gate set,
+or any gate set you want.
+
+And then you can run `./gen_ecc_set.sh` to generate the ECC set.
 
 ### Optimize a quantum circuit
 
@@ -33,7 +47,7 @@ Please subscribe to the FlexFlow users mailing list for
 
 ## Citations
 
-* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia [Quartz: Superoptimization of Quantum Circuits](). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
+* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia. [Quartz: Superoptimization of Quantum Circuits](). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
 
 
 ## License

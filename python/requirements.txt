@@ -5,6 +5,7 @@ cryptography==36.0.1
 dill==0.3.4
 idna==3.3
 mpmath==1.2.1
+natsort==8.1.0
 ntlm-auth==1.5.0
 numpy==1.22.1
 pbr==5.8.0
@@ -29,3 +30,4 @@ sympy==1.9
 tweedledum==1.1.1
 urllib3==1.26.8
 websocket-client==1.2.3
+z3_solver==4.8.12.0

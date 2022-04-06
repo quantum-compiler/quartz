@@ -41,9 +41,9 @@ See [code structure](CODE_STRUCTURE.md) for more information about the organizat
 
 Please let us know if you encounter any bugs or have any suggestions by [submitting an issue](https://github.com/quantum-compiler/quartz/issues).
 
-We welcome all contributions to FlexFlow from bug fixes to new features and extensions.
+We welcome all contributions to Quartz from bug fixes to new features and extensions.
 
-Please subscribe to the FlexFlow users mailing list for 
+Please subscribe to the Quartz users mailing list for 
 
 ## Citations
 

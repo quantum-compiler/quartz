@@ -17,7 +17,7 @@ int main() {
   QASMParser qasm_parser(&ctx);
   DAG *dag = nullptr;
   if (!qasm_parser.load_qasm(
-          "experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
+          "../experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
     std::cout << "Parser failed" << std::endl;
     return 0;
   }
@@ -30,7 +30,7 @@ int main() {
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "bfs_verified_simplified.json")) {
+  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json")) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }
@@ -57,6 +57,7 @@ int main() {
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
   //   back tracking search
+  auto start = std::chrono::steady_clock::now();
   int budget = 1000000;
   std::priority_queue<
       std::shared_ptr<Graph>, std::vector<std::shared_ptr<Graph>>,
@@ -74,7 +75,9 @@ int main() {
     top_graph->topology_order_ops(all_ops);
     assert(all_ops.size() == (size_t)top_graph->gate_count());
     for (auto op : all_ops) {
-      for (auto xfer : xfers) {
+      for (int i = 0; i < xfers.size(); ++i) {
+        auto xfer = xfers[i];
+        //   for (auto xfer : xfers) {
         if (top_graph->xfer_appliable(xfer, op)) {
           auto new_graph = top_graph->apply_xfer(xfer, op);
           if (hash_mp.find(new_graph->hash()) == hash_mp.end()) {
@@ -85,9 +88,15 @@ int main() {
               best_gate_cnt = new_graph->gate_count();
             }
             budget--;
+            auto end = std::chrono::steady_clock::now();
             if (budget % 1000 == 0) {
               std::cout << "budget: " << budget << " best gate count "
-                        << best_gate_cnt << std::endl;
+                        << best_gate_cnt << " in "
+                        << (double)std::chrono::duration_cast<
+                               std::chrono::milliseconds>(end - start)
+                                   .count() /
+                               1000.0
+                        << " seconds." << std::endl;
             }
           }
         }

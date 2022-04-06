@@ -21,7 +21,7 @@ todo (zikun): instructions to optimize a quantum circuit (C++ or Python interfac
 
 ## Repository Organization
 
-See [organization](CODE_STRUCTURE.md) for more information about the organization of the Quartz code base.
+See [code structure](CODE_STRUCTURE.md) for more information about the organization of the Quartz code base.
 
 ## Contributing
 

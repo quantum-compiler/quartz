@@ -34,6 +34,58 @@ And then you can run `./gen_ecc_set.sh` to generate the ECC set.
 
 todo (zikun): instructions to optimize a quantum circuit (C++ or Python interface, whichever is easier)
 
+#### Input the circuit
+
+To optimize a circuit, you can write your circuit in the `qasm` language and write it to a `qasm` file. Currently we only support a subset of `qasm`'s gramma. Specifically, the `qasm` files we support should consist of a header and lines of `qasm` instructions. The header should be in the format below:
+
+```
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[24];
+```
+
+The instructions should be in the format below:
+```
+cx q[3], q[2];
+cx q[8], q[7];
+cx q[14], q[13];
+cx q[21], q[20];
+```
+
+We do not support parameterized gates currently.
+
+To input a circuit in `qasm` file, you should first create a `Context` object, providing the gate set you use in your input file as parameter as below:
+
+``` cpp
+Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                GateType::input_qubit, GateType::input_param});
+```
+
+After that, you need a `QASMParser` object to parse the input `qasm` file. You can construct it as below:
+
+``` cpp
+QASMParser qasm_parser(&src_ctx);
+```
+
+Now you can use the `QASMParser` object to load the circuit from the `qasm` file to a `DAG` object, as below:
+
+``` cpp
+DAG *dag = nullptr;
+if (!qasm_parser.load_qasm(input_fn, dag)) {
+    std::cout << "Parser failed" << std::endl;
+}
+```
+
+After you have the circuit loaded into the `DAG` object, you can construct a `Graph` object from it. The `Graph` object is the final circuit representation used in our optimizer. You can construct it as below:
+
+``` cpp
+Graph graph(&src_ctx, dag);
+```
+
+#### Context shift
+
+If the input gate set is different from your target gate set, you should use the `context_shift` API.
+
 ## Repository Organization
 
 See [code structure](CODE_STRUCTURE.md) for more information about the organization of the Quartz code base.

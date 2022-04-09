@@ -480,6 +480,16 @@ void Graph::constant_and_rotation_elimination() {
   while (!op_queue.empty()) {
     auto op = op_queue.front();
     op_queue.pop();
+    if (outEdges.find(op) != outEdges.end()) {
+      std::set<Edge, EdgeCompare> list = outEdges[op];
+      for (auto it2 = list.cbegin(); it2 != list.cend(); it2++) {
+        auto e = *it2;
+        op_in_edges_cnt[e.dstOp]--;
+        if (op_in_edges_cnt[e.dstOp] == 0) {
+          op_queue.push(e.dstOp);
+        }
+      }
+    }
     // Won't remove node in op_queue
     // Remove node won't change the in-degree of other nodes
     // because we only remove poped nodes and their predecessors
@@ -564,17 +574,6 @@ void Graph::constant_and_rotation_elimination() {
       }
       if (all_parameter_is_0) {
         remove_node(op);
-      }
-    }
-    if (outEdges.find(op) != outEdges.end()) {
-      std::set<Edge, EdgeCompare> list = outEdges[op];
-      std::set<Edge, EdgeCompare>::const_iterator it2;
-      for (it2 = list.begin(); it2 != list.end(); it2++) {
-        auto e = *it2;
-        op_in_edges_cnt[e.dstOp]--;
-        if (op_in_edges_cnt[e.dstOp] == 0) {
-          op_queue.push(e.dstOp);
-        }
       }
     }
   }

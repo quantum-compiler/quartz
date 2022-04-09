@@ -21,6 +21,8 @@
 #include "ch.h"
 #include "p.h"
 #include "pdg.h"
+#include "rx1.h"
+#include "rx3.h"
 #include "u1.h"
 #include "u2.h"
 #include "u3.h"

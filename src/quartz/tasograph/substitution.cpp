@@ -672,6 +672,49 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
         newGraph->add_edge(srcOp->mapOp, dstOp->mapOp, srcIdx, i);
       }
   }
+
+  // Construct pos_2_logical_qubit
+  std::unordered_map<Op, int, OpHash> op_in_degree;
+  std::queue<Op> op_q;
+  for (auto it = newGraph->outEdges.cbegin(); it != newGraph->outEdges.cend();
+       ++it) {
+    if (it->first.ptr->tp == GateType::input_qubit ||
+        it->first.ptr->tp == GateType::input_param) {
+      op_q.push(it->first);
+    }
+  }
+
+  for (auto it = newGraph->inEdges.cbegin(); it != newGraph->inEdges.cend();
+       ++it) {
+    op_in_degree[it->first] = it->second.size();
+  }
+
+  while (!op_q.empty()) {
+    auto op = op_q.front();
+    op_q.pop();
+
+    // An input qubit
+    if (newGraph->qubit_2_idx.find(op) != newGraph->qubit_2_idx.end()) {
+      newGraph->pos_2_logical_qubit[Pos(op, 0)] = newGraph->qubit_2_idx[op];
+    }
+    if (newGraph->outEdges.find(op) != newGraph->outEdges.end()) {
+      auto op_out_edges = newGraph->outEdges.find(op)->second;
+      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
+           ++e_it) {
+        if (newGraph->pos_2_logical_qubit.find(
+                Pos(e_it->srcOp, e_it->srcIdx)) !=
+            newGraph->pos_2_logical_qubit.end()) {
+          newGraph->pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
+              newGraph->pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
+        }
+        assert(op_in_degree[e_it->dstOp] > 0);
+        op_in_degree[e_it->dstOp]--;
+        if (op_in_degree[e_it->dstOp] == 0) {
+          op_q.push(e_it->dstOp);
+        }
+      }
+    }
+  }
   return newGraph;
 }
 int GraphXfer::num_src_op() { return srcOps.size(); }

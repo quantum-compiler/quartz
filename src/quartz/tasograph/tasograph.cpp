@@ -33,7 +33,7 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
   // Guid for input qubit and input parameter nodes
   int num_input_qubits = dag->get_num_qubits();
   int num_input_params = dag->get_num_input_parameters();
-  // Currently only 100 vacant guid
+  // Currently only 16383 vacant guid
   assert(num_input_qubits + num_input_params <= GUID_PRESERVED);
   std::vector<Op> input_qubits_op;
   std::vector<Op> input_params_op;
@@ -112,6 +112,46 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       auto dstOp = edge_2_op[output_edge];
 
       add_edge(srcOp, dstOp, srcIdx, dstIdx);
+    }
+  }
+
+  // Construct pos_2_logical_qubit
+  std::unordered_map<Op, int, OpHash> op_in_degree;
+  std::queue<Op> op_q;
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
+    if (it->first.ptr->tp == GateType::input_qubit ||
+        it->first.ptr->tp == GateType::input_param) {
+      op_q.push(it->first);
+    }
+  }
+
+  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
+    op_in_degree[it->first] = it->second.size();
+  }
+
+  while (!op_q.empty()) {
+    auto op = op_q.front();
+    op_q.pop();
+
+    // An input qubit
+    if (qubit_2_idx.find(op) != qubit_2_idx.end()) {
+      pos_2_logical_qubit[Pos(op, 0)] = qubit_2_idx[op];
+    }
+    if (outEdges.find(op) != outEdges.end()) {
+      auto op_out_edges = outEdges.find(op)->second;
+      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
+           ++e_it) {
+        if (pos_2_logical_qubit.find(Pos(e_it->srcOp, e_it->srcIdx)) !=
+            pos_2_logical_qubit.end()) {
+          pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
+              pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
+        }
+        assert(op_in_degree[e_it->dstOp] > 0);
+        op_in_degree[e_it->dstOp]--;
+        if (op_in_degree[e_it->dstOp] == 0) {
+          op_q.push(e_it->dstOp);
+        }
+      }
     }
   }
 }
@@ -1516,6 +1556,21 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
     if (fail) {
       break;
+    }
+  }
+  if (!fail) {
+    // Check qubit consistancy
+    std::set<int> qubits;
+    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
+         ++it) {
+      Pos p = Pos(it->second.first, it->second.second);
+      auto q = pos_2_logical_qubit.find(p)->second;
+      if (qubits.find(q) != qubits.end()) {
+        fail = true;
+        break;
+      } else {
+        qubits.insert(q);
+      }
     }
   }
   if (!fail) {

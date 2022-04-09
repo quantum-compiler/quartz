@@ -54,7 +54,7 @@ cx q[21], q[20];
 
 We do not support parameterized gates currently.
 
-To input a circuit in `qasm` file, you should first create a `Context` object, providing the gate set you use in your input file as parameter as below:
+To input a circuit in `qasm` file, you should first create a `Context` object, providing the gate set you use in your input file as argument as below:
 
 ``` cpp
 Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
@@ -84,7 +84,50 @@ Graph graph(&src_ctx, dag);
 
 #### Context shift
 
-If the input gate set is different from your target gate set, you should use the `context_shift` API.
+If the input gate set is different from your target gate set, you should consider using the `context_shift` APIs to shift the context constructed with the gate sets to a context constructed with the target gate set.
+
+To shift the context, you should create three `Contxt` objects, one for input, one for target, and one for their union as below:
+
+``` cpp
+Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                GateType::input_qubit, GateType::input_param});
+Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
+                GateType::cx, GateType::input_qubit, GateType::input_param});
+auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+```
+
+In order to shift contexts, you should provide the rules to express a gate in the input gate set to the target gate set. To do this, you should construct a `RuleParser` object. As follows:
+
+``` cpp
+RuleParser rules(
+    {"cx q0 q1 = rx q1 pi; rz q1 0.5pi; rx q1 0.5pi; rz q1 -0.5pi; cz q0 "
+        "q1; rx q1 pi; rz q1 0.5pi; rx q1 0.5pi; rz q1 -0.5pi;",
+        "h q0 = rx q0 pi; rz q0 0.5pi; rx q0 0.5pi; rz q0 -0.5pi;",
+        "x q0 = rx q0 pi;"});
+```
+
+As shown in the example above, the grammar for the rules are simple. Also, if a gate in the input gate set already appears in the target set, you don't have to provide a rule for it.
+
+#### Optimization
+
+You can use the API:
+``` cpp
+Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
+           const std::string &equiv_file_name, bool use_simulated_annealing,
+           bool enable_early_stop, bool use_rotation_merging_in_searching,
+           GateType target_rotation, std::string circuit_name = "",
+           int timeout = 86400 /*1 day*/);
+```
+
+Explanation for some of the parameters:
+
+- `print_subst`: Deprecated will be removed in future version.
+- `equiv_file_name`: The filename of the file that stores the ECC set. 
+- `use_simulated_annealing`: Use simulated annealing in searching.
+- `use_rotation_merging_in_searching`: Enable rotation merging in each iteration of the back-track searching.
+- `target_rotation`: The target rotation used if you enable rotation merging in search.
+- `circuit_name`: The name of the circuit, which will be printed with the intermediate result. 
+- `timeout`: Timeout for optimization in seconds.
 
 ## Repository Organization
 

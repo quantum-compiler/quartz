@@ -97,7 +97,7 @@ public:
   Context *context;
   int tensorId;
   std::unordered_map<Op, OpX *, OpHash> mappedOps;
-  std::unordered_multimap<int, std::pair<Op, int>> mappedInputs;
+  std::unordered_map<int, std::pair<Op, int>> mappedInputs;
   std::unordered_map<TensorX, TensorX, TensorXHash> mappedOutputs;
   std::vector<OpX *> srcOps;
   std::vector<OpX *> dstOps;

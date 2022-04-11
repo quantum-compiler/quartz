@@ -33,7 +33,7 @@ class ActorCritic(nn.Module):
             nn.Softmax(dim=0))
 
     def forward(self, dgl_g):
-        value = self.critic(dgl_g)
+        value = self.critic(dgl_g).mean()
         probs = self.actor(dgl_g)
         dist = Categorical(probs)
         return dist, value
@@ -61,6 +61,7 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
             # action = dist.sample()
             node = action.cpu().item() // num_actions
             xfer = action.cpu().item() % num_actions
+            # print(f'{node}, {xfer}')
             next_graph = graph.apply_xfer(
                 xfer=context.get_xfer_from_id(id=xfer),
                 node=graph.get_node_from_id(id=node))
@@ -71,16 +72,16 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
                 seq_len = seq_cnt + 1
             else:
                 reward = graph.gate_count - next_graph.gate_count
-                total_reward += reward
 
             log_prob = dist.log_prob(action)
             entropy += dist.entropy().mean()
-            value = value[node]
+            # value = value[node]
 
         else:
-            log_prob = torch.tensor((0)).to(device)
-            value = torch.tensor((0)).to(device)
-            reward = 0
+            # log_prob = torch.tensor((0)).to(device)
+            # value = torch.tensor((0)).to(device)
+            # reward = 0
+            break
 
         log_probs.append(log_prob)
         values.append(value)
@@ -88,6 +89,8 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
         masks.append(1 - done)
 
         graph = next_graph
+
+    # print('end')
 
     if next_graph == None:
         next_value = invalid_reward
@@ -125,7 +128,7 @@ def a2c(hidden_size,
 
     num_actions = context.num_xfers
     model = ActorCritic(num_actions, hidden_size).to(device)
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), lr=lr)
     # TODO: scheduler
 
     reward_log = []
@@ -133,10 +136,12 @@ def a2c(hidden_size,
 
     for _ in tqdm(range(episodes)):
 
-        log_probs = torch.tensor([]).to(device)
-        values = torch.tensor([]).to(device)
-        masks = torch.tensor([]).to(device)
-        qs = torch.tensor([]).to(device)
+        log_probs = torch.tensor([], dtype=torch.float).to(device)
+        values = torch.tensor([], dtype=torch.float).to(device)
+        masks = torch.tensor([], dtype=torch.bool).to(device)
+        qs = torch.tensor([], dtype=torch.float).to(device)
+        average_seq_len = 0
+        average_reward = 0
         entropy = 0
 
         # rollout trajectory
@@ -150,17 +155,27 @@ def a2c(hidden_size,
             qs = torch.cat((qs, qs_))
             masks = torch.cat((masks, masks_))
             entropy += entropy_
+            average_seq_len += seq_len_
+            average_reward += total_rewards_
 
         advantage = qs - values
 
-        actor_loss = -(log_probs[masks] * advantage.detach()[masks]).mean()
-        critic_loss = advantage[masks].pow(2).mean()
+        actor_loss = -(log_probs * advantage.detach()).mean()
+        critic_loss = advantage.pow(2).mean()
 
         loss = actor_loss + 0.5 * critic_loss - 0.001 * entropy
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        average_seq_len /= batch_size
+        average_reward /= batch_size
+        print(
+            f'average sequence length: {average_seq_len}, average reward: {average_reward}'
+        )
+        seq_len_log.append(average_seq_len)
+        reward_log.append(average_reward)
 
 
 if __name__ == '__main__':
@@ -174,4 +189,4 @@ if __name__ == '__main__':
         filename="barenco_tof_3_opt_path/subst_history_39.qasm")
     init_graph = quartz.PyGraph(context=context, dag=init_dag)
 
-    a2c(64, context, init_graph)
+    a2c(64, context, init_graph, batch_size=5)

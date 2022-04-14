@@ -1,5 +1,7 @@
 import z3
 import math
+
+
 # parameter gates
 
 
@@ -64,13 +66,15 @@ def u2(phi, l, use_z3=True):
     cos_phi, sin_phi = phi
     cos_l, sin_l = l
     if use_z3:
-        return [[(1/z3.Sqrt(2), 0), (-1/z3.Sqrt(2) * cos_l, -1/z3.Sqrt(2) * sin_l)],
-                [(1/z3.Sqrt(2) * cos_phi, 1/z3.Sqrt(2) * sin_phi),
-                 (1/z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi), 1/z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
+        return [[(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
+                [(1 / z3.Sqrt(2) * cos_phi, 1 / z3.Sqrt(2) * sin_phi),
+                 (1 / z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
+                  1 / z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
     else:
-        return [[(1/math.sqrt(2), 0), (-1/math.sqrt(2) * cos_l, -1/math.sqrt(2) * sin_l)],
-                [(1/math.sqrt(2) * cos_phi, 1/math.sqrt(2) * sin_phi),
-                 (1/math.sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi), 1/math.sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
+        return [[(1 / math.sqrt(2), 0), (-1 / math.sqrt(2) * cos_l, -1 / math.sqrt(2) * sin_l)],
+                [(1 / math.sqrt(2) * cos_phi, 1 / math.sqrt(2) * sin_phi),
+                 (1 / math.sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
+                  1 / math.sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
 
 
 def u3(theta, phi, l, use_z3=True):
@@ -139,6 +143,20 @@ def pdg(phi, use_z3=True):
     cos_phi, sin_phi = phi
     return [[(1, 0), (0, 0)],
             [(0, 0), (cos_phi, -sin_phi)]]
+
+
+def rx1(use_z3=True):
+    if use_z3:
+        return [[(z3.Sqrt(2) / 2, 0), (0, -z3.Sqrt(2) / 2)], [(0, -z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)]]
+    else:
+        return [[(math.Sqrt(2) / 2, 0), (0, -math.Sqrt(2) / 2)], [(0, -math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)]]
+
+
+def rx3(use_z3=True):
+    if use_z3:
+        return [[(z3.Sqrt(2) / 2, 0), (0, z3.Sqrt(2) / 2)], [(0, z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)]]
+    else:
+        return [[(math.Sqrt(2) / 2, 0), (0, math.Sqrt(2) / 2)], [(0, math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)]]
 
 
 def cz(use_z3=True):

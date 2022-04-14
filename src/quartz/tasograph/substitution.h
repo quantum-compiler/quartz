@@ -64,6 +64,9 @@ public:
   }
 };
 
+  typedef std::priority_queue<std::shared_ptr<Graph>,
+    std::vector<std::shared_ptr<Graph>>, GraphCompare> CandQueue;
+
 class GraphXfer {
 public:
   GraphXfer(Context *_context);
@@ -77,6 +80,11 @@ public:
            std::vector<std::shared_ptr<Graph>> &new_candidates,
            std::set<size_t> &, float threshold, int maxNumOps,
            bool enable_early_stop, bool &stop_search);
+  void run_mth(int depth, Graph *graph,
+           CandQueue& candidates,
+           std::set<size_t> &, float threshold, int maxNumOps,
+           bool enable_early_stop, bool &stop_search,
+           std::mutex& hashmap_lock, std::mutex& queue_lock);
   std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);
   std::shared_ptr<Graph> create_new_graph(const Graph *graph) const;
   bool create_new_operator(const OpX *opx, Op &op);

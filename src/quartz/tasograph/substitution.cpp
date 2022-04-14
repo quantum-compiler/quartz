@@ -599,6 +599,90 @@ void GraphXfer::run(int depth, Graph *graph,
   }
 }
 
+void GraphXfer::run_mth(int depth, Graph *graph,
+                    CandQueue& candidates,
+                    std::set<size_t> &hashmap, float threshold, int maxNumOps,
+                    bool enable_early_stop, bool &stop_search,
+                    std::mutex& hashmap_lock, std::mutex& queue_lock) {
+  if (stop_search)
+    return;
+  // printf("run: depth(%d) srcOps.size(%zu) graph.size(%zu)
+  // candidates(%zu)\n", depth, srcOps.size(), graph->inEdges.size(),
+  // candidates.size());
+  if (depth >= (int)srcOps.size()) {
+    // Create dst operators
+    bool pass = true;
+    std::vector<OpX *>::const_iterator dstIt;
+    for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++)
+      if (pass) {
+        OpX *dstOp = *dstIt;
+        pass = (pass & create_new_operator(dstOp, dstOp->mapOp));
+      }
+    if (!pass)
+      return;
+    // Check that all external edges are mapped outputs
+    for (auto opIt = mappedOps.cbegin(); opIt != mappedOps.cend(); opIt++) {
+      const std::set<Edge, EdgeCompare> &list = graph->outEdges[opIt->first];
+      std::set<Edge, EdgeCompare>::const_iterator it;
+      for (it = list.begin(); it != list.end(); it++)
+        if (mappedOps.find(it->dstOp) == mappedOps.end()) {
+          // dstOp is external, (srcOp, srcIdx) must be in
+          // mappedOutputs
+          TensorX srcTen;
+          srcTen.op = opIt->second;
+          srcTen.idx = it->srcIdx;
+          if (mappedOutputs.find(srcTen) == mappedOutputs.end()) {
+            pass = false;
+            return;
+          }
+        }
+    }
+    // Generate a new graph by applying xfer rule
+    // Graph *newGraph = create_new_graph(graph);
+    std::shared_ptr<Graph> newGraph = create_new_graph(graph);
+    // Check that the new graph should not have any loop
+    if (newGraph->has_loop()) {
+      // printf("Found a new graph with LOOP!!!!\n");
+      return;
+    }
+    // TODO: remove me for better performance
+    assert(newGraph->check_correctness());
+    if (newGraph->total_cost() < threshold &&
+        (int)newGraph->inEdges.size() < maxNumOps) {
+      bool need_push = false;
+      {
+        std::lock_guard<std::mutex> lg(hashmap_lock);
+        if (hashmap.find(newGraph->hash()) == hashmap.end()) {
+          hashmap.insert(newGraph->hash());
+          need_push = true;
+          if (enable_early_stop)
+            stop_search = true;
+        }
+      }
+      if (need_push) {
+        std::lock_guard<std::mutex> lg(queue_lock);
+        candidates.emplace(newGraph);
+      }
+    }
+  } else {
+    OpX *srcOp = srcOps[depth];
+    std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
+    for (it = graph->inEdges.begin(); it != graph->inEdges.end(); it++) {
+      // printf("can_match(%d)\n", can_match(srcOp, it->first,
+      // graph));
+      if ((mappedOps.find(it->first) == mappedOps.end()) &&
+          can_match(srcOp, it->first, graph)) {
+        Op op = it->first;
+        // Check mapOutput
+        match(srcOp, op, graph);
+        run_mth(depth + 1, graph, candidates, hashmap, threshold, maxNumOps,
+            enable_early_stop, stop_search, hashmap_lock, queue_lock);
+        unmatch(srcOp, op, graph);
+      }
+    }
+  }
+}
+
 bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
   Gate *gate = context->get_gate(opx->type);
   op.ptr = gate;

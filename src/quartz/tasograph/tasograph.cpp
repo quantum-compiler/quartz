@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <iomanip>
+#include <mutex>
+#include <semaphore>
 
 namespace quartz {
 
@@ -1126,7 +1128,7 @@ std::shared_ptr<Graph> Graph::optimize(
     float alpha, int budget, bool print_subst, Context *ctx,
     const std::string &equiv_file_name, bool use_simulated_annealing,
     bool enable_early_stop, bool use_rotation_merging_in_searching,
-    GateType target_rotation, std::string circuit_name, int timeout) {
+    GateType target_rotation, std::string circuit_name, int timeout, const unsigned num_threads) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
@@ -1310,58 +1312,118 @@ std::shared_ptr<Graph> Graph::optimize(
                 << min_cost << ", " << max_cost << "]" << std::endl;
     }
   } else {
-    while (!candidates.empty()) {
-      auto subGraph = candidates.top();
-      if (use_rotation_merging_in_searching) {
-        subGraph->rotation_merging(target_rotation);
-      }
-      candidates.pop();
-      const auto tot_cost = subGraph->total_cost();
-      if (tot_cost < bestCost) {
-        bestCost = tot_cost;
-        bestGraph = subGraph;
-      }
-      if (counter > budget) {
-        // TODO: free all remaining candidates when budget exhausted
-        //   break;
-        ;
-      }
-      counter++;
-      subGraph->constant_and_rotation_elimination();
-      end = std::chrono::steady_clock::now();
-      if (circuit_name != "")
-        std::cout << circuit_name << ": ";
-      if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                     start)
-                  .count() /
-              1000.0 >
-          timeout) {
-        std::cout << "Timeout. Program terminated. Best gate count is "
-                  << bestCost << std::endl;
-        exit(1);
-      }
-      fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
-              bestCost, candidates.size(),
-              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                      .count() /
-                  1000.0);
-      fflush(stdout);
-
-      //   std::vector<Graph *> new_candidates;
-      bool stop_search = false;
-      for (auto &xfer : xfers) {
-        std::vector<std::shared_ptr<Graph>> new_candidates;
-        xfer->run(0, subGraph.get(), new_candidates, hashmap, bestCost * alpha,
-                  2 * maxNumOps, enable_early_stop, stop_search);
-        // auto front_gate_count = candidates.top()->gate_count();
-        for (auto &candidate : new_candidates) {
-          candidates.push(candidate);
+    if (num_threads == 1) {
+      while (!candidates.empty()) {
+        auto subGraph = candidates.top();
+        if (use_rotation_merging_in_searching) {
+          subGraph->rotation_merging(target_rotation);
         }
-        // auto new_front_gate_count = candidates.top()->gate_count();
-        // if (new_front_gate_count < front_gate_count) {
-        //   good_xfers.push_back(xfer);
-        //   }
+        candidates.pop();
+        const auto tot_cost = subGraph->total_cost();
+        if (tot_cost < bestCost) {
+          bestCost = tot_cost;
+          bestGraph = subGraph;
+        }
+        if (counter > budget) {
+          // TODO: free all remaining candidates when budget exhausted
+          //   break;
+          ;
+        }
+        counter++;
+        subGraph->constant_and_rotation_elimination();
+        end = std::chrono::steady_clock::now();
+        if (circuit_name != "")
+          std::cout << circuit_name << ": ";
+        if ((int) std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                        start)
+                .count() /
+            1000.0 >
+            timeout) {
+          std::cout << "Timeout. Program terminated. Best gate count is "
+                    << bestCost << std::endl;
+          exit(1);
+        }
+        fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
+                bestCost, candidates.size(),
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                        end - start)
+                        .count() /
+                1000.0);
+        fflush(stdout);
+
+        //   std::vector<Graph *> new_candidates;
+        bool stop_search = false;
+        for (auto &xfer: xfers) {
+          std::vector<std::shared_ptr<Graph>> new_candidates;
+          xfer->run(0, subGraph.get(), new_candidates, hashmap, bestCost * alpha,
+                    2 * maxNumOps, enable_early_stop, stop_search);
+          // auto front_gate_count = candidates.top()->gate_count();
+          for (auto &candidate: new_candidates) {
+            candidates.push(candidate);
+          }
+          // auto new_front_gate_count = candidates.top()->gate_count();
+          // if (new_front_gate_count < front_gate_count) {
+          //   good_xfers.push_back(xfer);
+          //   }
+        }
+      }
+    }
+    else {
+      std::counting_semaphore num_queueing_cands(1);
+      std::counting_semaphore available_threads(num_threads);
+      std::mutex hashmap_lock;
+      std::mutex queue_lock;
+      while (!candidates.empty()) {
+        auto subGraph = candidates.top();
+        if (use_rotation_merging_in_searching) {
+          subGraph->rotation_merging(target_rotation);
+        }
+        candidates.pop();
+        const auto tot_cost = subGraph->total_cost();
+        if (tot_cost < bestCost) {
+          bestCost = tot_cost;
+          bestGraph = subGraph;
+        }
+        if (counter > budget) {
+          // TODO: free all remaining candidates when budget exhausted
+          //   break;
+          ;
+        }
+        counter++;
+        subGraph->constant_and_rotation_elimination();
+        end = std::chrono::steady_clock::now();
+        if (circuit_name != "")
+          std::cout << circuit_name << ": ";
+        if ((int) std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                        start)
+                .count() /
+            1000.0 >
+            timeout) {
+          std::cout << "Timeout. Program terminated. Best gate count is "
+                    << bestCost << std::endl;
+          exit(1);
+        }
+        fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
+                bestCost, candidates.size(),
+                (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                        end - start)
+                        .count() /
+                1000.0);
+        fflush(stdout);
+
+        //   std::vector<Graph *> new_candidates;
+        bool stop_search = false;
+        #pragma omp parallel for default(none) \
+          shared(hashmap, subGraph, candidates, xfers, bestCost, alpha, maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock)
+        for (auto &xfer: xfers) {
+          xfer->run_mth(0, subGraph.get(), candidates, hashmap, bestCost * alpha,
+                    2 * maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock);
+          // auto front_gate_count = candidates.top()->gate_count();
+          // auto new_front_gate_count = candidates.top()->gate_count();
+          // if (new_front_gate_count < front_gate_count) {
+          //   good_xfers.push_back(xfer);
+          //   }
+        } // end for xfer
       }
     }
   }

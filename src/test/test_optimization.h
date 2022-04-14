@@ -31,7 +31,7 @@ void test_optimization(Context *ctx, const std::string &file_name,
 	auto new_graph = graph.optimize(
 	    1.1, 0, false, ctx, equivalent_file_name, use_simulated_annealing,
 	    false /*early_stop*/, false /*rotation_merging*/,
-	    GateType::rz /*Just a placeholder*/);
+	    GateType::rz /*Just a placeholder*/, "", 86400, 2);
 	auto end = std::chrono::steady_clock::now();
 	std::cout
 	    << "After optimizing graph in "

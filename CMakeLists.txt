@@ -41,7 +41,7 @@ file(GLOB_RECURSE QUARTZ_SRCS
 
 #Generic compilation options
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
+check_cxx_compiler_flag("-std=c++2a" SUPPORT_CXX2a)
 if(MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
     set(BUILD_SHARED_LIBS TRUE)

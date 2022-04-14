@@ -1,3 +1,5 @@
+#include <mutex>
+
 #include "substitution.h"
 
 namespace quartz {

@@ -1316,8 +1316,9 @@ std::shared_ptr<Graph> Graph::optimize(
         subGraph->rotation_merging(target_rotation);
       }
       candidates.pop();
-      if (subGraph->total_cost() < bestCost) {
-        bestCost = subGraph->total_cost();
+      const auto tot_cost = subGraph->total_cost();
+      if (tot_cost < bestCost) {
+        bestCost = tot_cost;
         bestGraph = subGraph;
       }
       if (counter > budget) {

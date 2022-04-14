@@ -63,3 +63,6 @@ install_manifest.txt
 
 # Build
 build/*
+
+# OS
+.DS_Store

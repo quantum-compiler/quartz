@@ -4,7 +4,7 @@
 #include <cassert>
 #include <iomanip>
 #include <mutex>
-#include <semaphore>
+// #include <semaphore>
 
 namespace quartz {
 
@@ -1369,8 +1369,8 @@ std::shared_ptr<Graph> Graph::optimize(
       }
     }
     else {
-      std::counting_semaphore num_queueing_cands(1);
-      std::counting_semaphore available_threads(num_threads);
+      // std::counting_semaphore num_queueing_cands(1);
+      // std::counting_semaphore available_threads(num_threads);
       std::mutex hashmap_lock;
       std::mutex queue_lock;
       while (!candidates.empty()) {

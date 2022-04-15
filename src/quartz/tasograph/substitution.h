@@ -7,7 +7,7 @@
 #include "assert.h"
 #include "tasograph.h"
 #include <queue>
-
+#include <mutex>
 namespace quartz {
 
 class OpX;

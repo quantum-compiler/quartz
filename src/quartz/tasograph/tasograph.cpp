@@ -165,6 +165,7 @@ Graph::Graph(const Graph &graph) {
   qubit_2_idx = graph.qubit_2_idx;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
+  pos_2_logical_qubit = graph.pos_2_logical_qubit;
 }
 
 size_t Graph::get_next_special_op_guid() {
@@ -1375,10 +1376,10 @@ std::shared_ptr<Graph> Graph::optimize(
       std::mutex queue_lock;
       while (!candidates.empty()) {
         auto subGraph = candidates.top();
+        candidates.pop();
         if (use_rotation_merging_in_searching) {
           subGraph->rotation_merging(target_rotation);
         }
-        candidates.pop();
         const auto tot_cost = subGraph->total_cost();
         if (tot_cost < bestCost) {
           bestCost = tot_cost;
@@ -1411,13 +1412,46 @@ std::shared_ptr<Graph> Graph::optimize(
                 1000.0);
         fflush(stdout);
 
-        //   std::vector<Graph *> new_candidates;
-        bool stop_search = false;
-        #pragma omp parallel for default(none) \
-          shared(hashmap, subGraph, candidates, xfers, bestCost, alpha, maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock)
-        for (auto &xfer: xfers) {
-          xfer->run_mth(0, subGraph.get(), candidates, hashmap, bestCost * alpha,
-                    2 * maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock);
+        std::vector<Op> all_ops;
+        subGraph->topology_order_ops(all_ops);
+        assert(all_ops.size() == (size_t)subGraph->gate_count());
+        #pragma omp parallel for default(none) collapse(2) \
+          shared(all_ops, xfers, subGraph, hashmap, candidates, alpha, bestCost, maxNumOps, hashmap_lock, queue_lock)
+        for (const auto& op : all_ops) {
+          for (const auto& xfer : xfers) {
+            if (subGraph->xfer_appliable(xfer, op)) {
+              auto newGraph = subGraph->apply_xfer(xfer, op);
+              if (!newGraph->has_loop()) {
+                assert(newGraph->check_correctness());
+                if (newGraph->total_cost() < alpha * bestCost &&
+                  (int)newGraph->inEdges.size() < maxNumOps * 2) {
+                  bool need_push = false;
+                  {
+                    std::lock_guard<std::mutex> lg(hashmap_lock);
+                    if (hashmap.find(newGraph->hash()) == hashmap.end()) {
+                      hashmap.insert(newGraph->hash());
+                      need_push = true;
+                    }
+                  }
+                  if (need_push) {
+                    std::lock_guard<std::mutex> lg(queue_lock);
+                    candidates.emplace(newGraph);
+                  }
+                }
+              }
+              else {
+                printf("Found a new graph with LOOP!!!!\n");
+              }
+            } // end if xfer_appliable
+          }
+        }
+
+//        bool stop_search = false;
+//        #pragma omp parallel for default(none) \
+//          shared(hashmap, subGraph, candidates, xfers, bestCost, alpha, maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock)
+//        for (auto &xfer: xfers) {
+//          xfer->run_mth(0, subGraph.get(), candidates, hashmap, bestCost * alpha,
+//                    2 * maxNumOps, enable_early_stop, stop_search, hashmap_lock, queue_lock);
           // auto front_gate_count = candidates.top()->gate_count();
           // auto new_front_gate_count = candidates.top()->gate_count();
           // if (new_front_gate_count < front_gate_count) {
@@ -1425,7 +1459,6 @@ std::shared_ptr<Graph> Graph::optimize(
           //   }
         } // end for xfer
       }
-    }
   }
   //   printf("        ===== Finish Cost-Based Backtracking Search =====\n\n");
   // Print results

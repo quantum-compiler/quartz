@@ -145,8 +145,10 @@ public:
 struct Edge {
   Edge(void);
   Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx);
+  Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx, int _logical_qubit_idx, int _physical_qubit_idx);
   Op srcOp, dstOp;
   int srcIdx, dstIdx;
+  mutable int logical_qubit_idx, physical_qubit_idx;
 };
 
 struct EdgeCompare {
@@ -218,6 +220,9 @@ public:
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
+  // physical mapping related
+  void init_physical_mapping();
+
 private:
   void replace_node(Op oldOp, Op newOp);
   void remove_node(Op oldOp);
@@ -244,6 +249,10 @@ public:
   std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> qubit_2_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
+
+  // physical mapping related
+  // stores the mapping of input_qubit Ops -> <logical, physical idx>
+  std::unordered_map<Op, std::pair<int, int>, OpHash> qubit_mapping_table;
 
 private:
   size_t special_op_guid;

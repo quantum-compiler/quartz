@@ -196,10 +196,17 @@ bool Graph::has_edge(const Op &srcOp, const Op &dstOp, int srcIdx,
 }
 
 Edge::Edge(void)
-    : srcOp(Op::INVALID_OP), dstOp(Op::INVALID_OP), srcIdx(-1), dstIdx(-1) {}
+    : srcOp(Op::INVALID_OP), dstOp(Op::INVALID_OP), srcIdx(-1), dstIdx(-1),
+      logical_qubit_idx(-1), physical_qubit_idx(-1){}
 
 Edge::Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx)
-    : srcOp(_srcOp), dstOp(_dstOp), srcIdx(_srcIdx), dstIdx(_dstIdx) {}
+    : srcOp(_srcOp), dstOp(_dstOp), srcIdx(_srcIdx), dstIdx(_dstIdx),
+      logical_qubit_idx(-1), physical_qubit_idx(-1){}
+
+Edge::Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx,
+           int _logical_qubit_idx, int _physical_qubit_idx)
+    : srcOp(_srcOp), dstOp(_dstOp), srcIdx(_srcIdx), dstIdx(_dstIdx),
+      logical_qubit_idx(_logical_qubit_idx), physical_qubit_idx(_physical_qubit_idx) {}
 
 bool Graph::has_loop(void) const {
   int done_ops_cnt = 0;
@@ -1917,4 +1924,53 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
     }
   }
 }
+
+void Graph::init_physical_mapping() {
+    // TODO: quartz physical: test this
+
+    // STEP 1: initial mapping
+    // TODO: quartz physical: use a better initial mapping
+    int qubit_index = 0;
+    for (const auto& op_in_edge : inEdges) {
+        if (op_in_edge.first.ptr->tp == GateType::input_qubit) {
+            qubit_mapping_table.insert({op_in_edge.first, std::pair<int, int>(qubit_index, qubit_index)});
+            qubit_index += 1;
+        }
+    }
+
+    // STEP 2: propagate through the circuit
+    std::queue<Edge> query_list;
+    // initialize edges directed connected to input_qubits and put them into query list
+    for (const auto& input_qubits_edges: qubit_mapping_table) {
+        auto initial_edge = *(outEdges[input_qubits_edges.first].begin());
+        initial_edge.logical_qubit_idx = input_qubits_edges.second.first;
+        initial_edge.physical_qubit_idx = input_qubits_edges.second.second;
+        query_list.push(initial_edge);
+    }
+    // scan through the circuit until the end
+    while (!query_list.empty()) {
+        // get a mapped edge
+        auto cur_edge = query_list.front();
+        query_list.pop();
+        // set mapping info for its target op
+        auto target_op = cur_edge.dstOp;
+        auto port_idx = cur_edge.dstIdx;
+        if (cur_edge.dstOp != Op::INVALID_OP){
+            // set in edge of target op
+            std::next(inEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+            std::next(inEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+            // set out edge of target op
+            std::next(outEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+            if (target_op.ptr->tp == GateType::swap) {
+                // note that swap gates have only two inputs
+                std::next(outEdges[target_op].begin(), 1 - port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+            } else {
+                std::next(outEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+            }
+            // put out edge into query list
+            query_list.push(*std::next(outEdges[target_op].begin(), port_idx));
+        }
+    }
+}
+
 }; // namespace quartz

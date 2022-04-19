@@ -1702,6 +1702,21 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     }
   }
   if (!fail) {
+    // Check qubit consistancy
+    std::set<int> qubits;
+    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
+         ++it) {
+      Pos p = Pos(it->second.first, it->second.second);
+      auto q = pos_2_logical_qubit.find(p)->second;
+      if (qubits.find(q) != qubits.end()) {
+        fail = true;
+        break;
+      } else {
+        qubits.insert(q);
+      }
+    }
+  }
+  if (!fail) {
     for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
          ++dst_it) {
       if (!fail) {

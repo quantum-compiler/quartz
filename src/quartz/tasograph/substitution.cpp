@@ -334,7 +334,7 @@ bool GraphXfer::map_output(const TensorX &src, const TensorX &dst) {
   return true;
 }
 
-bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
+bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph* const graph) const {
   // This function takes in an OpX, and will check all its input and
   // output tensors. If there are tensors connecting it with other already
   // mapped ops, check whether these edges exists in the given Graph. No
@@ -423,7 +423,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   return true;
 }
 
-void GraphXfer::match(OpX *srcOp, Op op, const Graph *graph) {
+void GraphXfer::match(OpX *srcOp, Op op, const Graph* const graph) {
   for (size_t i = 0; i < srcOp->inputs.size(); i++) {
     TensorX in = srcOp->inputs[i];
     if (in.op == nullptr) {
@@ -444,7 +444,7 @@ void GraphXfer::match(OpX *srcOp, Op op, const Graph *graph) {
   mappedOps[op] = srcOp;
 }
 
-void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
+void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph* const graph) {
   for (size_t i = 0; i < srcOp->inputs.size(); i++) {
     TensorX in = srcOp->inputs[i];
     if (in.op == nullptr) {
@@ -694,10 +694,11 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
   return true;
 }
 
-std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
+std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph* const graph) const {
   std::shared_ptr<Graph> newGraph(new Graph(*graph));
   newGraph->inEdges.clear();
   newGraph->outEdges.clear();
+  newGraph->pos_2_logical_qubit.clear();
   // Step 1: map dst ops
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
   std::vector<OpX *>::const_iterator dstIt;

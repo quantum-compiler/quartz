@@ -253,7 +253,7 @@ bool Graph::has_loop(void) const {
   //   return true;
 }
 
-bool Graph::check_correctness(void) {
+bool Graph::check_correctness(void) const {
   bool okay = true;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
   for (it = outEdges.begin(); it != outEdges.end(); it++) {
@@ -269,7 +269,7 @@ bool Graph::check_correctness(void) {
 }
 
 // TODO: add constant parameters
-size_t Graph::hash(void) {
+size_t Graph::hash(void) const {
   size_t total = 0;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
   std::unordered_map<size_t, size_t> hash_values;
@@ -295,7 +295,7 @@ size_t Graph::hash(void) {
     auto op = op_queue.front();
     op_queue.pop();
     if (hash_values.find(op.guid) == hash_values.end()) {
-      std::set<Edge, EdgeCompare> list = inEdges[op];
+      std::set<Edge, EdgeCompare> list = inEdges.at(op);
       std::set<Edge, EdgeCompare>::const_iterator it2;
       size_t my_hash = 17 * 13 + (size_t)op.ptr;
       for (it2 = list.begin(); it2 != list.end(); it2++) {
@@ -310,7 +310,7 @@ size_t Graph::hash(void) {
       total += my_hash;
     }
     if (outEdges.find(op) != outEdges.end()) {
-      std::set<Edge, EdgeCompare> list = outEdges[op];
+      std::set<Edge, EdgeCompare> list = outEdges.at(op);
       std::set<Edge, EdgeCompare>::const_iterator it2;
       for (it2 = list.begin(); it2 != list.end(); it2++) {
         auto e = *it2;
@@ -1418,10 +1418,11 @@ std::shared_ptr<Graph> Graph::optimize(
         #pragma omp parallel for default(none) collapse(2) \
           shared(all_ops, xfers, subGraph, hashmap, candidates, alpha, bestCost, maxNumOps, hashmap_lock, queue_lock)
         for (const auto& op : all_ops) {
-          for (const auto& xfer : xfers) {
-            if (subGraph->xfer_appliable(xfer, op)) {
-              auto newGraph = subGraph->apply_xfer(xfer, op);
-              if (!newGraph->has_loop()) {
+          for (const GraphXfer* const xfer_ : xfers) {
+            auto xfer = std::make_unique<GraphXfer>(*xfer_);
+            if (subGraph->xfer_appliable(xfer.get(), op)) {
+              std::shared_ptr<const Graph> newGraph = subGraph->apply_xfer(xfer.get(), op);
+              if (newGraph) {
                 assert(newGraph->check_correctness());
                 if (newGraph->total_cost() < alpha * bestCost &&
                   (int)newGraph->inEdges.size() < maxNumOps * 2) {
@@ -1435,7 +1436,7 @@ std::shared_ptr<Graph> Graph::optimize(
                   }
                   if (need_push) {
                     std::lock_guard<std::mutex> lg(queue_lock);
-                    candidates.emplace(newGraph);
+                    candidates.emplace(std::const_pointer_cast<Graph>(newGraph));
                   }
                 }
               }
@@ -1716,7 +1717,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return !fail;
 }
 
-std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
+std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) const {
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return nullptr;
   }
@@ -1795,6 +1796,21 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     }
     if (fail) {
       break;
+    }
+  }
+  if (!fail) {
+    // Check qubit consistancy
+    std::set<int> qubits;
+    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
+         ++it) {
+      Pos p = Pos(it->second.first, it->second.second);
+      auto q = pos_2_logical_qubit.find(p)->second;
+      if (qubits.find(q) != qubits.end()) {
+        fail = true;
+        break;
+      } else {
+        qubits.insert(q);
+      }
     }
   }
   if (!fail) {

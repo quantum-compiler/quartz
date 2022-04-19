@@ -17,7 +17,7 @@ int main() {
   QASMParser qasm_parser(&ctx);
   DAG *dag = nullptr;
   if (!qasm_parser.load_qasm(
-          "../experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
+          "experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
     std::cout << "Parser failed" << std::endl;
     return 0;
   }
@@ -30,7 +30,7 @@ int main() {
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json")) {
+  if (!eqs.load_json(&ctx, "bfs_verified_simplified.json")) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }
@@ -68,40 +68,44 @@ int main() {
   std::shared_ptr<Graph> best_graph = graph;
   hash_mp.insert(graph->hash());
   int best_gate_cnt = graph->gate_count();
+  std::mutex lock_hashmap, lock_q;
   while (!candidate_q.empty() && budget >= 0) {
     auto top_graph = candidate_q.top();
     candidate_q.pop();
     std::vector<Op> all_ops;
     top_graph->topology_order_ops(all_ops);
     assert(all_ops.size() == (size_t)top_graph->gate_count());
+
+
     for (auto op : all_ops) {
+#pragma omp parallel for default(none) collapse(1) \
+      shared(op, all_ops, xfers, top_graph, lock_hashmap, lock_q, best_gate_cnt, best_graph, hash_mp, candidate_q)
       for (int i = 0; i < xfers.size(); ++i) {
-        auto xfer = xfers[i];
-        //   for (auto xfer : xfers) {
-        if (top_graph->xfer_appliable(xfer, op)) {
-          auto new_graph = top_graph->apply_xfer(xfer, op);
-          if (hash_mp.find(new_graph->hash()) == hash_mp.end()) {
-            candidate_q.push(new_graph);
-            hash_mp.insert(new_graph->hash());
-            if (new_graph->gate_count() < best_gate_cnt) {
-              best_graph = new_graph;
-              best_gate_cnt = new_graph->gate_count();
-            }
-            budget--;
-            auto end = std::chrono::steady_clock::now();
-            if (budget % 1000 == 0) {
-              std::cout << "budget: " << budget << " best gate count "
-                        << best_gate_cnt << " in "
-                        << (double)std::chrono::duration_cast<
-                               std::chrono::milliseconds>(end - start)
-                                   .count() /
-                               1000.0
-                        << " seconds." << std::endl;
+        auto xfer = std::make_unique<GraphXfer>(*xfers[i]);
+        if (top_graph->xfer_appliable(xfer.get(), op)) {
+          auto new_graph = top_graph->apply_xfer(xfer.get(), op);
+          if (new_graph) {
+            std::lock_guard<std::mutex> lg_q(lock_q);
+            if (hash_mp.find(new_graph->hash()) == hash_mp.end()) {
+              candidate_q.push(new_graph);
+              hash_mp.insert(new_graph->hash());
+              if (new_graph->gate_count() < best_gate_cnt) {
+                best_graph = new_graph;
+                best_gate_cnt = new_graph->gate_count();
+              }
             }
           }
         }
       }
     }
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "|q|: " << candidate_q.size() << " best gate count "
+              << best_gate_cnt << " in "
+              << (double)std::chrono::duration_cast<
+                      std::chrono::milliseconds>(end - start)
+                      .count() /
+                 1000.0
+              << " seconds." << std::endl;
   }
 
   best_graph->to_qasm("test.qasm", false, false);

@@ -74,7 +74,7 @@ public:
   TensorX new_tensor(void);
   bool map_output(const TensorX &src, const TensorX &dst);
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
-  void match(OpX *srcOp, Op op, const Graph *graph);
+  void match(OpX *srcOp, Op op, const Graph* graph);
   void unmatch(OpX *srcOp, Op op, const Graph *graph);
   void run(int depth, Graph *graph,
            std::vector<std::shared_ptr<Graph>> &new_candidates,

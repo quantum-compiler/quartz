@@ -173,8 +173,8 @@ public:
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
   bool has_loop() const;
-  size_t hash();
-  bool check_correctness();
+  size_t hash() const;
+  bool check_correctness() const;
   float total_cost() const;
   int gate_count() const;
   size_t get_next_special_op_guid();
@@ -210,7 +210,7 @@ public:
                               std::vector<int> instruction);
   std::vector<size_t> appliable_xfers(Op op, const std::vector<GraphXfer *> &);
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op) const;
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

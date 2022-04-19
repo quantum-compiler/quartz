@@ -12,7 +12,7 @@ int main() {
 //	             GateType::x, GateType::add, GateType::z, GateType::rz});
 //    test_optimization(&ctx, "circuit/example-circuits/voqc_fig5.qasm",
 //                      "cmake-build-debug/bfs_verified.json");
-//    std::cout << "Current working directory: " << current_path() << std::endl;
+
 //	test_optimization(&ctx, "circuit/example-circuits/barenco_tof_3.qasm",
 //	                  "Nam_3_4_complete_ECC_set.json",
 //	                  false /*use_simulated_annealing*/);

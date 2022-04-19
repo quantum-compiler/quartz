@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import rl_dqn
 import json
 
-experiment_name = "rl_dqn_" + "pos_data_init_sample_"
+experiment_name = "rl_dqn_" + "32"
 
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
@@ -33,15 +33,15 @@ with open('valid_xfer_dict.json', 'r') as f:
 
 # RL training
 seq_lens, correct_cnts, rewards = rl_dqn.train(
-    lr=5e-3,
+    lr=2e-3,
     gamma=0.999,
-    replay_times=20,
+    replay_times=10,
     a_size=quartz_context.num_xfers,
-    episodes=1000,
+    episodes=10000,
     epsilon=0.5,
-    epsilon_decay=0.0003,
+    epsilon_decay=0.00003,
     train_epoch=10,
-    max_seq_len=30,
+    max_seq_len=80,
     batch_size=20,
     context=quartz_context,
     init_graph=init_graph,
@@ -80,4 +80,4 @@ def find_number(fn, n):
     print(f"{n} not found!")
 
 
-find_number(f"log/{experiment_name}_log.txt", 56)
+find_number(f"log/{experiment_name}_log.txt", 52)

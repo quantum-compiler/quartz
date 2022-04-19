@@ -4,6 +4,7 @@
    "cell_type": "code",
    "execution_count": 1,
    "metadata": {},
+<<<<<<< HEAD
    "outputs": [
     {
      "name": "stderr",
@@ -14,6 +15,9 @@
      ]
     }
    ],
+=======
+   "outputs": [],
+>>>>>>> Some changes
    "source": [
     "# A warning message from DGL will appear which seems to be related to an open issue in the DGL library, \n",
     "# it won't hurt the execution of the program, please ignore it.\n",

@@ -117,6 +117,7 @@ namespace quartz {
             }
         }
 
+        // TODO: init qubit mapping here
         totalCost = total_cost();
     }
 

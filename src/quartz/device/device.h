@@ -196,7 +196,7 @@ namespace quartz {
         }
 
         void add_edge(int src_idx, int dst_idx) {
-            DeviceTopologyGraph::add_edge(src_idx, dst_idx, 1.0f, true);
+            DeviceTopologyGraph::add_edge(src_idx, dst_idx, 3.0f, true);
         }
     };
 }

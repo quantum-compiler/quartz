@@ -159,7 +159,7 @@ cdef class PyXfer:
         if context == None:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
-            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag)
+            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
 
     def __dealloc__(self):
         pass
@@ -181,7 +181,7 @@ cdef class QuartzContext:
     cdef EquivalenceSet *eqs
     cdef vector[GraphXfer *] v_xfers
 
-    def __cinit__(self, *,  gate_set, filename):
+    def __cinit__(self, *,  gate_set, filename, no_increase=False):
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -200,8 +200,8 @@ cdef class QuartzContext:
                 if j != 0:
                     dag_ptr_0 = eq_sets[i][0]
                     dag_ptr_1 = eq_sets[i][j]
-                    xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1)
-                    xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0)
+                    xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                    xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
                     if xfer_0 != NULL:
                         self.v_xfers.push_back(xfer_0)
                     if xfer_1 != NULL:

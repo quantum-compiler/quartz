@@ -15,7 +15,8 @@ void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(10) {}
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
-                                       const DAG *dst_graph) {
+                                       const DAG *dst_graph,
+                                       bool no_increase_gate_count) {
   // Remove common unused qubits
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   auto qubit_num = src_graph->get_num_qubits();
@@ -29,6 +30,11 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
   assert(ret);
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
+
+  // Eliminate transfers which increase gate count
+  if (no_increase_gate_count &&
+      src_dag->get_num_gates() < dst_dag->get_num_gates())
+    return nullptr;
 
   // TODO: remove common unused input parameters?
 

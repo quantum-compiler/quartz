@@ -85,7 +85,8 @@ public:
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,
-                                     const DAG *dst_graph);
+                                     const DAG *dst_graph,
+                                     bool no_increase_gate_count = false);
   static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
                                                  Command src_cmd,
                                                  std::vector<Command> dst_cmds);

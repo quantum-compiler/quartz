@@ -1931,9 +1931,9 @@ void Graph::init_physical_mapping() {
     // STEP 1: initial mapping
     // TODO: quartz physical: use a better initial mapping
     int qubit_index = 0;
-    for (const auto& op_in_edge : inEdges) {
-        if (op_in_edge.first.ptr->tp == GateType::input_qubit) {
-            qubit_mapping_table.insert({op_in_edge.first, std::pair<int, int>(qubit_index, qubit_index)});
+    for (const auto& op_out_edge : outEdges) {
+        if (op_out_edge.first.ptr->tp == GateType::input_qubit) {
+            qubit_mapping_table.insert({op_out_edge.first, std::pair<int, int>(qubit_index, qubit_index)});
             qubit_index += 1;
         }
     }
@@ -1955,20 +1955,29 @@ void Graph::init_physical_mapping() {
         // set mapping info for its target op
         auto target_op = cur_edge.dstOp;
         auto port_idx = cur_edge.dstIdx;
+        std::cout << "Target Op is " << target_op.guid << " port " << port_idx << std::endl;
         if (cur_edge.dstOp != Op::INVALID_OP){
             // set in edge of target op
             std::next(inEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
             std::next(inEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
-            // set out edge of target op
-            std::next(outEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+            // set out edge of target op (need to differentiate swap and other gates)
             if (target_op.ptr->tp == GateType::swap) {
-                // note that swap gates have only two inputs
-                std::next(outEdges[target_op].begin(), 1 - port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+                for (auto& edge : outEdges[target_op]) {
+                    // notice that a swap has two outputs (can have less due to termination)
+                    if (edge.srcIdx == port_idx) edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
+                    else edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                }
             } else {
-                std::next(outEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
+                for (auto& edge : outEdges[target_op]) {
+                    if (edge.srcIdx != port_idx) continue;
+                    edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
+                    edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                }
             }
             // put out edge into query list
-            query_list.push(*std::next(outEdges[target_op].begin(), port_idx));
+            for (const auto& edge : outEdges[target_op]) {
+                if (edge.srcIdx == port_idx) query_list.push(edge);
+            }
         }
     }
 }

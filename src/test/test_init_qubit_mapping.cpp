@@ -18,7 +18,7 @@ ostream &operator << ( ostream& stream, GateType t )
 }
 
 int main() {
-    string circuit_file_name = "../tof_3_after_heavy.qasm";
+    string circuit_file_name = "../t_cx_tdg.qasm";
     cout << "This is test for init_physical_mapping on " << circuit_file_name <<".\n";
 
     // prepare context
@@ -34,12 +34,19 @@ int main() {
     Graph graph(&src_ctx, dag);
     cout << "Circuit initialized\n";
 
-    // test init qubit mapping
-    graph.init_physical_mapping();
     // print all Ops
+    cout << "Out Edges" << endl;
+    for (const auto& Op_edge : graph.outEdges) {
+        cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
+    }
+    cout << "In Edges" << endl;
     for (const auto& Op_edge : graph.inEdges) {
         cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
     }
+
+    // test init qubit mapping
+    graph.init_physical_mapping();
+    cout << "Mapping has been initialized." << endl;
     for (const auto& input_qubit_mapping : graph.qubit_mapping_table) {
         std::cout << "Gate: " << input_qubit_mapping.first.guid << std::endl;
         std::cout << "Logical idx: " << input_qubit_mapping.second.first << std::endl;

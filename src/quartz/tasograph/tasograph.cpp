@@ -1946,6 +1946,7 @@ void Graph::init_physical_mapping() {
         initial_edge.logical_qubit_idx = input_qubits_edges.second.first;
         initial_edge.physical_qubit_idx = input_qubits_edges.second.second;
         query_list.push(initial_edge);
+        // std::cout << initial_edge.dstOp.guid << std::endl;
     }
     // scan through the circuit until the end
     while (!query_list.empty()) {
@@ -1955,6 +1956,7 @@ void Graph::init_physical_mapping() {
         // set mapping info for its target op
         auto target_op = cur_edge.dstOp;
         auto port_idx = cur_edge.dstIdx;
+        // std::cout << "Target Op is" << target_op.guid << " port " << port_idx << std::endl;
         if (cur_edge.dstOp != Op::INVALID_OP){
             // set in edge of target op
             std::next(inEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;

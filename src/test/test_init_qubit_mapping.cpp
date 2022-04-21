@@ -18,7 +18,8 @@ ostream &operator << ( ostream& stream, GateType t )
 }
 
 int main() {
-    string circuit_file_name = "../t_cx_tdg.qasm";
+    // tof_3_after_heavy.qasm
+    string circuit_file_name = "../tof_3_after_heavy.qasm";
     cout << "This is test for init_physical_mapping on " << circuit_file_name <<".\n";
 
     // prepare context

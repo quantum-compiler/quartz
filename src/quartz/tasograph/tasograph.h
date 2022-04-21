@@ -165,6 +165,18 @@ struct EdgeCompare {
   };
 };
 
+enum class MappingStatus{
+    VALID=0,
+    INPUT_QUBIT_TOO_MANY_OUTPUTS,
+    INPUT_QUBIT_HAS_INPUT,
+    INPUT_QUBIT_MAPPING_MISMATCH,
+    NON_SWAP_PHYSICAL_MISMATCH,
+    NON_SWAP_LOGICAL_MISMATCH,
+    SWAP_PHYSICAL_MISMATCH,
+    SWAP_LOGICAL_MISMATCH,
+    SERIAL_MISMATCH,
+};
+
 class GraphXfer;
 
 class Graph {
@@ -222,7 +234,7 @@ public:
 
   // physical mapping related
   void init_physical_mapping();
-  bool check_mapping_correctness();
+  MappingStatus check_mapping_correctness();
 
 private:
   void replace_node(Op oldOp, Op newOp);

@@ -49,10 +49,7 @@ int main() {
     // test init qubit mapping
     graph.init_physical_mapping();
     cout << "Mapping has been initialized." << endl;
-    for (const auto& input_qubit_mapping : graph.qubit_mapping_table) {
-        std::cout << "Gate: " << input_qubit_mapping.first.guid << std::endl;
-        std::cout << "Logical idx: " << input_qubit_mapping.second.first << std::endl;
-        std::cout << "Physical idx: " << input_qubit_mapping.second.second << std::endl;
-    }
-    std::cout << "Test has passed\n";
+    bool succeeded = graph.check_mapping_correctness();
+    if (succeeded) std::cout << "Test has passed\n";
+    else std::cout << "Test failed\n";
 };

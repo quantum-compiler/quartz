@@ -222,6 +222,7 @@ public:
 
   // physical mapping related
   void init_physical_mapping();
+  bool check_mapping_correctness();
 
 private:
   void replace_node(Op oldOp, Op newOp);

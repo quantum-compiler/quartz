@@ -1926,8 +1926,6 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
 }
 
 void Graph::init_physical_mapping() {
-    // TODO: quartz physical: test this
-
     // STEP 1: initial mapping
     // TODO: quartz physical: use a better initial mapping
     int qubit_index = 0;
@@ -1981,6 +1979,81 @@ void Graph::init_physical_mapping() {
             }
         }
     }
+}
+
+bool Graph::check_mapping_correctness() {
+    // build a map of Op -> <in_edges, out_edges>
+    struct EdgePacket{
+        EdgePacket() = default;
+        const std::set<Edge, EdgeCompare>* in_edges;
+        const std::set<Edge, EdgeCompare>* out_edges;
+    };
+    std::map<Op, EdgePacket, OpCompare> edge_map;
+    for (const auto &op_out: outEdges) edge_map[op_out.first].out_edges = &op_out.second;
+    for (const auto &op_in: inEdges) edge_map[op_in.first].in_edges = &op_in.second;
+
+    // check correctness on each Op
+    for (const auto &op_edge: edge_map) {
+        // input_param always passes
+        if (op_edge.first.ptr->tp == GateType::input_param) continue;
+
+        // input_qubit only needs to check out edges
+        if (op_edge.first.ptr->tp == GateType::input_qubit) {
+            // each input qubit has one out edge
+            if (op_edge.second.out_edges->size() != 1) return false;
+            // each input qubit has no input edge
+            if (!op_edge.second.in_edges->empty()) return false;
+            // check if input qubit's physical and logical idx match the edge
+            if (op_edge.second.out_edges->begin()->physical_qubit_idx != qubit_mapping_table[op_edge.first].second ||
+                op_edge.second.out_edges->begin()->logical_qubit_idx != qubit_mapping_table[op_edge.first].first)
+                return false;
+            continue;
+        }
+
+        // other kind of Ops
+        if (op_edge.second.out_edges->empty()) {
+            // case for gates with no output (i.e. final gates)
+            continue;
+        } else if (op_edge.second.out_edges->size() == 1) {
+            // case for one qubit gate
+            auto in_edge = op_edge.second.in_edges->begin();
+            auto out_edge = op_edge.second.out_edges->begin();
+
+            // every gate has identical logical index for each pair of input and output
+            if (in_edge->logical_qubit_idx != out_edge->logical_qubit_idx) return false;
+
+            // physical qubit index should also be the same except for swap gates
+            if (in_edge->physical_qubit_idx != out_edge->physical_qubit_idx) return false;
+
+        } else if (op_edge.second.out_edges->size() == 2) {
+            // case for two qubits gate
+            auto in_edge1 = op_edge.second.in_edges->begin();
+            auto out_edge1 = op_edge.second.out_edges->begin();
+            auto in_edge2 = std::next(op_edge.second.in_edges->begin(), 1);
+            auto out_edge2 = std::next(op_edge.second.out_edges->begin(), 1);
+
+            // make sure edges are in order
+            if (in_edge1->dstIdx != out_edge1->srcIdx) std::swap(out_edge1, out_edge2);
+
+            // every gate has identical logical index for each pair of input and output
+            if (in_edge1->logical_qubit_idx != out_edge1->logical_qubit_idx) return false;
+            if (in_edge2->logical_qubit_idx != out_edge2->logical_qubit_idx) return false;
+
+            // physical qubit index should also be the same except for swap gates
+            if (op_edge.first.ptr->tp != GateType::swap) {
+                if (in_edge1->physical_qubit_idx != out_edge1->physical_qubit_idx) return false;
+                if (in_edge2->physical_qubit_idx != out_edge2->physical_qubit_idx) return false;
+            } else {
+                if (in_edge1->physical_qubit_idx != out_edge2->physical_qubit_idx) return false;
+                if (in_edge2->physical_qubit_idx != out_edge1->physical_qubit_idx) return false;
+            }
+        } else {
+            // Operations on more than 3 qubits are not supported.
+            std::cout << "Detect gates with more than two outputs" << '\n';
+            assert(false);
+        }
+    }
+    return true;
 }
 
 }; // namespace quartz

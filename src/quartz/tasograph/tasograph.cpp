@@ -1957,8 +1957,12 @@ void Graph::init_physical_mapping() {
         // std::cout << "Target Op is" << target_op.guid << " port " << port_idx << std::endl;
         if (cur_edge.dstOp != Op::INVALID_OP){
             // set in edge of target op
-            std::next(inEdges[target_op].begin(), port_idx)->physical_qubit_idx = cur_edge.physical_qubit_idx;
-            std::next(inEdges[target_op].begin(), port_idx)->logical_qubit_idx = cur_edge.logical_qubit_idx;
+            for (auto& in_edge : inEdges[target_op]) {
+                if (in_edge.dstIdx == port_idx) {
+                    in_edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                    in_edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
+                }
+            }
             // set out edge of target op (need to differentiate swap and other gates)
             if (target_op.ptr->tp == GateType::swap) {
                 for (auto& edge : outEdges[target_op]) {
@@ -1994,7 +1998,7 @@ MappingStatus Graph::check_mapping_correctness() {
 
     // check correctness on each Op
     for (const auto &op_edge: edge_map) {
-        std::cout << op_edge.first.guid << std::endl;
+        // std::cout << op_edge.first.guid << std::endl;
         // input_param always passes
         if (op_edge.first.ptr->tp == GateType::input_param) continue;
 
@@ -2009,7 +2013,7 @@ MappingStatus Graph::check_mapping_correctness() {
             // each input qubit has one out edge
             if (op_edge.second.out_edges->size() != 1) return MappingStatus::INPUT_QUBIT_TOO_MANY_OUTPUTS;
             // each input qubit has no input edge
-            if (!op_edge.second.in_edges->empty()) return MappingStatus::INPUT_QUBIT_HAS_INPUT;
+            if (op_edge.second.in_edges && !op_edge.second.in_edges->empty()) return MappingStatus::INPUT_QUBIT_HAS_INPUT;
             // check if input qubit's physical and logical idx match the edge
             if (op_edge.second.out_edges->begin()->physical_qubit_idx != qubit_mapping_table[op_edge.first].second ||
                 op_edge.second.out_edges->begin()->logical_qubit_idx != qubit_mapping_table[op_edge.first].first)

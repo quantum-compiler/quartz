@@ -166,7 +166,7 @@ struct EdgeCompare {
 };
 
 enum class MappingStatus{
-    VALID=0,
+    VALID,
     INPUT_QUBIT_TOO_MANY_OUTPUTS,
     INPUT_QUBIT_HAS_INPUT,
     INPUT_QUBIT_MAPPING_MISMATCH,

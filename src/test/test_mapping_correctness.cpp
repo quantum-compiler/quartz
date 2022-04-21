@@ -19,7 +19,7 @@ ostream &operator << ( ostream& stream, GateType t )
 
 int main() {
     // tof_3_after_heavy.qasm / t_cx_tdg.qasm
-    string circuit_file_name = "../t_cx_tdg.qasm";
+    string circuit_file_name = "../tof_3_after_heavy.qasm";
     cout << "This is test for init_physical_mapping on " << circuit_file_name <<".\n";
 
     // prepare context
@@ -49,7 +49,7 @@ int main() {
     // test init qubit mapping
     graph.init_physical_mapping();
     cout << "Mapping has been initialized." << endl;
-    bool succeeded = graph.check_mapping_correctness();
-    if (succeeded) std::cout << "Test has passed\n";
+    MappingStatus succeeded = graph.check_mapping_correctness();
+    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Test has passed\n";
     else std::cout << "Test failed\n";
 };

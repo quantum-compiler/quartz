@@ -22,7 +22,7 @@ int main() {
     cout << "This is test for init_physical_mapping on " << circuit_file_name <<".\n";
 
     // prepare context
-    Context src_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
+    Context src_ctx({GateType::h, GateType::x, GateType::rz, GateType::add, GateType::swap,
                      GateType::cx, GateType::input_qubit, GateType::input_param, GateType::t, GateType::tdg});
     // parse qasm file
     QASMParser qasm_parser(&src_ctx);
@@ -43,6 +43,7 @@ int main() {
     for (const auto& Op_edge : graph.inEdges) {
         cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
     }
+    cout << endl;
 
     // test init qubit mapping
     graph.init_physical_mapping();

@@ -17,7 +17,7 @@
    ],
 =======
    "outputs": [],
->>>>>>> Some changes
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
    "source": [
     "# A warning message from DGL will appear which seems to be related to an open issue in the DGL library, \n",
     "# it won't hurt the execution of the program, please ignore it.\n",

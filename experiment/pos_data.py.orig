@@ -1,12 +1,12 @@
 import json
 import random
+from dgl import save_graphs, load_graphs
+
 <<<<<<< HEAD
 from dgl import save_graphs, load_graphs
 
 =======
->>>>>>> Added positive-reward
-from dgl import save_graphs, load_graphs
-
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
 
 class PosRewardData:
     def __init__(self, maxlen=500) -> None:
@@ -74,7 +74,10 @@ class PosRewardData:
                 self.to_graphs[idx], self.to_graph_hashes[idx])
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
 # p = PosRewardData()
 # p.load_data()
 # print(p.all_data())

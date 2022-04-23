@@ -56,7 +56,7 @@ seq_lens, correct_cnts, rewards = rl_dqn.train(
     pos_data_init=False,
     pos_data_sampling=False,
     pos_data_sampling_rate=0.1)
->>>>>>> Some changes
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
 
 fig, ax = plt.subplots()
 ax.plot(seq_lens)
@@ -65,9 +65,12 @@ plt.savefig(f'figures/{experiment_name}_seqlen.png')
 
 fig, ax = plt.subplots()
 ax.plot(correct_cnts)
+<<<<<<< HEAD
 
 fig, ax = plt.subplots()
 ax.plot(correct_cnts)
+=======
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
 plt.title("correct counts - training epochs")
 plt.savefig(f'figures/{experiment_name}_corrcnt.png')
 

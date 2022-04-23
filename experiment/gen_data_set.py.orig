@@ -2,7 +2,13 @@ import quartz
 import time
 import heapq
 from concurrent.futures import ProcessPoolExecutor
+<<<<<<< HEAD
 import json
+=======
+import copy
+import json
+from dgl import save_graphs, load_graphs
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
 from qiskit.quantum_info import Statevector
 from qiskit import QuantumCircuit
 import math
@@ -218,13 +224,20 @@ while candidate_hq != [] and budget >= 0:
             new_graph = first_graph.apply_xfer(
                 xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
             new_hash = new_graph.hash()
+<<<<<<< HEAD
             buffer.update_path(first_graph, i, xfer, new_graph)
             buffer.update_reward(first_graph, i, xfer, new_graph)
+=======
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
             if new_hash not in hash_set:
                 new_cnt = new_graph.gate_count
                 hash_set.add(new_hash)
                 heapq.heappush(candidate_hq, (new_cnt, new_hash))
                 save_graph(new_graph)
+<<<<<<< HEAD
+=======
+                buffer.update(first_graph, i, xfer, new_graph)
+>>>>>>> 71d98205445c39f432f21a75828a84fc8da0564a
                 if new_cnt < best_gate_cnt:
                     best_graph = new_graph
                     best_gate_cnt = new_cnt

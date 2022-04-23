@@ -52,7 +52,7 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       auto input_qubit_op =
           Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit));
       input_qubits_op.push_back(input_qubit_op);
-      qubit_2_idx[input_qubit_op] = node->index;
+      input_qubit_op_2_qubit_idx[input_qubit_op] = node->index;
     } else if (node->type == DAGNode::input_param) {
       input_params_op.push_back(
           Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
@@ -134,8 +134,9 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     op_q.pop();
 
     // An input qubit
-    if (qubit_2_idx.find(op) != qubit_2_idx.end()) {
-      pos_2_logical_qubit[Pos(op, 0)] = qubit_2_idx[op];
+    if (input_qubit_op_2_qubit_idx.find(op) !=
+        input_qubit_op_2_qubit_idx.end()) {
+      pos_2_logical_qubit[Pos(op, 0)] = input_qubit_op_2_qubit_idx[op];
     }
     if (outEdges.find(op) != outEdges.end()) {
       auto op_out_edges = outEdges.find(op)->second;
@@ -160,7 +161,7 @@ Graph::Graph(const Graph &graph) {
   context = graph.context;
   constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
-  qubit_2_idx = graph.qubit_2_idx;
+  input_qubit_op_2_qubit_idx = graph.input_qubit_op_2_qubit_idx;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
 }
@@ -748,7 +749,7 @@ void Graph::rotation_merging(GateType target_rotation) {
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
-      int qubit_idx = qubit_2_idx[it.first];
+      int qubit_idx = input_qubit_op_2_qubit_idx[it.first];
       bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
@@ -921,7 +922,9 @@ void Graph::rotation_merging(GateType target_rotation) {
   }
 }
 
-size_t Graph::get_num_qubits() const { return qubit_2_idx.size(); }
+size_t Graph::get_num_qubits() const {
+  return input_qubit_op_2_qubit_idx.size();
+}
 
 void Graph::print_qubit_ops() {
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
@@ -929,7 +932,7 @@ void Graph::print_qubit_ops() {
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
-      int qubit_idx = qubit_2_idx[it.first];
+      int qubit_idx = input_qubit_op_2_qubit_idx[it.first];
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);
@@ -1011,7 +1014,7 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
-      int qubit_idx = qubit_2_idx.find(it.first)->second;
+      int qubit_idx = input_qubit_op_2_qubit_idx.find(it.first)->second;
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);

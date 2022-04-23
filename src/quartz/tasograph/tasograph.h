@@ -242,7 +242,7 @@ public:
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
-  std::unordered_map<Op, int, OpHash> qubit_2_idx;
+  std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
 
 private:

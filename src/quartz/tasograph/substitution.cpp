@@ -700,8 +700,10 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
     op_q.pop();
 
     // An input qubit
-    if (newGraph->qubit_2_idx.find(op) != newGraph->qubit_2_idx.end()) {
-      newGraph->pos_2_logical_qubit[Pos(op, 0)] = newGraph->qubit_2_idx[op];
+    if (newGraph->input_qubit_op_2_qubit_idx.find(op) !=
+        newGraph->input_qubit_op_2_qubit_idx.end()) {
+      newGraph->pos_2_logical_qubit[Pos(op, 0)] =
+          newGraph->input_qubit_op_2_qubit_idx[op];
     }
     if (newGraph->outEdges.find(op) != newGraph->outEdges.end()) {
       auto op_out_edges = newGraph->outEdges.find(op)->second;

@@ -22,13 +22,14 @@ def config_cython():
             if not fn.endswith(".pyx"):
                 continue
             ret.append(
-                Extension("quartz.%s" % fn[:-4], ["%s/%s" % (path, fn)],
-                          include_dirs=["../src/quartz/", "~/opt/include/"],
-                          libraries=["quartz_runtime"],
-                          library_dirs=["~/opt/lib/"],
-                          extra_compile_args=["-std=c++17"],
-                          extra_link_args=[],
-                          language="c++"))
+                Extension(
+                    "quartz.%s" % fn[:-4], ["%s/%s" % (path, fn)],
+                    include_dirs=["../src/quartz/", "/usr/local/include/"],
+                    libraries=["quartz_runtime"],
+                    library_dirs=["/usr/local/lib/"],
+                    extra_compile_args=["-std=c++17"],
+                    extra_link_args=[],
+                    language="c++"))
         return cythonize(ret, compiler_directives={"language_level": 3})
     except ImportError:
         print("WARNING: cython is not installed!!!")

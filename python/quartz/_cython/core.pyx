@@ -292,27 +292,30 @@ cdef class PyGraph:
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
         return deref(self.graph).xfer_appliable(xfer.graphXfer, node.node)
 
+    # TODO: use node_id directly instead of using PyNode
     def xfer_appliable(self, *, PyXfer xfer, PyNode node):
         return self._xfer_appliable(xfer, node)
 
+    # TODO: use node_id directly instead of using PyNode
     def available_xfers(self, *, QuartzContext context, PyNode node, output_format="int"):
-        # xfers = context.get_xfers()
-        # result = []
-        # for i in range(len(xfers)):
-        #     if self._xfer_appliable(xfers[i], node):
-        #         if output_format in ['int']:
-        #             result.append(i)
-        #         else:
-        #             result.append(xfers[i])
         result = deref(self.graph).appliable_xfers(node.node, context.v_xfers)
         return result
                     
+    # TODO: use node_id directly instead of using PyNode
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
         ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node)
         if ret.get() == NULL:
             return None
         else:
             return PyGraph().set_this(ret)
+
+    # TODO: use node_id directly instead of using PyNode
+    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node):
+        ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node)
+        if ret.first.get() == NULL:
+            return None, []
+        else:
+            return PyGraph().set_this(ret.first), ret.second
         
     def all_nodes_with_id(self) -> list:
         py_node_list = []

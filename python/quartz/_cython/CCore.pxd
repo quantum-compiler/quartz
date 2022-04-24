@@ -5,6 +5,7 @@ from libcpp cimport bool
 from libc.stdint cimport uint32_t
 from libcpp.string cimport string
 from libcpp.memory cimport shared_ptr
+from libcpp.pair cimport pair
 
 ctypedef float ParamType
 
@@ -99,6 +100,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
         shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
+        pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op) except +
         vector[size_t] appliable_xfers(Op, const vector[GraphXfer *] &)
         void all_ops(vector[Op]&) const
         int gate_count() const

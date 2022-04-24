@@ -397,7 +397,6 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
     }
     // Check output
     for (size_t i = 0; i < srcOp->outputs.size(); i++) {
-      TensorX out = srcOp->outputs[i];
       auto it = mappedOutputs.find(srcOp->outputs[i]);
       // If out is in mappedOutputs, it represents an external edge,
       // we don't check it here

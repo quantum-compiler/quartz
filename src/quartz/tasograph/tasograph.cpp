@@ -39,14 +39,6 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
   std::vector<Op> input_params_op;
   input_qubits_op.reserve(num_input_qubits);
   input_params_op.reserve(num_input_params);
-  //   for (int i = 0; i < num_input_qubits; ++i)
-  // 	input_qubits_op.push_back(
-  // 	    Op(get_next_special_op_guid(),
-  // ctx->get_gate(GateType::input_qubit)));
-  //   for (int i = 0; i < num_input_params; ++i)
-  // 	input_params_op.push_back(
-  // 	    Op(get_next_special_op_guid(),
-  // ctx->get_gate(GateType::input_param)));
   for (auto &node : dag->nodes) {
     if (node->type == DAGNode::input_qubit) {
       auto input_qubit_op =

@@ -28,7 +28,7 @@ gate_type_num = 29
 def masked_softmax(logits, mask):
     mask = torch.ones_like(mask, dtype=torch.bool) ^ mask
     logits[mask] -= 1.0e+10
-    return F.softmax(logits)
+    return F.softmax(logits, dim=-1)
 
 
 class ActorCritic(nn.Module):
@@ -39,20 +39,22 @@ class ActorCritic(nn.Module):
         # self.graph_embeding = QGNN(gate_type_num, hidden_size, hidden_size)
 
         self.actor = nn.Sequential(
-            QGNN(7, gate_type_num, hidden_size, hidden_size),
+            QGNN(6, gate_type_num, hidden_size, hidden_size),
             nn.Linear(hidden_size, hidden_size), nn.ReLU(),
             nn.Linear(hidden_size, num_outputs))
 
         self.critic = nn.Sequential(
-            QGNN(7, gate_type_num, hidden_size, hidden_size),
+            QGNN(6, gate_type_num, hidden_size, hidden_size),
             nn.Linear(hidden_size, hidden_size), nn.ReLU(),
             nn.Linear(hidden_size, 1))
 
     def forward(self, g, context):
         dgl_g = g.to_dgl_graph().to(device)
 
-        node_qs = self.critic(dgl_g)
-        node_prob = F.softmax(node_qs)
+        # critic network generate a q-value for selecting each node
+        # gradient required
+        node_qs = self.critic(dgl_g).squeeze()
+        node_prob = F.softmax(node_qs, dim=-1)
         node_dist = Categorical(node_prob)
         node = node_dist.sample()
         node_log_prob = node_dist.log_prob(node)
@@ -62,23 +64,27 @@ class ActorCritic(nn.Module):
         available_xfers = g.available_xfers(context=context,
                                             node=g.get_node_from_id(id=node))
         mask[available_xfers] = True
-        xfer_logit = self.actor(g)
+        xfer_logit = self.actor(dgl_g)
         xfer_probs = masked_softmax(xfer_logit[node], mask)
         xfer_dist = Categorical(xfer_probs)
         xfer = xfer_dist.sample()
         xfer_log_prob = xfer_dist.log_prob(xfer)
         xfer_entropy = xfer_dist.entropy()
 
+        # use the q-value for node selection as the v-value for action
         value = node_qs[node]
         print(f'value: {value}')
 
         return node.item(), node_log_prob, node_entropy, xfer.item(
         ), xfer_log_prob, xfer_entropy, value
 
-    def get_value(self, g, node):
+    # The q-value of a state
+    # used as the v-value in action selection policy
+    def get_value(self, g):
         dgl_g = g.to_dgl_graph().to(device)
         node_qs = self.cirtic(dgl_g)
-        return node_qs[node]
+        node_prob = F.softmax(node_prob)
+        return torch.dot(node_qs, node_prob).mean()
 
 
 def get_trajectory(device, max_seq_len, model, invalid_reward, init_state,
@@ -171,7 +177,7 @@ def a2c(hidden_size,
         episodes=20000,
         lr=1e-3,
         max_seq_len=5,
-        invalid_reward=-5,
+        invalid_reward=-1,
         batch_size=100):
 
     num_actions = context.num_xfers
@@ -216,13 +222,12 @@ def a2c(hidden_size,
         print(f'node_log_probs: {node_log_probs}')
         print(f'xfer_log_probs: {xfer_log_probs}')
 
-        actor_loss = -((node_log_probs + xfer_log_probs) *
-                       advantage.clone().detach()).mean()
+        actor_loss = -(xfer_log_probs * advantage.clone().detach()).mean()
         print(f'actor_loss: {actor_loss.item()}')
         critic_loss = advantage.pow(2).mean()
         print(f'critic_loss: {critic_loss.item()}')
 
-        loss = actor_loss + 0.5 * critic_loss - 0.001 * entropy
+        loss = actor_loss + 0.5 * critic_loss - 0.0001 * entropy
 
         print(f'entropy: {entropy.item()}')
         print(f'loss: {loss.item()}')
@@ -230,11 +235,7 @@ def a2c(hidden_size,
         optimizer.zero_grad()
         loss.backward()
         for param in model.parameters():
-            if param.grad == None:
-                # print(param.shape)
-                continue
-            else:
-                param.grad.data.clamp_(-1, 1)
+            param.grad.data.clamp_(-1, 1)
         optimizer.step()
 
         average_seq_len /= batch_size
@@ -246,13 +247,14 @@ def a2c(hidden_size,
         reward_log.append(average_reward)
 
 
-experiment_name = "rl_a2c_" + "pos_data_init_sample"
+experiment_name = "rl_a2c_rewrite_" + "1_step_from_56"
 context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
                                filename='../bfs_verified_simplified.json',
                                no_increase=True)
 parser = quartz.PyQASMParser(context=context)
-init_dag = parser.load_qasm(
-    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+# init_dag = parser.load_qasm(
+#     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+init_dag = parser.load_qasm(filename="near_56.qasm")
 init_graph = quartz.PyGraph(context=context, dag=init_dag)
 
 a2c(hidden_size=64,

@@ -76,12 +76,12 @@ int main() {
     top_graph->topology_order_ops(all_ops);
     assert(all_ops.size() == (size_t)top_graph->gate_count());
 
-
-    for (auto op : all_ops) {
+    // TODO  xfer contains OpX* which will be modified so xfer cannot be parallelized
 #pragma omp parallel for default(none) collapse(1) \
-      shared(op, all_ops, xfers, top_graph, lock_hashmap, lock_q, best_gate_cnt, best_graph, hash_mp, candidate_q)
-      for (int i = 0; i < xfers.size(); ++i) {
-        auto xfer = std::make_unique<GraphXfer>(*xfers[i]);
+      shared(all_ops, xfers, top_graph, lock_hashmap, lock_q, best_gate_cnt, best_graph, hash_mp, candidate_q)
+    for (int i = 0; i < xfers.size(); ++i) {
+      auto xfer = std::make_unique<GraphXfer>(*xfers[i]);
+      for (auto op : all_ops) {
         if (top_graph->xfer_appliable(xfer.get(), op)) {
           auto new_graph = top_graph->apply_xfer(xfer.get(), op);
           if (new_graph) {

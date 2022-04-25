@@ -685,7 +685,7 @@ void GraphXfer::run_mth(int depth, Graph *graph,
   }
 }
 
-bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
+bool GraphXfer::create_new_operator(const OpX* const opx, Op &op) {
   Gate *gate = context->get_gate(opx->type);
   op.ptr = gate;
   op.guid = context->next_global_unique_id();

@@ -31,7 +31,12 @@ namespace quartz {
         get_and_gen_parameters(num_params);
     }
 
-	size_t Context::next_global_unique_id(void) { return global_unique_id++; }
+	size_t Context::next_global_unique_id(void) {
+       #pragma omp critical(guid)
+      {
+        return global_unique_id++;
+      }
+    }
 
 	void Context::set_generated_parameter(int id, ParamType param) {
 		get_generated_parameters(id);

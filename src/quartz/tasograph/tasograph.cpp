@@ -1415,10 +1415,11 @@ std::shared_ptr<Graph> Graph::optimize(
         std::vector<Op> all_ops;
         subGraph->topology_order_ops(all_ops);
         assert(all_ops.size() == (size_t)subGraph->gate_count());
-        #pragma omp parallel for default(none) collapse(2) \
+        // TODO  xfer contains OpX* which will be modified so xfer cannot be parallelized
+        #pragma omp parallel for default(none) collapse(1) \
           shared(all_ops, xfers, subGraph, hashmap, candidates, alpha, bestCost, maxNumOps, hashmap_lock, queue_lock)
-        for (const auto& op : all_ops) {
-          for (const GraphXfer* const xfer_ : xfers) {
+        for (const GraphXfer* const xfer_ : xfers) {
+          for (const auto& op : all_ops) {
             auto xfer = std::make_unique<GraphXfer>(*xfer_);
             if (subGraph->xfer_appliable(xfer.get(), op)) {
               std::shared_ptr<const Graph> newGraph = subGraph->apply_xfer(xfer.get(), op);

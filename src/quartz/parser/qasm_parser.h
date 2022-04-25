@@ -50,6 +50,7 @@ public:
     std::ifstream fin;
     fin.open(file_name, std::ifstream::in);
     if (!fin.is_open()) {
+      std::cerr << "QASMParser fails to open " << file_name << std::endl;
       return false;
     }
     std::string line;
@@ -80,6 +81,10 @@ public:
         assert(!ss.good());
       } else if (is_gate_string(command, gate_type)) {
         Gate *gate = context->get_gate(gate_type);
+        if (!gate) {
+          std::cerr << "Unsupported gate in current context: " << command << std::endl;
+          return false;
+        }
         // Currently don't support parameter gate
         assert(gate->is_quantum_gate());
         std::vector<int> qubit_indices, parameter_indices;

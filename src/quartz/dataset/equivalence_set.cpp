@@ -198,6 +198,7 @@ namespace quartz {
 		std::ifstream fin;
 		fin.open(file_name, std::ifstream::in);
 		if (!fin.is_open()) {
+            std::cerr << "EquivalenceSet fails to open " << file_name << std::endl;
 			return false;
 		}
 

@@ -9,7 +9,7 @@
 
 namespace quartz {
 	Context::Context(const std::vector< GateType > &supported_gates)
-	    : supported_gates_(supported_gates), global_unique_id(16384) {
+	    : global_unique_id(16384), supported_gates_(supported_gates) {
 		gates_.reserve(supported_gates.size());
 		for (const auto &gate : supported_gates) {
 			insert_gate(gate);
@@ -38,7 +38,13 @@ namespace quartz {
 		random_parameters_[id] = param;
 	}
 
-	Gate *Context::get_gate(GateType tp) { return gates_[tp].get(); }
+	Gate *Context::get_gate(GateType tp) {
+      const auto it = gates_.find(tp);
+      if (it != gates_.end())
+        return it->second.get();
+      else
+        return nullptr;
+    }
 
 	bool Context::insert_gate(GateType tp) {
 		if (gates_.count(tp) > 0) {

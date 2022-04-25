@@ -24,9 +24,9 @@ def config_cython():
             ret.append(
                 Extension(
                     "quartz.%s" % fn[:-4], ["%s/%s" % (path, fn)],
-                    include_dirs=["../src/quartz/", "/usr/local/include/"],
+                    include_dirs=["../src/quartz/", "/usr/local/include/", "/home/jinjun/usr_local/include"],
                     libraries=["quartz_runtime"],
-                    library_dirs=["/usr/local/lib/"],
+                    library_dirs=["/usr/local/lib/", "/home/jinjun/usr_local/lib"],
                     extra_compile_args=["-std=c++17"],
                     extra_link_args=[],
                     language="c++"))

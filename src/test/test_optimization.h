@@ -17,7 +17,7 @@ void test_optimization(Context *ctx, const std::string &file_name,
 	QASMParser qasm_parser(ctx);
 	DAG *dag = nullptr;
 	if (!qasm_parser.load_qasm(file_name, dag)) {
-		std::cout << "Parser failed" << std::endl;
+		std::cerr << "Parser failed" << std::endl;
 		return;
 	}
     ctx->get_and_gen_input_dis(dag->get_num_qubits());

@@ -614,7 +614,7 @@ bool Graph::move_forward(Pos &pos, bool left) {
       return false;
     else {
       auto in_edges = inEdges[pos.op];
-      for (const auto edge : in_edges) {
+      for (const auto& edge : in_edges) {
         if (edge.dstIdx == pos.idx) {
           pos.op = edge.srcOp;
           pos.idx = edge.srcIdx;
@@ -627,7 +627,7 @@ bool Graph::move_forward(Pos &pos, bool left) {
       return false;
     } else {
       auto out_edges = outEdges[pos.op];
-      for (const auto edge : out_edges) {
+      for (const auto& edge : out_edges) {
         if (edge.srcIdx == pos.idx) {
           pos.op = edge.dstOp;
           pos.idx = edge.dstIdx;
@@ -764,7 +764,7 @@ void Graph::rotation_merging(GateType target_rotation) {
     if (op.ptr->tp == GateType::cx) {
       auto in_edge_list = inEdges[op];
       std::vector<Pos> pos_list(2); // Two inputs for cx gate
-      for (const auto edge : in_edge_list) {
+      for (const auto& edge : in_edge_list) {
         pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
       }
       bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
@@ -780,7 +780,7 @@ void Graph::rotation_merging(GateType target_rotation) {
       auto in_edge_list = inEdges[op];
       int num_qubits = op.ptr->get_num_qubits();
       std::vector<Pos> pos_list(num_qubits);
-      for (const auto edge : in_edge_list) {
+      for (const auto& edge : in_edge_list) {
         if (edge.dstIdx < num_qubits) {
           pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
         }
@@ -1126,8 +1126,8 @@ std::shared_ptr<Graph> Graph::optimize(
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
   if (!eqs.load_json(ctx, equiv_file_name)) {
-    std::cout << "Failed to load equivalence file." << std::endl;
-    assert(false);
+    std::cerr << "Failed to load equivalence file: " << equiv_file_name << std::endl;
+    exit(1);
   }
   auto end = std::chrono::steady_clock::now();
   //   std::cout << std::dec << eqs.num_equivalence_classes()

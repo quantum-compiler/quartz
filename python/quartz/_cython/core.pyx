@@ -116,6 +116,17 @@ cdef class PyGate:
     @property
     def num_parameters(self):
         return self.gate.num_parameters
+    
+    @staticmethod
+    def rebuild(GateType _type, int _num_qubits, int _num_params):
+        gate = PyGate()
+        inner_gate = new Gate(_type, _num_qubits, _num_params)
+        gate.set_this(inner_gate)
+        return gate
+    
+    def __reduce__(self):
+        return (self.__class__.rebuild, (self.tp, self.num_qubits, self.num_parameters))
+
 
 cdef class PyDAG:
     cdef DAG_ptr dag
@@ -151,7 +162,7 @@ cdef class PyDAG:
     
     @property
     def num_gates(self):
-        return self.dag.get_num_gates() 
+        return self.dag.get_num_gates()
 
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
@@ -269,6 +280,42 @@ cdef class QuartzContext:
             num += 1
         return num
 
+from functools import partial
+
+# cdef class PyNode:
+#     cdef Op node
+
+#     cdef int guid
+#     cdef object gate
+
+#     def __cinit__(self, *, int guid = -1, PyGate gate = None):
+#         self.guid = guid
+#         self.gate = gate
+#         if id != -1 and gate != None:
+#             self.node = Op(guid, gate.gate)
+#         else:
+#             self.node = Op()
+
+#     def __dealloc__(self):
+#         pass
+    
+#     @property
+#     def node_guid(self):
+#         return self.node.guid
+
+#     @property
+#     def gate(self):
+#         return PyGate().set_this(self.node.ptr)
+
+#     @property
+#     def gate_tp(self):
+#         return self.node.ptr.tp
+
+#     def __reduce__(self):
+#         return (
+#             partial(self.__class__, guid=self.guid, gate=self.gate), ()
+#         )
+
 cdef class PyNode:
     cdef Op node
 
@@ -286,6 +333,10 @@ cdef class PyNode:
         return self.node.guid
 
     @property
+    def guid(self):
+        return self.node.guid
+
+    @property
     def gate(self):
         return PyGate().set_this(self.node.ptr)
 
@@ -293,30 +344,49 @@ cdef class PyNode:
     def gate_tp(self):
         return self.node.ptr.tp
 
+    def __reduce__(self):
+        return (
+            partial(self.__class__, guid=self.node_guid, gate=self.gate), ()
+        )
 
 cdef class PyGraph:
     cdef shared_ptr[Graph] graph
-    cdef vector[Op] nodes
+    cdef object _nodes
+
+    property nodes:
+        def __get__(self):
+            return self._nodes
+        
+        def __set__(self, nodes):
+            self._nodes = nodes
 
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
+        self.nodes = []
         if context != None and dag != None:
             self.graph = make_shared[Graph](context.context, dag.dag)
-            gate_count = self.gate_count
-            self.nodes.reserve(gate_count)
-            deref(self.graph).topology_order_ops(self.nodes)
+            self.get_nodes()
         else:
             self.graph = shared_ptr[Graph](NULL)
-            self.nodes.clear()
 
     def __dealloc__(self):
         self.graph.reset()
 
+    def get_nodes(self):
+        gate_count = self.gate_count
+        cdef vector[Op] nodes_vec
+        nodes_vec.reserve(gate_count)
+        deref(self.graph).topology_order_ops(nodes_vec)
+
+        self.nodes = []
+        for i in range(gate_count):
+            self.nodes.append(PyNode(
+                guid=nodes_vec[i].guid,
+                gate=PyGate().set_this(nodes_vec[i].ptr)
+            ))
+
     cdef set_this(self, shared_ptr[Graph] graph_):
         self.graph = graph_
-        gate_count = self.gate_count
-        self.nodes.clear()
-        self.nodes.reserve(gate_count)
-        deref(self.graph).topology_order_ops(self.nodes)
+        self.get_nodes()
         return self
 
     # TODO: deprecate this function
@@ -355,41 +425,34 @@ cdef class PyGraph:
             return None, []
         else:
             return PyGraph().set_this(ret.first), ret.second
-        
-    def all_nodes_with_id(self) -> list:
-        py_node_list = []
-        gate_count = self.gate_count
-        for i in range(gate_count):
-            node_dict = {}
-            node_dict['id'] = i
-            node_dict['node'] = PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr))
-            py_node_list.append(node_dict)
-        return py_node_list
+    
+    def all_nodes(self):
+        return self.nodes
 
-    def all_nodes(self) -> list:
-        py_node_list = []
-        gate_count = self.gate_count
-        for i in range(gate_count):
-            py_node_list.append(PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr)))
-        return py_node_list
+    def all_nodes_with_id(self) -> list:
+        nodes_with_id = [
+            { "id": i, 'node': node }
+            for (i, node) in enumerate(self.nodes)
+        ]
+        return nodes_with_id
 
     def get_node_from_id(self, *, id) -> PyNode:
         assert(id < self.num_nodes)
-        return PyNode(guid=self.nodes[id].guid, gate=PyGate().set_this(self.nodes[id].ptr))
+        return self.nodes[id]
 
     def hash(self):
         return deref(self.graph).hash()
 
     def all_edges(self):
         id_guid_mapping = {}
-        gate_cnt = self.nodes.size()
+        gate_cnt = len(self.nodes)
         for i in range(gate_cnt):
             id_guid_mapping[self.nodes[i].guid] = i
 
         cdef vector[Edge] edge_v
         deref(self.graph).all_edges(edge_v)
-        edges = []
         cdef int edge_cnt = edge_v.size()
+        edges = []
         for i in range(edge_cnt):
             e = (id_guid_mapping[edge_v[i].srcOp.guid], id_guid_mapping[edge_v[i].dstOp.guid], edge_v[i].srcIdx, edge_v[i].dstIdx)
             edges.append(e)
@@ -418,8 +481,7 @@ cdef class PyGraph:
         g.edata['dst_idx'] = torch.tensor(dst_idx2)
         g.edata['reversed'] = torch.tensor(reverse)
 
-        nodes = self.all_nodes()
-        node_gate_tp = [node.gate_tp for node in nodes]
+        node_gate_tp = [node.gate_tp for node in self.nodes]
         g.ndata['gate_type'] = torch.tensor(node_gate_tp)
 
         return g
@@ -427,9 +489,8 @@ cdef class PyGraph:
     def get_available_xfers_matrix(self, *, context):
         rows, cols = (self.num_nodes, context.num_xfers)
         arr = [[0 for i in range(cols)] for j in range(rows)]
-        nodes = self.all_nodes()
         for i in range(rows):
-            available_list = self.available_xfers(context=context, node=nodes[i], output_format='int')
+            available_list = self.available_xfers(context=context, node=self.nodes[i], output_format='int')
             for xfer_id in available_list:
                 arr[i][xfer_id] = 1
         return arr
@@ -458,11 +519,11 @@ cdef class PyGraph:
 
     @property
     def num_nodes(self):
-        return self.nodes.size()
+        return len(self.nodes)
 
     @property
     def num_edges(self):
         cdef vector[Edge] edge_v
         deref(self.graph).all_edges(edge_v)
         return edge_v.size()
-        
+

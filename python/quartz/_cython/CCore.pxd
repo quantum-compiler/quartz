@@ -109,6 +109,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         void topology_order_ops(vector[Op] &) const
         shared_ptr[Graph] ccz_flip_t(Context *)
         void to_qasm(const string &, bool, bool) const
+        string to_qasm(bool, bool) const
         shared_ptr[Graph] ccz_flip_greedy_rz()
         
 
@@ -123,3 +124,4 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:
         QASMParser(Context *)
         bool load_qasm(const string &, DAG *&) except +
+        bool load_qasm_str(const string &, DAG *&) except +

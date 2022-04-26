@@ -2,13 +2,13 @@ import quartz
 import time
 import os
 import heapq
-from concurrent.futures import ProcessPoolExecutor
 import json
 from qiskit.quantum_info import Statevector
 from qiskit import QuantumCircuit
 import math
 from collections import deque
 from functools import partial
+import multiprocess as mp
 
 def check(graph):
     graph.to_qasm(filename='check.qasm')
@@ -128,72 +128,87 @@ class DataBuffer:
 
     def save_data(self):
         with open('dataset/reward.json', 'w') as f:
-            json.dump(self.reward_map, f)
+            json.dump(self.reward_map, f, indent=2)
         with open('dataset/path.json', 'w') as f:
-            json.dump(self.path_map, f)
+            json.dump(self.path_map, f, indent=2)
 
-quartz_context = quartz.QuartzContext(
-    gate_set=['h', 'cx', 't', 'tdg'],
-    filename='../bfs_verified_simplified.json',
-    no_increase=True)
-parser = quartz.PyQASMParser(context=quartz_context)
-my_dag = parser.load_qasm(
-    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
-init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
+first_graph = None
+quartz_context = None
+all_nodes = None
 
-candidate_hq = []
-# min-heap by default; contains (gate_count, hash)
-# gate_count is used to compare the pair by default
-heapq.heappush(candidate_hq, (init_graph.gate_count, init_graph.hash()))
-visited_hash_set = set()
-visited_hash_set.add(init_graph.hash())
-best_graph = init_graph
-best_gate_cnt = init_graph.gate_count
-max_gate_cnt = 64
-budget = 5_000_000
-buffer = DataBuffer(init_graph, 0.9)
-save_graph(init_graph) # TODO  check IO optimization
-start = time.time()
+def gen():
+    global first_graph
+    global quartz_context
+    global all_nodes
+    quartz_context = quartz.QuartzContext(
+        gate_set=['h', 'cx', 't', 'tdg'],
+        filename='../bfs_verified_simplified.json',
+        no_increase=True)
+    parser = quartz.PyQASMParser(context=quartz_context)
+    my_dag = parser.load_qasm(
+        filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+    init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
 
-while len(candidate_hq) > 0 and budget > 0:
-    popped_cnt, first_hash = heapq.heappop(candidate_hq)
-    first_graph = get_graph_from_hash(quartz_context, first_hash)
-    all_nodes = first_graph.all_nodes()
-    first_cnt = first_graph.gate_count
-    # TODO  recompute? first_cnt, first_hash = heapq.heappop(candidate_hq)
-    assert(popped_cnt == first_cnt)
-    print(f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}')
-    
-    def available_xfers(i):
-        return first_graph.available_xfers(context=quartz_context, node=all_nodes[i])
+    candidate_hq = []
+    # min-heap by default; contains (gate_count, hash)
+    # gate_count is used to compare the pair by default
+    heapq.heappush(candidate_hq, (init_graph.gate_count, init_graph))
+    visited_hash_set = set()
+    visited_hash_set.add(init_graph.hash())
+    best_graph = init_graph
+    best_gate_cnt = init_graph.gate_count
+    max_gate_cnt = 64
+    budget = 5_000_000
+    buffer = DataBuffer(init_graph, 0.9)
+    # save_graph(init_graph) # TODO  check IO optimization
+    start = time.time()
 
-    with ProcessPoolExecutor(max_workers=32) as executor:
-        results = executor.map(available_xfers, list(range(len(all_nodes))), chunksize=2)
-        appliable_xfers_nodes = list(results)
+    while len(candidate_hq) > 0 and budget > 0:
+        popped_cnt, first_graph = heapq.heappop(candidate_hq)
+        # first_graph = get_graph_from_hash(quartz_context, first_hash)
+        all_nodes = first_graph.all_nodes()
+        first_cnt = first_graph.gate_count
+        # TODO  recompute? first_cnt, first_hash = heapq.heappop(candidate_hq)
+        assert(popped_cnt == first_cnt)
+        # print(f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}')
+        
+        def available_xfers(i):
+            return first_graph.available_xfers(context=quartz_context, node=all_nodes[i])
 
-    for i in range(len(all_nodes)):
-        node = all_nodes[i]
-        appliable_xfers = appliable_xfers_nodes[i]
-        for xfer in appliable_xfers:
-            new_graph = first_graph.apply_xfer(
-                xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
-            new_hash = new_graph.hash()
-            buffer.update_path(first_graph, i, xfer, new_graph)
-            buffer.update_reward(first_graph, i, xfer, new_graph)
-            if new_hash not in visited_hash_set:
-                new_cnt = new_graph.gate_count
-                visited_hash_set.add(new_hash)
-                heapq.heappush(candidate_hq, (new_cnt, new_hash))
-                save_graph(new_graph) # TODO  check IO optimization
-                if new_cnt < best_gate_cnt:
-                    best_graph = new_graph
-                    best_gate_cnt = new_cnt
-            budget -= 1
-            if budget % 10_000 == 0:
-                print(
-                    f'{budget}: minimum gate count is {best_gate_cnt}, after {time.time() - start:.2f} seconds'
-                )
-                buffer.save_data()
-                print(buffer.reward_map)
+        av_start = time.monotonic_ns()
 
-buffer.save_data()
+        with mp.Pool() as pool:
+            appliable_xfers_nodes = pool.map(available_xfers, list(range(len(all_nodes))))
+        
+        av_end = time.monotonic_ns()
+        print(f'av duration: { (av_end - av_start) / 1e6 } ms')
+
+        for i in range(len(all_nodes)):
+            node = all_nodes[i]
+            appliable_xfers = appliable_xfers_nodes[i]
+            for xfer in appliable_xfers:
+                new_graph = first_graph.apply_xfer(
+                    xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
+                new_hash = new_graph.hash()
+                buffer.update_path(first_graph, i, xfer, new_graph)
+                buffer.update_reward(first_graph, i, xfer, new_graph)
+                if new_hash not in visited_hash_set:
+                    new_cnt = new_graph.gate_count
+                    visited_hash_set.add(new_hash)
+                    heapq.heappush(candidate_hq, (new_cnt, new_graph))
+                    # save_graph(new_graph) # TODO  check IO optimization
+                    if new_cnt < best_gate_cnt:
+                        best_graph = new_graph
+                        best_gate_cnt = new_cnt
+                budget -= 1
+                if budget % 10_000 == 0:
+                    print(
+                        f'{budget}: minimum gate count is {best_gate_cnt}, after {time.time() - start:.2f} seconds'
+                    )
+                    buffer.save_data()
+                    print(buffer.reward_map)
+
+    buffer.save_data()
+
+if __name__ == '__main__':
+    gen()

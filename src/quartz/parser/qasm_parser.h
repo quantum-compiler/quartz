@@ -45,17 +45,13 @@ bool is_gate_string(const std::string &token, GateType &type) {
 class QASMParser {
 public:
   QASMParser(Context *ctx) : context(ctx) {}
-  bool load_qasm(const std::string &file_name, DAG *&dag) {
+
+  template<class _CharT, class _Traits>
+  bool load_qasm_stream(std::basic_istream<_CharT, _Traits>& qasm_stream, DAG*& dag) {
     dag = NULL;
-    std::ifstream fin;
-    fin.open(file_name, std::ifstream::in);
-    if (!fin.is_open()) {
-      std::cerr << "QASMParser fails to open " << file_name << std::endl;
-      return false;
-    }
     std::string line;
     GateType gate_type;
-    while (std::getline(fin, line)) {
+    while (std::getline(qasm_stream, line)) {
       // repleace comma with space
       find_and_replace_all(line, ",", " ");
       // ignore semicolon at the end
@@ -105,8 +101,24 @@ public:
         assert(false);
       }
     }
-    fin.close();
     return true;
+  }
+
+  bool load_qasm_str(const std::string& qasm_str, DAG*& dag) {
+    std::stringstream sstream(qasm_str);
+    return load_qasm_stream(sstream, dag);
+  }
+
+  bool load_qasm(const std::string &file_name, DAG *&dag) {
+    std::ifstream fin;
+    fin.open(file_name, std::ifstream::in);
+    if (!fin.is_open()) {
+      std::cerr << "QASMParser fails to open " << file_name << std::endl;
+      return false;
+    }
+    const bool res = load_qasm_stream(fin, dag);
+    fin.close();
+    return res;
   }
 
 private:

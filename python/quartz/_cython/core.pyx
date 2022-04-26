@@ -3,6 +3,7 @@
 from cython.operator cimport dereference as deref
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr, make_shared
+from libcpp cimport bool
 from CCore cimport GateType
 from CCore cimport Gate
 from CCore cimport DAG
@@ -165,9 +166,13 @@ cdef class PyDAG:
 
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
+    cdef bool is_nop
 
-    def __cinit__(self, *, QuartzContext context=None, PyDAG dag_from=None, PyDAG dag_to=None):
+    def __cinit__(self, *, QuartzContext context=None, PyDAG dag_from=None, PyDAG dag_to=None, bool is_nop=False):
+        self.is_nop = is_nop
         if context == None:
+            self.graphXfer = NULL
+        elif is_nop:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
             self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
@@ -175,24 +180,39 @@ cdef class PyXfer:
     def __dealloc__(self):
         pass
 
-    cdef set_this(self, GraphXfer *graphXfer_):
+    cdef set_this(self, GraphXfer *graphXfer_, bool is_nop=False):
         self.graphXfer = graphXfer_
+        self.is_nop = is_nop
+        # TODO: maybe delete before setting to None?
+        if self.is_nop:
+            self.graphXfer = NULL
         return self
     
+    # TODO: raise exception if NULL or NOP
     @property
     def src_gate_count(self):
         return self.graphXfer.num_src_op()
     
+    # TODO: raise exception if NULL or NOP
     @property
     def dst_gate_count(self):
         return self.graphXfer.num_dst_op()
+
+    @property
+    def is_nop(self):
+        return self.is_nop
+
+    @property
+    def is_NOP(self):
+        return self.is_nop
 
 cdef class QuartzContext:
     cdef Context *context
     cdef EquivalenceSet *eqs
     cdef vector[GraphXfer *] v_xfers
+    cdef bool include_nop
 
-    def __cinit__(self, *,  gate_set, filename, no_increase=False):
+    def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -217,8 +237,8 @@ cdef class QuartzContext:
                         self.v_xfers.push_back(xfer_0)
                     if xfer_1 != NULL:
                         self.v_xfers.push_back(xfer_1)
-        
-        
+        self.include_nop = include_nop
+
     cdef load_json(self, filename):
         # Load ECC from file
         filename_bytes = filename.encode('utf-8')
@@ -236,10 +256,17 @@ cdef class QuartzContext:
         xfers = []
         for i in range(num_xfers):
             xfers.append(PyXfer().set_this(self.v_xfers[i]))
+        if self.include_nop:
+            xfers.append(PyXfer(is_nop=True))
         return xfers
 
-    def get_xfer_from_id(self, *, id):
-        xfer = PyXfer().set_this(self.v_xfers[id])
+    def get_xfer_from_id(self, *, id) -> PyXfer:
+        if id < self.v_xfers.size():
+            xfer = PyXfer().set_this(self.v_xfers[id])
+        elif self.include_nop and id == self.v_xfers.size():
+            xfer = PyXfer(is_nop=True)
+        else:
+            xfer = None
         return xfer
 
     @property
@@ -248,7 +275,10 @@ cdef class QuartzContext:
     
     @property
     def num_xfers(self):
-        return self.v_xfers.size()
+        num = self.v_xfers.size()
+        if self.include_nop:
+            num += 1
+        return num
 
 from functools import partial
 
@@ -359,20 +389,27 @@ cdef class PyGraph:
         self.get_nodes()
         return self
 
+    # TODO: deprecate this function
     cdef _xfer_appliable(self, PyXfer xfer, PyNode node):
         return deref(self.graph).xfer_appliable(xfer.graphXfer, node.node)
 
     # TODO: use node_id directly instead of using PyNode
     def xfer_appliable(self, *, PyXfer xfer, PyNode node):
+        if xfer.is_nop:
+            return True
         return self._xfer_appliable(xfer, node)
 
     # TODO: use node_id directly instead of using PyNode
     def available_xfers(self, *, QuartzContext context, PyNode node, output_format="int"):
         result = deref(self.graph).appliable_xfers(node.node, context.v_xfers)
+        if context.include_nop:
+            result.push_back(context.num_xfers - 1)
         return result
                     
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
+        if xfer.is_nop:
+            return self
         ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node)
         if ret.get() == NULL:
             return None
@@ -381,6 +418,8 @@ cdef class PyGraph:
 
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node):
+        if xfer.is_nop:
+            return self
         ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node)
         if ret.first.get() == NULL:
             return None, []

@@ -985,6 +985,10 @@ void Graph::print_qubit_ops() {
 void Graph::to_qasm(const std::string &save_filename, bool print_result,
                     bool print_guid) const {
   std::ofstream ofs(save_filename);
+  ofs << to_qasm(print_result, print_guid);
+}
+
+std::string Graph::to_qasm(bool print_result, bool print_guid) const {
   std::ostringstream o;
   std::map<float, std::string> constant_2_pi;
   std::vector<float> multiples;
@@ -1105,9 +1109,10 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
       }
     }
   }
-  ofs << o.str();
+  const std::string ostr(o.str());
   if (print_result)
-    std::cout << o.str();
+    std::cout << ostr;
+  return ostr;
 }
 
 void Graph::draw_circuit(const std::string &src_file_name,

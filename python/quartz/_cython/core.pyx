@@ -512,7 +512,7 @@ cdef class PyGraph:
         fn_bytes = filename.encode('utf-8')
         deref(self.graph).to_qasm(fn_bytes, False, False)
     
-    def to_qasm(self, *) -> str:
+    def to_qasm_str(self, *) -> str:
         cdef string s = deref(self.graph).to_qasm(False, False)
         return s.decode('utf-8')
 

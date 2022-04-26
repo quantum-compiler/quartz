@@ -214,7 +214,8 @@ class Generator:
                             pbar.set_postfix({
                                 'best_gate_cnt': best_gate_cnt,
                                 '|reward_map|': len(self.buffer.reward_map),
-                                'budget': budget
+                                'budget': budget,
+                                '|graphs|': len(self.buffer.hash2graphs),
                             })
                             pbar.refresh()
                         if budget % 100_000 == 0:
@@ -233,7 +234,8 @@ if __name__ == '__main__':
 
     generator = Generator(
         gate_set=['h', 'cx', 't', 'tdg'],
-        ecc_file='../bfs_verified_simplified.json',
+        # ecc_file='../bfs_verified_simplified.json',
+        ecc_file='../3_2_5_complete_ECC_set.json',
         input_circuit_file="barenco_tof_3_opt_path/subst_history_39.qasm",
         gamma=0.9,
         no_increase=True,

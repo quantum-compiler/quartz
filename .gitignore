@@ -60,6 +60,7 @@ python/quartz/__pycache__/
 src/python/utils/__pycache__/
 src/python/verifier/__pycache__/
 install_manifest.txt
+**/__pycache__
 
 # Build
 build/*

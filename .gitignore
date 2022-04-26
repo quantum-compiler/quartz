@@ -68,3 +68,5 @@ build/*
 # others
 .DS_Store
 experiment/dataset
+**/wandb
+experiment/pretrain/dataset

@@ -93,8 +93,6 @@ class QGNN(nn.Module):
                       dim=1)
         g.edata['w'] = w
         h = self.conv1(g, g.ndata['h'])
-        from IPython import embed
-        embed()
         h = self.conv2(g, h)
         h = self.conv3(g, h)
         h = self.conv4(g, h)

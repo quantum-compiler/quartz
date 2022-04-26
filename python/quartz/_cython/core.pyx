@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 from cython.operator cimport dereference as deref
+from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr, make_shared
 from libcpp cimport bool
@@ -64,6 +65,13 @@ cdef class PyQASMParser:
         dag = PyDAG()
         filename_bytes = filename.encode('utf-8')
         success = self.parser.load_qasm(filename_bytes, dag.dag)
+        assert(success, "Failed to load qasm file!")
+        return dag
+    
+    def load_qasm_str(self, str qasm_str) -> PyDAG:
+        dag = PyDAG()
+        qasm_str_bytes = qasm_str.encode('utf-8')
+        success = self.parser.load_qasm_str(qasm_str_bytes, dag.dag)
         assert(success, "Failed to load qasm file!")
         return dag
 
@@ -503,6 +511,10 @@ cdef class PyGraph:
     def to_qasm(self, *, str filename):
         fn_bytes = filename.encode('utf-8')
         deref(self.graph).to_qasm(fn_bytes, False, False)
+    
+    def to_qasm(self, *) -> str:
+        cdef string s = deref(self.graph).to_qasm(False, False)
+        return s.decode('utf-8')
 
     def ccz_flip_greedy_rz(self, *, rotation_merging=False):
         return PyGraph().set_this(deref(self.graph).ccz_flip_greedy_rz())

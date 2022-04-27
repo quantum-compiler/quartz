@@ -70,3 +70,4 @@ build/*
 experiment/dataset
 **/wandb
 experiment/pretrain/dataset
+experiment/pretrain/QGNN-Pretrain/

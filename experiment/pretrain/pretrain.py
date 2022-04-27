@@ -37,7 +37,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         ecc_file: str = 'bfs_verified_simplified.json',
         split_file: str = 'split.json',
         mode: str = 'train',
-        batch_size: int = 4,
+        batch_size: int = 128,
         use_max_gate_count: bool = False,
     ):
         super().__init__()
@@ -292,9 +292,7 @@ class PretrainNet(pl.LightningModule):
         # out: ( sum(num of nodes), num_xfers )
         out =  self.q_net(batched_graph)
         
-        pred = out * masks
-        label = gt_rewards * masks
-        loss = self._compute_log_loss(pred, label, mode)
+        loss = self._compute_log_loss(out, gt_rewards, masks, mode)
 
         # log some info
         num_nodes = batched_graph.batch_num_nodes()
@@ -321,8 +319,12 @@ class PretrainNet(pl.LightningModule):
         
         return loss
     
-    def _compute_log_loss(self, pred, label, prefix: str = ''):
+    def _compute_log_loss(self, out, gt_rewards, masks, prefix: str = ''):
+        pred = out * masks
+        label = gt_rewards * masks
+
         loss = self.loss_fn(pred, label)
+        loss = loss / masks.sum() # manually apply mean reduction
         
         self.log(f'{prefix}_loss', loss)
 
@@ -369,7 +371,7 @@ datamodule: pl.LightningDataModule = None
 def train(
     ckpt_weight = None,
 ):
-    wandb_logger = init_wandb(offline=False)
+    wandb_logger = init_wandb(enable=True, offline=False)
     ckpt_callback_list = [
         ModelCheckpoint(
             monitor='val_loss',
@@ -396,7 +398,7 @@ def train(
     )
     trainer.fit(model, datamodule=datamodule)
 
-def test(cfg):
+def test():
     wandb_logger = init_wandb(enable=False, offline=True)
     trainer = pl.Trainer(
         gpus=[2],

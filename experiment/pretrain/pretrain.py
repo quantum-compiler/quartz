@@ -37,7 +37,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
         ecc_file: str = 'bfs_verified_simplified.json',
         split_file: str = 'split.json',
         mode: str = 'train',
-        batch_size: int = 4
+        batch_size: int = 4,
+        use_max_gate_count: bool = False,
     ):
         super().__init__()
         self.hash2graphs = {}
@@ -45,6 +46,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         self.num_xfers = 0
         self.max_gate_count = 0
         self.batch_size = batch_size
+        self.use_max_gate_count = use_max_gate_count
 
         # load graphs and rewards
         with open(os.path.join(dataset_dir, graph_file)) as f:
@@ -81,6 +83,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
         
+        # TODO  speed up
         for (g_hash, xfers) in tqdm(rewards.items()):
             graph_qasm, gate_count = hash2graphs[g_hash]
             pydag = parser.load_qasm_str(graph_qasm)
@@ -105,8 +108,12 @@ class QGNNPretrainDM(pl.LightningDataModule):
             # batch [ (dgl_graph, reward_mat, mask_mat) ]
             dgl_graphs, reward_mats, mask_mats = list(zip(*batch))
             batched_graphs = dgl.batch(dgl_graphs)
-            reward_mats = default_collate(reward_mats)
-            mask_mats = default_collate(mask_mats)
+            if self.use_max_gate_count:
+                reward_mats = default_collate(reward_mats)
+                mask_mats = default_collate(mask_mats)
+            else:
+                reward_mats = torch.cat(reward_mats, dim=0)
+                mask_mats = torch.cat(mask_mats, dim=0)
             return (batched_graphs, reward_mats, mask_mats)
 
         # Ref: https://pytorch.org/docs/master/notes/randomness.html#dataloader
@@ -117,6 +124,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
             hashes=self.split_info[mode],
             num_xfers=self.num_xfers,
             max_gate_count=self.max_gate_count,
+            use_max_gate_count=self.use_max_gate_count
         )
         
         dataloader = torch.utils.data.DataLoader(
@@ -136,10 +144,12 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         hashes: list,
         num_xfers: int,
         max_gate_count: int,
+        use_max_gate_count: bool = False
     ):
         super().__init__()
         self.num_xfers = num_xfers
         self.max_gate_count = max_gate_count
+        self.use_max_gate_count = use_max_gate_count
         self.hash2graphs = [
             (*hash2graphs[g_hash], g_hash)
             for g_hash in hashes
@@ -149,39 +159,48 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         return len(self.hash2graphs)
 
     def __getitem__(self, idx):
-        '''
-        return (dgl_graph, reward_mat, mask_mat)
-        '''
+        """
+        Return: (dgl_graph, reward_mat, mask_mat)
+        """
         pygraph, reward_dict, gate_count, g_hash = self.hash2graphs[idx]
+        gate_count_to_use = \
+            self.max_gate_count if self.use_max_gate_count else gate_count
         # { node_id: { xfer_id: reward } }
         # (num_nodes, num_xfers)
-        reward_mat = torch.zeros(self.max_gate_count, self.num_xfers)
-        mask_mat = torch.zeros(self.max_gate_count, self.num_xfers, dtype=torch.bool)
-        zero_reward_mat = torch.zeros(self.max_gate_count, self.num_xfers, dtype=torch.bool)
-        neg_reward_mat = torch.ones(self.max_gate_count, self.num_xfers, dtype=torch.bool)
+        reward_mat = torch.zeros(gate_count_to_use, self.num_xfers)
+        mask_mat = torch.zeros(gate_count_to_use, self.num_xfers, dtype=torch.bool)
+        zero_reward_mat = torch.zeros(gate_count_to_use, self.num_xfers, dtype=torch.bool)
+        neg_reward_mat = torch.ones(gate_count_to_use, self.num_xfers, dtype=torch.bool)
 
         num_pos_rewards = 0
         for (node_id, xfers) in reward_dict.items():
             for (xfer_id, reward) in xfers.items():
                 node_id = int(node_id)
-                xfer_id = int(xfer_id) # TODO
+                xfer_id = int(xfer_id) # TODO  why json dump/load int as str
                 reward_mat[node_id][xfer_id] = float(reward)
                 # use all of the positive rewards
                 mask_mat[node_id][xfer_id] = reward > 0
                 zero_reward_mat[node_id][xfer_id] = reward == 0
-                neg_reward_mat[node_id][xfer_id] = False
+                neg_reward_mat[node_id][xfer_id] = False # reward < 0
                 num_pos_rewards += (reward > 0)
         
+        # TODO  num_pos_rewards should have a min value
+        num_pos_rewards = max(num_pos_rewards, 10)
+        # (?, 2)
         zero_reward_indices = zero_reward_mat.nonzero()
         neg_reward_indices = neg_reward_mat.nonzero()
+        # set negtive reward values
+        reward_mat[ neg_reward_indices[:, 0], neg_reward_indices[:, 1] ] = -2
+
         # use part of the zero or negative rewards
+        # we select them randomly here so they are different for each epochs
         zero_reward_indices = zero_reward_indices[
             torch.randperm(zero_reward_indices.shape[0])[:num_pos_rewards]
-        ]
+        ] # (num_pos_rewards, 2)
         neg_reward_indices = neg_reward_indices[
             torch.randperm(neg_reward_indices.shape[0])[:num_pos_rewards]
         ]
-
+        # set mask to select
         mask_mat[ zero_reward_indices[:, 0], zero_reward_indices[:, 1] ] = True
         mask_mat[ neg_reward_indices[:, 0], neg_reward_indices[:, 1] ] = True
 
@@ -260,18 +279,66 @@ class PretrainNet(pl.LightningModule):
         gate_type_num = 26
         self.q_net = QGNN(gate_type_num, 64, num_xfers, 64)
 
-    def _common_step(self, batch):
-        return self.q_net(batch)
+        self.loss_fn = nn.MSELoss(reduction='sum')
+
+    def _common_step(self, batch, mode: str = 'unknwon'):
+        """
+        Args: batch contains:
+            batched_graph: batch_num_nodes: sum(batched_graph.batch_num_nodes())
+            gt_rewards: (bs, batch_num_nodes, num_xfers)
+            masks: (bs, batch_num_nodes, num_xfers)
+        """
+        batched_graph, gt_rewards, masks = batch
+        # out: ( sum(num of nodes), num_xfers )
+        out =  self.q_net(batched_graph)
+        
+        pred = out * masks
+        label = gt_rewards * masks
+        loss = self._compute_log_loss(pred, label, mode)
+
+        # log some info
+        num_nodes = batched_graph.batch_num_nodes()
+        num_nodes = [int(n) for n in num_nodes]
+        r_start, r_end = 0, 0
+        for i_batch, n_nodes in enumerate(num_nodes):
+            r_end += n_nodes
+            r = slice(r_start, r_end)
+
+            selected_indices = masks[r].nonzero()
+            selected_rewards = gt_rewards[ selected_indices[:, 0], selected_indices[:, 1] ]
+
+            self.log(f'{mode}_num_nodes_{i_batch}', n_nodes, on_step=True)
+            self.log(f'{mode}_num_unmasked_label_{i_batch}', selected_indices.shape[0])
+            self.log(f'{mode}_pos_label_{i_batch}', (selected_rewards > 0).sum())
+            self.log(f'{mode}_zero_label_{i_batch}', (selected_rewards == 0).sum())
+            self.log(f'{mode}_neg_label_{i_batch}', (selected_rewards < 0).sum())
+            
+            self.log(f'{mode}_max_reward_{i_batch}', torch.max(selected_rewards))
+            self.log(f'{mode}_min_reward_{i_batch}', torch.min(selected_rewards))
+            self.log(f'{mode}_mean_reward_{i_batch}', torch.mean(selected_rewards))
+
+            r_start = r_end
+        
+        return loss
+    
+    def _compute_log_loss(self, pred, label, prefix: str = ''):
+        loss = self.loss_fn(pred, label)
+        
+        self.log(f'{prefix}_loss', loss)
+
+        return loss
     
     def training_step(self, batch, batch_idx):
-        # TODO  compute and log loss
-        out = self._common_step(batch)
+        loss = self._common_step(batch, 'train')
+        return loss
     
     def validation_step(self, batch, batch_idx):
-        out = self._common_step(batch)
+        loss = self._common_step(batch, 'val')
+        return loss
     
     def test_step(self, batch, batch_idx):
-        out = self._common_step(batch)
+        loss = self._common_step(batch, 'test')
+        return loss
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
@@ -302,10 +369,10 @@ datamodule: pl.LightningDataModule = None
 def train(
     ckpt_weight = None,
 ):
-    wandb_logger = init_wandb(offline=True)
+    wandb_logger = init_wandb(offline=False)
     ckpt_callback_list = [
         ModelCheckpoint(
-            monitor='val_MAE',
+            monitor='val_loss',
             # dirpath='',
             filename='{epoch}-{val_MAE:.2f}-best',
             save_top_k=3,

@@ -349,7 +349,7 @@ cdef class PyGraph:
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node):
         if xfer.is_nop:
-            return self
+            return self, []
         ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node)
         if ret.first.get() == NULL:
             return None, []

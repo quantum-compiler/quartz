@@ -2079,9 +2079,7 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
     auto gate_count_cost = gate_count();
     total_cost += gate_count_cost;
 
-    // Part2: cost of swaps
-    // find all initial swap gates
-    // initial swaps gates are defined as follows:
+    // Part2: minus cost of initial swaps gates, which are defined as follows:
     // 1. it's a swap
     // 2. both inputs have not gone through any gates other than swap
     std::unordered_set<Op, OpHash> initial_swap_set;
@@ -2112,10 +2110,10 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
             initial_swap_set.insert(candidate_op);
         }
     }
-    // calculate additional swap cost based on qubit distance in device
+    total_cost -= static_cast<double>(initial_swap_set.size());
+
+    // Part3: calculate additional swap cost based on qubit distance in device
     for (const auto& Op_edge : inEdges) {
-        // ignore the gate if it is initial swap
-        if (initial_swap_set.find(Op_edge.first) != initial_swap_set.end()) { continue; }
         // ignore the gate if it has only one input
         if (Op_edge.second.size() == 1) { continue; }
         // calculate the min swap cost (only consider input 0 and input 1)

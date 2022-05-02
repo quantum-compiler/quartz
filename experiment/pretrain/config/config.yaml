@@ -2,12 +2,14 @@
 mode: train
 resume: False
 
-weight: ''
+ckpt_path: ''
 
 gpus: [2]
-
 seed: 98765
 
 wandb:
   en: True
   offline: False
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: 'bfs_verified_simplified.json'

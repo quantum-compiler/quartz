@@ -5,6 +5,7 @@
 #include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
+#include "../device/device.h"
 
 #include <chrono>
 #include <fstream>
@@ -235,6 +236,7 @@ public:
   // physical mapping related
   void init_physical_mapping();
   MappingStatus check_mapping_correctness();
+  double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);
 
 private:
   void replace_node(Op oldOp, Op newOp);

@@ -2060,4 +2060,65 @@ MappingStatus Graph::check_mapping_correctness() {
     return MappingStatus::VALID;
 }
 
+double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device) {
+    double total_cost = 0;
+    // Part1: cost of gates
+    auto gate_count_cost = gate_count();
+    total_cost += gate_count_cost;
+
+    // Part2: cost of swaps
+    // find all initial swap gates
+    // initial swaps gates are defined as follows:
+    // 1. it's a swap
+    // 2. both inputs have not gone through any gates other than swap
+    std::unordered_set<Op, OpHash> initial_swap_set;
+    std::unordered_set<Op, OpHash> candidate_0;
+    std::unordered_set<Op, OpHash> candidate_1;
+    for (const auto& input_qubit_mapping : qubit_mapping_table) {
+        // start from input qubits
+        const Edge* input_qubit_edge = &*outEdges[input_qubit_mapping.first].begin();
+        bool has_next = true;
+        while (has_next && input_qubit_edge->dstOp.ptr->tp == GateType::swap) {
+            // store the swap gate in corresponding candidate set
+            if (input_qubit_edge->dstIdx == 0) candidate_0.insert(input_qubit_edge->dstOp);
+            if (input_qubit_edge->dstIdx == 1) candidate_1.insert(input_qubit_edge->dstOp);
+            // move one step forward
+            has_next = false;
+            for (const auto& next_edge : outEdges[input_qubit_edge->dstOp]) {
+                if (next_edge.srcIdx == input_qubit_edge->dstIdx) {
+                    has_next = true;
+                    input_qubit_edge = &next_edge;
+                }
+            }
+        }
+    }
+    for (const auto& candidate_op : candidate_0) {
+        // an initial swap must be in both candidate0 and candidate1
+        if (candidate_1.find(candidate_op) != candidate_1.end()) {
+            // it's in candidate1
+            initial_swap_set.insert(candidate_op);
+        }
+    }
+    // calculate additional swap cost based on qubit distance in device
+    for (const auto& Op_edge : inEdges) {
+        // ignore the gate if it is initial swap
+        if (initial_swap_set.find(Op_edge.first) != initial_swap_set.end()) { continue; }
+        // ignore the gate if it has only one input
+        if (Op_edge.second.size() == 1) { continue; }
+        // calculate the min swap cost (only consider input 0 and input 1)
+        // we assume that qubit 0 is moved to somewhere adjacent to qubit 1
+        double min_swap_cost = 99999999999;
+        const auto& first_qubit = Op_edge.second.begin();
+        const auto& second_qubit = std::next(Op_edge.second.begin());
+        auto input_neighbours = device->get_input_neighbours(second_qubit->physical_qubit_idx);
+        for (const auto& neighbour : input_neighbours) {
+            double swap_cost = 2 * device->cal_swap_cost(first_qubit->physical_qubit_idx, neighbour);
+            min_swap_cost = std::min(min_swap_cost, swap_cost);
+        }
+        total_cost += min_swap_cost;
+    }
+
+    return total_cost;
+}
+
 }; // namespace quartz

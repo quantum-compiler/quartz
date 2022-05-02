@@ -1,0 +1,13 @@
+# train, test
+mode: train
+resume: False
+
+weight: ''
+
+gpus: [2]
+
+seed: 98765
+
+wandb:
+  en: True
+  offline: False

@@ -58,8 +58,8 @@ int main() {
     graph.init_physical_mapping();
     cout << "Mapping has been initialized." << endl;
     MappingStatus succeeded = graph.check_mapping_correctness();
-    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check.\n";
-    else std::cout << "Mapping test failed!\n";
+    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check." << endl;
+    else std::cout << "Mapping test failed!\n" << endl;
 
     // test cost
     double total_cost = graph.circuit_implementation_cost(device);

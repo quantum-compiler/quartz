@@ -1978,8 +1978,21 @@ void Graph::init_physical_mapping() {
                 }
             }
             // put out edge into query list
-            for (const auto& edge : outEdges[target_op]) {
-                if (edge.srcIdx == port_idx) query_list.push(edge);
+            if (target_op.ptr->tp == GateType::swap) {
+                // swap gates put out edges when both out edges are finished
+                int finished_edge = 0;
+                for (const auto& edge : outEdges[target_op]) {
+                    if (edge.physical_qubit_idx != -1 && edge.logical_qubit_idx != -1) finished_edge++;
+                }
+                if (finished_edge == 2) {
+                    for (const auto& edge : outEdges[target_op]) {
+                        query_list.push(edge);
+                    }
+                }
+            } else {
+                for (const auto& edge : outEdges[target_op]) {
+                    if (edge.srcIdx == port_idx) query_list.push(edge);
+                }
             }
         }
     }

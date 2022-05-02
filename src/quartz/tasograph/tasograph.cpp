@@ -2107,7 +2107,7 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
         if (Op_edge.second.size() == 1) { continue; }
         // calculate the min swap cost (only consider input 0 and input 1)
         // we assume that qubit 0 is moved to somewhere adjacent to qubit 1
-        double min_swap_cost = 99999999999;
+        double min_swap_cost = device->unconnected_swap_penalty;
         const auto& first_qubit = Op_edge.second.begin();
         const auto& second_qubit = std::next(Op_edge.second.begin());
         auto input_neighbours = device->get_input_neighbours(second_qubit->physical_qubit_idx);

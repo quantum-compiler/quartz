@@ -170,8 +170,10 @@ namespace quartz {
 
     protected:
         int num_qubits{0};
-        constexpr static double unconnected_swap_penalty = 10000;
         std::vector<std::shared_ptr<DeviceQubit>> device_qubits;
+
+    public:
+        constexpr static double unconnected_swap_penalty = 10000;
     };
 
     class GenericDevice : public DeviceTopologyGraph {

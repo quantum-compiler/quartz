@@ -67,7 +67,8 @@ build/*
 
 # others
 .DS_Store
-experiment/dataset
 **/wandb
+
 experiment/pretrain/dataset
-experiment/pretrain/QGNN-Pretrain/
+experiment/pretrain/pretrain_dataset*
+experiment/pretrain/outputs

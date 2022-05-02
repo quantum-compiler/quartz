@@ -2,6 +2,8 @@
 import os
 import json
 import random
+import argparse
+import hydra
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,6 +11,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.strategies import DDPStrategy
 import dgl
 
 from tqdm import tqdm
@@ -272,12 +275,13 @@ class QGNN(nn.Module):
         return h
 
 class PretrainNet(pl.LightningModule):
-    def __init__(self,
-        num_xfers: int
-    ):
+    def __init__(self, config = None):
         super().__init__()
+        self.save_hyperparameters()
+        self.cfg: dict = self.hparams.config
+
         gate_type_num = 26
-        self.q_net = QGNN(gate_type_num, 64, num_xfers, 64)
+        self.q_net = QGNN(gate_type_num, 64, self.cfg['num_xfers'], 64)
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 
@@ -305,15 +309,15 @@ class PretrainNet(pl.LightningModule):
             selected_indices = masks[r].nonzero()
             selected_rewards = gt_rewards[ selected_indices[:, 0], selected_indices[:, 1] ]
 
-            self.log(f'{mode}_num_nodes_{i_batch}', n_nodes, on_step=True)
-            self.log(f'{mode}_num_unmasked_label_{i_batch}', selected_indices.shape[0])
-            self.log(f'{mode}_pos_label_{i_batch}', (selected_rewards > 0).sum())
-            self.log(f'{mode}_zero_label_{i_batch}', (selected_rewards == 0).sum())
-            self.log(f'{mode}_neg_label_{i_batch}', (selected_rewards < 0).sum())
+            self.log(f'{mode}_num_nodes_{i_batch}', float(n_nodes), on_step=True)
+            self.log(f'{mode}_num_unmasked_label_{i_batch}', float(selected_indices.shape[0]), on_step=True)
+            self.log(f'{mode}_pos_label_{i_batch}', float((selected_rewards > 0).sum()), on_step=True)
+            self.log(f'{mode}_zero_label_{i_batch}', float((selected_rewards == 0).sum()), on_step=True)
+            self.log(f'{mode}_neg_label_{i_batch}', float((selected_rewards < 0).sum()), on_step=True)
             
-            self.log(f'{mode}_max_reward_{i_batch}', torch.max(selected_rewards))
-            self.log(f'{mode}_min_reward_{i_batch}', torch.min(selected_rewards))
-            self.log(f'{mode}_mean_reward_{i_batch}', torch.mean(selected_rewards))
+            self.log(f'{mode}_max_reward_{i_batch}', torch.max(selected_rewards), on_step=True)
+            self.log(f'{mode}_min_reward_{i_batch}', torch.min(selected_rewards), on_step=True)
+            self.log(f'{mode}_mean_reward_{i_batch}', torch.mean(selected_rewards), on_step=True)
 
             r_start = r_end
         
@@ -367,30 +371,33 @@ def init_wandb(
 
 model: pl.LightningModule = None
 datamodule: pl.LightningDataModule = None
+output_dir: str = ''
 
-def train(
-    ckpt_weight = None,
-):
-    wandb_logger = init_wandb(enable=True, offline=False)
+def train(cfg):
+    wandb_logger = init_wandb(
+        enable=cfg.wandb.en, offline=cfg.wandb.offline,
+        task='train',
+    )
     ckpt_callback_list = [
         ModelCheckpoint(
             monitor='val_loss',
-            # dirpath='',
-            filename='{epoch}-{val_MAE:.2f}-best',
+            dirpath=output_dir,
+            filename='{epoch}-{val_loss:.2f}-best',
             save_top_k=3,
             save_last=True,
             mode='min',
         ),
     ]
     trainer = pl.Trainer(
-        resume_from_checkpoint=ckpt_weight,
+        resume_from_checkpoint=cfg.weight if os.path.exists(cfg.weight) else None,
         max_epochs=1000_0000,
-        gpus=[2],
+        gpus=cfg.gpus,
         logger=wandb_logger,
         strategy='ddp', 
         log_every_n_steps=10, 
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
+        strategy=DDPStrategy(find_unused_parameters=False),
         # gradient_clip_val=cfg.task.optimizer.clip_value,
         # gradient_clip_algorithm=cfg.task.optimizer.clip_algo,
         # val_check_interval=cfg.val_check_interval,
@@ -398,24 +405,54 @@ def train(
     )
     trainer.fit(model, datamodule=datamodule)
 
-def test():
-    wandb_logger = init_wandb(enable=False, offline=True)
+def test(cfg):
+    wandb_logger = init_wandb(
+        enable=cfg.wandb.en, offline=cfg.wandb.offline,
+        task='test',
+    )
     trainer = pl.Trainer(
-        gpus=[2],
+        gpus=cfg.gpus,
         logger=wandb_logger,
     )
     trainer.test(model, datamodule=datamodule)
 
-def main():
+@hydra.main(config_path='config', config_name='config')
+def main(cfg):
     global model
     global datamodule
-
-    seed_all(98765)
+    global output_dir
     
-    datamodule = QGNNPretrainDM()
-    model = PretrainNet(datamodule.num_xfers)
+    output_dir = os.path.abspath(os.curdir) # get hydra output dir
+    os.chdir(hydra.utils.get_original_cwd())    # set working dir to the original one
+    seed_all(cfg.seed)
 
-    train()
+    datamodule = QGNNPretrainDM()
+    PLModel = PretrainNet
+    model_config = {
+        'num_xfers': datamodule.num_xfers,
+    }
+
+    if cfg.mode == 'train':
+        if cfg.resume:
+            assert(os.path.exists(cfg.weight))
+            model = PLModel.load_from_checkpoint(cfg.weight, config=model_config)
+        else:
+            model = PLModel(config=model_config)  # train from scratch
+    elif cfg.mode == 'test':
+        if len(cfg.weight) > 0:
+            assert(os.path.exists(cfg.weight))
+            model = PLModel.load_from_checkpoint(cfg.weight, config=model_config)
+        else:
+            model = PLModel(config=model_config)  # test from scratch
+    else:
+        raise ValueError(f'Invalid mode: {cfg.mode}')
+    
+    if cfg.mode == 'train':
+        train(cfg)
+    elif cfg.mode == 'test':
+        test(cfg)
+    else:
+        raise ValueError(f'Invalid mode: {cfg.mode}')
 
 if __name__ == '__main__':
     main()

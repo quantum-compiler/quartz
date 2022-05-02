@@ -1984,7 +1984,7 @@ void Graph::init_physical_mapping() {
                 for (const auto& edge : outEdges[target_op]) {
                     if (edge.physical_qubit_idx != -1 && edge.logical_qubit_idx != -1) finished_edge++;
                 }
-                if (finished_edge == 2) {
+                if (finished_edge == outEdges[target_op].size()) {
                     for (const auto& edge : outEdges[target_op]) {
                         query_list.push(edge);
                     }

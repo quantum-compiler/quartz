@@ -2099,6 +2099,7 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
                 if (next_edge.srcIdx == input_qubit_edge->dstIdx) {
                     has_next = true;
                     input_qubit_edge = &next_edge;
+                    break;
                 }
             }
         }

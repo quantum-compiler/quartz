@@ -2115,6 +2115,8 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
 
     // Part3: calculate additional swap cost based on qubit distance in device
     for (const auto& Op_edge : inEdges) {
+        // ignore the gate if it is initial swap
+        if (initial_swap_set.find(Op_edge.first) != initial_swap_set.end()) { continue; }
         // ignore the gate if it has only one input
         if (Op_edge.second.size() == 1) { continue; }
         // calculate the min swap cost (only consider input 0 and input 1)

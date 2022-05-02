@@ -1,0 +1,17 @@
+mode: train
+resume: False
+
+load_pretrained: True
+pretrained_weight: '../pretrain/outputs/train_2/epoch=101-val_loss=0.04-best.ckpt'
+
+weight: ''
+
+gpus: [1]
+
+seed: 98765
+
+wandb:
+  en: True
+  offline: False
+
+init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'

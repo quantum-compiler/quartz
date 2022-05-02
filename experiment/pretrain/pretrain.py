@@ -1,4 +1,4 @@
-
+import sys
 import os
 import json
 import random
@@ -20,6 +20,8 @@ from IPython import embed
 
 import quartz
 
+quartz_context: quartz.QuartzContext = None
+
 def seed_all(seed: int):
     if seed is not None:
         random.seed(seed)
@@ -36,10 +38,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
         dataset_dir: str = 'dataset',
         graph_file: str = 'graph.json',
         reward_file: str = 'reward.json',
-        gate_set: list = ['h', 'cx', 't', 'tdg'],
-        ecc_file: str = 'bfs_verified_simplified.json',
+        
         split_file: str = 'split.json',
-        mode: str = 'train',
         batch_size: int = 128,
         use_max_gate_count: bool = False,
     ):
@@ -76,17 +76,10 @@ class QGNNPretrainDM(pl.LightningDataModule):
             with open(split_file_path) as f:
                 self.split_info = json.load(f)
 
-        # only use this context to convert qasm to graphs
-        quartz_context = quartz.QuartzContext(
-            gate_set=gate_set,
-            filename=ecc_file,
-            # no_increase=no_increase, # TODO  no need to specify
-            include_nop=False, # TODO
-        )
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
         
-        # TODO  speed up
+        # TODO  speed up by parallelism
         for (g_hash, xfers) in tqdm(rewards.items()):
             graph_qasm, gate_count = hash2graphs[g_hash]
             pydag = parser.load_qasm_str(graph_qasm)
@@ -275,13 +268,14 @@ class QGNN(nn.Module):
         return h
 
 class PretrainNet(pl.LightningModule):
-    def __init__(self, config = None):
+    def __init__(self,
+        num_xfers: int
+    ):
         super().__init__()
         self.save_hyperparameters()
-        self.cfg: dict = self.hparams.config
 
         gate_type_num = 26
-        self.q_net = QGNN(gate_type_num, 64, self.cfg['num_xfers'], 64)
+        self.q_net = QGNN(gate_type_num, 64, num_xfers, 64)
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 
@@ -389,11 +383,9 @@ def train(cfg):
         ),
     ]
     trainer = pl.Trainer(
-        resume_from_checkpoint=cfg.weight if os.path.exists(cfg.weight) else None,
         max_epochs=1000_0000,
         gpus=cfg.gpus,
         logger=wandb_logger,
-        strategy='ddp', 
         log_every_n_steps=10, 
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
@@ -403,7 +395,12 @@ def train(cfg):
         # val_check_interval=cfg.val_check_interval,
         # plugins=DDPPlugin(find_unused_parameters=False),
     )
-    trainer.fit(model, datamodule=datamodule)
+    if cfg.resume is True:
+        ckpt_path = cfg.ckpt_path
+        assert os.path.exists(ckpt_path)
+    else:
+        ckpt_path = None
+    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 def test(cfg):
     wandb_logger = init_wandb(
@@ -414,38 +411,56 @@ def test(cfg):
         gpus=cfg.gpus,
         logger=wandb_logger,
     )
-    trainer.test(model, datamodule=datamodule)
+    if cfg.resume is True:
+        ckpt_path = cfg.ckpt_path
+        assert os.path.exists(ckpt_path)
+    else:
+        ckpt_path = None
+        print(f'Warning: Test from scratch!', file=sys.stderr)
+    trainer.test(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 @hydra.main(config_path='config', config_name='config')
 def main(cfg):
     global model
     global datamodule
     global output_dir
+    global quartz_context
     
     output_dir = os.path.abspath(os.curdir) # get hydra output dir
-    os.chdir(hydra.utils.get_original_cwd())    # set working dir to the original one
+    os.chdir(hydra.utils.get_original_cwd()) # set working dir to the original one
     seed_all(cfg.seed)
+
+    # only use this context to convert qasm to graphs
+    quartz_context = quartz.QuartzContext(
+        gate_set=cfg.gate_set,
+        filename=cfg.ecc_file,
+        # we need to include xfers that lead to gate increase when training
+        # we may exclude them when generating the dataset for pre-training
+        no_increase=False,
+        include_nop=False, # TODO
+    )
 
     datamodule = QGNNPretrainDM()
     PLModel = PretrainNet
-    model_config = {
-        'num_xfers': datamodule.num_xfers,
-    }
 
-    if cfg.mode == 'train':
-        if cfg.resume:
-            assert(os.path.exists(cfg.weight))
-            model = PLModel.load_from_checkpoint(cfg.weight, config=model_config)
-        else:
-            model = PLModel(config=model_config)  # train from scratch
-    elif cfg.mode == 'test':
-        if len(cfg.weight) > 0:
-            assert(os.path.exists(cfg.weight))
-            model = PLModel.load_from_checkpoint(cfg.weight, config=model_config)
-        else:
-            model = PLModel(config=model_config)  # test from scratch
-    else:
-        raise ValueError(f'Invalid mode: {cfg.mode}')
+    model = PLModel(quartz_context.num_xfers)
+
+    # if cfg.mode == 'train':
+    #     if cfg.resume:
+    #         assert os.path.exists(cfg.ckpt_path)
+    #         # TODO  do not pass num_xfers
+    #         model = PLModel.load_from_checkpoint(cfg.ckpt_path, datamodule.num_xfers)
+    #     else:
+    #         model = PLModel(datamodule.num_xfers)  # train from scratch
+    # elif cfg.mode == 'test':
+    #     if len(cfg.ckpt_path) > 0:
+    #         assert os.path.exists(cfg.ckpt_path)
+    #         # TODO  do not pass num_xfers
+    #         model = PLModel.load_from_checkpoint(cfg.ckpt_path, datamodule.num_xfers)
+    #     else:
+    #         model = PLModel(datamodule.num_xfers)  # test from scratch
+    # else:
+    #     raise ValueError(f'Invalid mode: {cfg.mode}')
     
     if cfg.mode == 'train':
         train(cfg)

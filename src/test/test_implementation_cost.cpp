@@ -37,6 +37,11 @@ int main() {
 
     // initialize a device
     auto device = std::make_shared<quartz::SymmetricUniformDevice>(5);
+    device->add_edge(0, 2);
+    device->add_edge(0, 3);
+    device->add_edge(4, 3);
+    device->add_edge(4, 1);
+    device->add_edge(1, 2);
 
     // print all Ops
     cout << "Out Edges" << endl;

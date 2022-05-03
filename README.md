@@ -30,9 +30,9 @@ See all supported gate types in [gates.inc.h](src/quartz/gate/gates.inc.h) and t
 
 And then you can run `./gen_ecc_set.sh` to generate the ECC set.
 
-### Optimize a quantum circuit
+## Optimize a quantum circuit
 
-todo (zikun): instructions to optimize a quantum circuit (C++ or Python interface, whichever is easier)
+We show the steps to super-optimize a quantum circuit in Quartz.
 
 #### Input the circuit
 

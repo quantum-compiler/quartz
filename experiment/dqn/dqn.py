@@ -266,12 +266,14 @@ class DQNMod(pl.LightningModule):
         eps_init: float = 0.5,
         eps_decay: float = 0.0001,
         eps_min: float = 0.05,
-        gamma: float = 0.999,
+        gamma: float = 0.9,
         episode_length: int = 100, # TODO  check these hparams
         replaybuf_size: int = 10_000,
         warm_start_steps: int = 512,
         target_update_interval: int = 100,
         seq_out_dir: str = 'out_graphs',
+        pretrained_weight_path: str = None,
+        restore_after_better: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -308,14 +310,24 @@ class DQNMod(pl.LightningModule):
         self.episode_reward = 0
         self.total_reward = 0
         self.num_out_graphs = 0
+        self.pretrained_q_net = None
 
+        self.load_pretrained_weight()
         self.populate(self.hparams.warm_start_steps)
 
-    def load_pretrained_weight(self, pretrained_net_path: str):
-        pretrained_net = PretrainNet.load_from_checkpoint(pretrained_net_path)
-        pretrained_q_net = pretrained_net.q_net
-        self.q_net.load_state_dict(pretrained_q_net.state_dict())
-        self.target_net.load_state_dict(self.q_net.state_dict())
+    def load_pretrained_weight(self):
+        if self.hparams.pretrained_weight_path is not None:
+            ckpt_path = self.hparams.pretrained_weight_path
+            assert os.path.exists(ckpt_path)
+            pretrained_net = PretrainNet.load_from_checkpoint(ckpt_path)
+            self.pretrained_q_net = pretrained_net.q_net
+            self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
+            self.target_net.load_state_dict(self.q_net.state_dict())
+    
+    def _restore_pretrained_weight(self):
+        if self.pretrained_q_net is not None:
+            self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
+            self.target_net.load_state_dict(self.q_net.state_dict())
 
     def agent_step(self, eps: float) -> Experience:
         exp = self.agent.play_step(self.q_net, eps)
@@ -327,7 +339,7 @@ class DQNMod(pl.LightningModule):
                 exp.next_state.gate_count < self.env.init_graph.gate_count:
                 print(
                     f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    'buffer rebuilding...'
+                    ' buffer rebuilding...'
                 )
                 # output sequence
                 self.num_out_graphs += 1
@@ -349,7 +361,10 @@ class DQNMod(pl.LightningModule):
                 # reset: start from the best graph
                 self.env.set_init_state(exp.next_state)
                 self.buffer.buffer.clear()
+                # TODO may meet gate count reduction again, which introduces recursions
                 self.populate(self.hparams.warm_start_steps)
+                if self.hparams.restore_after_better:
+                    self._restore_pretrained_weight() # TODO  check this
             else:
                 self.env.reset()
 
@@ -399,6 +414,19 @@ class DQNMod(pl.LightningModule):
         target_max_q_values = rewards + self.hparams.gamma * target_next_max_q_values
         
         loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
+
+        self.log_dict({
+            f'mean_batch_reward': rewards.mean(),
+            f'mean_target_next_max_Q': target_next_max_q_values.mean(),
+            f'mean_target_max_Q': target_max_q_values.mean(),
+            f'mean_pred_Q': acted_pred_q_values.mean(),
+
+            f'max_batch_reward': rewards.max(),
+            f'max_target_next_max_Q': target_next_max_q_values.max(),
+            f'max_target_max_Q': target_max_q_values.max(),
+            f'max_pred_Q': acted_pred_q_values.max(),
+        }, on_step=True)
+
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -417,7 +445,7 @@ class DQNMod(pl.LightningModule):
         # TODO  for _ in range(self.hparams.batch_size // 10):
         exp = self.agent_step(self.eps)
         self.episode_reward += exp.reward
-
+        self.log(f'episode_reward', self.episode_reward, on_step=True)
         # GD with sampled data
         loss = self._compute_loss(batch)
         
@@ -425,12 +453,11 @@ class DQNMod(pl.LightningModule):
             self.total_reward += self.episode_reward
             self.episode_reward = 0
 
-        if self.global_step % self.hparams.target_update_interval == 0:
+        if self.global_step and self.global_step % self.hparams.target_update_interval == 0:
             self.target_net.load_state_dict(self.q_net.state_dict())
 
         self.log(f'train_loss', loss)
         self.log(f'step_reward', exp.reward, on_step=True, prog_bar=True)
-        self.log(f'episode_reward', self.episode_reward, on_step=True)
         self.log(f'total_reward', self.total_reward, on_step=True)
         self.log(f'eps', self.eps, on_step=True)
         self.log(f'env_step', self.env.step, on_step=True, prog_bar=True)
@@ -528,11 +555,12 @@ def init_wandb(
     offline: bool = False,
     project: str = 'Quartz-DQN',
     task: str = 'train',
+    entity: str = ''
 ):
     if enable is False:
         return None
     wandb_logger = WandbLogger(
-        # entity=cfg.wandb.entity,
+        entity=entity,
         offline=offline,
         project=project,
         group=task,
@@ -542,7 +570,7 @@ def init_wandb(
 def train(cfg):
     wandb_logger = init_wandb(
         enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='train',
+        task='train', entity=cfg.wandb.entity
     )
     ckpt_callback_list = [
         ModelCheckpoint(
@@ -558,7 +586,7 @@ def train(cfg):
         max_epochs=1000_0000,
         gpus=cfg.gpus,
         logger=wandb_logger,
-        log_every_n_steps=10, 
+        log_every_n_steps=1,
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
         strategy=DDPStrategy(find_unused_parameters=True),
@@ -575,7 +603,7 @@ def train(cfg):
 def test(cfg):
     wandb_logger = init_wandb(
         enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='test',
+        task='test', entity=cfg.wandb.entity
     )
     trainer = pl.Trainer(
         gpus=cfg.gpus,
@@ -616,15 +644,12 @@ def main(cfg):
         no_increase=cfg.no_increase,
         include_nop=cfg.include_nop,
         seq_out_dir=output_dir,
+        pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
+        gamma=cfg.gamma,
+        restore_after_better=cfg.restore_after_better,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?
-
-    if cfg.load_pretrained:
-        assert cfg.resume is False, \
-            'If resume is true, then the pretrained weight would be overwritten'
-        assert os.path.exists(cfg.pretrained_weight)
-        dqnmod.load_pretrained_weight(cfg.pretrained_weight)
 
     if cfg.mode == 'train':
         train(cfg)

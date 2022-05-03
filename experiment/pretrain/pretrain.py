@@ -1,3 +1,4 @@
+from math import gamma
 import sys
 import os
 import json
@@ -21,6 +22,7 @@ from IPython import embed
 import quartz
 
 quartz_context: quartz.QuartzContext = None
+output_dir: str = None
 
 def seed_all(seed: int):
     if seed is not None:
@@ -42,6 +44,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         split_file: str = 'split.json',
         batch_size: int = 128,
         use_max_gate_count: bool = False,
+        gamma: float = 0.99,
     ):
         super().__init__()
         self.hash2graphs = {}
@@ -50,15 +53,17 @@ class QGNNPretrainDM(pl.LightningDataModule):
         self.max_gate_count = 0
         self.batch_size = batch_size
         self.use_max_gate_count = use_max_gate_count
+        self.gamma = gamma
 
         # load graphs and rewards
         with open(os.path.join(dataset_dir, graph_file)) as f:
             hash2graphs: dict = json.load(f) # hash -> (graph_qasm, gate_count)
         with open(os.path.join(dataset_dir, reward_file)) as f:
             rewards: dict = json.load(f) # hash -> { node_id: { xfer_id: reward } }
-        
+
         split_file_path = os.path.join(dataset_dir, split_file)
-        if not os.path.exists(split_file_path):
+
+        def gen_save_split():
             # generate and save split info
             graph_keys = list(rewards.keys())
             random.shuffle(graph_keys)
@@ -72,9 +77,21 @@ class QGNNPretrainDM(pl.LightningDataModule):
             }
             with open(split_file_path, 'w') as f:
                 json.dump(self.split_info, fp=f, indent=2)
+
+        if not os.path.exists(split_file_path):
+            gen_save_split()
         else:
             with open(split_file_path) as f:
                 self.split_info = json.load(f)
+            graphs_in_split_info = sum([
+                len(hashes)
+                for mode, hashes in self.split_info.items()
+            ])
+            if graphs_in_split_info != len(rewards):
+                gen_save_split()
+
+        with open(os.path.join(output_dir, 'split.json'), 'w') as f:
+            json.dump(self.split_info, fp=f, indent=2)
 
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
@@ -130,7 +147,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
             hashes=self.split_info[mode],
             num_xfers=self.num_xfers,
             max_gate_count=self.max_gate_count,
-            use_max_gate_count=self.use_max_gate_count
+            use_max_gate_count=self.use_max_gate_count,
+            gamma=self.gamma,
         )
         
         dataloader = torch.utils.data.DataLoader(
@@ -150,12 +168,14 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         hashes: list,
         num_xfers: int,
         max_gate_count: int,
-        use_max_gate_count: bool = False
+        use_max_gate_count: bool = False,
+        gamma: float = 0.99,
     ):
         super().__init__()
         self.num_xfers = num_xfers
         self.max_gate_count = max_gate_count
         self.use_max_gate_count = use_max_gate_count
+        self.gamma = gamma
         self.graph_hash_list = [
             (*hash2graphs[g_hash], g_hash)
             for g_hash in hashes
@@ -181,6 +201,12 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         num_pos_rewards = 0
         for (node_id, xfers) in reward_dict.items():
             for (xfer_id, reward) in xfers.items():
+                if isinstance(reward, list):
+                    reward = [
+                        pair[0] * self.gamma ** pair[1]
+                        for pair in reward
+                    ]
+                    reward = max(reward)
                 node_id = int(node_id)
                 xfer_id = int(xfer_id) # TODO  why json dump/load int as str
                 reward_mat[node_id][xfer_id] = float(reward)
@@ -362,11 +388,12 @@ def init_wandb(
     offline: bool = False,
     project: str = 'QGNN-Pretrain',
     task: str = 'train',
+    entity: str = '',
 ):
     if enable is False:
         return None
     wandb_logger = WandbLogger(
-        # entity=cfg.wandb.entity,
+        entity=entity,
         offline=offline,
         project=project,
         group=task,
@@ -375,12 +402,11 @@ def init_wandb(
 
 model: pl.LightningModule = None
 datamodule: pl.LightningDataModule = None
-output_dir: str = ''
 
 def train(cfg):
     wandb_logger = init_wandb(
         enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='train',
+        task='train', entity=cfg.wandb.entity,
     )
     ckpt_callback_list = [
         ModelCheckpoint(
@@ -396,7 +422,7 @@ def train(cfg):
         max_epochs=1000_0000,
         gpus=cfg.gpus,
         logger=wandb_logger,
-        log_every_n_steps=10, 
+        log_every_n_steps=1,
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
         strategy=DDPStrategy(find_unused_parameters=False),
@@ -415,7 +441,7 @@ def train(cfg):
 def test(cfg):
     wandb_logger = init_wandb(
         enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='test',
+        task='test', entity=cfg.wandb.entity
     )
     trainer = pl.Trainer(
         gpus=cfg.gpus,
@@ -450,7 +476,13 @@ def main(cfg):
         include_nop=cfg.include_nop, # TODO
     )
 
-    datamodule = QGNNPretrainDM(include_nop=cfg.include_nop)
+    datamodule = QGNNPretrainDM(
+        dataset_dir=cfg.dataset_dir,
+        graph_file=cfg.graph_file,
+        reward_file=cfg.reward_file,
+        include_nop=cfg.include_nop,
+        gamma=cfg.gamma,
+    )
     PLModel = PretrainNet
 
     model = PLModel(quartz_context.num_xfers)

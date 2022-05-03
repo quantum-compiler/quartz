@@ -2,7 +2,7 @@ mode: train
 resume: False
 
 load_pretrained: True
-pretrained_weight: '../pretrain/outputs/2022-05-03/02-51-01/epoch=29-val_loss=0.07-best.ckpt'
+pretrained_weight: '../pretrain/outputs/2022-05-03/02-56-00/epoch=33-val_loss=0.05-best.ckpt'
 
 weight: ''
 
@@ -13,10 +13,14 @@ seed: 98765
 wandb:
   en: True
   offline: False
+  entity: quartz
 
 init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
 
 gate_set: ['h', 'cx', 't', 'tdg']
 ecc_file: 'bfs_verified_simplified.json'
 no_increase: True
-include_nop: False
+include_nop: True
+
+gamma: 0.99
+restore_after_better: False

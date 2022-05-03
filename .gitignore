@@ -72,3 +72,5 @@ build/*
 experiment/pretrain/dataset
 experiment/pretrain/pretrain_dataset*
 experiment/pretrain/outputs
+experiment/dqn/outputs
+experiment/dqn/out_graphs

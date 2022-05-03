@@ -146,17 +146,22 @@ class Environment:
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         self.max_steps_per_episode = max_steps_per_episode
+        self.state = None
+        self.step = 0
+        self.state_seq = []
 
         self.reset()
 
     def reset(self):
         self.state: quartz.PyGraph = self.init_graph
         self.step = 0
+        self.state_seq = [self.state]
 
     def set_init_state(self, graph: quartz.PyGraph):
         self.init_graph = graph
         self.state = graph
         self.step = 0
+        self.state_seq = [self.state]
 
     def get_action_space(self) -> Tuple[List[int], List[int]]:
         return (
@@ -186,6 +191,7 @@ class Environment:
         
         self.step += 1
         self.state = next_state
+        self.state_seq.append(self.state)
         if self.step >= self.max_steps_per_episode:
             game_over = True
             # TODO  whether we need to change this_step_reward here?
@@ -265,6 +271,7 @@ class DQNMod(pl.LightningModule):
         replaybuf_size: int = 10_000,
         warm_start_steps: int = 512,
         target_update_interval: int = 100,
+        seq_out_dir: str = 'out_graphs',
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -322,18 +329,24 @@ class DQNMod(pl.LightningModule):
                     f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
                     'buffer rebuilding...'
                 )
+                # output sequence
                 self.num_out_graphs += 1
-                out_path = 'out_graphs' # TODO  dir setting
-                if not os.path.exists(out_path):
-                    os.makedirs(out_path)
-                out_path = os.path.join(
-                    out_path,
-                    f'{self.num_out_graphs}_{exp.action_node}_{exp.action_xfer}_{exp.next_state.gate_count}.qasm',
+                out_dir = os.path.join(
+                    self.hparams.seq_out_dir,
+                    'out_graphs',
+                    f'{self.num_out_graphs}',
                 )
-                qasm_str = exp.next_state.to_qasm_str()
-                with open(out_path, 'w') as f:
-                    print(qasm_str, file=f)
-
+                if not os.path.exists(out_dir):
+                    os.makedirs(out_dir)
+                for i_step, graph in enumerate(self.env.state_seq):
+                    out_path = os.path.join(
+                        out_dir,
+                        f'{i_step}_{exp.action_node}_{exp.action_xfer}_{graph.gate_count}.qasm',
+                    )
+                    qasm_str = graph.to_qasm_str()
+                    with open(out_path, 'w') as f:
+                        print(qasm_str, file=f)
+                # reset: start from the best graph
                 self.env.set_init_state(exp.next_state)
                 self.buffer.buffer.clear()
                 self.populate(self.hparams.warm_start_steps)
@@ -602,6 +615,7 @@ def main(cfg):
         ecc_file=cfg.ecc_file,
         no_increase=cfg.no_increase,
         include_nop=cfg.include_nop,
+        seq_out_dir=output_dir,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?

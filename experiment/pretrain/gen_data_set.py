@@ -60,7 +60,7 @@ class DataBuffer:
     def update_reward(self, pre_graph_hash, pre_graph_cnt, node_id, xfer_id, graph_hash, graph_cnt):
         # pre_graph -> graph
         # TODO  if exists? min?
-        assert(pre_graph_hash in self.hash2graphs and graph_hash in self.hash2graphs)
+        assert pre_graph_hash in self.hash2graphs and graph_hash in self.hash2graphs
         # old_graph_gate_cnt = self.gate_count_map.get(graph_hash, None)
         # assert(old_graph_gate_cnt is None or old_graph_gate_cnt == graph_gate_cnt)
         # self.gate_count_map[graph_hash] = graph_gate_cnt
@@ -88,7 +88,7 @@ class DataBuffer:
 
                 pre_dict = self.path_map[g_hash]
                 for pre_hash in pre_dict:
-                    assert(self.hash2graphs[pre_hash][1] >= pre_graph_cnt)
+                    assert self.hash2graphs[pre_hash][1] >= pre_graph_cnt
                     if pre_hash not in s and self.hash2graphs[pre_hash][1] <= pre_graph_cnt:
                         # TODO  global or local?
                         # print(f'!!! in update_reward: {self.gate_count_map[pre_hash]} > {pre_graph_gate_cnt}')
@@ -135,6 +135,7 @@ class Generator:
             gate_set=gate_set,
             filename=ecc_file,
             no_increase=no_increase,
+            include_nop=True, # TODO
         )
         parser = quartz.PyQASMParser(context=quartz_context)
         dag = parser.load_qasm(filename=input_circuit_file)
@@ -234,8 +235,8 @@ if __name__ == '__main__':
 
     generator = Generator(
         gate_set=['h', 'cx', 't', 'tdg'],
-        # ecc_file='../bfs_verified_simplified.json',
-        ecc_file='../3_2_5_complete_ECC_set.json',
+        ecc_file='bfs_verified_simplified.json',
+        # ecc_file='../3_2_5_complete_ECC_set.json',
         input_circuit_file="barenco_tof_3_opt_path/subst_history_39.qasm",
         gamma=0.9,
         no_increase=True,

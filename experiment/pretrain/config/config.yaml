@@ -4,7 +4,7 @@ resume: False
 
 ckpt_path: ''
 
-gpus: [2]
+gpus: [1]
 seed: 98765
 
 wandb:
@@ -13,3 +13,5 @@ wandb:
 
 gate_set: ['h', 'cx', 't', 'tdg']
 ecc_file: 'bfs_verified_simplified.json'
+no_increase: True
+include_nop: False

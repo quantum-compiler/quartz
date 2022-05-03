@@ -38,7 +38,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         dataset_dir: str = 'dataset',
         graph_file: str = 'graph.json',
         reward_file: str = 'reward.json',
-        
+        include_nop: bool = False,
         split_file: str = 'split.json',
         batch_size: int = 128,
         use_max_gate_count: bool = False,
@@ -81,6 +81,16 @@ class QGNNPretrainDM(pl.LightningDataModule):
         
         # TODO  speed up by parallelism
         for (g_hash, xfers) in tqdm(rewards.items()):
+            if include_nop is False:
+                # filter no-op away
+                xfers = {
+                    node_id: {
+                        xfer_id: reward
+                        for xfer_id, reward in xfer_dict.items()
+                        if int(xfer_id) != self.num_xfers
+                    }
+                    for node_id, xfer_dict in xfers.items()
+                }
             graph_qasm, gate_count = hash2graphs[g_hash]
             pydag = parser.load_qasm_str(graph_qasm)
             pygraph = quartz.PyGraph(context=quartz_context, dag=pydag)
@@ -146,19 +156,19 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         self.num_xfers = num_xfers
         self.max_gate_count = max_gate_count
         self.use_max_gate_count = use_max_gate_count
-        self.hash2graphs = [
+        self.graph_hash_list = [
             (*hash2graphs[g_hash], g_hash)
             for g_hash in hashes
         ]
     
     def __len__(self):
-        return len(self.hash2graphs)
+        return len(self.graph_hash_list)
 
     def __getitem__(self, idx):
         """
         Return: (dgl_graph, reward_mat, mask_mat)
         """
-        pygraph, reward_dict, gate_count, g_hash = self.hash2graphs[idx]
+        pygraph, reward_dict, gate_count, g_hash = self.graph_hash_list[idx]
         gate_count_to_use = \
             self.max_gate_count if self.use_max_gate_count else gate_count
         # { node_id: { xfer_id: reward } }
@@ -436,11 +446,11 @@ def main(cfg):
         filename=cfg.ecc_file,
         # we need to include xfers that lead to gate increase when training
         # we may exclude them when generating the dataset for pre-training
-        no_increase=False,
-        include_nop=False, # TODO
+        no_increase=cfg.no_increase,
+        include_nop=cfg.include_nop, # TODO
     )
 
-    datamodule = QGNNPretrainDM()
+    datamodule = QGNNPretrainDM(include_nop=cfg.include_nop)
     PLModel = PretrainNet
 
     model = PLModel(quartz_context.num_xfers)

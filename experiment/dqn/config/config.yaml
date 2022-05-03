@@ -15,3 +15,8 @@ wandb:
   offline: False
 
 init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: 'bfs_verified_simplified.json'
+no_increase: True
+include_nop: False

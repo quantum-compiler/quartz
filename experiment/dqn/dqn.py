@@ -253,6 +253,8 @@ class DQNMod(pl.LightningModule):
         gate_type_num: int = 26,
         gate_set: List = ['h', 'cx', 't', 'tdg'],
         ecc_file: str = 'bfs_verified_simplified.json',
+        no_increase: bool = True,
+        include_nop: bool = False,
         lr: float = 1e-3,
         batch_size: int = 128,
         eps_init: float = 0.5,
@@ -260,7 +262,7 @@ class DQNMod(pl.LightningModule):
         eps_min: float = 0.05,
         gamma: float = 0.999,
         episode_length: int = 100, # TODO  check these hparams
-        replaybuf_size: int = 100_000,
+        replaybuf_size: int = 10_000,
         warm_start_steps: int = 512,
         target_update_interval: int = 100,
     ):
@@ -272,8 +274,9 @@ class DQNMod(pl.LightningModule):
             filename=ecc_file,
             # TODO  we need to include xfers that lead to gate increase when training?
             # we may exclude them when generating the dataset for pre-training
-            no_increase=False,
-            include_nop=False, # TODO
+            # TODO  to make the task easier, we exclude those xfers currently
+            no_increase=no_increase,
+            include_nop=include_nop,
         )
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
@@ -398,9 +401,9 @@ class DQNMod(pl.LightningModule):
             self.eps + self.hparams.eps_decay,
             self.hparams.eps_min
         )
-        for _ in range(self.hparams.batch_size // 10):
-            exp = self.agent_step(self.eps)
-            self.episode_reward += exp.reward
+        # TODO  for _ in range(self.hparams.batch_size // 10):
+        exp = self.agent_step(self.eps)
+        self.episode_reward += exp.reward
 
         # GD with sampled data
         loss = self._compute_loss(batch)
@@ -594,7 +597,11 @@ def main(cfg):
         init_graph_qasm_str = f.read()
     
     dqnmod = DQNMod(
-        init_graph_qasm_str=init_graph_qasm_str
+        init_graph_qasm_str=init_graph_qasm_str,
+        gate_set=cfg.gate_set,
+        ecc_file=cfg.ecc_file,
+        no_increase=cfg.no_increase,
+        include_nop=cfg.include_nop,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?

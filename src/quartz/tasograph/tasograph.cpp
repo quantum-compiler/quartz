@@ -614,7 +614,7 @@ bool Graph::move_forward(Pos &pos, bool left) {
       return false;
     else {
       auto in_edges = inEdges[pos.op];
-      for (const auto& edge : in_edges) {
+      for (const auto &edge : in_edges) {
         if (edge.dstIdx == pos.idx) {
           pos.op = edge.srcOp;
           pos.idx = edge.srcIdx;
@@ -627,7 +627,7 @@ bool Graph::move_forward(Pos &pos, bool left) {
       return false;
     } else {
       auto out_edges = outEdges[pos.op];
-      for (const auto& edge : out_edges) {
+      for (const auto &edge : out_edges) {
         if (edge.srcIdx == pos.idx) {
           pos.op = edge.dstOp;
           pos.idx = edge.dstIdx;
@@ -764,7 +764,7 @@ void Graph::rotation_merging(GateType target_rotation) {
     if (op.ptr->tp == GateType::cx) {
       auto in_edge_list = inEdges[op];
       std::vector<Pos> pos_list(2); // Two inputs for cx gate
-      for (const auto& edge : in_edge_list) {
+      for (const auto &edge : in_edge_list) {
         pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
       }
       bitmasks[Pos(op, 0)] = bitmasks[pos_list[0]];
@@ -780,7 +780,7 @@ void Graph::rotation_merging(GateType target_rotation) {
       auto in_edge_list = inEdges[op];
       int num_qubits = op.ptr->get_num_qubits();
       std::vector<Pos> pos_list(num_qubits);
-      for (const auto& edge : in_edge_list) {
+      for (const auto &edge : in_edge_list) {
         if (edge.dstIdx < num_qubits) {
           pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
         }
@@ -1131,7 +1131,8 @@ std::shared_ptr<Graph> Graph::optimize(
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
   if (!eqs.load_json(ctx, equiv_file_name)) {
-    std::cerr << "Failed to load equivalence file: " << equiv_file_name << std::endl;
+    std::cerr << "Failed to load equivalence file: " << equiv_file_name
+              << std::endl;
     exit(1);
   }
   auto end = std::chrono::steady_clock::now();
@@ -1903,23 +1904,27 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     }
   }
   if (!fail) {
-    // The destination graph in xfer is an empty graph
     std::vector<Op> all_ops;
     new_graph->topology_order_ops(all_ops);
     auto ops_num = all_ops.size();
+    // The destination graph in xfer is an empty graph
     if (xfer->dstOps.size() == 0) {
       std::set<Op> op_set;
       for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
-        auto in_es = inEdges.find((*it)->mapOp)->second;
-        auto out_es = outEdges.find((*it)->mapOp)->second;
-        for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
-          if (e_it->srcOp.ptr->tp != GateType::input_param &&
-              e_it->srcOp.ptr->tp != GateType::input_qubit) {
-            op_set.insert(e_it->srcOp);
+        if (inEdges.find((*it)->mapOp) != inEdges.end()) {
+          auto in_es = inEdges.find((*it)->mapOp)->second;
+          for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
+            if (e_it->srcOp.ptr->tp != GateType::input_param &&
+                e_it->srcOp.ptr->tp != GateType::input_qubit) {
+              op_set.insert(e_it->srcOp);
+            }
           }
         }
-        for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
-          op_set.insert(e_it->dstOp);
+        if (outEdges.find((*it)->mapOp) != outEdges.end()) {
+          auto out_es = outEdges.find((*it)->mapOp)->second;
+          for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
+            op_set.insert(e_it->dstOp);
+          }
         }
       }
       for (size_t i = 0; i < ops_num; ++i) {

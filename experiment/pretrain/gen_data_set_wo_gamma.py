@@ -22,11 +22,10 @@ def check(graph):
         Statevector.from_instruction(qc_optimized))
 
 class DataBuffer:
-    def __init__(self, gamma) -> None:
+    def __init__(self) -> None:
         self.hash2graphs = {} # graph qasm and gate count
         self.reward_map = {}
         self.path_map = {} # predecessors
-        self.gamma = gamma
                 
     def add_graph(self, graph: quartz.PyGraph, graph_hash, graph_cnt):
         assert(graph_hash not in self.hash2graphs) # TODO  remove
@@ -44,18 +43,18 @@ class DataBuffer:
             self.reward_map[g_hash] = {}
             self.reward_map[g_hash][node_id] = {}
             self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
+                xfer_id] = [ [reward, depth] ] # reward * gamma**depth
         elif node_id not in self.reward_map[g_hash]:
             self.reward_map[g_hash][node_id] = {}
             self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
+                xfer_id] = [ [reward, depth] ]
         elif xfer_id not in self.reward_map[g_hash][node_id]:
             self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
+                xfer_id] = [ [reward, depth] ]
         else:
-            self.reward_map[g_hash][node_id][xfer_id] = max(
-                reward * math.pow(self.gamma, depth),
-                self.reward_map[g_hash][node_id][xfer_id])
+            self.reward_map[g_hash][node_id][xfer_id].append(
+                [reward, depth]
+            )
 
     def update_reward(self, pre_graph_hash, pre_graph_cnt, node_id, xfer_id, graph_hash, graph_cnt):
         # pre_graph -> graph
@@ -121,7 +120,6 @@ class Generator:
         gate_set: list,
         ecc_file: str,
         input_circuit_file: str,
-        gamma: int = 0.9,
         no_increase: bool = True,
         output_path: str = 'pretrain_dataset',
     ):
@@ -141,7 +139,7 @@ class Generator:
         dag = parser.load_qasm(filename=input_circuit_file)
         first_graph = quartz.PyGraph(context=quartz_context, dag=dag)
         
-        self.buffer = DataBuffer(gamma)
+        self.buffer = DataBuffer()
     
     def save(self, prefix: str = ''):
         self.buffer.save_path(os.path.join(self.output_path, f'{prefix}path.json'))
@@ -229,9 +227,8 @@ class Generator:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate dataset for pre-training.')
+    parser = argparse.ArgumentParser(description='Generate dataset for pre-training (without gamma).')
     parser.add_argument('--output-path', type=str, required=True)
-    parser.add_argument('--gamma', type=float, default=0.9, required=True)
     args = parser.parse_args()
 
     generator = Generator(
@@ -239,7 +236,6 @@ if __name__ == '__main__':
         ecc_file='bfs_verified_simplified.json',
         # ecc_file='../3_2_5_complete_ECC_set.json',
         input_circuit_file="../barenco_tof_3_opt_path/subst_history_39.qasm",
-        gamma=args.gamma,
         no_increase=True,
         output_path=args.output_path,
     )

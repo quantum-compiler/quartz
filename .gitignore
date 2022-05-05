@@ -72,3 +72,11 @@ build/*
 experiment/pretrain/dataset
 experiment/pretrain/pretrain_dataset*
 experiment/pretrain/outputs
+
+experiment/ppo/PPO_logs
+experiment/ppo/PPO_preTrained
+experiment/ppo/pretrain/dataset
+experiment/ppo/pretrain/pretrain_dataset_g9
+experiment/ppo/pretrain/pretrain_dataset_g99
+
+experiment/a2c/*txt

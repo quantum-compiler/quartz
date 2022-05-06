@@ -242,7 +242,8 @@ class PretrainNet(pl.LightningModule):
         gate_type_num = 29
         self.q_net = nn.Sequential(QGNN(6, gate_type_num, 64, 64),
                                    nn.Linear(64, 32), nn.ReLU(),
-                                   nn.Linear(32, 1))
+                                   nn.Linear(32, 16), nn.ReLU(),
+                                   nn.Linear(16, 1))
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 

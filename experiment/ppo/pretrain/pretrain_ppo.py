@@ -183,68 +183,64 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         """
-        Return: (dgl_graph, reward_mat, mask_mat)
+        Return: (dgl_graph, value_vec, mask_vec)
         """
         pygraph, reward_dict, gate_count, g_hash = self.graph_hash_list[idx]
         gate_count_to_use = \
             self.max_gate_count if self.use_max_gate_count else gate_count
         # { node_id: { xfer_id: reward } }
         # (num_nodes, num_xfers)
-        reward_mat = torch.zeros(gate_count_to_use, self.num_xfers)
-        mask_mat = torch.zeros(gate_count_to_use,
-                               self.num_xfers,
-                               dtype=torch.bool)
-        zero_reward_mat = torch.zeros(gate_count_to_use,
-                                      self.num_xfers,
-                                      dtype=torch.bool)
-        neg_reward_mat = torch.ones(gate_count_to_use,
-                                    self.num_xfers,
-                                    dtype=torch.bool)
+        value_vec = torch.zeros(gate_count_to_use)
+        mask_vec = torch.zeros(gate_count_to_use, dtype=torch.bool)
+        zero_value_vec = torch.zeros(gate_count_to_use, dtype=torch.bool)
+        neg_value_vec = torch.ones(gate_count_to_use, dtype=torch.bool)
 
-        num_pos_rewards = 0
+        num_pos_values = 0
         for (node_id, xfers) in reward_dict.items():
+            rewards = []
             for (xfer_id, reward) in xfers.items():
                 if isinstance(reward, list):
                     reward = [pair[0] * self.gamma**pair[1] for pair in reward]
                     reward = max(reward)
-                node_id = int(node_id)
-                xfer_id = int(xfer_id)  # TODO  why json dump/load int as str
-                reward_mat[node_id][xfer_id] = float(reward)
-                # use all of the positive rewards
-                mask_mat[node_id][xfer_id] = reward > 0
-                zero_reward_mat[node_id][xfer_id] = reward == 0
-                neg_reward_mat[node_id][xfer_id] = False  # reward < 0
-                num_pos_rewards += (reward > 0)
+                rewards.append(reward)
+            node_value = max(rewards)
+            node_id = int(node_id)  # TODO  why json dump/load int as str
+            value_vec[node_id] = float(node_value)
+            # use all of the positive rewards
+            mask_vec[node_id] = reward > 0
+            zero_value_vec[node_id] = reward == 0
+            neg_value_vec[node_id] = False  # reward < 0
+            num_pos_values += (reward > 0)
 
         # TODO  num_pos_rewards should have a min value
-        num_pos_rewards = max(num_pos_rewards, 10)
-        # (?, 2)
-        zero_reward_indices = zero_reward_mat.nonzero()
-        neg_reward_indices = neg_reward_mat.nonzero()
+        num_pos_rewards = max(num_pos_values, 10)
+        # (?, 1)
+        zero_value_indices = zero_value_vec.nonzero()
+        neg_value_indices = neg_value_vec.nonzero()
         # set negtive reward values
-        reward_mat[neg_reward_indices[:, 0], neg_reward_indices[:, 1]] = -2
+        value_vec[neg_value_indices[:, 0]] = -2
 
         # use part of the zero or negative rewards
         # we select them randomly here so they are different for each epochs
-        zero_reward_indices = zero_reward_indices[torch.randperm(
-            zero_reward_indices.shape[0]
-        )[:num_pos_rewards]]  # (num_pos_rewards, 2)
-        neg_reward_indices = neg_reward_indices[torch.randperm(
-            neg_reward_indices.shape[0])[:num_pos_rewards]]
+        zero_value_indices = zero_value_indices[torch.randperm(
+            zero_value_indices.shape[0]
+        )[:num_pos_rewards]]  # (num_pos_rewards, 1)
+        neg_value_indices = neg_value_indices[torch.randperm(
+            neg_value_indices.shape[0])[:num_pos_rewards]]
         # set mask to select
-        mask_mat[zero_reward_indices[:, 0], zero_reward_indices[:, 1]] = True
-        mask_mat[neg_reward_indices[:, 0], neg_reward_indices[:, 1]] = True
+        mask_vec[zero_value_indices[:, 0]] = True
+        mask_vec[neg_value_indices[:, 0]] = True
 
-        return (pygraph.to_dgl_graph(), reward_mat, mask_mat)
+        return (pygraph.to_dgl_graph(), value_vec, mask_vec)
 
 
 class PretrainNet(pl.LightningModule):
-    def __init__(self, num_xfers: int):
+    def __init__(self):
         super().__init__()
         self.save_hyperparameters()
 
         gate_type_num = 29
-        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 64, num_xfers, 64),
+        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 64, 64),
                                    nn.Linear(64, 32), nn.ReLU(),
                                    nn.Linear(32, 1))
 
@@ -257,11 +253,11 @@ class PretrainNet(pl.LightningModule):
             gt_rewards: (bs, batch_num_nodes, num_xfers)
             masks: (bs, batch_num_nodes, num_xfers)
         """
-        batched_graph, gt_rewards, masks = batch
+        batched_graph, node_values, masks = batch
         # out: ( sum(num of nodes), num_xfers )
         out = self.q_net(batched_graph)
 
-        loss = self._compute_log_loss(out, gt_rewards, masks, mode)
+        loss = self._compute_log_loss(out, node_values, masks, mode)
 
         # log some info
         num_nodes = batched_graph.batch_num_nodes()
@@ -272,8 +268,7 @@ class PretrainNet(pl.LightningModule):
             r = slice(r_start, r_end)
 
             selected_indices = masks[r].nonzero()
-            selected_rewards = gt_rewards[selected_indices[:, 0],
-                                          selected_indices[:, 1]]
+            selected_values = node_values[selected_indices[:, 0]]
 
             self.log(f'{mode}_num_nodes_{i_batch}',
                      float(n_nodes),
@@ -282,32 +277,32 @@ class PretrainNet(pl.LightningModule):
                      float(selected_indices.shape[0]),
                      on_step=True)
             self.log(f'{mode}_pos_label_{i_batch}',
-                     float((selected_rewards > 0).sum()),
+                     float((selected_values > 0).sum()),
                      on_step=True)
             self.log(f'{mode}_zero_label_{i_batch}',
-                     float((selected_rewards == 0).sum()),
+                     float((selected_values == 0).sum()),
                      on_step=True)
             self.log(f'{mode}_neg_label_{i_batch}',
-                     float((selected_rewards < 0).sum()),
+                     float((selected_values < 0).sum()),
                      on_step=True)
 
-            self.log(f'{mode}_max_reward_{i_batch}',
-                     torch.max(selected_rewards),
+            self.log(f'{mode}_max_value_{i_batch}',
+                     torch.max(selected_values),
                      on_step=True)
-            self.log(f'{mode}_min_reward_{i_batch}',
-                     torch.min(selected_rewards),
+            self.log(f'{mode}_min_value_{i_batch}',
+                     torch.min(selected_values),
                      on_step=True)
-            self.log(f'{mode}_mean_reward_{i_batch}',
-                     torch.mean(selected_rewards),
+            self.log(f'{mode}_mean_value_{i_batch}',
+                     torch.mean(selected_values),
                      on_step=True)
 
             r_start = r_end
 
         return loss
 
-    def _compute_log_loss(self, out, gt_rewards, masks, prefix: str = ''):
+    def _compute_log_loss(self, out, node_values, masks, prefix: str = ''):
         pred = out * masks
-        label = gt_rewards * masks
+        label = node_values * masks
 
         loss = self.loss_fn(pred, label)
         loss = loss / masks.sum()  # manually apply mean reduction
@@ -445,7 +440,7 @@ def main(cfg):
     )
     PLModel = PretrainNet
 
-    model = PLModel(quartz_context.num_xfers)
+    model = PLModel()
 
     # if cfg.mode == 'train':
     #     if cfg.resume:

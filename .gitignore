@@ -73,3 +73,8 @@ experiment/pretrain/dataset
 experiment/pretrain/pretrain_dataset*
 experiment/pretrain/outputs
 
+experiment/ppo/PPO_logs
+experiment/ppo/PPO_preTrained
+experiment/ppo/pretrain/dataset
+experiment/ppo/pretrain/outputs
+experiment/ppo/pretrain/pretrain_dataset_g9

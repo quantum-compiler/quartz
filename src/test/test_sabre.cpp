@@ -59,7 +59,7 @@ int main() {
     std::vector<std::pair<int, int>> front_set;
     front_set.emplace_back(1, 3);
     front_set.emplace_back(2, 3);
-    cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl;
+    cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl << endl;
 
     // init qubit mapping and print cost
     graph.init_physical_mapping(InitialMappingType::SABRE);

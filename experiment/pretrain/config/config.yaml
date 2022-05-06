@@ -2,12 +2,23 @@
 mode: train
 resume: False
 
-weight: ''
+ckpt_path: ''
 
-gpus: [2]
-
+gpus: [1]
 seed: 98765
 
 wandb:
   en: True
   offline: False
+  entity: quartz
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: '../../bfs_verified_simplified.json'
+no_increase: True
+include_nop: True
+
+dataset_dir: dataset
+graph_file: graph.json
+reward_file: reward.json
+
+gamma: 0.9

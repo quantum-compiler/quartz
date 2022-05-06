@@ -4,6 +4,21 @@
 namespace quartz {
     using QubitMappingTable = std::unordered_map<Op, std::pair<int, int>, OpHash>;
 
+    double basic_sabre_heuristic(const std::vector<std::pair<int, int>>& front_set,
+                                 const std::shared_ptr<DeviceTopologyGraph>& device) {
+        double total_cost = 0;
+        for (const auto& qubit_pair : front_set) {
+            double min_swap_cost = device->unconnected_swap_penalty;
+            auto input_neighbours = device->get_input_neighbours(qubit_pair.second);
+            for (const auto& neighbour : input_neighbours) {
+                double swap_cost = device->cal_swap_cost(qubit_pair.first, neighbour);
+                min_swap_cost = std::min(min_swap_cost, swap_cost);
+            }
+            total_cost += min_swap_cost;
+        }
+        return total_cost;
+    }
+
     std::vector<int> calculate_sabre_mapping(Graph initial_graph) {
         // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
         // <logical, physical>
@@ -52,6 +67,13 @@ namespace quartz {
             }
         }
 
+        // STEP2: SWAP-based heuristic search
+
+        // STEP3: reverse the graph
+
+        // STEP4: SWAP-based heuristic search
+
+        // return final mapping
         return {};
     }
 }

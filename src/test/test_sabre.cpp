@@ -2,6 +2,7 @@
 #include "quartz/tasograph/tasograph.h"
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
+#include "quartz/sabre/sabre.h"
 #include <iostream>
 
 using namespace quartz;
@@ -53,6 +54,12 @@ int main() {
         cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
     }
     cout << endl;
+
+    // test basic sabre heuristic
+    std::vector<std::pair<int, int>> front_set;
+    front_set.emplace_back(1, 3);
+    front_set.emplace_back(2, 3);
+    cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl;
 
     // init qubit mapping and print cost
     graph.init_physical_mapping(InitialMappingType::SABRE);

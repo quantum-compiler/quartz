@@ -354,7 +354,7 @@ class DQNMod(pl.LightningModule):
                     out_path = os.path.join(
                         out_dir,
                         f'{i_step}_{exp.action_node}_{exp.action_xfer}_{graph.gate_count}.qasm',
-                    )
+                    ) # TODO  wrong filename; 
                     qasm_str = graph.to_qasm_str()
                     with open(out_path, 'w') as f:
                         print(qasm_str, file=f)

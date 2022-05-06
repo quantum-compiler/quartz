@@ -148,20 +148,25 @@ class Environment:
         self.max_steps_per_episode = max_steps_per_episode
         self.state = None
         self.step = 0
-        self.state_seq = []
+        self.exp_seq = [ self._get_firtst_exp() ]
 
         self.reset()
 
     def reset(self):
         self.state: quartz.PyGraph = self.init_graph
         self.step = 0
-        self.state_seq = [self.state]
+        self.exp_seq = [ self._get_firtst_exp() ]
 
     def set_init_state(self, graph: quartz.PyGraph):
         self.init_graph = graph
         self.state = graph
         self.step = 0
-        self.state_seq = [self.state]
+        self.exp_seq = [ self._get_firtst_exp() ]
+
+    def _get_firtst_exp(self) -> Experience:
+        return Experience(
+            None, 0, 0, 0, self.init_graph, False,
+        )
 
     def get_action_space(self) -> Tuple[List[int], List[int]]:
         return (
@@ -191,7 +196,6 @@ class Environment:
         
         self.step += 1
         self.state = next_state
-        self.state_seq.append(self.state)
         if self.step >= self.max_steps_per_episode:
             game_over = True
             # TODO  whether we need to change this_step_reward here?
@@ -200,7 +204,9 @@ class Environment:
             game_over = True # TODO  only apply one xfer each episode
             # TODO  note this case: 58 -> 80 -> 78
 
-        return Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
+        exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
+        self.exp_seq.append(exp);
+        return exp
 
 class Agent:
 
@@ -350,12 +356,12 @@ class DQNMod(pl.LightningModule):
                 )
                 if not os.path.exists(out_dir):
                     os.makedirs(out_dir)
-                for i_step, graph in enumerate(self.env.state_seq):
+                for i_step, exp in enumerate(self.env.exp_seq):
                     out_path = os.path.join(
                         out_dir,
-                        f'{i_step}_{exp.action_node}_{exp.action_xfer}_{graph.gate_count}.qasm',
+                        f'{i_step}_{exp.action_node}_{exp.action_xfer}_{exp.next_state.gate_count}.qasm',
                     ) # TODO  wrong filename; 
-                    qasm_str = graph.to_qasm_str()
+                    qasm_str = exp.next_state.to_qasm_str()
                     with open(out_path, 'w') as f:
                         print(qasm_str, file=f)
                 # reset: start from the best graph

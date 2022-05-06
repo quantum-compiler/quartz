@@ -1,5 +1,6 @@
 #include "tasograph.h"
 #include "substitution.h"
+#include "../sabre/sabre.h"
 
 #include <cassert>
 #include <iomanip>

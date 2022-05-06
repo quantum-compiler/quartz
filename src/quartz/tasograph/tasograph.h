@@ -178,6 +178,10 @@ enum class MappingStatus{
     SERIAL_MISMATCH,
 };
 
+enum class InitialMappingType{
+    TRIVIAL, SABRE
+};
+
 class GraphXfer;
 
 class Graph {
@@ -234,9 +238,13 @@ public:
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
   // physical mapping related
-  void init_physical_mapping();
+  void init_physical_mapping(InitialMappingType mapping_type);
+  void _trivial_mapping();
+  void _sabre_mapping();
+  void propagate_mapping();
   MappingStatus check_mapping_correctness();
   double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);
+
 
 private:
   void replace_node(Op oldOp, Op newOp);

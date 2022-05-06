@@ -1925,9 +1925,26 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-void Graph::init_physical_mapping() {
+void Graph::init_physical_mapping(InitialMappingType mapping_type) {
     // STEP 1: initial mapping
-    // TODO: quartz physical: use a better initial mapping
+    switch (mapping_type) {
+        case InitialMappingType::TRIVIAL:
+            _trivial_mapping();
+            break;
+        case InitialMappingType::SABRE:
+            _sabre_mapping();
+            break;
+        default:
+            std::cout << "Unrecognized initial mapping type\n";
+            assert(false);
+    }
+
+    // STEP 2: propagate through the circuit
+    propagate_mapping();
+}
+
+void Graph::_trivial_mapping() {
+    // Trivial mapping: input gate i -> phy = log = i
     int qubit_index = 0;
     for (const auto& op_out_edge : outEdges) {
         if (op_out_edge.first.ptr->tp == GateType::input_qubit) {
@@ -1935,8 +1952,13 @@ void Graph::init_physical_mapping() {
             qubit_index += 1;
         }
     }
+}
 
-    // STEP 2: propagate through the circuit
+void Graph::_sabre_mapping() {
+
+}
+
+void Graph::propagate_mapping() {
     std::queue<Edge> query_list;
     // initialize edges directed connected to input_qubits and put them into query list
     for (const auto& input_qubits_edges: qubit_mapping_table) {

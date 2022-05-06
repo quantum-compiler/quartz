@@ -47,7 +47,7 @@ int main() {
     cout << endl;
 
     // test init qubit mapping
-    graph.init_physical_mapping();
+    graph.init_physical_mapping(InitialMappingType::TRIVIAL);
     cout << "Mapping has been initialized." << endl;
     MappingStatus succeeded = graph.check_mapping_correctness();
     if (succeeded == quartz::MappingStatus::VALID) std::cout << "Test has passed\n";

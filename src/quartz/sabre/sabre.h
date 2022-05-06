@@ -10,7 +10,8 @@ namespace quartz {
         initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL);
         QubitMappingTable initial_qubit_mapping = initial_graph.qubit_mapping_table;
         QubitMappingTable final_qubit_mapping;
-        for (const auto& op_edge : initial_graph.inEdges) {
+        auto tmp_inEdges = initial_graph.inEdges;
+        for (const auto& op_edge : tmp_inEdges) {
             if (initial_graph.outEdges.find(op_edge.first) == initial_graph.outEdges.end()) {
                 // Case 1: the gate has no output
                 // initialize output edges for this gate

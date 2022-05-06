@@ -2157,10 +2157,10 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
     return total_cost;
 }
 
-void Graph::add_swap(Edge e1, Edge e2) {
+void Graph::add_swap(const Edge& e1, const Edge& e2) {
     // TODO: check compatibility with other parts
     // create a swap gate and insert it into inEdges and outEdges
-    auto new_swap_op = Op(get_next_special_op_guid(), context->get_gate(GateType::swap));
+    auto new_swap_op = Op(context->next_global_unique_id(), context->get_gate(GateType::swap));
     auto in_edge_0 = Edge(e1.srcOp, new_swap_op, e1.srcIdx, 0);
     auto in_edge_1 = Edge(e2.srcOp, new_swap_op, e2.srcIdx, 1);
     auto out_edge_0 = Edge(new_swap_op, e1.dstOp, 0, e1.dstIdx);

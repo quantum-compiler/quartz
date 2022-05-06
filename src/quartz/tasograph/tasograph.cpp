@@ -1956,7 +1956,7 @@ void Graph::_trivial_mapping() {
 }
 
 void Graph::_sabre_mapping() {
-
+    calculate_sabre_mapping(*this);
 }
 
 void Graph::propagate_mapping() {

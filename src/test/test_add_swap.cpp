@@ -72,7 +72,7 @@ int main() {
             edge1 = Edge(target->srcOp, target->dstOp, target->srcIdx, target->dstIdx,
                          target->logical_qubit_idx, target->physical_qubit_idx);
         }
-        if (op.first.guid == 16384) {
+        if (op.first.guid == 1) {
             auto target = op.second.begin();
             edge2 = Edge(target->srcOp, target->dstOp, target->srcIdx, target->dstIdx,
                          target->logical_qubit_idx, target->physical_qubit_idx);

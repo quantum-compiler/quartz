@@ -2157,4 +2157,51 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
     return total_cost;
 }
 
+void Graph::add_swap(Edge e1, Edge e2) {
+    // TODO: check compatibility with other parts
+    // create a swap gate and insert it into inEdges and outEdges
+    auto new_swap_op = Op(get_next_special_op_guid(), context->get_gate(GateType::swap));
+    auto in_edge_0 = Edge(e1.srcOp, new_swap_op, e1.srcIdx, 0);
+    auto in_edge_1 = Edge(e2.srcOp, new_swap_op, e2.srcIdx, 1);
+    auto out_edge_0 = Edge(new_swap_op, e1.dstOp, 0, e1.dstIdx);
+    auto out_edge_1 = Edge(new_swap_op, e2.dstOp, 1, e2.dstIdx);
+    inEdges[new_swap_op].insert(in_edge_0);
+    inEdges[new_swap_op].insert(in_edge_1);
+    outEdges[new_swap_op].insert(out_edge_0);
+    outEdges[new_swap_op].insert(out_edge_1);
+
+    // change e1 and e2's endpoints
+    // e1 src
+    for (auto& edge : outEdges[e1.srcOp]) {
+        if (edge.srcIdx == e1.srcIdx) {
+            edge.dstOp = new_swap_op;
+            edge.dstIdx = 0;
+        }
+    }
+    // e1 dst
+    for (auto& edge : inEdges[e1.dstOp]) {
+        if (edge.dstIdx == e1.dstIdx) {
+            edge.srcOp = new_swap_op;
+            edge.srcIdx = 0;
+        }
+    }
+    // e2 src
+    for (auto& edge : outEdges[e2.srcOp]) {
+        if (edge.srcIdx == e2.srcIdx) {
+            edge.dstOp = new_swap_op;
+            edge.dstIdx = 1;
+        }
+    }
+    // e2 dst
+    for (auto& edge : inEdges[e2.dstOp]) {
+        if (edge.dstIdx == e2.dstIdx) {
+            edge.srcOp = new_swap_op;
+            edge.srcIdx = 1;
+        }
+    }
+
+    // re-calculate physical mapping
+    propagate_mapping();
+}
+
 }; // namespace quartz

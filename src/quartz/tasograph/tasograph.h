@@ -147,8 +147,8 @@ struct Edge {
   Edge(void);
   Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx);
   Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx, int _logical_qubit_idx, int _physical_qubit_idx);
-  Op srcOp, dstOp;
-  int srcIdx, dstIdx;
+  mutable Op srcOp, dstOp;
+  mutable int srcIdx, dstIdx;
   mutable int logical_qubit_idx, physical_qubit_idx;
 };
 
@@ -244,6 +244,8 @@ public:
   void propagate_mapping();
   MappingStatus check_mapping_correctness();
   double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);
+  // physical mapping with RL
+  void add_swap(Edge e1, Edge e2);
 
 
 private:

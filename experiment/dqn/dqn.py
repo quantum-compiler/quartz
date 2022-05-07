@@ -141,26 +141,29 @@ class Environment:
         init_graph: quartz.PyGraph,
         quartz_context: quartz.QuartzContext,
         max_steps_per_episode: int = 100,
+        nop_policy: list = ['c', 0.0],
     ):
         self.init_graph = init_graph
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         self.max_steps_per_episode = max_steps_per_episode
+        self.nop_policy = nop_policy
+        
         self.state = None
-        self.step = 0
+        self.cur_step = 0
         self.exp_seq = [ self._get_firtst_exp() ]
 
         self.reset()
 
     def reset(self):
         self.state: quartz.PyGraph = self.init_graph
-        self.step = 0
+        self.cur_step = 0
         self.exp_seq = [ self._get_firtst_exp() ]
 
     def set_init_state(self, graph: quartz.PyGraph):
         self.init_graph = graph
         self.state = graph
-        self.step = 0
+        self.cur_step = 0
         self.exp_seq = [ self._get_firtst_exp() ]
 
     def _get_firtst_exp(self) -> Experience:
@@ -194,9 +197,14 @@ class Environment:
             game_over = False
             this_step_reward = cur_state.gate_count - next_state.gate_count
         
-        self.step += 1
+        # handle NOP
+        if action_xfer == self.quartz_context.num_xfers:
+            game_over = (self.nop_policy[0] == 's')
+            this_step_reward = self.nop_policy[1]
+        
+        self.cur_step += 1
         self.state = next_state
-        if self.step >= self.max_steps_per_episode:
+        if self.cur_step >= self.max_steps_per_episode:
             game_over = True
             # TODO  whether we need to change this_step_reward here?
         
@@ -217,6 +225,8 @@ class Agent:
         self.env = env
         self.device = device
 
+        self.choices = [ ('s', 0) ]
+
     @torch.no_grad()
     def _get_action(self, q_net: nn.Module, eps: float) -> Tuple[int, int]:
         if np.random.random() < (1 - eps):
@@ -229,6 +239,7 @@ class Agent:
             optimal_xfer = optimal_xfers[optimal_node]
             # return values will be added into data buffer, which latter feeds the dataset
             # they cannot be cuda tensors, or CUDA error will occur in collate_fn
+            self.choices.append( ('q', eps) )
             return optimal_node.item(), optimal_xfer.item()
         else:
             # random
@@ -241,21 +252,17 @@ class Agent:
                 if len(av_xfers) > 0:
                     xfer_space = av_xfers
             xfer = np.random.choice(xfer_space)
+            self.choices.append( ('r', eps) )
             return node, xfer
 
     @torch.no_grad()
     def play_step(self, q_net: nn.Module, eps: float) -> Experience:
         action_node, action_xfer = self._get_action(q_net, eps)
-        exp = self.env.act(action_node, action_xfer)
-        # if exp.game_over:
-        #     # TODO  check this
-        #     # start from this best graph in the following experiment
-        #     if exp.reward > 0:
-        #         self.env.set_init_state(exp.next_state)
-        #     else:
-        #         self.env.reset()
-        
+        exp = self.env.act(action_node, action_xfer)        
         return exp
+
+    def clear_choices(self):
+        self.choices = [ ('s', 0) ]
 
 
 class DQNMod(pl.LightningModule):
@@ -280,6 +287,7 @@ class DQNMod(pl.LightningModule):
         seq_out_dir: str = 'out_graphs',
         pretrained_weight_path: str = None,
         restore_after_better: bool = False,
+        nop_policy: list = ['c', 0.0]
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -307,6 +315,7 @@ class DQNMod(pl.LightningModule):
             init_graph=init_graph,
             quartz_context=quartz_context,
             max_steps_per_episode=episode_length,
+            nop_policy=nop_policy,
         )
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
@@ -345,7 +354,8 @@ class DQNMod(pl.LightningModule):
                 exp.next_state.gate_count < self.env.init_graph.gate_count:
                 print(
                     f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    ' buffer rebuilding...'
+                    f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}'
+                    '  buffer rebuilding...'
                 )
                 # output sequence
                 self.num_out_graphs += 1
@@ -359,21 +369,24 @@ class DQNMod(pl.LightningModule):
                 for i_step, exp in enumerate(self.env.exp_seq):
                     out_path = os.path.join(
                         out_dir,
-                        f'{i_step}_{exp.action_node}_{exp.action_xfer}_{exp.next_state.gate_count}.qasm',
-                    ) # TODO  wrong filename; 
+                        f'{i_step}_{exp.next_state.gate_count}_{exp.action_node}_{exp.action_xfer}_'
+                        f'{self.agent.choices[i_step][0]}_{self.agent.choices[i_step][1]:.3f}.qasm',
+                    ) # TODO  wrong filename
                     qasm_str = exp.next_state.to_qasm_str()
                     with open(out_path, 'w') as f:
                         print(qasm_str, file=f)
                 # reset: start from the best graph
                 self.env.set_init_state(exp.next_state)
                 self.buffer.buffer.clear()
+                self.agent.clear_choices()
                 # TODO may meet gate count reduction again, which introduces recursions
                 self.populate(self.hparams.warm_start_steps)
                 if self.hparams.restore_after_better:
                     self._restore_pretrained_weight() # TODO  check this
             else:
                 self.env.reset()
-
+                self.agent.clear_choices()
+        # end if
         return exp
     
     def populate(self, steps: int = 1000):
@@ -445,7 +458,7 @@ class DQNMod(pl.LightningModule):
         """
         # play one step
         self.eps = max(
-            self.eps + self.hparams.eps_decay,
+            self.eps - self.hparams.eps_decay,
             self.hparams.eps_min
         )
         # TODO  for _ in range(self.hparams.batch_size // 10):
@@ -466,7 +479,7 @@ class DQNMod(pl.LightningModule):
         self.log(f'step_reward', exp.reward, on_step=True, prog_bar=True)
         self.log(f'total_reward', self.total_reward, on_step=True)
         self.log(f'eps', self.eps, on_step=True)
-        self.log(f'env_step', self.env.step, on_step=True, prog_bar=True)
+        self.log(f'env_step', self.env.cur_step, on_step=True, prog_bar=True)
         self.log(f'best_gc', self.env.init_graph.gate_count, on_step=True, prog_bar=True)
         self.log(f'|buffer|', len(self.buffer.buffer), on_step=True, prog_bar=True)
 
@@ -529,7 +542,7 @@ class DQNMod(pl.LightningModule):
         # TODO  not sure if it can avoid duplicate data when using DDP
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
-            num_workers=8,
+            num_workers=4,
             batch_size=self.hparams.batch_size,
             # shuffle=self.training, # this would be overwritten by PL
             collate_fn=collate_fn,
@@ -653,6 +666,8 @@ def main(cfg):
         pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
         gamma=cfg.gamma,
         restore_after_better=cfg.restore_after_better,
+        target_update_interval=cfg.target_update_interval,
+        nop_policy=cfg.nop_policy,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?

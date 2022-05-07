@@ -2,7 +2,7 @@ mode: train
 resume: False
 
 load_pretrained: True
-pretrained_weight: '../pretrain/outputs/2022-05-03/02-56-00/epoch=33-val_loss=0.05-best.ckpt'
+pretrained_weight: '../pretrain/outputs/2022-05-03/15-28-33/epoch=280-val_loss=0.08-best.ckpt'
 
 weight: ''
 
@@ -24,3 +24,5 @@ include_nop: True
 
 gamma: 0.99
 restore_after_better: False
+target_update_interval: 100
+nop_policy: ['c', 0.0]

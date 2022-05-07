@@ -153,7 +153,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
-            num_workers=8,
+            num_workers=4,
             batch_size=self.batch_size,
             shuffle=(mode == 'train'),
             collate_fn=collate_fn,

@@ -15,6 +15,7 @@ from pytorch_lightning.strategies import DDPStrategy
 import dgl
 from gnn import QGNN
 from tqdm import tqdm
+from transformers import TransfoXLConfig, TransfoXLModel
 
 import quartz
 
@@ -240,10 +241,10 @@ class PretrainNet(pl.LightningModule):
         self.save_hyperparameters()
 
         gate_type_num = 29
-        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 64, 64),
-                                   nn.Linear(64, 32), nn.ReLU(),
-                                   nn.Linear(32, 16), nn.ReLU(),
-                                   nn.Linear(16, 1))
+
+        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 256, 256),
+                                   nn.Linear(256, 128), nn.ReLU(),
+                                   nn.Linear(128, 1))
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 

@@ -4,7 +4,7 @@ resume: False
 
 ckpt_path: ''
 
-gpus: [3]
+gpus: [2]
 seed: 98765
 
 wandb:

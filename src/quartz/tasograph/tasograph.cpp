@@ -1933,13 +1933,23 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
         }
       }
     } else {
-      auto target_op = xfer->dstOps[0]->mapOp;
+      std::set<Op> mapped_op_set;
+      for (const auto &opx : xfer->dstOps) {
+        mapped_op_set.insert(opx->mapOp);
+      }
       for (size_t i = 0; i < ops_num; ++i) {
-        if (target_op == all_ops[i]) {
+        if (mapped_op_set.find(all_ops[i]) != mapped_op_set.end()) {
           node_trace.push_back(i);
-          break;
         }
       }
+
+      //   auto target_op = xfer->dstOps[0]->mapOp;
+      //   for (size_t i = 0; i < ops_num; ++i) {
+      //     if (target_op == all_ops[i]) {
+      //       node_trace.push_back(i);
+      //       break;
+      //     }
+      //   }
     }
   }
   while (!opx_op_dq.empty()) {

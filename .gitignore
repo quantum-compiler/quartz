@@ -77,4 +77,5 @@ experiment/ppo/PPO_logs
 experiment/ppo/PPO_preTrained
 experiment/ppo/pretrain/dataset
 experiment/ppo/pretrain/outputs
+experiment/ppo/pretrain/config/config.yaml
 experiment/ppo/pretrain/pretrain_dataset_g9

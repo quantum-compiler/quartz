@@ -13,11 +13,7 @@ wandb:
   entity: quartz
 
 gate_set: ['h', 'cx', 't', 'tdg']
-<<<<<<< HEAD
-ecc_file: 'bfs_verified_simplified.json'
-=======
 ecc_file: '../../bfs_verified_simplified.json'
->>>>>>> Modified config for ppo pretraining
 no_increase: True
 include_nop: True
 
@@ -26,7 +22,7 @@ graph_file: graph.json
 reward_file: reward.json
 
 <<<<<<< HEAD
-gamma: 0.99
 =======
+batch_size: 512
+>>>>>>> use new buffer, init_state, restart policy
 gamma: 0.9
->>>>>>> Modified config for ppo pretraining

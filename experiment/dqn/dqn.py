@@ -1,10 +1,11 @@
-from email import generator
 import os
 import sys
 import json
+import math
 import random
 import warnings
 from collections import deque, namedtuple
+import heapq
 from typing import List, Tuple
 import hydra
 import numpy as np
@@ -25,6 +26,43 @@ import quartz
 
 sys.path.append(os.path.join(os.getcwd(), '..'))
 from pretrain.pretrain import PretrainNet
+
+class SpecialMinHeap:
+    def __init__(self, max_size = math.inf):
+        self.arr= []
+        self.inserted_hash = set()
+        self.max_size = max_size
+
+    def __len__(self):
+        return len(self.arr)
+
+    def push(self, item):
+        popped = None
+        if item[1].hash() not in self.inserted_hash:
+            self.inserted_hash.add(item[1].hash())
+            if len(self.arr) >= self.max_size:
+                popped = self.pop()
+            heapq.heappush(self.arr, item)
+        return popped
+
+    def pop(self):
+        popped = heapq.heappop(self.arr)
+        self.inserted_hash.remove(popped[1].hash())
+        return popped
+
+    def sample(self, k: int = 1):
+        # arr: [ (num_gate_reduced, graph) ]
+        assert len(self.arr) > 0 and isinstance(self.arr[0], tuple)
+        num_gate_reduced_list, graph_list = zip(*self.arr)
+        num_gate_reduced_list = list(num_gate_reduced_list)
+        graph_list = list(graph_list)
+        # generate sample distribution
+        sample_counts = torch.tensor(num_gate_reduced_list)
+        sample_counts = sample_counts - sample_counts.min() # [0, 0, 1, 2, ...]
+        sample_counts = sample_counts * 10 + 1
+        sampled = random.sample(self.arr, k=k, counts=sample_counts.tolist())
+        return sampled
+
 
 class QConv(nn.Module):
     def __init__(self, in_feat, inter_dim, out_feat):
@@ -198,7 +236,8 @@ class Environment:
             this_step_reward = cur_state.gate_count - next_state.gate_count
         
         # handle NOP
-        if action_xfer == self.quartz_context.num_xfers:
+        if self.quartz_context.xfer_id_is_nop(xfer_id=action_xfer):
+        # if action_xfer == self.quartz_context.num_xfers:
             game_over = (self.nop_policy[0] == 's')
             this_step_reward = self.nop_policy[1]
         
@@ -286,8 +325,12 @@ class DQNMod(pl.LightningModule):
         target_update_interval: int = 100,
         seq_out_dir: str = 'out_graphs',
         pretrained_weight_path: str = None,
-        restore_after_better: bool = False,
-        nop_policy: list = ['c', 0.0]
+        restore_weight_after_better: bool = False,
+        nop_policy: list = ['c', 0.0],
+        restart_from_best: bool = False,
+        clear_buf_after_better: bool = False,
+        init_state_buf_size: int = 512,
+        agent_episode: bool = True,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -305,6 +348,7 @@ class DQNMod(pl.LightningModule):
         parser = quartz.PyQASMParser(context=quartz_context)
         init_dag = parser.load_qasm_str(init_graph_qasm_str)
         init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
+        self.init_graph = init_graph
 
         self.q_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
         self.target_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
@@ -320,6 +364,9 @@ class DQNMod(pl.LightningModule):
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
         self.buffer = ReplayBuffer(replaybuf_size)
+        self.init_state_buffer = SpecialMinHeap(max_size=init_state_buf_size)
+        self.init_state_buffer.push((init_graph.gate_count, init_graph))
+        self.best_graph = init_graph
 
         self.eps = eps_init
         self.episode_reward = 0
@@ -344,51 +391,84 @@ class DQNMod(pl.LightningModule):
             self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
             self.target_net.load_state_dict(self.q_net.state_dict())
 
-    def agent_step(self, eps: float) -> Experience:
+    def _output_seq(self):
+        # output sequence
+        self.num_out_graphs += 1
+        out_dir = os.path.join(
+            self.hparams.seq_out_dir,
+            'out_graphs',
+            f'{self.num_out_graphs}',
+        )
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        for i_step, exp in enumerate(self.env.exp_seq):
+            out_path = os.path.join(
+                out_dir,
+                f'{i_step}_{exp.next_state.gate_count}_{exp.action_node}_{exp.action_xfer}_'
+                f'{self.agent.choices[i_step][0]}_{self.agent.choices[i_step][1]:.3f}.qasm',
+            ) # TODO  wrong filename
+            qasm_str = exp.next_state.to_qasm_str()
+            with open(out_path, 'w') as f:
+                print(qasm_str, file=f)
+
+    def agent_step(self, eps: float) -> Tuple[Experience, int]:
         exp = self.agent.play_step(self.q_net, eps)
         self.buffer.append(exp)
+        env_cur_step = self.env.cur_step
+
+        if exp.game_over and exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count:
+            # better graph found, add it to init_state_buffer
+            self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
+        elif exp.next_state:
+            if np.random.random() < 0.10 or len(self.init_state_buffer) < 10:
+                self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
 
         if exp.game_over:
             # TODO  if a better graph is found, clear the buffer and populate it with the new graph?
             if exp.next_state and \
-                exp.next_state.gate_count < self.env.init_graph.gate_count:
+                exp.next_state.gate_count < self.best_graph.gate_count:
+                # a better graph is found
+                self.best_graph = exp.next_state
                 print(
                     f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
                     f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}'
-                    '  buffer rebuilding...'
                 )
-                # output sequence
-                self.num_out_graphs += 1
-                out_dir = os.path.join(
-                    self.hparams.seq_out_dir,
-                    'out_graphs',
-                    f'{self.num_out_graphs}',
-                )
-                if not os.path.exists(out_dir):
-                    os.makedirs(out_dir)
-                for i_step, exp in enumerate(self.env.exp_seq):
-                    out_path = os.path.join(
-                        out_dir,
-                        f'{i_step}_{exp.next_state.gate_count}_{exp.action_node}_{exp.action_xfer}_'
-                        f'{self.agent.choices[i_step][0]}_{self.agent.choices[i_step][1]:.3f}.qasm',
-                    ) # TODO  wrong filename
-                    qasm_str = exp.next_state.to_qasm_str()
-                    with open(out_path, 'w') as f:
-                        print(qasm_str, file=f)
-                # reset: start from the best graph
-                self.env.set_init_state(exp.next_state)
-                self.buffer.buffer.clear()
+                self._output_seq()
+                # reset
+                if self.hparams.restart_from_best:
+                    # start from the best graph
+                    self.env.set_init_state(exp.next_state)
+                else:
+                    # sample a init state
+                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
+                    self.env.set_init_state(init_state_pair[1])
+                
                 self.agent.clear_choices()
-                # TODO may meet gate count reduction again, which introduces recursions
-                self.populate(self.hparams.warm_start_steps)
-                if self.hparams.restore_after_better:
-                    self._restore_pretrained_weight() # TODO  check this
+                if self.hparams.clear_buf_after_better:
+                    # clear and re-populate
+                    self.buffer.buffer.clear()
+                    # may meet gate count reduction again, which introduces recursions
+                    self.populate(self.hparams.warm_start_steps)
+                if self.hparams.restore_weight_after_better:
+                    self._restore_pretrained_weight()
             else:
-                self.env.reset()
                 self.agent.clear_choices()
+                if self.hparams.restart_from_best:
+                    self.env.reset()
+                else:
+                    # sample a init state
+                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
+                    self.env.set_init_state(init_state_pair[1])
         # end if
-        return exp
-    
+        return exp, env_cur_step
+
+    def agent_episode(self, eps: float) -> Tuple[Experience, int]:
+        while True:
+            exp, env_cur_step = self.agent_step(eps)
+            if exp.game_over == True:
+                break
+        return exp, env_cur_step
+
     def populate(self, steps: int = 1000):
         """
         Carries out several random steps through the environment to initially fill up the replay buffer with
@@ -462,7 +542,10 @@ class DQNMod(pl.LightningModule):
             self.hparams.eps_min
         )
         # TODO  for _ in range(self.hparams.batch_size // 10):
-        exp = self.agent_step(self.eps)
+        if self.hparams.agent_episode:
+            exp, env_cur_step = self.agent_episode(self.eps)
+        else:
+            exp, env_cur_step = self.agent_step(self.eps)
         self.episode_reward += exp.reward
         self.log(f'episode_reward', self.episode_reward, on_step=True)
         # GD with sampled data
@@ -479,9 +562,11 @@ class DQNMod(pl.LightningModule):
         self.log(f'step_reward', exp.reward, on_step=True, prog_bar=True)
         self.log(f'total_reward', self.total_reward, on_step=True)
         self.log(f'eps', self.eps, on_step=True)
-        self.log(f'env_step', self.env.cur_step, on_step=True, prog_bar=True)
-        self.log(f'best_gc', self.env.init_graph.gate_count, on_step=True, prog_bar=True)
-        self.log(f'|buffer|', len(self.buffer.buffer), on_step=True, prog_bar=True)
+        self.log(f'env_step', env_cur_step, on_step=True, prog_bar=True)
+        self.log(f'best_gc', self.best_graph.gate_count, on_step=True, prog_bar=True)
+        self.log(f'init', self.env.init_graph.gate_count, on_step=True, prog_bar=True)
+        self.log(f'|buf|', len(self.buffer.buffer), on_step=True, prog_bar=True)
+        self.log(f'|init_state_buf|', len(self.init_state_buffer), on_step=True, prog_bar=True)
 
         return loss
     
@@ -609,6 +694,8 @@ def train(cfg):
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
         strategy=DDPStrategy(find_unused_parameters=True),
+        track_grad_norm=2,
+        # detect_anomaly=True,
         # gradient_clip_val=cfg.task.optimizer.clip_value,
         # gradient_clip_algorithm=cfg.task.optimizer.clip_algo,
         # val_check_interval=cfg.val_check_interval,
@@ -664,10 +751,17 @@ def main(cfg):
         include_nop=cfg.include_nop,
         seq_out_dir=output_dir,
         pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
+        batch_size=cfg.batch_size,
+        warm_start_steps=cfg.batch_size * 2,
         gamma=cfg.gamma,
-        restore_after_better=cfg.restore_after_better,
+        replaybuf_size=cfg.replaybuf_size,
+        init_state_buf_size=cfg.init_state_buf_size,
+        restore_weight_after_better=cfg.restore_weight_after_better,
         target_update_interval=cfg.target_update_interval,
         nop_policy=cfg.nop_policy,
+        restart_from_best=cfg.restart_from_best,
+        clear_buf_after_better=cfg.clear_buf_after_better,
+        agent_episode=cfg.agent_episode,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?

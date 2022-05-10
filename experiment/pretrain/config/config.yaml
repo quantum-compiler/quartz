@@ -21,4 +21,5 @@ dataset_dir: dataset
 graph_file: graph.json
 reward_file: reward.json
 
+batch_size: 512
 gamma: 0.9

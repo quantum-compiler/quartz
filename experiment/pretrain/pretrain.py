@@ -482,6 +482,7 @@ def main(cfg):
         reward_file=cfg.reward_file,
         include_nop=cfg.include_nop,
         gamma=cfg.gamma,
+        batch_size=cfg.batch_size,
     )
     PLModel = PretrainNet
 

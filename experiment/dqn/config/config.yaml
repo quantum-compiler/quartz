@@ -22,7 +22,13 @@ ecc_file: 'bfs_verified_simplified.json'
 no_increase: True
 include_nop: True
 
-gamma: 0.99
-restore_after_better: False
+batch_size: 1024
+gamma: 0.9
 target_update_interval: 100
-nop_policy: ['c', 0.0]
+replaybuf_size: 10240
+init_state_buf_size: 256
+nop_policy: ['s', 0.0]
+restart_from_best: False
+restore_weight_after_better: False
+clear_buf_after_better: False
+agent_episode: True

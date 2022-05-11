@@ -277,6 +277,15 @@ cdef class QuartzContext:
             xfer = None
         return xfer
 
+    def xfer_id_is_nop(self, *, xfer_id) -> bool:
+        if xfer_id == self.v_xfers.size():
+            if self.include_nop:
+                return True
+            else:
+                assert False
+        else:
+            return False
+
     @property
     def num_equivalence_classes(self):
         return self.eqs.num_equivalence_classes()

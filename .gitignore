@@ -82,3 +82,6 @@ experiment/ppo/pretrain/pretrain_dataset_g9
 experiment/ppo/pretrain/pretrain_dataset_g99
 
 experiment/a2c/*txt
+
+experiment/dqn/outputs
+experiment/dqn/out_graphs

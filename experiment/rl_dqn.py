@@ -512,7 +512,7 @@ if __name__ == '__main__':
     #     json.dump(valid_xfer_dict, f)
 
     with open('valid_xfer_dict.json', 'r') as f:
-        valid_xfer_dict = json.load(f)
+        fvalid_xfer_dict = json.load(f)
 
     # RL training
     seq_lens, correct_cnts, rewards, losses = train(

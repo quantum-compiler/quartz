@@ -21,4 +21,4 @@ dataset_dir: dataset
 graph_file: graph.json
 reward_file: reward.json
 
-gamma: 0.99
+gamma: 0.9

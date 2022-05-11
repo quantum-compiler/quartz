@@ -1,5 +1,6 @@
 mode: train
 resume: False
+ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
 
 load_pretrained: True
 pretrained_weight: '../pretrain/outputs/2022-05-03/15-28-33/epoch=280-val_loss=0.08-best.ckpt'

@@ -17,7 +17,7 @@ import dgl
 
 import time
 from tqdm import tqdm
-import icecream as ic
+from icecream import ic
 from IPython import embed
 
 import quartz
@@ -348,6 +348,7 @@ class PretrainNet(pl.LightningModule):
         loss = self._compute_loss(out, gt_rewards, masks, mode)
         if mode in ['val', 'test'] or self.global_step % self.hparams.acc_interval == 0:
             batch_acc= self._compute_acc(out, gt_rewards, num_nodes, topk=self.hparams.acc_topk, prefix=mode)
+            print(f'{mode}: batch_acc {batch_acc} at globalstep {self.global_step}')
 
         # log some info
         r_start, r_end = 0, 0
@@ -371,6 +372,14 @@ class PretrainNet(pl.LightningModule):
             self.log(f'{mode}_mean_reward_{i_batch}', torch.mean(selected_rewards), on_step=True)
 
             r_start = r_end
+
+        # print learning rates
+        optimizer = self.optimizers()
+        self.log(
+            f'lr',
+            optimizer.param_groups[0]['lr'],
+            prog_bar=True, on_step=True,
+        )
         
         return loss
 
@@ -427,7 +436,7 @@ class PretrainNet(pl.LightningModule):
         # e_time = time.time_ns()
         # print(f'duration: { (e_time - s_time) / 1e6 } ms')
         self.log_dict({
-            f'{prefix}_batch_acc': batch_acc,
+            f'{prefix}_batch_acc_top{topk}': batch_acc,
         }, on_step=True)
         return batch_acc
 

@@ -1,0 +1,35 @@
+mode: train
+resume: False
+ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
+
+load_pretrained: True
+pretrained_weight: '../pretrain/outputs/2022-05-03/15-28-33/epoch=280-val_loss=0.08-best.ckpt'
+
+weight: ''
+
+gpus: [2]
+
+seed: 98765
+
+wandb:
+  en: True
+  offline: False
+  entity: quartz
+
+init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: 'bfs_verified_simplified.json'
+no_increase: True
+include_nop: True
+
+batch_size: 1024
+gamma: 0.9
+target_update_interval: 100
+replaybuf_size: 10240
+init_state_buf_size: 256
+nop_policy: ['s', 0.0]
+restart_from_best: False
+restore_weight_after_better: False
+clear_buf_after_better: False
+agent_episode: True

@@ -15,6 +15,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.strategies import DDPStrategy
 import dgl
 
+import time
 from tqdm import tqdm
 import icecream as ic
 from IPython import embed
@@ -45,6 +46,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         batch_size: int = 128,
         use_max_gate_count: bool = False,
         gamma: float = 0.99,
+        num_workers: int = 4,
     ):
         super().__init__()
         self.hash2graphs = {}
@@ -54,6 +56,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         self.batch_size = batch_size
         self.use_max_gate_count = use_max_gate_count
         self.gamma = gamma
+        self.num_workers = num_workers
 
         # load graphs and rewards
         with open(os.path.join(dataset_dir, graph_file)) as f:
@@ -129,6 +132,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         
         def collate_fn(batch):
             # batch [ (dgl_graph, reward_mat, mask_mat) ]
+            # s_time = time.time_ns()
             dgl_graphs, reward_mats, mask_mats = list(zip(*batch))
             batched_graphs = dgl.batch(dgl_graphs)
             if self.use_max_gate_count:
@@ -137,6 +141,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
             else:
                 reward_mats = torch.cat(reward_mats, dim=0)
                 mask_mats = torch.cat(mask_mats, dim=0)
+            # e_time = time.time_ns()
+            # print(f'duration: { (e_time - s_time) / 1e6 } ms')
             return (batched_graphs, reward_mats, mask_mats)
 
         # Ref: https://pytorch.org/docs/master/notes/randomness.html#dataloader
@@ -153,7 +159,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
         
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
-            num_workers=4,
+            num_workers=self.num_workers,
             batch_size=self.batch_size,
             shuffle=(mode == 'train'),
             collate_fn=collate_fn,
@@ -188,6 +194,7 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         """
         Return: (dgl_graph, reward_mat, mask_mat)
         """
+        # s_time = time.time_ns()
         pygraph, reward_dict, gate_count, g_hash = self.graph_hash_list[idx]
         gate_count_to_use = \
             self.max_gate_count if self.use_max_gate_count else gate_count
@@ -236,6 +243,8 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         mask_mat[ zero_reward_indices[:, 0], zero_reward_indices[:, 1] ] = True
         mask_mat[ neg_reward_indices[:, 0], neg_reward_indices[:, 1] ] = True
 
+        # e_time = time.time_ns()
+        # print(f'duration: { (e_time - s_time) / 1e6 } ms')
         return (pygraph.to_dgl_graph(), reward_mat, mask_mat)
 
 class QConv(nn.Module):
@@ -305,14 +314,22 @@ class QGNN(nn.Module):
 
 class PretrainNet(pl.LightningModule):
     def __init__(self,
-        num_xfers: int
+        num_xfers: int,
+        acc_interval: int = 32,
+        scheduler: str = '',
+        qgnn_h_feats: int = 64,
+        qgnn_inter_dim: int = 64,
     ):
         super().__init__()
         self.save_hyperparameters()
 
         gate_type_num = 26
-        self.q_net = QGNN(gate_type_num, 64, num_xfers, 64)
-
+        self.q_net = QGNN(
+            in_feats=gate_type_num,
+            h_feats=qgnn_h_feats,
+            num_classes=num_xfers,
+            inter_dim=qgnn_inter_dim,
+        )
         self.loss_fn = nn.MSELoss(reduction='sum')
 
     def _common_step(self, batch, mode: str = 'unknwon'):
@@ -323,16 +340,21 @@ class PretrainNet(pl.LightningModule):
             masks: (bs, batch_num_nodes, num_xfers)
         """
         batched_graph, gt_rewards, masks = batch
+        num_nodes = batched_graph.batch_num_nodes()
+        num_nodes = [int(n) for n in num_nodes]
         # out: ( sum(num of nodes), num_xfers )
         out =  self.q_net(batched_graph)
         
-        loss = self._compute_log_loss(out, gt_rewards, masks, mode)
+        loss = self._compute_loss(out, gt_rewards, masks, mode)
+        if mode == 'val' or self.global_step % self.hparams.acc_interval == 0:
+            batch_mean_acc, batch_acc_per_node = \
+                self._compute_acc(out, gt_rewards, num_nodes, topk=1, prefix=mode)
 
         # log some info
-        num_nodes = batched_graph.batch_num_nodes()
-        num_nodes = [int(n) for n in num_nodes]
         r_start, r_end = 0, 0
         for i_batch, n_nodes in enumerate(num_nodes):
+            if i_batch >= 1:
+                break
             r_end += n_nodes
             r = slice(r_start, r_end)
 
@@ -352,8 +374,8 @@ class PretrainNet(pl.LightningModule):
             r_start = r_end
         
         return loss
-    
-    def _compute_log_loss(self, out, gt_rewards, masks, prefix: str = ''):
+
+    def _compute_loss(self, out, gt_rewards, masks, prefix: str = ''):
         pred = out * masks
         label = gt_rewards * masks
 
@@ -364,6 +386,75 @@ class PretrainNet(pl.LightningModule):
 
         return loss
     
+    def _compute_acc(self, pred, gt, num_nodes, topk: int = 1, prefix: str = ''):
+        # s_time = time.time_ns()
+        def get_opt_xfers(q_values):
+            n_nodes: int = q_values.shape[0]
+            q_topk, _ = torch.topk(q_values, k=topk, dim=1)
+            min_q_th, _ = torch.min(q_topk, dim=1)
+            min_q_th = torch.unsqueeze(min_q_th, dim=1)
+            opt_nodes, opt_xfers = torch.nonzero(q_values >= min_q_th, as_tuple=True)
+            opt_xfers_per_node = [
+                opt_xfers[opt_nodes == node_id]
+                for node_id in range(n_nodes)
+            ]
+            return opt_xfers_per_node
+
+        batch_acc_per_node = []
+        mean_acc_per_graph = []
+        r_start, r_end = 0, 0
+        for i_batch, n_nodes in enumerate(num_nodes):
+            """it takes more than 20 ms/it , which is very slow for large batch_size"""
+            r_end += n_nodes
+            r = slice(r_start, r_end)
+            i_pred, i_gt = pred[r], gt[r]
+
+            q_topk, _ = torch.topk(i_gt, k=topk, dim=1)
+            min_q_th, _ = torch.min(q_topk, dim=1)
+            min_q_th = torch.unsqueeze(min_q_th, dim=1)
+            gt_opt_nodes, gt_opt_xfers = torch.nonzero(i_gt >= min_q_th, as_tuple=True)
+            gt_opt_xfers_per_node = [
+                gt_opt_xfers[gt_opt_nodes == node_id]
+                for node_id in range(n_nodes)
+            ]
+
+            q_topk, _ = torch.topk(i_pred, k=topk, dim=1)
+            min_q_th, _ = torch.min(q_topk, dim=1)
+            min_q_th = torch.unsqueeze(min_q_th, dim=1)
+            pred_opt_nodes, pred_opt_xfers = torch.nonzero(i_pred >= min_q_th, as_tuple=True)
+            pred_opt_xfers_per_node = [
+                pred_opt_xfers[pred_opt_nodes == node_id]
+                for node_id in range(n_nodes)
+            ]
+
+            acc_per_node = []
+            for node_id in range(n_nodes):
+                gt_opt_xfers: torch.tensor = gt_opt_xfers_per_node[node_id]
+                pred_opt_xfers: torch.tensor = pred_opt_xfers_per_node[node_id]
+                node_acc = torch.sum(
+                    torch.tensor([xfer in gt_opt_xfers for xfer in pred_opt_xfers], device='cpu'),
+                dim=0) / pred_opt_xfers.shape[0] # float32
+                acc_per_node.append(node_acc)
+                batch_acc_per_node.append(node_acc)
+            # end for
+            acc_per_node = torch.Tensor(acc_per_node, device='cpu')
+            graph_mean_acc = torch.mean(acc_per_node, dim=0)
+            mean_acc_per_graph.append(graph_mean_acc)
+        # end for
+        mean_acc_per_graph = torch.Tensor(mean_acc_per_graph, device='cpu')
+        batch_mean_graph_acc = torch.mean(mean_acc_per_graph, dim=0)
+        # mean acc for all nodes in the batch
+        batch_acc_per_node = torch.Tensor(batch_acc_per_node, device='cpu')
+        batch_mean_acc = torch.mean(batch_acc_per_node, dim=0)
+        self.log_dict({
+            f'{prefix}_batch_mean_acc': batch_mean_acc,
+            f'{prefix}_batch_mean_graph_acc': batch_mean_graph_acc,
+        }, on_step=True)
+        
+        # e_time = time.time_ns()
+        # print(f'duration: { (e_time - s_time) / 1e6 } ms')
+        return batch_mean_acc, batch_acc_per_node
+
     def training_step(self, batch, batch_idx):
         loss = self._common_step(batch, 'train')
         return loss
@@ -381,7 +472,22 @@ class PretrainNet(pl.LightningModule):
             params=list(self.q_net.parameters()),
             lr=1e-3,
         )
-        return optimizer
+        if self.hparams.scheduler == 'reduce':
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer=optimizer,
+                patience=128,
+                factor=0.2,
+                threshold=0.001,
+            )
+            return {
+                'optimizer': optimizer,
+                'lr_scheduler': {
+                    'scheduler': scheduler,
+                    'monitor': 'train_loss',    # TODO
+                }
+            }
+        else:
+            return optimizer
 
 def init_wandb(
     enable: bool = True,
@@ -426,6 +532,7 @@ def train(cfg):
         callbacks=ckpt_callback_list,
         sync_batchnorm=True,
         strategy=DDPStrategy(find_unused_parameters=False),
+        check_val_every_n_epoch=cfg.check_val_every_n_epoch,
         # gradient_clip_val=cfg.task.optimizer.clip_value,
         # gradient_clip_algorithm=cfg.task.optimizer.clip_algo,
         # val_check_interval=cfg.val_check_interval,
@@ -483,10 +590,17 @@ def main(cfg):
         include_nop=cfg.include_nop,
         gamma=cfg.gamma,
         batch_size=cfg.batch_size,
+        num_workers=cfg.num_workers,
     )
     PLModel = PretrainNet
 
-    model = PLModel(quartz_context.num_xfers)
+    model = PLModel(
+        num_xfers=quartz_context.num_xfers,
+        acc_interval=cfg.acc_interval,
+        scheduler=cfg.scheduler,
+        qgnn_h_feats=cfg.qgnn_h_feats,
+        qgnn_inter_dim=cfg.qgnn_inter_dim,
+    )
 
     # if cfg.mode == 'train':
     #     if cfg.resume:

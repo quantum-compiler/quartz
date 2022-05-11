@@ -21,5 +21,12 @@ dataset_dir: dataset
 graph_file: graph.json
 reward_file: reward.json
 
+check_val_every_n_epoch: 8
+scheduler: None
+num_workers: 4
 batch_size: 512
 gamma: 0.9
+acc_interval: 32
+
+qgnn_h_feats: 64
+qgnn_inter_dim: 64

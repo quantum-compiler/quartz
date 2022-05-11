@@ -19,7 +19,7 @@ from pytorch_lightning.strategies import DDPStrategy
 import dgl
 
 from tqdm import tqdm
-import icecream as ic
+from icecream import ic
 from IPython import embed
 
 import quartz

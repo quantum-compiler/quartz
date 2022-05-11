@@ -15,6 +15,7 @@ from pytorch_lightning.strategies import DDPStrategy
 import dgl
 from gnn import QGNN
 from tqdm import tqdm
+from transformers import TransfoXLConfig, TransfoXLModel
 
 import quartz
 
@@ -207,10 +208,10 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
             node_id = int(node_id)  # TODO  why json dump/load int as str
             value_vec[node_id] = float(node_value)
             # use all of the positive rewards
-            mask_vec[node_id] = reward > 0
-            zero_value_vec[node_id] = reward == 0
-            neg_value_vec[node_id] = False  # reward < 0
-            num_pos_values += (reward > 0)
+            mask_vec[node_id] = node_value > 0
+            zero_value_vec[node_id] = node_value == 0
+            neg_value_vec[node_id] = False  # node_value < 0
+            num_pos_values += (node_value > 0)
 
         # TODO  num_pos_rewards should have a min value
         num_pos_rewards = max(num_pos_values, 10)
@@ -240,9 +241,10 @@ class PretrainNet(pl.LightningModule):
         self.save_hyperparameters()
 
         gate_type_num = 29
-        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 64, 64),
-                                   nn.Linear(64, 32), nn.ReLU(),
-                                   nn.Linear(32, 1))
+
+        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 256, 256),
+                                   nn.Linear(256, 128), nn.ReLU(),
+                                   nn.Linear(128, 1))
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 
@@ -256,7 +258,7 @@ class PretrainNet(pl.LightningModule):
         batched_graph, node_values, masks = batch
         # out: ( sum(num of nodes), num_xfers )
         out = self.q_net(batched_graph)
-
+        out = out.reshape(node_values.shape)
         loss = self._compute_log_loss(out, node_values, masks, mode)
 
         # log some info
@@ -326,7 +328,7 @@ class PretrainNet(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             params=list(self.q_net.parameters()),
-            lr=1e-3,
+            lr=5e-4,
         )
         return optimizer
 

@@ -10,8 +10,9 @@ import numpy as np
 import dgl
 import time
 from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor
-from pathos.multiprocessing import ProcessingPool
+import wandb
+
+wandb.init(project='ppo_local')
 
 # set device to cpu or cuda
 device = torch.device('cpu')
@@ -210,7 +211,6 @@ class PPO:
         self.log_file_handle = log_file_handle
 
     def select_action(self, graph):
-
         # Use the old policy network to select an action
         # No gradient needed
         with torch.no_grad():
@@ -278,6 +278,12 @@ class PPO:
 
             actor_loss = -torch.min(surr1, surr2).mean()
             critic_loss = advantages.pow(2).mean()
+
+            wandb.log({
+                'actor_loss': actor_loss,
+                'critic_loss': critic_loss,
+                'xfer_entropy': xfer_entropy
+            })
 
             # final loss of clipped objective PPO
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
@@ -370,7 +376,7 @@ init_dag = parser.load_qasm(filename="../near_56.qasm")
 init_graph = quartz.PyGraph(context=context, dag=init_dag)
 xfer_dim = context.num_xfers
 init_graphs = [init_graph]
-best_gate_count = init_graph.gate_count
+best_gate_cnt = init_graph.gate_count
 
 ###################### logging ######################
 
@@ -419,10 +425,11 @@ print("save checkpoint path : " + checkpoint_path)
 
 def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
     graph = init_state
-    best_gate_count = init_state.gate_count
     done = False
     nop_stop = False
     trajectory_reward = 0
+    trajectory_len = 0
+    trajectory_best_gate_count = init_state.gate_count
 
     for t in range(max_seq_len):
         if not done:
@@ -452,11 +459,13 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
             ppo_agent.buffer.next_nodes.append(next_nodes)
             graph = next_graph
         else:
+            trajectory_len = t
             break
 
-    best_gate_count = min(graph.gate_count, best_gate_count)
+    trajectory_best_gate_count = min(graph.gate_count,
+                                     trajectory_best_gate_count)
 
-    return trajectory_reward, best_gate_count
+    return trajectory_reward, trajectory_best_gate_count, trajectory_len
 
 
 ############# print all hyperparameters #############
@@ -553,16 +562,17 @@ i_episode = 0
 for i_episode in tqdm(range(episodes)):
 
     current_ep_reward = 0
-    ep_best_gate_count = init_graph.gate_count
+    ep_best_gate_cnt = init_graph.gate_count
+    ep_seq_len = 0
 
     for i in range(batch_size):
-        trajectory_reward, trajectory_best_gate_count = get_trajectory(
+        t_reward, t_best_gate_cnt, t_seq_len = get_trajectory(
             ppo_agent, init_graph, max_seq_len, invalid_reward)
 
-        current_ep_reward += trajectory_reward
-        best_gate_count = min(best_gate_count, trajectory_best_gate_count)
-        ep_best_gate_count = min(ep_best_gate_count,
-                                 trajectory_best_gate_count)
+        current_ep_reward += t_reward
+        best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
+        ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
+        ep_seq_len += t_seq_len
 
     # update PPO agent
     ppo_agent.update()
@@ -576,14 +586,22 @@ for i_episode in tqdm(range(episodes)):
         # log average reward till last episode
         log_avg_reward = log_running_reward / log_running_episodes / batch_size
         log_avg_reward = round(log_avg_reward, 4)
+        log_avg_seq_len = ep_seq_len / batch_size
 
-        message = f'episode: {i_episode}\taverage reward: {log_avg_reward}\tbest of episode: {ep_best_gate_count}\tbest: {best_gate_count} '
+        message = f'episode: {i_episode}\taverage reward: {log_avg_reward}\taverage seq len: {log_avg_seq_len}\tbest of episode: {ep_best_gate_cnt}\tbest: {best_gate_cnt} '
         log_f.write(message + '\n')
         print(message)
         log_f.flush()
 
         log_running_reward = 0
         log_running_episodes = 0
+
+        wandb.log({
+            'reward': log_avg_reward,
+            'seq_len': log_avg_seq_len,
+            'ep_best': ep_best_gate_cnt,
+            'best': best_gate_cnt
+        })
 
     # save model weights
     if i_episode % save_model_freq == 0:

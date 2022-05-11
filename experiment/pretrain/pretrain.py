@@ -107,7 +107,7 @@ class QGNNPretrainDM(pl.LightningDataModule):
                     node_id: {
                         xfer_id: reward
                         for xfer_id, reward in xfer_dict.items()
-                        if int(xfer_id) != self.num_xfers
+                        if int(xfer_id) < quartz_context.num_xfers # filter nop
                     }
                     for node_id, xfer_dict in xfers.items()
                 }
@@ -116,7 +116,6 @@ class QGNNPretrainDM(pl.LightningDataModule):
             pygraph = quartz.PyGraph(context=quartz_context, dag=pydag)
             self.hash2graphs[g_hash] = (pygraph, xfers, gate_count)
             self.max_gate_count = max(self.max_gate_count, gate_count)
-
 
     def train_dataloader(self):
         return self._get_dataloader('train')
@@ -319,6 +318,7 @@ class PretrainNet(pl.LightningModule):
         scheduler: str = '',
         qgnn_h_feats: int = 64,
         qgnn_inter_dim: int = 64,
+        acc_topk: int = 3,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -346,9 +346,8 @@ class PretrainNet(pl.LightningModule):
         out =  self.q_net(batched_graph)
         
         loss = self._compute_loss(out, gt_rewards, masks, mode)
-        if mode == 'val' or self.global_step % self.hparams.acc_interval == 0:
-            batch_mean_acc, batch_acc_per_node = \
-                self._compute_acc(out, gt_rewards, num_nodes, topk=1, prefix=mode)
+        if mode in ['val', 'test'] or self.global_step % self.hparams.acc_interval == 0:
+            batch_acc= self._compute_acc(out, gt_rewards, num_nodes, topk=self.hparams.acc_topk, prefix=mode)
 
         # log some info
         r_start, r_end = 0, 0
@@ -385,12 +384,63 @@ class PretrainNet(pl.LightningModule):
         self.log(f'{prefix}_loss', loss)
 
         return loss
-    
-    def _compute_acc(self, pred, gt, num_nodes, topk: int = 1, prefix: str = ''):
+
+    def _compute_acc(self, pred, gt, num_nodes: list, topk: int, prefix: str = '') -> torch.Tensor:
+        
+        def topk_2d(x: torch.Tensor, k: int, as_tuple: bool = False):
+            x_f = x.flatten()
+            v_topk, i_f_topk = torch.topk(x_f, k)
+            i_f_topk = i_f_topk.tolist()
+            i_topk = [
+                (i_f // x.shape[1], i_f % x.shape[1])
+                for i_f in i_f_topk
+            ]
+            if not as_tuple:
+                i_topk = torch.tensor(i_topk, device=x.device)
+            else:
+                i_topk_sep = list(zip(*i_topk))
+                i_topk = (
+                    torch.tensor(i_topk_sep[0], device=x.device),
+                    torch.tensor(i_topk_sep[1], device=x.device),
+                )
+            return v_topk, i_topk
+        # end def
+        # s_time = time.time_ns()
+        batch_right_action_count = torch.zeros(len(num_nodes), device='cpu')
+        batch_tot_action_count = torch.zeros(len(num_nodes), device='cpu')
+        r_start, r_end = 0, 0
+        for i_batch, n_nodes in enumerate(num_nodes):
+            """compute optimal actions for each graph"""
+            """it takes more than 20 ms/it , which is very slow for large batch_size"""
+            r_end += n_nodes
+            r = slice(r_start, r_end)
+            i_pred, i_gt = pred[r], gt[r]
+            
+            gt_q_topk, gt_act_topk = topk_2d(i_gt, k=topk, as_tuple=False)
+            pred_q_topk, pred_act_topk = topk_2d(i_pred, k=topk, as_tuple=False)
+
+            num_right = sum([act in gt_act_topk for act in pred_act_topk])
+            batch_right_action_count[i_batch] = num_right
+            batch_tot_action_count[i_batch] = pred_act_topk.shape[0]
+        # end for
+        batch_acc = torch.sum(batch_right_action_count, dim=0) / torch.sum(batch_tot_action_count, dim=0)
+        # e_time = time.time_ns()
+        # print(f'duration: { (e_time - s_time) / 1e6 } ms')
+        self.log_dict({
+            f'{prefix}_batch_acc': batch_acc,
+        }, on_step=True)
+        return batch_acc
+
+    def _compute_acc_droped(
+        self, pred, gt, num_nodes, 
+        xfer_topk: int = 1,
+        node_topk: int = 1,
+        prefix: str = ''
+    ):
         # s_time = time.time_ns()
         def get_opt_xfers(q_values):
             n_nodes: int = q_values.shape[0]
-            q_topk, _ = torch.topk(q_values, k=topk, dim=1)
+            q_topk, _ = torch.topk(q_values, k=xfer_topk, dim=1)
             min_q_th, _ = torch.min(q_topk, dim=1)
             min_q_th = torch.unsqueeze(min_q_th, dim=1)
             opt_nodes, opt_xfers = torch.nonzero(q_values >= min_q_th, as_tuple=True)
@@ -400,8 +450,8 @@ class PretrainNet(pl.LightningModule):
             ]
             return opt_xfers_per_node
 
-        batch_acc_per_node = []
-        mean_acc_per_graph = []
+        batch_action_right = []
+        batch_xfer_acc_per_node = []
         r_start, r_end = 0, 0
         for i_batch, n_nodes in enumerate(num_nodes):
             """it takes more than 20 ms/it , which is very slow for large batch_size"""
@@ -409,51 +459,71 @@ class PretrainNet(pl.LightningModule):
             r = slice(r_start, r_end)
             i_pred, i_gt = pred[r], gt[r]
 
-            q_topk, _ = torch.topk(i_gt, k=topk, dim=1)
-            min_q_th, _ = torch.min(q_topk, dim=1)
-            min_q_th = torch.unsqueeze(min_q_th, dim=1)
-            gt_opt_nodes, gt_opt_xfers = torch.nonzero(i_gt >= min_q_th, as_tuple=True)
+            gt_q_topk_per_node, gt_xfer_topk_per_node = torch.topk(i_gt, k=xfer_topk, dim=1)
+            gt_min_q_th_per_node, _ = torch.min(gt_q_topk_per_node, dim=1)
+            gt_min_q_th_per_node = torch.unsqueeze(gt_min_q_th_per_node, dim=1)
+            gt_opt_nodes, gt_opt_xfers = torch.nonzero(i_gt >= gt_min_q_th_per_node, as_tuple=True)
             gt_opt_xfers_per_node = [
                 gt_opt_xfers[gt_opt_nodes == node_id]
                 for node_id in range(n_nodes)
             ]
 
-            q_topk, _ = torch.topk(i_pred, k=topk, dim=1)
-            min_q_th, _ = torch.min(q_topk, dim=1)
-            min_q_th = torch.unsqueeze(min_q_th, dim=1)
-            pred_opt_nodes, pred_opt_xfers = torch.nonzero(i_pred >= min_q_th, as_tuple=True)
+            pred_q_topk_per_node, pred_xfer_topk_per_node = torch.topk(i_pred, k=xfer_topk, dim=1)
+            pred_min_q_th_per_node, _ = torch.min(pred_q_topk_per_node, dim=1)
+            pred_min_q_th_per_node = torch.unsqueeze(pred_min_q_th_per_node, dim=1)
+            pred_opt_nodes, pred_opt_xfers = torch.nonzero(i_pred >= pred_min_q_th_per_node, as_tuple=True)
             pred_opt_xfers_per_node = [
                 pred_opt_xfers[pred_opt_nodes == node_id]
                 for node_id in range(n_nodes)
             ]
 
-            acc_per_node = []
+            """compute acc of action (node_id, xfer_id) for the whole graph"""
+            gt_q_max_per_node, _idxs1 = torch.max(gt_q_topk_per_node, dim=1)
+            gt_xfer_max_per_node = torch.tensor([
+                gt_xfer_topk_per_node[i, xfer_id] for i, xfer_id in enumerate(_idxs1)]).to(self.device)
+            gt_q_max, gt_node_max = torch.max(gt_q_max_per_node, dim=0)
+            gt_xfer_max = gt_xfer_max_per_node[gt_node_max]
+
+            pred_q_max_per_node, _idxs2 = torch.max(pred_q_topk_per_node, dim=1)
+            pred_xfer_max_per_node = torch.tensor([
+                pred_xfer_topk_per_node[i, xfer_id] for i, xfer_id in enumerate(_idxs2)]).to(self.device)
+            pred_q_max, pred_node_max = torch.max(pred_q_max_per_node, dim=0)
+            pred_xfer_max = pred_xfer_max_per_node[pred_node_max]
+
+            batch_action_right.append(gt_node_max == pred_node_max and gt_xfer_max == pred_xfer_max)
+
+            """compute acc of selecting node for the whole graph"""
+            # TODO  min or max?
+            gt_q_mean_topk_per_node = torch.mean(gt_q_topk_per_node, dim=1).flatten()
+            pred_q_mean_topk_per_node = torch.mean(pred_q_topk_per_node, dim=1).flatten()
+            gt_opt_topk_q, gt_opt_topk_nodes = torch.topk(gt_q_mean_topk_per_node, k=node_topk, dim=0)
+            pred_opt_topk_q, pred_opt_topk_nodes = torch.topk(pred_q_mean_topk_per_node, k=node_topk, dim=0)
+            node_acc = torch.mean(
+                torch.tensor([node_id in gt_opt_topk_nodes for node_id in pred_opt_topk_nodes], device='cpu'),
+            dim=0)
+
+            """compute acc of selecting xfer per node"""
             for node_id in range(n_nodes):
                 gt_opt_xfers: torch.tensor = gt_opt_xfers_per_node[node_id]
                 pred_opt_xfers: torch.tensor = pred_opt_xfers_per_node[node_id]
-                node_acc = torch.sum(
+                node_acc = torch.mean(
                     torch.tensor([xfer in gt_opt_xfers for xfer in pred_opt_xfers], device='cpu'),
-                dim=0) / pred_opt_xfers.shape[0] # float32
-                acc_per_node.append(node_acc)
-                batch_acc_per_node.append(node_acc)
+                dim=0) # float32
+                batch_xfer_acc_per_node.append(node_acc)
             # end for
-            acc_per_node = torch.Tensor(acc_per_node, device='cpu')
-            graph_mean_acc = torch.mean(acc_per_node, dim=0)
-            mean_acc_per_graph.append(graph_mean_acc)
         # end for
-        mean_acc_per_graph = torch.Tensor(mean_acc_per_graph, device='cpu')
-        batch_mean_graph_acc = torch.mean(mean_acc_per_graph, dim=0)
-        # mean acc for all nodes in the batch
-        batch_acc_per_node = torch.Tensor(batch_acc_per_node, device='cpu')
-        batch_mean_acc = torch.mean(batch_acc_per_node, dim=0)
+        batch_action_right = torch.mean(torch.tensor(batch_action_right), device='cpu')
+        # mean xfer acc for all nodes in the batch
+        batch_xfer_acc_per_node = torch.Tensor(batch_xfer_acc_per_node, device='cpu')
+        batch_xfer_mean_acc = torch.mean(batch_xfer_acc_per_node, dim=0)
         self.log_dict({
-            f'{prefix}_batch_mean_acc': batch_mean_acc,
-            f'{prefix}_batch_mean_graph_acc': batch_mean_graph_acc,
+            f'{prefix}_batch_xfer_mean_acc': batch_xfer_mean_acc,
+            f'{prefix}_batch_action_right': batch_action_right,
         }, on_step=True)
         
         # e_time = time.time_ns()
         # print(f'duration: { (e_time - s_time) / 1e6 } ms')
-        return batch_mean_acc, batch_acc_per_node
+        return batch_xfer_mean_acc
 
     def training_step(self, batch, batch_idx):
         loss = self._common_step(batch, 'train')
@@ -484,6 +554,7 @@ class PretrainNet(pl.LightningModule):
                 'lr_scheduler': {
                     'scheduler': scheduler,
                     'monitor': 'train_loss',    # TODO
+                    'strict': False, # TODO  when resuming from checkpoint
                 }
             }
         else:
@@ -600,6 +671,7 @@ def main(cfg):
         scheduler=cfg.scheduler,
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,
+        acc_topk=cfg.acc_topk,
     )
 
     # if cfg.mode == 'train':

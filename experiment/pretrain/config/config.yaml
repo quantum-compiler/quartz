@@ -27,6 +27,7 @@ num_workers: 4
 batch_size: 512
 gamma: 0.9
 acc_interval: 32
+acc_topk: 4
 
 qgnn_h_feats: 64
 qgnn_inter_dim: 64

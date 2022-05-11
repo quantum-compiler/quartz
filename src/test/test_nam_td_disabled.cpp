@@ -49,7 +49,8 @@ int main(int argc, char **argv) {
                                        xfer_pair.second, trace);
   auto graph_before_search = graph.toffoli_flip_by_instruction(
       GateType::rz, xfer_pair.first, xfer_pair.second, trace);
-  //   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
+  graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
+  exit(1);
 
   // Optimization
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);

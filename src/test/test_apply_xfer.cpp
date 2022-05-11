@@ -45,8 +45,8 @@ int main() {
       if (first)
         first = false;
       else {
-        auto xfer_0 = GraphXfer::create_GraphXfer(&ctx, eqcs[0], circ);
-        auto xfer_1 = GraphXfer::create_GraphXfer(&ctx, circ, eqcs[0]);
+        auto xfer_0 = GraphXfer::create_GraphXfer(&ctx, eqcs[0], circ, true);
+        auto xfer_1 = GraphXfer::create_GraphXfer(&ctx, circ, eqcs[0], true);
         if (xfer_0 != nullptr)
           xfers.push_back(xfer_0);
         if (xfer_1 != nullptr)
@@ -55,6 +55,16 @@ int main() {
     }
   }
   std::cout << "number of xfers: " << xfers.size() << std::endl;
+
+  size_t cnt = 0;
+  for (size_t i = 0; i < xfers.size(); ++i) {
+    if (xfers[i]->srcOps.size() > xfers[i]->dstOps.size()) {
+      std::cout << ++cnt << ": " << i << std::endl;
+      if (i == 926) {
+        std::cout << i;
+      }
+    }
+  }
 
   //   back tracking search
   auto start = std::chrono::steady_clock::now();
@@ -75,7 +85,7 @@ int main() {
     top_graph->topology_order_ops(all_ops);
     assert(all_ops.size() == (size_t)top_graph->gate_count());
     for (auto op : all_ops) {
-      for (int i = 0; i < xfers.size(); ++i) {
+      for (size_t i = 0; i < xfers.size(); ++i) {
         auto xfer = xfers[i];
         //   for (auto xfer : xfers) {
         if (top_graph->xfer_appliable(xfer, op)) {

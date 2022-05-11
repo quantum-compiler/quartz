@@ -173,6 +173,15 @@ class RLDataset(torch.utils.data.dataset.IterableDataset):
                 states[i], action_nodes[i], action_xfers[i], rewards[i], next_states[i], game_overs[i]
             )
 
+class DummyDataset(torch.utils.data.dataset.IterableDataset):
+
+    def __init__(self, size: int = 100):
+        self.size = size
+
+    def __iter__(self):
+        for i in range(self.size):
+            yield i
+
 class Environment:
 
     def __init__(self,
@@ -365,14 +374,14 @@ class DQNMod(pl.LightningModule):
         self.agent = Agent(self.env, self.device)
         self.buffer = ReplayBuffer(replaybuf_size)
         self.init_state_buffer = SpecialMinHeap(max_size=init_state_buf_size)
-        self.init_state_buffer.push((init_graph.gate_count, init_graph))
+        self.init_state_buffer.push((0, init_graph))
         self.best_graph = init_graph
 
         self.eps = eps_init
         self.episode_reward = 0
         self.total_reward = 0
         self.num_out_graphs = 0
-        self.pretrained_q_net = None
+        self.pretrained_q_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
 
         self.load_pretrained_weight()
         self.populate(self.hparams.warm_start_steps)
@@ -487,7 +496,8 @@ class DQNMod(pl.LightningModule):
         # ( sum(num of nodes), num_xfers )
         pred_q_values = self.q_net(states)
         if max(next_num_nodes) > 0:
-            target_next_q_values = self.target_net(next_states)
+            with torch.no_grad():
+                target_next_q_values = self.target_net(next_states)
             # ( sum(num of nodes), )
             target_next_max_q_values_all_nodes, _ = torch.max(target_next_q_values, dim=-1)
         # pad neg rewards for empty graphs
@@ -643,6 +653,16 @@ class DQNMod(pl.LightningModule):
         return super().on_after_batch_transfer(batch, dataloader_idx)
 
     # TODO  no val or test
+    def test_dataloader(self) -> torch.utils.data.DataLoader:
+        dataset = DummyDataset()
+        dataloader = torch.utils.data.DataLoader(
+            dataset=dataset,
+        )
+        return dataloader
+    
+    def test_step(self, batch, batch_idx):
+        
+        return 0
 
 def seed_all(seed: int):
     if seed is not None:

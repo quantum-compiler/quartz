@@ -12,7 +12,7 @@ import time
 from tqdm import tqdm
 import wandb
 
-wandb.init(project='ppo_local')
+wandb.init(project='ppo_local_multi_init_states')
 
 # set device to cpu or cuda
 device = torch.device('cpu')
@@ -337,7 +337,7 @@ class PPO:
 ####### initialize environment hyperparameters ######
 
 # TODO: Change this
-experiment_name = "rl_ppo_" + ""
+experiment_name = "rl_ppo_local_multi_init_states"
 
 # max timesteps in one trajectory
 max_seq_len = 100

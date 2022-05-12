@@ -90,6 +90,10 @@ namespace quartz {
                                });
         }
 
+        [[nodiscard]] int get_num_qubits() const {
+            return num_qubits;
+        }
+
         [[nodiscard]] std::vector<int> get_input_neighbours(int qubit_idx) {
             auto &edge_list = device_qubits[qubit_idx]->in_edges;
             std::vector<int> input_neighbour_list;

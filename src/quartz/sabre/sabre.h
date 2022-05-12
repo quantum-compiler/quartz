@@ -19,7 +19,7 @@ namespace quartz {
         return total_cost;
     }
 
-    std::vector<int> calculate_sabre_mapping(Graph initial_graph) {
+    std::vector<int> calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
         // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
         // <logical, physical>
         initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL);
@@ -68,6 +68,17 @@ namespace quartz {
         }
 
         // STEP2: SWAP-based heuristic search
+        std::vector<int> logical2physical;
+        std::vector<int> physical2logical;
+        logical2physical.reserve(initial_qubit_mapping.size());
+        physical2logical.reserve(device->get_num_qubits());
+        for (int i = 0; i < device->get_num_qubits(); i++) {
+            physical2logical.emplace_back(-1);
+        }
+        for (int i = 0; i < initial_qubit_mapping.size(); i++) {
+            physical2logical[i] = i;
+            logical2physical.emplace_back(i);
+        }
 
         // STEP3: reverse the graph
 

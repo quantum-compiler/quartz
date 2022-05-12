@@ -1926,14 +1926,14 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-void Graph::init_physical_mapping(InitialMappingType mapping_type) {
+void Graph::init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device) {
     // STEP 1: initial mapping
     switch (mapping_type) {
         case InitialMappingType::TRIVIAL:
             _trivial_mapping();
             break;
         case InitialMappingType::SABRE:
-            _sabre_mapping();
+            _sabre_mapping(device);
             break;
         default:
             std::cout << "Unrecognized initial mapping type\n";
@@ -1955,8 +1955,8 @@ void Graph::_trivial_mapping() {
     }
 }
 
-void Graph::_sabre_mapping() {
-    calculate_sabre_mapping(*this);
+void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device) {
+    calculate_sabre_mapping(*this, device);
 }
 
 void Graph::propagate_mapping() {

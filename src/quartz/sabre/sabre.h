@@ -22,7 +22,7 @@ namespace quartz {
     std::vector<int> calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
         // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
         // <logical, physical>
-        initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL);
+        initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr);
         QubitMappingTable initial_qubit_mapping = initial_graph.qubit_mapping_table;
         QubitMappingTable final_qubit_mapping;
         auto tmp_inEdges = initial_graph.inEdges;
@@ -68,6 +68,7 @@ namespace quartz {
         }
 
         // STEP2: SWAP-based heuristic search
+        // initialize mapping
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
         logical2physical.reserve(initial_qubit_mapping.size());
@@ -78,6 +79,78 @@ namespace quartz {
         for (int i = 0; i < initial_qubit_mapping.size(); i++) {
             physical2logical[i] = i;
             logical2physical.emplace_back(i);
+        }
+        // initialize front set f
+        std::unordered_set<Op, OpHash> front_set;
+        std::unordered_set<Op, OpHash> executed_set;
+        for (const auto& op_edge : initial_graph.outEdges) {
+            if (op_edge.first.ptr->tp == GateType::input_qubit) {
+                front_set.insert(op_edge.first);
+            }
+        }
+        // sabre loop 1
+        while (!front_set.empty()) {
+            // line 2 - 7, find executable gates
+            std::vector<Op> executable_gate_list;
+            for (const auto& front_gate : front_set) {
+                // one qubit gate is always executable
+                if (initial_graph.inEdges[front_gate].size() == 1) {
+                    executable_gate_list.emplace_back(front_gate);
+                } else if (initial_graph.inEdges[front_gate].size() == 2) {
+                    Edge first_input = *initial_graph.inEdges[front_gate].begin();
+                    Edge second_input = *std::next(initial_graph.inEdges[front_gate].begin());
+                    int physical1 = logical2physical[first_input.logical_qubit_idx];
+                    int physical2 = logical2physical[second_input.logical_qubit_idx];
+                    std::vector<int> first_neighbour = device->get_input_neighbours(physical1);
+                    for (int neighbour : first_neighbour) {
+                        if (neighbour == physical2) {
+                            executable_gate_list.emplace_back(front_gate);
+                            break;
+                        }
+                    }
+                } else {
+                    // we do not support gates with more than 2 inputs in sabre
+                    std::cout << "Find a gate with more than 2 inputs in sabre" << std::endl;
+                    assert(false);
+                }
+            }
+            // line 8 - 27
+            if (!executable_gate_list.empty()) {
+                // line 9 - 16
+                for (const Op& gate : executable_gate_list) {
+                    // line 10, execute
+                    front_set.erase(gate);
+                    executed_set.insert(gate);
+                    // line 11, obtain successor
+                    if (initial_graph.outEdges[gate].empty()) {
+                        // this means that it is a final gate
+                        continue;
+                    }
+                    std::vector<Op> successor_list;
+                    for (const auto& edge: initial_graph.outEdges[gate]) {
+                        successor_list.emplace_back(edge.dstOp);
+                    }
+                    // line 12 - 14, check whether successor's dependency has been resolved
+                    for (const auto &successor : successor_list) {
+                        int resolved_count = 0;
+                        for (const auto& successor_edge : initial_graph.inEdges[successor]) {
+                            if (executed_set.find(successor_edge.srcOp) != executed_set.end()) {
+                                // found in executed
+                                resolved_count += 1;
+                            }
+                        }
+                        if (resolved_count == initial_graph.inEdges[successor].size()) {
+                            // resolved
+                            front_set.emplace(successor);
+                        }
+                    }
+                }
+                continue;
+            } else {
+                // TODO: we can only believe physical mapping table, not that in edge!!!!!!!!!!!!!!!!
+                // TODO: when executing swaps, change mapping table!
+
+            }
         }
 
         // STEP3: reverse the graph

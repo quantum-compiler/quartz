@@ -386,14 +386,21 @@ class PretrainNet(pl.LightningModule):
         return loss
 
     def _compute_loss(self, out, gt_rewards, masks, prefix: str = ''):
-        pred = out * masks
-        label = gt_rewards * masks
+        if self.hparams.use_mask:
+            pred = out * masks
+            label = gt_rewards * masks
 
-        loss = self.loss_fn(pred, label)
-        loss = loss / masks.sum() # manually apply mean reduction
+            loss = self.loss_fn(pred, label)
+            loss = loss / masks.sum() # manually apply mean reduction
+        else:
+            loss = self.loss_fn(out, gt_rewards) # sum reduce
+            mse_loss = loss / (out.shape[0] * out.shape[1])
+            # self.log(f'{prefix}_mse_loss', mse_loss)
+            if loss > 0.01:
+                loss = mse_loss
         
         self.log(f'{prefix}_loss', loss)
-
+        
         return loss
 
     def _compute_acc(self, pred, gt, num_nodes: list, topk: int, prefix: str = '') -> torch.Tensor:

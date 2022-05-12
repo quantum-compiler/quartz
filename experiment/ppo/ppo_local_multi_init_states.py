@@ -579,6 +579,7 @@ for i_episode in tqdm(range(episodes)):
     current_ep_reward = 0
     ep_best_gate_cnt = init_graph.gate_count
     ep_seq_len = 0
+    ep_best_reward = 0
 
     ep_init_graphs = init_graphs + new_init_graphs
     if batch_size < len(ep_init_graphs):
@@ -595,6 +596,7 @@ for i_episode in tqdm(range(episodes)):
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
         ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
         ep_seq_len += t_seq_len
+        ep_best_reward = max(ep_best_reward, t_reward)
 
     # update PPO agent
     ppo_agent.update()
@@ -610,7 +612,7 @@ for i_episode in tqdm(range(episodes)):
         log_avg_reward = round(log_avg_reward, 4)
         log_avg_seq_len = ep_seq_len / batch_size
 
-        message = f'ep: {i_episode}\tavg reward: {log_avg_reward}\tavg seq len: {log_avg_seq_len}\tbest of ep: {ep_best_gate_cnt}\tbest: {best_gate_cnt} '
+        message = f'ep: {i_episode}\tavg_r: {log_avg_reward}\tbest_r: {ep_best_reward}\tavg_seq_len: {log_avg_seq_len}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt} '
         log_f.write(message + '\n')
         print(message)
         log_f.flush()
@@ -621,9 +623,10 @@ for i_episode in tqdm(range(episodes)):
         wandb.log({
             'episode': i_episode,
             'batch_size': batch_size,
-            'reward': log_avg_reward,
-            'seq_len': log_avg_seq_len,
+            'avg_reward': log_avg_reward,
+            'avg_seq_len': log_avg_seq_len,
             'ep_best': ep_best_gate_cnt,
+            'ep_best_reward': ep_best_reward,
             'best': best_gate_cnt
         })
 

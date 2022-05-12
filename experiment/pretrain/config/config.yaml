@@ -31,3 +31,4 @@ acc_topk: 4
 
 qgnn_h_feats: 64
 qgnn_inter_dim: 64
+use_mask: True

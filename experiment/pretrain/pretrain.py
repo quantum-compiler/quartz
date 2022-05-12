@@ -319,6 +319,7 @@ class PretrainNet(pl.LightningModule):
         qgnn_h_feats: int = 64,
         qgnn_inter_dim: int = 64,
         acc_topk: int = 3,
+        use_mask: bool = True,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -374,24 +375,32 @@ class PretrainNet(pl.LightningModule):
             r_start = r_end
 
         # print learning rates
-        optimizer = self.optimizers()
-        self.log(
-            f'lr',
-            optimizer.param_groups[0]['lr'],
-            prog_bar=True, on_step=True,
-        )
+        if mode == 'train':
+            optimizer = self.optimizers()
+            self.log(
+                f'lr',
+                optimizer.param_groups[0]['lr'],
+                prog_bar=True, on_step=True,
+            )
         
         return loss
 
     def _compute_loss(self, out, gt_rewards, masks, prefix: str = ''):
-        pred = out * masks
-        label = gt_rewards * masks
+        if self.hparams.use_mask:
+            pred = out * masks
+            label = gt_rewards * masks
 
-        loss = self.loss_fn(pred, label)
-        loss = loss / masks.sum() # manually apply mean reduction
+            loss = self.loss_fn(pred, label)
+            loss = loss / masks.sum() # manually apply mean reduction
+        else:
+            loss = self.loss_fn(out, gt_rewards) # sum reduce
+            mse_loss = loss / (out.shape[0] * out.shape[1])
+            # self.log(f'{prefix}_mse_loss', mse_loss)
+            if loss > 0.01:
+                loss = mse_loss
         
         self.log(f'{prefix}_loss', loss)
-
+        
         return loss
 
     def _compute_acc(self, pred, gt, num_nodes: list, topk: int, prefix: str = '') -> torch.Tensor:
@@ -431,6 +440,8 @@ class PretrainNet(pl.LightningModule):
             num_right = sum([act in gt_act_topk for act in pred_act_topk])
             batch_right_action_count[i_batch] = num_right
             batch_tot_action_count[i_batch] = pred_act_topk.shape[0]
+
+            r_start = r_end
         # end for
         batch_acc = torch.sum(batch_right_action_count, dim=0) / torch.sum(batch_tot_action_count, dim=0)
         # e_time = time.time_ns()
@@ -520,6 +531,7 @@ class PretrainNet(pl.LightningModule):
                 dim=0) # float32
                 batch_xfer_acc_per_node.append(node_acc)
             # end for
+            r_start = r_end
         # end for
         batch_action_right = torch.mean(torch.tensor(batch_action_right), device='cpu')
         # mean xfer acc for all nodes in the batch
@@ -681,6 +693,7 @@ def main(cfg):
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,
         acc_topk=cfg.acc_topk,
+        use_mask=cfg.use_mask,
     )
 
     # if cfg.mode == 'train':

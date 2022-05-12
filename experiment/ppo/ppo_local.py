@@ -87,8 +87,8 @@ class ActorCritic(nn.Module):
         available_xfers = g.available_xfers(context=context,
                                             node=g.get_node_from_id(id=node))
         mask[available_xfers] = True
-        xfer_logits = self.actor(graph_embed)
-        xfer_probs = masked_softmax(xfer_logits[node], mask)
+        xfer_logits = self.actor(graph_embed[node])
+        xfer_probs = masked_softmax(xfer_logits, mask)
         xfer_dist = Categorical(xfer_probs)
         xfer = xfer_dist.sample()
         xfer_logprob = xfer_dist.log_prob(xfer)
@@ -104,7 +104,6 @@ class ActorCritic(nn.Module):
         # start = time.time()
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
         batched_node_vs = self.critic(batched_graph_embeds).squeeze()
-        batched_xfer_logits = self.actor(batched_graph_embeds)
 
         with torch.no_grad():
             batched_next_graph_embeds = self.graph_embedding(
@@ -112,8 +111,8 @@ class ActorCritic(nn.Module):
             batched_next_node_vs = self.critic(batched_next_graph_embeds)
 
         # Split batched tensors into lists
+        graph_embed_list = torch.split(batched_graph_embeds, node_nums)
         node_vs_list = torch.split(batched_node_vs, node_nums)
-        xfer_logits_list = torch.split(batched_xfer_logits, node_nums)
         next_node_vs_list = torch.split(batched_next_node_vs, next_node_nums)
 
         # t_0 = time.time()
@@ -121,8 +120,6 @@ class ActorCritic(nn.Module):
 
         values = []
         next_values = []
-        xfer_logprobs = []
-        xfer_entropy = 0
 
         for i in range(batched_dgl_gs.batch_size):
             value = node_vs_list[i][nodes[i]]
@@ -145,20 +142,35 @@ class ActorCritic(nn.Module):
         # t_2 = time.time()
         # print(f"time get next values: {t_2 - t_1}")
 
+        selected_node_embeds = []
         for i in range(batched_dgl_gs.batch_size):
-            mask = masks[i]
-            xfer_probs = masked_softmax(xfer_logits_list[i][nodes[i]].clone(),
-                                        mask)
-            xfer_dist = Categorical(xfer_probs)
-            xfer_logprob = xfer_dist.log_prob(xfers[i])
-            xfer_entropy = xfer_dist.entropy()
+            selected_node_embeds.append(graph_embed_list[i][nodes[i]])
+        selected_node_embeds = torch.stack(selected_node_embeds)
+        xfer_logits = self.actor(selected_node_embeds)
+        xfer_probs = masked_softmax(xfer_logits, masks)
+        xfer_dists = Categorical(xfer_probs)
+        xfer_logprobs = xfer_dists.log_prob(
+            torch.tensor(xfers, dtype=torch.int).to(device))
+        xfer_entropy = xfer_dists.entropy().sum()
 
-            xfer_logprobs.append(xfer_logprob)
-            xfer_entropy += xfer_entropy
+        # for i in range(batched_dgl_gs.batch_size):
+        #     mask = masks[i]
+        #     xfer_probs = masked_softmax(xfer_logits_list[i][nodes[i]].clone(),
+        #                                 mask)
+        #     xfer_dist = Categorical(xfer_probs)
+        #     xfer_logprob = xfer_dist.log_prob(xfers[i])
+        #     xfer_entropy = xfer_dist.entropy()
+
+        #     xfer_logprobs.append(xfer_logprob)
+        #     xfer_entropy += xfer_entropy
 
         values = torch.stack(values)
         next_values = torch.stack(next_values)
-        xfer_logprobs = torch.stack(xfer_logprobs)
+        # xfer_logprobs = torch.stack(xfer_logprobs)
+
+        # print(xfer_logprobs_0 - xfer_logprobs)
+
+        # print(xfer_logprobs)
 
         # t_3 = time.time()
         # print(f"time get logprob: {t_3 - t_2}")
@@ -224,16 +236,19 @@ class PPO:
         return node.item(), xfer.item()
 
     def update(self):
-        # start = time.time()
+        start = time.time()
 
-        masks = []
-        for (graph, node) in zip(self.buffer.graphs, self.buffer.nodes):
-            mask = torch.zeros((self.context.num_xfers),
-                               dtype=torch.bool).to(device)
+        masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
+                            dtype=torch.bool).to(device)
+        print(masks.shape)
+        for i, (graph,
+                node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
             available_xfers = graph.available_xfers(
                 context=self.context, node=graph.get_node_from_id(id=node))
-            mask[available_xfers] = True
-            masks.append(mask)
+            masks[i][available_xfers] = True
+
+        t_0 = time.time()
+        print(f"mask time: {t_0 - start}")
 
         gs = [g.to_dgl_graph() for g in self.buffer.graphs]
         batched_dgl_gs = dgl.batch(gs).to(device)
@@ -255,6 +270,9 @@ class PPO:
 
         old_xfer_logprobs = torch.squeeze(
             torch.stack(self.buffer.xfer_logprobs, dim=0)).detach().to(device)
+
+        t_0 = time.time()
+        print(f"preprocessing time: {t_0 - start}")
 
         # Optimize policy for K epochs
         for _ in range(self.K_epochs):
@@ -315,7 +333,7 @@ class PPO:
         # clear buffer
         self.buffer.clear()
 
-        # print(f"update time: {time.time() - start}")
+        print(f"update time: {time.time() - start}")
 
     def save(self, checkpoint_path):
         torch.save(self.policy_old.state_dict(), checkpoint_path)

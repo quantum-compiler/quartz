@@ -463,7 +463,7 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
                 new_hash = next_graph.hash()
                 if new_hash not in new_init_state_hash_set:
                     new_init_graphs.append(next_graph)
-                    new_init_state_hash_set.append(new_init_state_hash_set)
+                    new_init_state_hash_set.add(new_hash)
 
             trajectory_reward += reward
             reward = torch.tensor(reward, dtype=torch.float)

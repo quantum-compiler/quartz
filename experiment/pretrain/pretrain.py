@@ -425,11 +425,14 @@ class PretrainNet(pl.LightningModule):
         # end def
         # s_time = time.time_ns()
         batch_right_action_count = torch.zeros(len(num_nodes), device='cpu')
-        batch_tot_action_count = torch.zeros(len(num_nodes), device='cpu')
+        batch_pred_action_count = torch.zeros(len(num_nodes), device='cpu')
+        best_pred_in_topk_gt = 0
+        best_gt_in_topk_pred = 0
+        valid_pred_actions = 0
+        valid_best_pred_actions = 0
         r_start, r_end = 0, 0
         for i_batch, n_nodes in enumerate(num_nodes):
             """compute optimal actions for each graph"""
-            """it takes more than 20 ms/it , which is very slow for large batch_size"""
             r_end += n_nodes
             r = slice(r_start, r_end)
             i_pred, i_gt = pred[r], gt[r]
@@ -437,20 +440,53 @@ class PretrainNet(pl.LightningModule):
             gt_q_topk, gt_act_topk = topk_2d(i_gt, k=topk, as_tuple=False)
             pred_q_topk, pred_act_topk = topk_2d(i_pred, k=topk, as_tuple=False)
 
+            # deal with the case that multiple elements has the same value
+            gt_lower_bound, _ = torch.min(gt_q_topk, dim=0)
+            gt_act_topk = (i_gt >= gt_lower_bound).nonzero()
+            pred_lower_bound, _ = torch.min(pred_q_topk, dim=0)
+            pred_act_topk = (i_pred >= pred_lower_bound).nonzero()
+
+            """how well the top k actions matched"""
             num_right = sum([act in gt_act_topk for act in pred_act_topk])
             batch_right_action_count[i_batch] = num_right
-            batch_tot_action_count[i_batch] = pred_act_topk.shape[0]
+            batch_pred_action_count[i_batch] = pred_act_topk.shape[0]
 
+            """whether the best predicted action lies in the top k ground truth"""
+            pred_q_best, _ = torch.max(pred_q_topk, dim=0)
+            pred_act_best = (i_pred >= pred_q_best).nonzero()
+            best_pred_in_topk_gt += sum([act in gt_act_topk for act in pred_act_best]) > 0
+            
+            """whether the best ground truth action lies in the top k predicted actions"""
+            gt_q_best, _ = torch.max(gt_q_topk, dim=0)
+            gt_act_best = (i_gt >= gt_q_best).nonzero()
+            best_gt_in_topk_pred += sum([act in pred_act_topk for act in gt_act_best]) > 0
+
+            """ratio of valid actions in top k predicted ones"""
+            pred_topk_act_gt_q_values = i_gt[ pred_act_topk[:, 0], pred_act_topk[:, 1] ]
+            valid_pred_actions += torch.sum(pred_topk_act_gt_q_values > -2, dim=0)
+            
+            pred_best_act_gt_q_values = i_gt[ pred_act_best[:, 0], pred_act_best[:, 1] ]
+            valid_best_pred_actions += torch.sum(pred_best_act_gt_q_values > -2, dim=0) > 0
+            
             r_start = r_end
         # end for
-        batch_acc = torch.sum(batch_right_action_count, dim=0) / torch.sum(batch_tot_action_count, dim=0)
+        num_pred_topk_actions = torch.sum(batch_pred_action_count, dim=0)
+        topk_pred_in_topk_gt_acc = \
+            torch.sum(batch_right_action_count, dim=0) / num_pred_topk_actions
+        best_pred_in_topk_gt_acc = best_pred_in_topk_gt / len(num_nodes)
+        best_gt_in_topk_pred_acc = best_gt_in_topk_pred / len(num_nodes)
+        valid_in_topk_pred_acc = valid_pred_actions / num_pred_topk_actions
+        valid_of_best_pred_acc = valid_best_pred_actions / len(num_nodes)
         # e_time = time.time_ns()
         # print(f'duration: { (e_time - s_time) / 1e6 } ms')
         self.log_dict({
-            f'{prefix}_batch_acc_top{topk}': batch_acc,
+            f'{prefix}_top{topk}_pred_in_top{topk}_gt_acc': topk_pred_in_topk_gt_acc,
+            f'{prefix}_best_pred_in_top{topk}_gt_acc': best_pred_in_topk_gt_acc,
+            f'{prefix}_best_gt_in_top{topk}_pred_acc': best_gt_in_topk_pred_acc,
+            f'{prefix}_top{topk}_pred_valid_acc': valid_in_topk_pred_acc,
+            f'{prefix}_best_pred_valid_acc': valid_of_best_pred_acc,
         }, on_step=True)
-        return batch_acc
-
+        return topk_pred_in_topk_gt_acc
     def _compute_acc_droped(
         self, pred, gt, num_nodes, 
         xfer_topk: int = 1,

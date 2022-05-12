@@ -344,7 +344,7 @@ episodes = int(1e5)
 # log in the interval (in num episodes)
 log_freq = 1
 # save model frequency (in num timesteps)
-save_model_freq = int(5e2)
+save_model_freq = int(2e2)
 
 #####################################################
 

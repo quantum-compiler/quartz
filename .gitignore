@@ -79,3 +79,6 @@ experiment/ppo/pretrain/dataset
 experiment/ppo/pretrain/outputs
 experiment/ppo/pretrain/config/config.yaml
 experiment/ppo/pretrain/pretrain_dataset_g9
+experiment/ppo/pretrain/pretrain_dataset_g99
+
+experiment/a2c/*txt

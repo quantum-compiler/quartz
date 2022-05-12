@@ -35,6 +35,10 @@ init_dag = parser.load_qasm(
 #     filename='../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
 init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
 
+# init_dag = parser.load_qasm(
+#     filename='../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
+init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
+
 candidate_hq = []
 heapq.heappush(candidate_hq, init_graph)
 hash_set = set()

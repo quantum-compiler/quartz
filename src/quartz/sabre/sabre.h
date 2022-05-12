@@ -121,6 +121,18 @@ namespace quartz {
                     // line 10, execute
                     front_set.erase(gate);
                     executed_set.insert(gate);
+                    if (gate.ptr->tp == GateType::swap) {
+                        // need to update mapping if we have executed a swap
+                        int first_logical = initial_graph.inEdges[gate].begin()->logical_qubit_idx;
+                        int second_logical = std::next(initial_graph.inEdges[gate].begin())->logical_qubit_idx;
+                        // swap
+                        int ori_first_physical = logical2physical[first_logical];
+                        int ori_second_physical = logical2physical[second_logical];
+                        logical2physical[first_logical] = ori_second_physical;
+                        logical2physical[second_logical] = ori_first_physical;
+                        physical2logical[ori_first_physical] = second_logical;
+                        physical2logical[ori_second_physical] = first_logical;
+                    }
                     // line 11, obtain successor
                     if (initial_graph.outEdges[gate].empty()) {
                         // this means that it is a final gate

@@ -11,8 +11,11 @@ from collections import deque
 
 def check(graph):
     graph.to_qasm(filename='check.qasm')
+    # qc_origin = QuantumCircuit.from_qasm_file(
+    #     'barenco_tof_3_opt_path/subst_history_39.qasm')
     qc_origin = QuantumCircuit.from_qasm_file(
-        'barenco_tof_3_opt_path/subst_history_39.qasm')
+        't_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm'
+    )
     # qc_origin = QuantumCircuit.from_qasm_file(
     #     '../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
     qc_optimized = QuantumCircuit.from_qasm_file('check.qasm')
@@ -26,7 +29,8 @@ quartz_context = quartz.QuartzContext(
     no_increase=True)
 parser = quartz.PyQASMParser(context=quartz_context)
 init_dag = parser.load_qasm(
-    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+    filename=
+    't_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm')
 # init_dag = parser.load_qasm(
 #     filename='../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
 init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)

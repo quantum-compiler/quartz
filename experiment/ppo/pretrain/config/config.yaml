@@ -4,7 +4,7 @@ resume: False
 
 ckpt_path: ''
 
-gpus: [3]
+gpus: [2]
 seed: 98765
 
 wandb:
@@ -21,4 +21,4 @@ dataset_dir: dataset
 graph_file: graph.json
 reward_file: reward.json
 
-gamma: 0.99
+gamma: 0.9

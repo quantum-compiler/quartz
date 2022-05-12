@@ -350,7 +350,7 @@ save_model_freq = int(5e2)
 
 ################ PPO hyperparameters ################
 
-K_epochs = 10  # update policy for K epochs
+K_epochs = 20  # update policy for K epochs
 eps_clip = 0.2  # clip parameter for PPO
 gamma = 0.9  # discount factor
 lr_graph_embedding = 3e-4  # learning rate for graph embedding network
@@ -597,6 +597,7 @@ for i_episode in tqdm(range(episodes)):
         log_running_episodes = 0
 
         wandb.log({
+            'episode': i_episode,
             'reward': log_avg_reward,
             'seq_len': log_avg_seq_len,
             'ep_best': ep_best_gate_cnt,

@@ -175,7 +175,9 @@ namespace quartz {
                         }
                     }
                 }
-                // line 20 - 23, find swap with minimal score
+                // line 20 - 24, find swap with minimal score
+                double min_swap_cost = 10000000;
+                std::pair<int, int> optimal_swap{-1, -1};
                 for (const auto& swap: swap_candidate_list) {
                     // line 21, generate \pi_tmp
                     std::vector<int> tmp_logical2physical = logical2physical;
@@ -192,12 +194,32 @@ namespace quartz {
                     if (logical_1 != -1) tmp_logical2physical[logical_1] = physical_2;
                     if (logical_2 != -1) tmp_logical2physical[logical_2] = physical_1;
                     // line 22, calculate heuristic score
-
+                    std::vector<std::pair<int, int>> front_mapping;
+                    for (const auto& gate : front_set) {
+                        int f_logical_1 = initial_graph.inEdges[gate].begin()->logical_qubit_idx;
+                        int f_logical_2 = std::next(initial_graph.inEdges[gate].begin())->logical_qubit_idx;
+                        int f_physical_1 = tmp_logical2physical[f_logical_1];
+                        int f_physical_2 = tmp_logical2physical[f_logical_2];
+                        front_mapping.emplace_back(std::pair<int, int>{f_physical_1, f_physical_2});
+                    }
+                    // TODO: change to a better heuristic
+                    double cur_swap_score = basic_sabre_heuristic(front_mapping, device);
+                    if (cur_swap_score <= min_swap_cost) {
+                        min_swap_cost = cur_swap_score;
+                        optimal_swap = swap;
+                    }
                 }
-                // line 24 - 25, apply swap
-
-                // TODO: we can only believe physical mapping table, not that in edge!!!!!!!!!!!!!!!!
-                // TODO: when executing swaps, change mapping table!
+                // line 25, apply swap
+                int physical_1 = optimal_swap.first;
+                int physical_2 = optimal_swap.second;
+                assert(physical_1 != -1 && physical_2 != -1);
+                int logical_1 = physical2logical[physical_1];
+                int logical_2 = physical2logical[physical_2];
+                assert(logical_1 != -1 || logical_2 != -1);
+                physical2logical[physical_1] = logical_2;
+                physical2logical[physical_2] = logical_1;
+                if (logical_1 != -1) logical2physical[logical_1] = physical_2;
+                if (logical_2 != -1) logical2physical[logical_2] = physical_1;
             }
         }
 

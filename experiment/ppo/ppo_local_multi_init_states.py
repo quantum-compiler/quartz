@@ -11,6 +11,7 @@ import dgl
 import time
 from tqdm import tqdm
 import wandb
+from collections import deque
 
 wandb.init(project='ppo_local_multi_init_states')
 
@@ -341,7 +342,7 @@ experiment_name = "rl_ppo_local_multi_init_states"
 
 # max timesteps in one trajectory
 max_seq_len = 100
-batch_size = 50
+batch_size = 128
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
@@ -383,7 +384,7 @@ global new_init_states
 global new_init_state_hash_set
 
 init_graphs = [init_graph]
-new_init_graphs = []
+new_init_graphs = deque([], maxlen=49)
 new_init_state_hash_set = set([init_graph.hash()])
 best_gate_cnt = init_graph.gate_count
 
@@ -581,8 +582,9 @@ for i_episode in tqdm(range(episodes)):
     ep_seq_len = 0
     ep_best_reward = 0
 
-    ep_init_graphs = init_graphs + new_init_graphs
+    ep_init_graphs = init_graphs + list(new_init_graphs)
     if batch_size < len(ep_init_graphs):
+        # Will run out of memory
         batch_size *= 2
 
     for i in range(batch_size):

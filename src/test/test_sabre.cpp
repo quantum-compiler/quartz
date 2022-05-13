@@ -20,7 +20,7 @@ ostream &operator << ( ostream& stream, GateType t )
 
 int main() {
     // tof_3_after_heavy.qasm / t_cx_tdg.qasm
-    string circuit_file_name = "../t_cx_tdg.qasm";
+    string circuit_file_name = "../sabre.qasm";
     cout << "This is test for add swap on " << circuit_file_name <<".\n";
 
     // prepare context
@@ -38,11 +38,11 @@ int main() {
 
     // initialize a device
     auto device = std::make_shared<quartz::SymmetricUniformDevice>(5);
-    device->add_edge(0, 2);
-    device->add_edge(0, 3);
-    device->add_edge(4, 3);
-    device->add_edge(4, 1);
+    device->add_edge(0, 1);
     device->add_edge(1, 2);
+    device->add_edge(2, 3);
+    device->add_edge(3, 4);
+    device->add_edge(4, 0);
 
     // print all Ops
     cout << "Out Edges" << endl;
@@ -62,12 +62,12 @@ int main() {
     cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl << endl;
 
     // init qubit mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::SABRE, device);
+    graph.init_physical_mapping(InitialMappingType::TRIVIAL, device);
     cout << "Mapping has been initialized." << endl;
-//    MappingStatus succeeded = graph.check_mapping_correctness();
-//    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check." << endl;
-//    else std::cout << "Mapping test failed!\n" << endl;
-//    double total_cost = graph.circuit_implementation_cost(device);
-//    cout << "Total cost is " << total_cost << endl << endl;
+    MappingStatus succeeded = graph.check_mapping_correctness();
+    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check." << endl;
+    else std::cout << "Mapping test failed!\n" << endl;
+    double total_cost = graph.circuit_implementation_cost(device);
+    cout << "Total cost is " << total_cost << endl << endl;
 
 };

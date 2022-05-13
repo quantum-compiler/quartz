@@ -1956,7 +1956,8 @@ void Graph::_trivial_mapping() {
 }
 
 void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device) {
-    calculate_sabre_mapping(*this, device);
+    QubitMappingTable sabre_mapping = calculate_sabre_mapping(*this, device);
+    qubit_mapping_table = sabre_mapping;
 }
 
 void Graph::propagate_mapping() {

@@ -52,8 +52,8 @@ namespace quartz {
             // line 2 - 7, find executable gates
             std::vector<Op> executable_gate_list;
             for (const auto& front_gate : front_set) {
-                // one qubit gate is always executable
-                if (graph.inEdges[front_gate].size() == 1) {
+                // one qubit gate / input gate is always executable
+                if (front_gate.ptr->tp == GateType::input_qubit || graph.inEdges[front_gate].size() == 1) {
                     executable_gate_list.emplace_back(front_gate);
                 } else if (graph.inEdges[front_gate].size() == 2) {
                     Edge first_input = *graph.inEdges[front_gate].begin();
@@ -184,7 +184,7 @@ namespace quartz {
         return logical2physical;
     }
 
-    std::vector<int> calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
+    QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
         // returns a logical2physical mapping at beginning
 
         // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
@@ -257,6 +257,12 @@ namespace quartz {
         std::vector<int> initial_logical2physical = sabre_main_loop(reversed_graph, device);
 
         // return final mapping
-        return initial_logical2physical;
+        QubitMappingTable final_result;
+        for (auto& mapping : initial_graph.qubit_mapping_table) {
+            int logical_idx = mapping.second.first;
+            int physical_idx = initial_logical2physical[logical_idx];
+            final_result.insert({mapping.first, std::pair<int, int>{logical_idx, physical_idx}});
+        }
+        return final_result;
     }
 }

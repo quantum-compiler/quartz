@@ -159,9 +159,45 @@ namespace quartz {
                 }
                 continue;
             } else {
+                // line 18 -19, obtain swaps
+                std::vector<std::pair<int, int>> swap_candidate_list;
+                for (const auto& gate : front_set) {
+                    // all gates in F must be two qubit gates
+                    auto edge_set = initial_graph.inEdges[gate];
+                    assert(edge_set.size() == 2);
+                    // swaps are between input qubits and all physical neighbours
+                    for (const auto& edge : edge_set) {
+                        int logical_idx = edge.logical_qubit_idx;
+                        int physical_idx = logical2physical[logical_idx];
+                        auto neighbour_list = device->get_input_neighbours(physical_idx);
+                        for (int neighbour : neighbour_list) {
+                            swap_candidate_list.emplace_back(std::pair<int, int>{physical_idx, neighbour});
+                        }
+                    }
+                }
+                // line 20 - 23, find swap with minimal score
+                for (const auto& swap: swap_candidate_list) {
+                    // line 21, generate \pi_tmp
+                    std::vector<int> tmp_logical2physical = logical2physical;
+                    std::vector<int> tmp_physical2logical = physical2logical;
+                    int physical_1 = swap.first;
+                    int physical_2 = swap.second;
+                    int logical_1 = tmp_physical2logical[physical_1];
+                    int logical_2 = tmp_logical2physical[physical_2];
+                    // swap physical
+                    tmp_physical2logical[physical_1] = logical_2;
+                    tmp_physical2logical[physical_2] = logical_1;
+                    // swap logical, there must be one with logical qubit
+                    assert(logical_1 != -1 || logical_2 != -1);
+                    if (logical_1 != -1) tmp_logical2physical[logical_1] = physical_2;
+                    if (logical_2 != -1) tmp_logical2physical[logical_2] = physical_1;
+                    // line 22, calculate heuristic score
+
+                }
+                // line 24 - 25, apply swap
+
                 // TODO: we can only believe physical mapping table, not that in edge!!!!!!!!!!!!!!!!
                 // TODO: when executing swaps, change mapping table!
-
             }
         }
 

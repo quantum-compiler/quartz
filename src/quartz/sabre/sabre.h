@@ -19,7 +19,174 @@ namespace quartz {
         return total_cost;
     }
 
+    std::vector<int> sabre_main_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
+        // returns the logical mapping at the end after sabre pass
+        // initialize mapping
+        std::vector<int> logical2physical;
+        std::vector<int> physical2logical;
+        QubitMappingTable initial_qubit_mapping = graph.qubit_mapping_table;
+        logical2physical.reserve(initial_qubit_mapping.size());
+        physical2logical.reserve(device->get_num_qubits());
+        for (int i = 0; i < device->get_num_qubits(); i++) {
+            physical2logical.emplace_back(-1);
+        }
+        for (int i = 0; i < initial_qubit_mapping.size(); i++) {
+            logical2physical.emplace_back(-1);
+        }
+        for (const auto& qubit_mapping : graph.qubit_mapping_table) {
+            int logical = qubit_mapping.second.first;
+            int physical = qubit_mapping.second.second;
+            logical2physical[logical] = physical;
+            physical2logical[physical] = logical;
+        }
+        // initialize front set f
+        std::unordered_set<Op, OpHash> front_set;
+        std::unordered_set<Op, OpHash> executed_set;
+        for (const auto& op_edge : graph.outEdges) {
+            if (op_edge.first.ptr->tp == GateType::input_qubit) {
+                front_set.insert(op_edge.first);
+            }
+        }
+        // sabre loop 1
+        while (!front_set.empty()) {
+            // line 2 - 7, find executable gates
+            std::vector<Op> executable_gate_list;
+            for (const auto& front_gate : front_set) {
+                // one qubit gate is always executable
+                if (graph.inEdges[front_gate].size() == 1) {
+                    executable_gate_list.emplace_back(front_gate);
+                } else if (graph.inEdges[front_gate].size() == 2) {
+                    Edge first_input = *graph.inEdges[front_gate].begin();
+                    Edge second_input = *std::next(graph.inEdges[front_gate].begin());
+                    int physical1 = logical2physical[first_input.logical_qubit_idx];
+                    int physical2 = logical2physical[second_input.logical_qubit_idx];
+                    std::vector<int> first_neighbour = device->get_input_neighbours(physical1);
+                    for (int neighbour : first_neighbour) {
+                        if (neighbour == physical2) {
+                            executable_gate_list.emplace_back(front_gate);
+                            break;
+                        }
+                    }
+                } else {
+                    // we do not support gates with more than 2 inputs in sabre
+                    std::cout << "Find a gate with more than 2 inputs in sabre" << std::endl;
+                    assert(false);
+                }
+            }
+            // line 8 - 27
+            if (!executable_gate_list.empty()) {
+                // line 9 - 16
+                for (const Op& gate : executable_gate_list) {
+                    // line 10, execute
+                    front_set.erase(gate);
+                    executed_set.insert(gate);
+                    if (gate.ptr->tp == GateType::swap) {
+                        // need to update mapping if we have executed a swap
+                        int first_logical = graph.inEdges[gate].begin()->logical_qubit_idx;
+                        int second_logical = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
+                        // swap
+                        int ori_first_physical = logical2physical[first_logical];
+                        int ori_second_physical = logical2physical[second_logical];
+                        logical2physical[first_logical] = ori_second_physical;
+                        logical2physical[second_logical] = ori_first_physical;
+                        physical2logical[ori_first_physical] = second_logical;
+                        physical2logical[ori_second_physical] = first_logical;
+                    }
+                    // line 11, obtain successor
+                    if (graph.outEdges[gate].empty()) {
+                        // this means that it is a final gate
+                        continue;
+                    }
+                    std::vector<Op> successor_list;
+                    for (const auto& edge: graph.outEdges[gate]) {
+                        successor_list.emplace_back(edge.dstOp);
+                    }
+                    // line 12 - 14, check whether successor's dependency has been resolved
+                    for (const auto &successor : successor_list) {
+                        int resolved_count = 0;
+                        for (const auto& successor_edge : graph.inEdges[successor]) {
+                            if (executed_set.find(successor_edge.srcOp) != executed_set.end()) {
+                                // found in executed
+                                resolved_count += 1;
+                            }
+                        }
+                        if (resolved_count == graph.inEdges[successor].size()) {
+                            // resolved
+                            front_set.emplace(successor);
+                        }
+                    }
+                }
+                continue;
+            } else {
+                // line 18 -19, obtain swaps
+                std::vector<std::pair<int, int>> swap_candidate_list;
+                for (const auto& gate : front_set) {
+                    // all gates in F must be two qubit gates
+                    auto edge_set = graph.inEdges[gate];
+                    assert(edge_set.size() == 2);
+                    // swaps are between input qubits and all physical neighbours
+                    for (const auto& edge : edge_set) {
+                        int logical_idx = edge.logical_qubit_idx;
+                        int physical_idx = logical2physical[logical_idx];
+                        auto neighbour_list = device->get_input_neighbours(physical_idx);
+                        for (int neighbour : neighbour_list) {
+                            swap_candidate_list.emplace_back(std::pair<int, int>{physical_idx, neighbour});
+                        }
+                    }
+                }
+                // line 20 - 24, find swap with minimal score
+                double min_swap_cost = 10000000;
+                std::pair<int, int> optimal_swap{-1, -1};
+                for (const auto& swap: swap_candidate_list) {
+                    // line 21, generate \pi_tmp
+                    std::vector<int> tmp_logical2physical = logical2physical;
+                    std::vector<int> tmp_physical2logical = physical2logical;
+                    int physical_1 = swap.first;
+                    int physical_2 = swap.second;
+                    int logical_1 = tmp_physical2logical[physical_1];
+                    int logical_2 = tmp_logical2physical[physical_2];
+                    // swap physical
+                    tmp_physical2logical[physical_1] = logical_2;
+                    tmp_physical2logical[physical_2] = logical_1;
+                    // swap logical, there must be one with logical qubit
+                    assert(logical_1 != -1 || logical_2 != -1);
+                    if (logical_1 != -1) tmp_logical2physical[logical_1] = physical_2;
+                    if (logical_2 != -1) tmp_logical2physical[logical_2] = physical_1;
+                    // line 22, calculate heuristic score
+                    std::vector<std::pair<int, int>> front_mapping;
+                    for (const auto& gate : front_set) {
+                        int f_logical_1 = graph.inEdges[gate].begin()->logical_qubit_idx;
+                        int f_logical_2 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
+                        int f_physical_1 = tmp_logical2physical[f_logical_1];
+                        int f_physical_2 = tmp_logical2physical[f_logical_2];
+                        front_mapping.emplace_back(std::pair<int, int>{f_physical_1, f_physical_2});
+                    }
+                    // TODO: change to a better heuristic
+                    double cur_swap_score = basic_sabre_heuristic(front_mapping, device);
+                    if (cur_swap_score <= min_swap_cost) {
+                        min_swap_cost = cur_swap_score;
+                        optimal_swap = swap;
+                    }
+                }
+                // line 25, apply swap
+                int physical_1 = optimal_swap.first;
+                int physical_2 = optimal_swap.second;
+                assert(physical_1 != -1 && physical_2 != -1);
+                int logical_1 = physical2logical[physical_1];
+                int logical_2 = physical2logical[physical_2];
+                assert(logical_1 != -1 || logical_2 != -1);
+                physical2logical[physical_1] = logical_2;
+                physical2logical[physical_2] = logical_1;
+                if (logical_1 != -1) logical2physical[logical_1] = physical_2;
+                if (logical_2 != -1) logical2physical[logical_2] = physical_1;
+            }
+        }
+        return logical2physical;
+    }
+
     std::vector<int> calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
+        // returns a logical2physical mapping at beginning
+
         // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
         // <logical, physical>
         initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr);
@@ -68,166 +235,28 @@ namespace quartz {
         }
 
         // STEP2: SWAP-based heuristic search
-        // initialize mapping
-        std::vector<int> logical2physical;
-        std::vector<int> physical2logical;
-        logical2physical.reserve(initial_qubit_mapping.size());
-        physical2logical.reserve(device->get_num_qubits());
-        for (int i = 0; i < device->get_num_qubits(); i++) {
-            physical2logical.emplace_back(-1);
-        }
-        for (int i = 0; i < initial_qubit_mapping.size(); i++) {
-            physical2logical[i] = i;
-            logical2physical.emplace_back(i);
-        }
-        // initialize front set f
-        std::unordered_set<Op, OpHash> front_set;
-        std::unordered_set<Op, OpHash> executed_set;
-        for (const auto& op_edge : initial_graph.outEdges) {
-            if (op_edge.first.ptr->tp == GateType::input_qubit) {
-                front_set.insert(op_edge.first);
-            }
-        }
-        // sabre loop 1
-        while (!front_set.empty()) {
-            // line 2 - 7, find executable gates
-            std::vector<Op> executable_gate_list;
-            for (const auto& front_gate : front_set) {
-                // one qubit gate is always executable
-                if (initial_graph.inEdges[front_gate].size() == 1) {
-                    executable_gate_list.emplace_back(front_gate);
-                } else if (initial_graph.inEdges[front_gate].size() == 2) {
-                    Edge first_input = *initial_graph.inEdges[front_gate].begin();
-                    Edge second_input = *std::next(initial_graph.inEdges[front_gate].begin());
-                    int physical1 = logical2physical[first_input.logical_qubit_idx];
-                    int physical2 = logical2physical[second_input.logical_qubit_idx];
-                    std::vector<int> first_neighbour = device->get_input_neighbours(physical1);
-                    for (int neighbour : first_neighbour) {
-                        if (neighbour == physical2) {
-                            executable_gate_list.emplace_back(front_gate);
-                            break;
-                        }
-                    }
-                } else {
-                    // we do not support gates with more than 2 inputs in sabre
-                    std::cout << "Find a gate with more than 2 inputs in sabre" << std::endl;
-                    assert(false);
-                }
-            }
-            // line 8 - 27
-            if (!executable_gate_list.empty()) {
-                // line 9 - 16
-                for (const Op& gate : executable_gate_list) {
-                    // line 10, execute
-                    front_set.erase(gate);
-                    executed_set.insert(gate);
-                    if (gate.ptr->tp == GateType::swap) {
-                        // need to update mapping if we have executed a swap
-                        int first_logical = initial_graph.inEdges[gate].begin()->logical_qubit_idx;
-                        int second_logical = std::next(initial_graph.inEdges[gate].begin())->logical_qubit_idx;
-                        // swap
-                        int ori_first_physical = logical2physical[first_logical];
-                        int ori_second_physical = logical2physical[second_logical];
-                        logical2physical[first_logical] = ori_second_physical;
-                        logical2physical[second_logical] = ori_first_physical;
-                        physical2logical[ori_first_physical] = second_logical;
-                        physical2logical[ori_second_physical] = first_logical;
-                    }
-                    // line 11, obtain successor
-                    if (initial_graph.outEdges[gate].empty()) {
-                        // this means that it is a final gate
-                        continue;
-                    }
-                    std::vector<Op> successor_list;
-                    for (const auto& edge: initial_graph.outEdges[gate]) {
-                        successor_list.emplace_back(edge.dstOp);
-                    }
-                    // line 12 - 14, check whether successor's dependency has been resolved
-                    for (const auto &successor : successor_list) {
-                        int resolved_count = 0;
-                        for (const auto& successor_edge : initial_graph.inEdges[successor]) {
-                            if (executed_set.find(successor_edge.srcOp) != executed_set.end()) {
-                                // found in executed
-                                resolved_count += 1;
-                            }
-                        }
-                        if (resolved_count == initial_graph.inEdges[successor].size()) {
-                            // resolved
-                            front_set.emplace(successor);
-                        }
-                    }
-                }
-                continue;
-            } else {
-                // line 18 -19, obtain swaps
-                std::vector<std::pair<int, int>> swap_candidate_list;
-                for (const auto& gate : front_set) {
-                    // all gates in F must be two qubit gates
-                    auto edge_set = initial_graph.inEdges[gate];
-                    assert(edge_set.size() == 2);
-                    // swaps are between input qubits and all physical neighbours
-                    for (const auto& edge : edge_set) {
-                        int logical_idx = edge.logical_qubit_idx;
-                        int physical_idx = logical2physical[logical_idx];
-                        auto neighbour_list = device->get_input_neighbours(physical_idx);
-                        for (int neighbour : neighbour_list) {
-                            swap_candidate_list.emplace_back(std::pair<int, int>{physical_idx, neighbour});
-                        }
-                    }
-                }
-                // line 20 - 24, find swap with minimal score
-                double min_swap_cost = 10000000;
-                std::pair<int, int> optimal_swap{-1, -1};
-                for (const auto& swap: swap_candidate_list) {
-                    // line 21, generate \pi_tmp
-                    std::vector<int> tmp_logical2physical = logical2physical;
-                    std::vector<int> tmp_physical2logical = physical2logical;
-                    int physical_1 = swap.first;
-                    int physical_2 = swap.second;
-                    int logical_1 = tmp_physical2logical[physical_1];
-                    int logical_2 = tmp_logical2physical[physical_2];
-                    // swap physical
-                    tmp_physical2logical[physical_1] = logical_2;
-                    tmp_physical2logical[physical_2] = logical_1;
-                    // swap logical, there must be one with logical qubit
-                    assert(logical_1 != -1 || logical_2 != -1);
-                    if (logical_1 != -1) tmp_logical2physical[logical_1] = physical_2;
-                    if (logical_2 != -1) tmp_logical2physical[logical_2] = physical_1;
-                    // line 22, calculate heuristic score
-                    std::vector<std::pair<int, int>> front_mapping;
-                    for (const auto& gate : front_set) {
-                        int f_logical_1 = initial_graph.inEdges[gate].begin()->logical_qubit_idx;
-                        int f_logical_2 = std::next(initial_graph.inEdges[gate].begin())->logical_qubit_idx;
-                        int f_physical_1 = tmp_logical2physical[f_logical_1];
-                        int f_physical_2 = tmp_logical2physical[f_logical_2];
-                        front_mapping.emplace_back(std::pair<int, int>{f_physical_1, f_physical_2});
-                    }
-                    // TODO: change to a better heuristic
-                    double cur_swap_score = basic_sabre_heuristic(front_mapping, device);
-                    if (cur_swap_score <= min_swap_cost) {
-                        min_swap_cost = cur_swap_score;
-                        optimal_swap = swap;
-                    }
-                }
-                // line 25, apply swap
-                int physical_1 = optimal_swap.first;
-                int physical_2 = optimal_swap.second;
-                assert(physical_1 != -1 && physical_2 != -1);
-                int logical_1 = physical2logical[physical_1];
-                int logical_2 = physical2logical[physical_2];
-                assert(logical_1 != -1 || logical_2 != -1);
-                physical2logical[physical_1] = logical_2;
-                physical2logical[physical_2] = logical_1;
-                if (logical_1 != -1) logical2physical[logical_1] = physical_2;
-                if (logical_2 != -1) logical2physical[logical_2] = physical_1;
-            }
-        }
+        std::vector<int> final_logical2physical = sabre_main_loop(initial_graph, device);
 
         // STEP3: reverse the graph
+        Graph reversed_graph = initial_graph;
+        reversed_graph.inEdges = initial_graph.outEdges;
+        reversed_graph.outEdges = initial_graph.inEdges;
+        reversed_graph.qubit_mapping_table.clear();
+        for (const auto& op_edge : reversed_graph.outEdges) {
+            if (op_edge.first.ptr->tp == GateType::input_qubit) {
+                auto out_edge_list = reversed_graph.outEdges[op_edge.first];
+                assert(out_edge_list.size() == 1);
+                auto logical_idx = out_edge_list.begin()->logical_qubit_idx;
+                auto physical_idx = final_logical2physical[logical_idx];
+                reversed_graph.qubit_mapping_table.insert({op_edge.first,
+                                                           std::pair<int, int>{logical_idx, physical_idx}});
+            }
+        }
 
         // STEP4: SWAP-based heuristic search
+        std::vector<int> initial_logical2physical = sabre_main_loop(reversed_graph, device);
 
         // return final mapping
-        return {};
+        return initial_logical2physical;
     }
 }

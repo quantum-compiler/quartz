@@ -239,8 +239,34 @@ namespace quartz {
 
         // STEP3: reverse the graph
         Graph reversed_graph = initial_graph;
+        // init in / out edges
         reversed_graph.inEdges = initial_graph.outEdges;
         reversed_graph.outEdges = initial_graph.inEdges;
+        for (auto& op_edge : reversed_graph.inEdges) {
+            for (auto& edge : op_edge.second) {
+                Op src_op = edge.srcOp;
+                Op dst_op = edge.dstOp;
+                int src_idx = edge.srcIdx;
+                int dst_idx = edge.dstIdx;
+                edge.srcOp = dst_op;
+                edge.dstOp = src_op;
+                edge.srcIdx = dst_idx;
+                edge.dstIdx = src_idx;
+            }
+        }
+        for (auto& op_edge : reversed_graph.outEdges) {
+            for (auto& edge : op_edge.second) {
+                Op src_op = edge.srcOp;
+                Op dst_op = edge.dstOp;
+                int src_idx = edge.srcIdx;
+                int dst_idx = edge.dstIdx;
+                edge.srcOp = dst_op;
+                edge.dstOp = src_op;
+                edge.srcIdx = dst_idx;
+                edge.dstIdx = src_idx;
+            }
+        }
+        // init qubit mapping table
         reversed_graph.qubit_mapping_table.clear();
         for (const auto& op_edge : reversed_graph.outEdges) {
             if (op_edge.first.ptr->tp == GateType::input_qubit) {

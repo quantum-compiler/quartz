@@ -164,6 +164,7 @@ Graph::Graph(const Graph &graph) {
   qubit_2_idx = graph.qubit_2_idx;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
+  qubit_mapping_table = graph.qubit_mapping_table;
 }
 
 size_t Graph::get_next_special_op_guid() {

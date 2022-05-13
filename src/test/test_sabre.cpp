@@ -62,7 +62,7 @@ int main() {
     cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl << endl;
 
     // init qubit mapping and print cost
-    // trivial mapping has cost 25
+    // trivial mapping has cost 25, optimal is 7
     graph.init_physical_mapping(InitialMappingType::SABRE, device);
     cout << "Mapping has been initialized." << endl;
     MappingStatus succeeded = graph.check_mapping_correctness();

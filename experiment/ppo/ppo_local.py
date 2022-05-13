@@ -18,7 +18,7 @@ wandb.init(project='ppo_local')
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:0')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -341,13 +341,13 @@ experiment_name = "rl_ppo_" + ""
 
 # max timesteps in one trajectory
 max_seq_len = 100
-batch_size = 100
+batch_size = 64
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
 log_freq = 1
 # save model frequency (in num timesteps)
-save_model_freq = int(2e2)
+save_model_freq = 100
 
 #####################################################
 

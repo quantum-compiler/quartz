@@ -11,14 +11,16 @@ import dgl
 import time
 from tqdm import tqdm
 import wandb
+from collections import deque
+import random
 
-wandb.init(project='ppo_local')
+wandb.init(project='ppo_local_multi_init_states_with_increase')
 
 # set device to cpu or cuda
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:2')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -337,17 +339,18 @@ class PPO:
 ####### initialize environment hyperparameters ######
 
 # TODO: Change this
-experiment_name = "rl_ppo_" + ""
+experiment_name = "rl_ppo_local_multi_init_states_include_increase"
 
 # max timesteps in one trajectory
 max_seq_len = 200
-batch_size = 64
+batch_size = 128
+max_init_states = 64
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
 log_freq = 1
 # save model frequency (in num timesteps)
-save_model_freq = 100
+save_model_freq = int(2e2)
 
 #####################################################
 
@@ -369,17 +372,22 @@ invalid_reward = -1
 
 context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
                                filename='../../bfs_verified_simplified.json',
-                               no_increase=True)
+                               no_increase=False)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(
 #     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_dag = parser.load_qasm(filename="../near_56.qasm")
-# TODO: may need more initial graphs, from easy to hard
-init_graph = quartz.PyGraph(context=context, dag=init_dag)
+init_circ = quartz.PyGraph(context=context, dag=init_dag)
 xfer_dim = context.num_xfers
-init_graphs = [init_graph]
-best_gate_cnt = init_graph.gate_count
+
+global init_graphs
+global new_init_states
+global new_init_state_hash_set
+
+new_init_graphs = []
+new_init_state_hash_set = set([init_circ.hash()])
+best_gate_cnt = init_circ.gate_count
 
 ###################### logging ######################
 
@@ -452,6 +460,13 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
                 next_nodes = [node]
             else:
                 reward = (graph.gate_count - next_graph.gate_count) * 3
+
+            # TODO: is this sampling reasonable?
+            if reward > 0 and trajectory_reward > 0:
+                new_hash = next_graph.hash()
+                if new_hash not in new_init_state_hash_set:
+                    new_init_graphs.append(next_graph)
+                    new_init_state_hash_set.add(new_hash)
 
             trajectory_reward += reward
             reward = torch.tensor(reward, dtype=torch.float)
@@ -565,10 +580,20 @@ i_episode = 0
 for i_episode in tqdm(range(episodes)):
 
     current_ep_reward = 0
-    ep_best_gate_cnt = init_graph.gate_count
+    ep_best_gate_cnt = init_circ.gate_count
     ep_seq_len = 0
+    ep_best_reward = 0
+
+    if len(new_init_graphs) < max_init_states - 1:
+        ep_init_graphs = [init_circ] + new_init_graphs
+    else:
+        ep_init_graphs = [init_circ] + random.sample(new_init_graphs,
+                                                     max_init_states - 1)
 
     for i in range(batch_size):
+
+        init_graph = ep_init_graphs[i % len(ep_init_graphs)]
+
         t_reward, t_best_gate_cnt, t_seq_len = get_trajectory(
             ppo_agent, init_graph, max_seq_len, invalid_reward)
 
@@ -576,6 +601,7 @@ for i_episode in tqdm(range(episodes)):
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
         ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
         ep_seq_len += t_seq_len
+        ep_best_reward = max(ep_best_reward, t_reward)
 
     # update PPO agent
     ppo_agent.update()
@@ -591,7 +617,7 @@ for i_episode in tqdm(range(episodes)):
         log_avg_reward = round(log_avg_reward, 4)
         log_avg_seq_len = ep_seq_len / batch_size
 
-        message = f'ep: {i_episode}\tavg reward: {log_avg_reward}\tavg seq len: {log_avg_seq_len}\tbest of ep: {ep_best_gate_cnt}\tbest: {best_gate_cnt} '
+        message = f'ep: {i_episode}\tavg_r: {log_avg_reward}\tbest_r: {ep_best_reward}\tavg_seq_len: {log_avg_seq_len}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt} '
         log_f.write(message + '\n')
         print(message)
         log_f.flush()
@@ -601,9 +627,11 @@ for i_episode in tqdm(range(episodes)):
 
         wandb.log({
             'episode': i_episode,
-            'reward': log_avg_reward,
-            'seq_len': log_avg_seq_len,
+            'batch_size': batch_size,
+            'avg_reward': log_avg_reward,
+            'avg_seq_len': log_avg_seq_len,
             'ep_best': ep_best_gate_cnt,
+            'ep_best_reward': ep_best_reward,
             'best': best_gate_cnt
         })
 

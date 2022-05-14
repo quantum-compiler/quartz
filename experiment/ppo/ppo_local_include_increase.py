@@ -12,7 +12,7 @@ import time
 from tqdm import tqdm
 import wandb
 
-wandb.init(project='ppo_local')
+wandb.init(project='ppo_local_with_increase')
 
 # set device to cpu or cuda
 device = torch.device('cpu')
@@ -337,7 +337,7 @@ class PPO:
 ####### initialize environment hyperparameters ######
 
 # TODO: Change this
-experiment_name = "rl_ppo_" + ""
+experiment_name = "rl_ppo_" + "local_include_increase"
 
 # max timesteps in one trajectory
 max_seq_len = 200
@@ -369,7 +369,7 @@ invalid_reward = -1
 
 context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
                                filename='../../bfs_verified_simplified.json',
-                               no_increase=True)
+                               no_increase=False)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(

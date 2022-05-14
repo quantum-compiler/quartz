@@ -12,6 +12,7 @@ import time
 from tqdm import tqdm
 import wandb
 from collections import deque
+import random
 
 wandb.init(project='ppo_local_multi_init_states')
 
@@ -19,7 +20,7 @@ wandb.init(project='ppo_local_multi_init_states')
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:2')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -341,8 +342,9 @@ class PPO:
 experiment_name = "rl_ppo_local_multi_init_states"
 
 # max timesteps in one trajectory
-max_seq_len = 100
+max_seq_len = 200
 batch_size = 128
+max_init_states = 64
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
@@ -376,17 +378,16 @@ parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(
 #     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_dag = parser.load_qasm(filename="../near_56.qasm")
-init_graph = quartz.PyGraph(context=context, dag=init_dag)
+init_circ = quartz.PyGraph(context=context, dag=init_dag)
 xfer_dim = context.num_xfers
 
 global init_graphs
 global new_init_states
 global new_init_state_hash_set
 
-init_graphs = [init_graph]
-new_init_graphs = deque([], maxlen=49)
-new_init_state_hash_set = set([init_graph.hash()])
-best_gate_cnt = init_graph.gate_count
+new_init_graphs = []
+new_init_state_hash_set = set([init_circ.hash()])
+best_gate_cnt = init_circ.gate_count
 
 ###################### logging ######################
 
@@ -578,14 +579,15 @@ i_episode = 0
 for i_episode in tqdm(range(episodes)):
 
     current_ep_reward = 0
-    ep_best_gate_cnt = init_graph.gate_count
+    ep_best_gate_cnt = init_circ.gate_count
     ep_seq_len = 0
     ep_best_reward = 0
 
-    ep_init_graphs = init_graphs + list(new_init_graphs)
-    if batch_size < len(ep_init_graphs):
-        # Will run out of memory
-        batch_size *= 2
+    if len(new_init_graphs) < max_init_states - 1:
+        ep_init_graphs = [init_circ] + new_init_graphs
+    else:
+        ep_init_graphs = [init_circ] + random.sample(new_init_graphs,
+                                                     max_init_states - 1)
 
     for i in range(batch_size):
 

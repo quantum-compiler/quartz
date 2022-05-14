@@ -74,7 +74,7 @@ experiment/pretrain/pretrain_dataset*
 experiment/pretrain/outputs
 
 experiment/ppo/PPO_logs
-experiment/ppo/PPO_preTrained
+# experiment/ppo/PPO_preTrained
 experiment/ppo/pretrain/dataset
 experiment/ppo/pretrain/outputs
 experiment/ppo/pretrain/config/config.yaml

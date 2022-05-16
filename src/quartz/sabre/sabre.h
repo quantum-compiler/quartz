@@ -144,7 +144,7 @@ namespace quartz {
                     int physical_1 = swap.first;
                     int physical_2 = swap.second;
                     int logical_1 = tmp_physical2logical[physical_1];
-                    int logical_2 = tmp_logical2physical[physical_2];
+                    int logical_2 = tmp_physical2logical[physical_2];
                     // swap physical
                     tmp_physical2logical[physical_1] = logical_2;
                     tmp_physical2logical[physical_2] = logical_1;

@@ -99,7 +99,7 @@ int main() {
     cout << "Gate count: " << total_gate_count << endl;
 
     // perform a trivial mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::SABRE, device, 1);
+    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1);
     MappingStatus succeeded = graph.check_mapping_correctness();
     if (succeeded == quartz::MappingStatus::VALID) {
         std::cout << "Trivial Mapping has passed correctness check." << endl;

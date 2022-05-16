@@ -63,7 +63,7 @@ int main() {
 
     // init qubit mapping and print cost
     // trivial mapping has cost 25, optimal is 7
-    graph.init_physical_mapping(InitialMappingType::SABRE, device);
+    graph.init_physical_mapping(InitialMappingType::SABRE, device, 1);
     cout << "Mapping has been initialized." << endl;
     MappingStatus succeeded = graph.check_mapping_correctness();
     if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check." << endl;

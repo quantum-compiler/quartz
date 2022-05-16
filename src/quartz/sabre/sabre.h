@@ -187,9 +187,9 @@ namespace quartz {
     QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
         // returns a logical2physical mapping at beginning
 
-        // STEP1: Generate a trivial mapping and generate initial, final qubit mapping table
+        // STEP1: Generate initial, final qubit mapping table
+        // Note that we suppose a trivial initial mapping is already provided.
         // <logical, physical>
-        initial_graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr);
         QubitMappingTable initial_qubit_mapping = initial_graph.qubit_mapping_table;
         QubitMappingTable final_qubit_mapping;
         auto tmp_inEdges = initial_graph.inEdges;

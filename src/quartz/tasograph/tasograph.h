@@ -238,9 +238,9 @@ public:
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
   // physical mapping related
-  void init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device);
+  void init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device, int pass);
   void _trivial_mapping();
-  void _sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device);
+  void _sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass);
   void propagate_mapping();
   MappingStatus check_mapping_correctness();
   double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);

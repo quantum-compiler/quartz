@@ -25,7 +25,8 @@ int main() {
 
     // prepare context
     Context src_ctx({GateType::h, GateType::x, GateType::rz, GateType::add, GateType::swap,
-                     GateType::cx, GateType::input_qubit, GateType::input_param, GateType::t, GateType::tdg});
+                     GateType::cx, GateType::input_qubit, GateType::input_param, GateType::t, GateType::tdg,
+                     GateType::s, GateType::sdg});
     // parse qasm file
     QASMParser qasm_parser(&src_ctx);
     DAG *dag = nullptr;

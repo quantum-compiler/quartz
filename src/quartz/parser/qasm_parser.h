@@ -56,6 +56,9 @@ public:
     GateType gate_type;
     while (std::getline(fin, line)) {
       // repleace comma with space
+      if (line[0] == ' ') {
+          line = line.substr(1);
+      }
       find_and_replace_all(line, ",", " ");
       // ignore semicolon at the end
       find_and_replace_all(line, ";", "");

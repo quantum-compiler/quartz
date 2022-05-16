@@ -94,31 +94,30 @@ int main() {
     device->add_edge(13, 19);
     device->add_edge(14, 18);
 
-    // print all Ops
-    cout << "Out Edges" << endl;
-    for (const auto& Op_edge : graph.outEdges) {
-        cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
-    }
-    cout << "In Edges" << endl;
-    for (const auto& Op_edge : graph.inEdges) {
-        cout << "Gate: " << Op_edge.first.guid << " has type " << Op_edge.first.ptr->tp << endl;
-    }
-    cout << endl;
+    // print gate count
+    int total_gate_count = graph.gate_count();
+    cout << "Gate count: " << total_gate_count << endl;
 
-    // test basic sabre heuristic
-    std::vector<std::pair<int, int>> front_set;
-    front_set.emplace_back(1, 3);
-    front_set.emplace_back(2, 3);
-    cout << "Heuristic value: " << basic_sabre_heuristic(front_set, device) << endl << endl;
-
-    // init qubit mapping and print cost
-    // trivial mapping has cost 25, optimal is 7
+    // perform a trivial mapping and print cost
     graph.init_physical_mapping(InitialMappingType::SABRE, device, 1);
-    cout << "Mapping has been initialized." << endl;
     MappingStatus succeeded = graph.check_mapping_correctness();
-    if (succeeded == quartz::MappingStatus::VALID) std::cout << "Mapping has passed correctness check." << endl;
-    else std::cout << "Mapping test failed!\n" << endl;
+    if (succeeded == quartz::MappingStatus::VALID) {
+        std::cout << "Trivial Mapping has passed correctness check." << endl;
+    } else {
+        std::cout << "Mapping test failed!" << endl;
+    }
     double total_cost = graph.circuit_implementation_cost(device);
-    cout << "Total cost is " << total_cost << endl << endl;
+    cout << "Trivial implementation cost is " << total_cost << endl;
+
+    // init sabre mapping and print cost
+    graph.init_physical_mapping(InitialMappingType::SABRE, device, 1);
+    MappingStatus succeeded2 = graph.check_mapping_correctness();
+    if (succeeded2 == quartz::MappingStatus::VALID) {
+        std::cout << "Sabre mapping has passed correctness check." << endl;
+    } else {
+        std::cout << "Mapping test failed!" << endl;
+    }
+    double sabre_cost = graph.circuit_implementation_cost(device);
+    cout << "Sabre implementation cost is " << sabre_cost << endl << endl;
 
 };

@@ -47,7 +47,7 @@ int main() {
     cout << endl;
 
     // test init qubit mapping
-    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1);
+    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1, false);
     cout << "Mapping has been initialized." << endl;
     for (const auto& input_qubit_mapping : graph.qubit_mapping_table) {
         std::cout << "Gate: " << input_qubit_mapping.first.guid << std::endl;

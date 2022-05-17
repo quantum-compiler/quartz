@@ -100,7 +100,7 @@ int main() {
     cout << "Gate count: " << total_gate_count << endl;
 
     // perform a trivial mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1);
+    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1, false);
     MappingStatus succeeded = graph.check_mapping_correctness();
     if (succeeded == quartz::MappingStatus::VALID) {
         std::cout << "Trivial Mapping has passed correctness check." << endl;
@@ -111,7 +111,7 @@ int main() {
     cout << "Trivial implementation cost is " << total_cost << endl;
 
     // init sabre mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::SABRE, device, 1);
+    graph.init_physical_mapping(InitialMappingType::SABRE, device, 3, true);
     MappingStatus succeeded2 = graph.check_mapping_correctness();
     if (succeeded2 == quartz::MappingStatus::VALID) {
         std::cout << "Sabre mapping has passed correctness check." << endl;

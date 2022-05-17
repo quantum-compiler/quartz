@@ -1927,14 +1927,15 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-void Graph::init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device, int pass) {
+void Graph::init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device,
+                                  int pass, bool use_extensive) {
     // STEP 1: initial mapping
     switch (mapping_type) {
         case InitialMappingType::TRIVIAL:
             _trivial_mapping();
             break;
         case InitialMappingType::SABRE:
-            _sabre_mapping(device, pass);
+            _sabre_mapping(device, pass, use_extensive);
             break;
         default:
             std::cout << "Unrecognized initial mapping type\n";
@@ -1956,12 +1957,12 @@ void Graph::_trivial_mapping() {
     }
 }
 
-void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass) {
+void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass, bool use_extensive) {
     // use trivial mapping to provide a initial mapping for sabre
     _trivial_mapping();
     propagate_mapping();
     for (int i = 0; i < pass; ++i) {
-        QubitMappingTable sabre_mapping = calculate_sabre_mapping(*this, device);
+        QubitMappingTable sabre_mapping = calculate_sabre_mapping(*this, device, use_extensive);
         qubit_mapping_table = sabre_mapping;
     }
 }

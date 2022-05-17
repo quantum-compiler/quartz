@@ -3,6 +3,7 @@
 
 namespace quartz {
     using QubitMappingTable = std::unordered_map<Op, std::pair<int, int>, OpHash>;
+    const double SABRE_HEURISTIC_W = 0.5;
 
     double basic_sabre_heuristic(const std::vector<std::pair<int, int>>& front_set,
                                  const std::shared_ptr<DeviceTopologyGraph>& device) {
@@ -19,16 +20,33 @@ namespace quartz {
         return total_cost;
     }
 
-    std::vector<int> sabre_main_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
+    double extended_sabre_heuristic(const std::vector<std::pair<int, int>>& front_set,
+                                    const std::vector<std::pair<int, int>>& extended_set,
+                                    const std::vector<double>& decay_list, std::pair<int, int> swap,
+                                    const std::shared_ptr<DeviceTopologyGraph>& device) {
+        double F_score = basic_sabre_heuristic(front_set, device);
+        F_score /= double(front_set.size());
+        double E_score = basic_sabre_heuristic(extended_set, device);
+        if (!extended_set.empty()) {
+            E_score /= double(extended_set.size());
+        }
+        double decay_factor = decay_list[swap.first] > decay_list[swap.second] ? decay_list[swap.first] : decay_list[swap.second];
+        double final_score = decay_factor * F_score + SABRE_HEURISTIC_W * E_score;
+        return final_score;
+    }
+
+    std::vector<int> sabre_main_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph>& device, bool use_extensive) {
         // returns the logical mapping at the end after sabre pass
         // initialize mapping
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
+        std::vector<double> decay_list;
         QubitMappingTable initial_qubit_mapping = graph.qubit_mapping_table;
         logical2physical.reserve(initial_qubit_mapping.size());
         physical2logical.reserve(device->get_num_qubits());
         for (int i = 0; i < device->get_num_qubits(); i++) {
             physical2logical.emplace_back(-1);
+            decay_list.emplace_back(1.0);
         }
         for (int i = 0; i < initial_qubit_mapping.size(); i++) {
             logical2physical.emplace_back(-1);
@@ -75,6 +93,8 @@ namespace quartz {
             }
             // line 8 - 27
             if (!executable_gate_list.empty()) {
+                // heuristic: reset decay to one if we found an executable gate
+                for (double& decay : decay_list) { decay = 1.0; }
                 // line 9 - 16
                 for (const Op& gate : executable_gate_list) {
                     // line 10, execute
@@ -134,6 +154,20 @@ namespace quartz {
                         }
                     }
                 }
+                // heuristic: get extended set from front set
+                std::unordered_set<Op, OpHash> extensive_set;
+                for (const auto& gate: front_set) {
+                    if (graph.outEdges[gate].empty()) {
+                        // this means that the current gate in front set a final gate
+                        continue;
+                    }
+                    for (const auto& edge: graph.outEdges[gate]) {
+                        // we only consider two qubit gates in extensive set
+                        if (graph.inEdges[edge.dstOp].size() == 2) {
+                            extensive_set.emplace(edge.dstOp);
+                        }
+                    }
+                }
                 // line 20 - 24, find swap with minimal score
                 double min_swap_cost = 10000000;
                 std::pair<int, int> optimal_swap{-1, -1};
@@ -161,8 +195,23 @@ namespace quartz {
                         int f_physical_2 = tmp_logical2physical[f_logical_2];
                         front_mapping.emplace_back(std::pair<int, int>{f_physical_1, f_physical_2});
                     }
-                    // TODO: change to a better heuristic
-                    double cur_swap_score = basic_sabre_heuristic(front_mapping, device);
+                    // heuristic: get extensive set mapping
+                    std::vector<std::pair<int, int>> extensive_set_mapping;
+                    for (const auto& gate : extensive_set) {
+                        assert(graph.inEdges[gate].size() == 2);
+                        int e_logical1 = graph.inEdges[gate].begin()->logical_qubit_idx;
+                        int e_logical2 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
+                        int e_physical1 = tmp_logical2physical[e_logical1];
+                        int e_physical2 = tmp_logical2physical[e_logical2];
+                        extensive_set_mapping.emplace_back(std::pair<int, int>{e_physical1, e_physical2});
+                    }
+                    double cur_swap_score;
+                    if (use_extensive) {
+                        cur_swap_score = extended_sabre_heuristic(front_mapping, extensive_set_mapping,
+                                                                  decay_list, swap, device);
+                    } else {
+                        cur_swap_score = basic_sabre_heuristic(front_mapping, device);
+                    }
                     if (cur_swap_score <= min_swap_cost) {
                         min_swap_cost = cur_swap_score;
                         optimal_swap = swap;
@@ -179,12 +228,16 @@ namespace quartz {
                 physical2logical[physical_2] = logical_1;
                 if (logical_1 != -1) logical2physical[logical_1] = physical_2;
                 if (logical_2 != -1) logical2physical[logical_2] = physical_1;
+                // heuristic: increase decay when applying swap
+                decay_list[physical_1] += 0.001;
+                decay_list[physical_2] += 0.001;
             }
         }
         return logical2physical;
     }
 
-    QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device) {
+    QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device,
+                                              bool use_extensive) {
         // returns a logical2physical mapping at beginning
 
         // STEP1: Generate initial, final qubit mapping table
@@ -235,7 +288,7 @@ namespace quartz {
         }
 
         // STEP2: SWAP-based heuristic search
-        std::vector<int> final_logical2physical = sabre_main_loop(initial_graph, device);
+        std::vector<int> final_logical2physical = sabre_main_loop(initial_graph, device, use_extensive);
 
         // STEP3: reverse the graph
         Graph reversed_graph = initial_graph;
@@ -280,7 +333,7 @@ namespace quartz {
         }
 
         // STEP4: SWAP-based heuristic search
-        std::vector<int> initial_logical2physical = sabre_main_loop(reversed_graph, device);
+        std::vector<int> initial_logical2physical = sabre_main_loop(reversed_graph, device, use_extensive);
 
         // return final mapping
         QubitMappingTable final_result;

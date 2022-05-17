@@ -293,24 +293,24 @@ class PPO:
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
             loss = actor_loss + 0.5 * critic_loss - 0.01 * xfer_entropy
 
-            self.log_file_handle.write(f"epoch: {_}\n")
-            for i in range(len(self.buffer.graphs)):
-                message = f"node: {self.buffer.nodes[i]}, xfer: {self.buffer.xfers[i]}, reward: {self.buffer.rewards[i]}, value: {values[i]:.3f}, next value: {next_values[i]:.3f}"
-                if self.buffer.rewards[i] > 0:
-                    message += ", Reduced!!!"
-                # print(message)
-                self.log_file_handle.write(message + '\n')
-                self.log_file_handle.flush()
-                if self.buffer.is_terminals[i]:
-                    # print("terminated")
-                    self.log_file_handle.write('terminated\n')
-
             # take gradient step
             self.optimizer.zero_grad()
             loss.backward()
             for param in self.policy.parameters():
                 param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
+
+        self.log_file_handle.write(f"epoch: {_}\n")
+        for i in range(len(self.buffer.graphs)):
+            message = f"node: {self.buffer.nodes[i]}, xfer: {self.buffer.xfers[i]}, reward: {self.buffer.rewards[i]}, value: {values[i]:.3f}, next value: {next_values[i]:.3f}"
+            if self.buffer.rewards[i] > 0:
+                message += ", Reduced!!!"
+            # print(message)
+            self.log_file_handle.write(message + '\n')
+            self.log_file_handle.flush()
+            if self.buffer.is_terminals[i]:
+                # print("terminated")
+                self.log_file_handle.write('terminated\n')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -346,8 +346,9 @@ episodes = int(1e5)
 
 # log in the interval (in num episodes)
 log_freq = 1
+cuda_clear_cache_freq = 10
 # save model frequency (in num timesteps)
-save_model_freq = 100
+save_model_freq = 50
 
 #####################################################
 
@@ -582,6 +583,9 @@ for i_episode in tqdm(range(episodes)):
 
     log_running_reward += current_ep_reward
     log_running_episodes += 1
+
+    if i_episode % cuda_clear_cache_freq == 0:
+        torch.cuda.empty_cache()
 
     # log in logging file
     if i_episode % log_freq == 0:

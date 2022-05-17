@@ -30,7 +30,11 @@ def config_cython():
                     extra_compile_args=["-std=c++17"],
                     extra_link_args=[],
                     language="c++"))
-        return cythonize(ret, compiler_directives={"language_level": 3})
+        return cythonize(
+            ret,
+            compiler_directives={"language_level": 3},
+            emit_linenums=True,
+        )
     except ImportError:
         print("WARNING: cython is not installed!!!")
         return []

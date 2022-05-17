@@ -307,7 +307,7 @@ class PPO:
             message = f"node: {self.buffer.nodes[i]}, xfer: {self.buffer.xfers[i]}, reward: {self.buffer.rewards[i]}, value: {values[i]:.3f}, next value: {next_values[i]:.3f}"
             if self.buffer.rewards[i] > 0:
                 message += ", Reduced!!!"
-            elif self.buffer.rewards[i] > 0:
+            elif self.buffer.rewards[i] < 0:
                 message += ", Increased..."
             # print(message)
             self.log_file_handle.write(message + '\n')

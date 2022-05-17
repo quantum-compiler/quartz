@@ -137,8 +137,11 @@ class ActorCritic(nn.Module):
                 # node_list contains "next nodes" and their neighbors
                 # we choose the max as the next value
                 node_list = next_node_lists[i]
-                next_value = torch.max(
-                    next_node_vs_list[i][node_list.to(device)])
+                if list(node_list) == []:
+                    next_value = torch.tensor(0).to(device)
+                else:
+                    next_value = torch.max(
+                        next_node_vs_list[i][node_list.to(device)])
             next_values.append(next_value)
 
         # t_2 = time.time()

@@ -18,7 +18,7 @@ wandb.init(project='ppo_local')
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:0')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -87,8 +87,8 @@ class ActorCritic(nn.Module):
         available_xfers = g.available_xfers(context=context,
                                             node=g.get_node_from_id(id=node))
         mask[available_xfers] = True
-        xfer_logits = self.actor(graph_embed)
-        xfer_probs = masked_softmax(xfer_logits[node], mask)
+        xfer_logits = self.actor(graph_embed[node])
+        xfer_probs = masked_softmax(xfer_logits, mask)
         xfer_dist = Categorical(xfer_probs)
         xfer = xfer_dist.sample()
         xfer_logprob = xfer_dist.log_prob(xfer)
@@ -104,7 +104,6 @@ class ActorCritic(nn.Module):
         # start = time.time()
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
         batched_node_vs = self.critic(batched_graph_embeds).squeeze()
-        batched_xfer_logits = self.actor(batched_graph_embeds)
 
         with torch.no_grad():
             batched_next_graph_embeds = self.graph_embedding(
@@ -112,8 +111,8 @@ class ActorCritic(nn.Module):
             batched_next_node_vs = self.critic(batched_next_graph_embeds)
 
         # Split batched tensors into lists
+        graph_embed_list = torch.split(batched_graph_embeds, node_nums)
         node_vs_list = torch.split(batched_node_vs, node_nums)
-        xfer_logits_list = torch.split(batched_xfer_logits, node_nums)
         next_node_vs_list = torch.split(batched_next_node_vs, next_node_nums)
 
         # t_0 = time.time()
@@ -121,8 +120,6 @@ class ActorCritic(nn.Module):
 
         values = []
         next_values = []
-        xfer_logprobs = []
-        xfer_entropy = 0
 
         for i in range(batched_dgl_gs.batch_size):
             value = node_vs_list[i][nodes[i]]
@@ -145,20 +142,19 @@ class ActorCritic(nn.Module):
         # t_2 = time.time()
         # print(f"time get next values: {t_2 - t_1}")
 
+        selected_node_embeds = []
         for i in range(batched_dgl_gs.batch_size):
-            mask = masks[i]
-            xfer_probs = masked_softmax(xfer_logits_list[i][nodes[i]].clone(),
-                                        mask)
-            xfer_dist = Categorical(xfer_probs)
-            xfer_logprob = xfer_dist.log_prob(xfers[i])
-            xfer_entropy = xfer_dist.entropy()
-
-            xfer_logprobs.append(xfer_logprob)
-            xfer_entropy += xfer_entropy
+            selected_node_embeds.append(graph_embed_list[i][nodes[i]])
+        selected_node_embeds = torch.stack(selected_node_embeds)
+        xfer_logits = self.actor(selected_node_embeds)
+        xfer_probs = masked_softmax(xfer_logits, masks)
+        xfer_dists = Categorical(xfer_probs)
+        xfer_logprobs = xfer_dists.log_prob(
+            torch.tensor(xfers, dtype=torch.int).to(device))
+        xfer_entropy = xfer_dists.entropy().mean()
 
         values = torch.stack(values)
         next_values = torch.stack(next_values)
-        xfer_logprobs = torch.stack(xfer_logprobs)
 
         # t_3 = time.time()
         # print(f"time get logprob: {t_3 - t_2}")
@@ -226,14 +222,17 @@ class PPO:
     def update(self):
         # start = time.time()
 
-        masks = []
-        for (graph, node) in zip(self.buffer.graphs, self.buffer.nodes):
-            mask = torch.zeros((self.context.num_xfers),
-                               dtype=torch.bool).to(device)
+        masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
+                            dtype=torch.bool).to(device)
+        # print(masks.shape)
+        for i, (graph,
+                node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
             available_xfers = graph.available_xfers(
                 context=self.context, node=graph.get_node_from_id(id=node))
-            mask[available_xfers] = True
-            masks.append(mask)
+            masks[i][available_xfers] = True
+
+        # t_0 = time.time()
+        # print(f"mask time: {t_0 - start}")
 
         gs = [g.to_dgl_graph() for g in self.buffer.graphs]
         batched_dgl_gs = dgl.batch(gs).to(device)
@@ -247,14 +246,18 @@ class PPO:
         next_node_lists = []
         for i in range(len(self.buffer.next_graphs)):
             node_list = torch.tensor(self.buffer.next_nodes[i],
-                                     dtype=torch.int)
-            for n in self.buffer.next_nodes[i]:
-                node_list = torch.cat(
-                    (node_list, dgl_next_gs[i].predecessors(n)))
+                                     dtype=torch.int64)
+            src_node_ids, _, edge_ids = dgl_next_gs[i].in_edges(node_list,
+                                                                form='all')
+            mask = dgl_next_gs[i].edata['reversed'][edge_ids] == 0
+            node_list = torch.cat((node_list, src_node_ids[mask]))
             next_node_lists.append(node_list)
 
         old_xfer_logprobs = torch.squeeze(
             torch.stack(self.buffer.xfer_logprobs, dim=0)).detach().to(device)
+
+        # t_0 = time.time()
+        # print(f"preprocessing time: {t_0 - start}")
 
         # Optimize policy for K epochs
         for _ in range(self.K_epochs):
@@ -288,7 +291,7 @@ class PPO:
             # final loss of clipped objective PPO
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
-            loss = actor_loss + 0.5 * critic_loss - 0.001 * xfer_entropy
+            loss = actor_loss + 0.5 * critic_loss - 0.01 * xfer_entropy
 
             self.log_file_handle.write(f"epoch: {_}\n")
             for i in range(len(self.buffer.graphs)):
@@ -337,14 +340,14 @@ class PPO:
 experiment_name = "rl_ppo_" + ""
 
 # max timesteps in one trajectory
-max_seq_len = 100
-batch_size = 100
+max_seq_len = 200
+batch_size = 64
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
 log_freq = 1
 # save model frequency (in num timesteps)
-save_model_freq = int(2e2)
+save_model_freq = 100
 
 #####################################################
 
@@ -588,7 +591,7 @@ for i_episode in tqdm(range(episodes)):
         log_avg_reward = round(log_avg_reward, 4)
         log_avg_seq_len = ep_seq_len / batch_size
 
-        message = f'episode: {i_episode}\taverage reward: {log_avg_reward}\taverage seq len: {log_avg_seq_len}\tbest of episode: {ep_best_gate_cnt}\tbest: {best_gate_cnt} '
+        message = f'ep: {i_episode}\tavg reward: {log_avg_reward}\tavg seq len: {log_avg_seq_len}\tbest of ep: {ep_best_gate_cnt}\tbest: {best_gate_cnt} '
         log_f.write(message + '\n')
         print(message)
         log_f.flush()

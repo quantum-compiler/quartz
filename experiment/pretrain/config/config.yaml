@@ -13,7 +13,7 @@ wandb:
   entity: quartz
 
 gate_set: ['h', 'cx', 't', 'tdg']
-ecc_file: 'bfs_verified_simplified.json'
+ecc_file: '../../bfs_verified_simplified.json'
 no_increase: True
 include_nop: True
 

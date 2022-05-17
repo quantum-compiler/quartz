@@ -239,9 +239,10 @@ public:
 
   // physical mapping related
   void init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device,
-                             int pass, bool use_extensive);
+                             int pass, bool use_extensive, double w_value);
   void _trivial_mapping();
-  void _sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass, bool use_extensive);
+  void _sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass,
+                      bool use_extensive, double w_value);
   void propagate_mapping();
   MappingStatus check_mapping_correctness();
   double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);

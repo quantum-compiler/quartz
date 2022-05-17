@@ -100,25 +100,39 @@ int main() {
     cout << "Gate count: " << total_gate_count << endl;
 
     // perform a trivial mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr, -1, false);
-    MappingStatus succeeded = graph.check_mapping_correctness();
+    auto trivial_graph = graph;
+    trivial_graph.init_physical_mapping(InitialMappingType::TRIVIAL, nullptr,
+                                        -1, false, -1);
+    MappingStatus succeeded = trivial_graph.check_mapping_correctness();
     if (succeeded == quartz::MappingStatus::VALID) {
         std::cout << "Trivial Mapping has passed correctness check." << endl;
     } else {
         std::cout << "Mapping test failed!" << endl;
     }
-    double total_cost = graph.circuit_implementation_cost(device);
+    double total_cost = trivial_graph.circuit_implementation_cost(device);
     cout << "Trivial implementation cost is " << total_cost << endl;
 
     // init sabre mapping and print cost
-    graph.init_physical_mapping(InitialMappingType::SABRE, device, 3, true);
-    MappingStatus succeeded2 = graph.check_mapping_correctness();
-    if (succeeded2 == quartz::MappingStatus::VALID) {
-        std::cout << "Sabre mapping has passed correctness check." << endl;
-    } else {
-        std::cout << "Mapping test failed!" << endl;
+    // hyper-parameter search
+    std::vector<int> iter_list{1, 2, 3, 5, 8, 10};
+    std::vector<double> W_list{0.0, 0.01, 0.1, 0.2, 0.5, 1.0};
+    std::vector<bool> use_extensive_list{true, false};
+    double min_sabre_cost = 100000;
+    for (const auto& iter_cnt : iter_list) {
+        for (const auto& w_value : W_list) {
+            for (const auto& use_extensive : use_extensive_list) {
+                auto tmp_graph = graph;
+                tmp_graph.init_physical_mapping(InitialMappingType::SABRE, device,
+                                                iter_cnt, use_extensive, w_value);
+                MappingStatus succeeded_tmp = tmp_graph.check_mapping_correctness();
+                if (succeeded_tmp != quartz::MappingStatus::VALID) {
+                    std::cout << "Mapping test failed!" << endl;
+                }
+                double sabre_cost = tmp_graph.circuit_implementation_cost(device);
+                min_sabre_cost = min(min_sabre_cost, sabre_cost);
+            }
+        }
     }
-    double sabre_cost = graph.circuit_implementation_cost(device);
-    cout << "Sabre implementation cost is " << sabre_cost << endl << endl;
+    cout << "Sabre search implementation cost is " << min_sabre_cost << endl;
 
 };

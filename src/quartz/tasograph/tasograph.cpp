@@ -1959,9 +1959,16 @@ void Graph::_trivial_mapping() {
 
 void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass,
                            bool use_extensive, double w_value) {
-    // use trivial mapping to provide a initial mapping for sabre
+    // set a random initial mapping
     _trivial_mapping();
-    propagate_mapping();
+    size_t num_qubits = qubit_mapping_table.size();
+    std::vector<int> l2p;
+    for (int i = 0; i < num_qubits; ++i) {
+        l2p.emplace_back(i);
+    }
+    set_physical_mapping(l2p);
+
+    // perform sabre search
     for (int i = 0; i < pass; ++i) {
         QubitMappingTable sabre_mapping = calculate_sabre_mapping(*this, device, use_extensive, w_value);
         qubit_mapping_table = sabre_mapping;

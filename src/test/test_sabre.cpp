@@ -114,22 +114,24 @@ int main() {
 
     // init sabre mapping and print cost
     // hyper-parameter search
-    std::vector<int> iter_list{1, 2, 3, 5, 8, 10};
+    std::vector<int> iter_list{1, 2, 3, 5};
     std::vector<double> W_list{0.0, 0.01, 0.1, 0.2, 0.5, 1.0};
     std::vector<bool> use_extensive_list{true, false};
     double min_sabre_cost = 100000;
     for (const auto& iter_cnt : iter_list) {
         for (const auto& w_value : W_list) {
             for (const auto& use_extensive : use_extensive_list) {
-                auto tmp_graph = graph;
-                tmp_graph.init_physical_mapping(InitialMappingType::SABRE, device,
-                                                iter_cnt, use_extensive, w_value);
-                MappingStatus succeeded_tmp = tmp_graph.check_mapping_correctness();
-                if (succeeded_tmp != quartz::MappingStatus::VALID) {
-                    std::cout << "Mapping test failed!" << endl;
+                for (int repeat = 0; repeat < 3; ++repeat) {
+                    auto tmp_graph = graph;
+                    tmp_graph.init_physical_mapping(InitialMappingType::SABRE, device,
+                                                    iter_cnt, use_extensive, w_value);
+                    MappingStatus succeeded_tmp = tmp_graph.check_mapping_correctness();
+                    if (succeeded_tmp != quartz::MappingStatus::VALID) {
+                        std::cout << "Mapping test failed!" << endl;
+                    }
+                    double sabre_cost = tmp_graph.circuit_implementation_cost(device);
+                    min_sabre_cost = min(min_sabre_cost, sabre_cost);
                 }
-                double sabre_cost = tmp_graph.circuit_implementation_cost(device);
-                min_sabre_cost = min(min_sabre_cost, sabre_cost);
             }
         }
     }

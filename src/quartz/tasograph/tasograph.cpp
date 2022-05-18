@@ -1933,7 +1933,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
         }
       }
     } else {
-      std::set<Op> mapped_op_set;
+      std::unordered_set<Op, OpHash> mapped_op_set;
       for (const auto &opx : xfer->dstOps) {
         mapped_op_set.insert(opx->mapOp);
       }

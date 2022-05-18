@@ -8,16 +8,13 @@ from qiskit import QuantumCircuit
 import math
 from collections import deque
 
+global fn
+fn = 't_tdg_h_cx_toffoli_flip_dataset/tof_3_after_toffoli_flip.qasm'
+
 
 def check(graph):
     graph.to_qasm(filename='check.qasm')
-    qc_origin = QuantumCircuit.from_qasm_file(
-        'barenco_tof_3_opt_path/subst_history_39.qasm')
-    # qc_origin = QuantumCircuit.from_qasm_file(
-    #     't_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm'
-    # )
-    # qc_origin = QuantumCircuit.from_qasm_file(
-    #     '../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
+    qc_origin = QuantumCircuit.from_qasm_file(fn)
     qc_optimized = QuantumCircuit.from_qasm_file('check.qasm')
     return Statevector.from_instruction(qc_origin).equiv(
         Statevector.from_instruction(qc_optimized))
@@ -26,18 +23,10 @@ def check(graph):
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg', 'x'],
     filename='../bfs_verified_simplified.json',
-    no_increase=False)
+    no_increase=True)
 print(f'number of xfers: {quartz_context.num_xfers}')
 parser = quartz.PyQASMParser(context=quartz_context)
-# init_dag = parser.load_qasm(
-#     filename=
-#     't_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm')
-init_dag = parser.load_qasm(
-    filename='barenco_tof_3_opt_path/subst_history_39.qasm')
-init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
-
-# init_dag = parser.load_qasm(
-#     filename='../circuit/nam-circuits/qasm_files/adder_8_before.qasm')
+init_dag = parser.load_qasm(filename=fn)
 init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
 
 candidate_hq = []

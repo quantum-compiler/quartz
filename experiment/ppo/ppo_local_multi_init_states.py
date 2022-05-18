@@ -1,20 +1,14 @@
 import torch
-from gnn import QGNN
 import os
 from datetime import datetime
-import torch.nn as nn
-from torch.distributions import Categorical
 import quartz
-import torch.nn.functional as F
 import numpy as np
-import dgl
 import time
 from tqdm import tqdm
 import wandb
-from collections import deque
 import random
-import sys
 from PPO import PPO
+from Utils import get_trajectory
 
 wandb.init(project='ppo_local_multi_init_states')
 
@@ -119,65 +113,6 @@ if not os.path.exists(directory):
 checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(
     experiment_name, random_seed, run_num)
 print("save checkpoint path : " + checkpoint_path)
-
-################## get trajectory ##################
-
-
-def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
-    graph = init_state
-    done = False
-    nop_stop = False
-    trajectory_reward = 0
-    trajectory_len = 0
-    trajectory_best_gate_count = init_state.gate_count
-    intermediate_graphs = []
-
-    for t in range(max_seq_len):
-        if not done:
-            # t_0 = time.time()
-            node, xfer = ppo_agent.select_action(graph)
-            # t_1 = time.time()
-            # print(f'time network: {t_1 - t_0}')
-            next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
-                xfer=context.get_xfer_from_id(id=xfer),
-                node=graph.get_node_from_id(id=node))
-            # t_2 = time.time()
-            # print(f'time apply xfer: {t_2 - t_1}')
-
-            if next_graph == None:
-                reward = invalid_reward
-                done = True
-                next_graph = graph
-            elif context.get_xfer_from_id(id=xfer).is_nop:
-                reward = 0
-                done = True
-                nop_stop = True
-                next_nodes = [node]
-            else:
-                reward = (graph.gate_count - next_graph.gate_count) * 3
-
-            trajectory_reward += reward
-
-            if trajectory_reward > 0:
-                intermediate_graphs.append(next_graph)
-
-            reward = torch.tensor(reward, dtype=torch.float)
-            ppo_agent.buffer.rewards.append(reward)
-            ppo_agent.buffer.is_terminals.append(
-                torch.tensor(done, dtype=torch.bool))
-            ppo_agent.buffer.next_graphs.append(next_graph)
-            ppo_agent.buffer.next_nodes.append(next_nodes)
-            ppo_agent.buffer.is_start_point.append(t == 0)
-            graph = next_graph
-        else:
-            trajectory_len = t
-            break
-
-    trajectory_best_gate_count = min(graph.gate_count,
-                                     trajectory_best_gate_count)
-
-    return trajectory_reward, trajectory_best_gate_count, trajectory_len, intermediate_graphs
-
 
 ############# print all hyperparameters #############
 
@@ -285,7 +220,7 @@ for i_episode in tqdm(range(episodes)):
                                   ground_truth_minimum) * 3
 
         t_reward, t_best_gate_cnt, t_seq_len, intermediate_graphs = get_trajectory(
-            ppo_agent, init_graph, max_seq_len, invalid_reward)
+            ppo_agent, context, init_graph, max_seq_len, invalid_reward)
 
         current_ep_reward += t_reward
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)

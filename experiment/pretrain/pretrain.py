@@ -487,6 +487,7 @@ class PretrainNet(pl.LightningModule):
             f'{prefix}_best_pred_valid_acc': valid_of_best_pred_acc,
         }, on_step=True)
         return topk_pred_in_topk_gt_acc
+        
     def _compute_acc_droped(
         self, pred, gt, num_nodes, 
         xfer_topk: int = 1,

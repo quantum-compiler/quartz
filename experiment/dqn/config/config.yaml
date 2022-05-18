@@ -3,11 +3,11 @@ resume: False
 ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
 
 load_pretrained: True
-pretrained_weight: '../pretrain/outputs/2022-05-03/15-28-33/epoch=280-val_loss=0.08-best.ckpt'
-
+# pretrained_weight: '../pretrain/outputs/2022-05-12/04-12-25/epoch=479-val_loss=0.00-best.ckpt'
+pretrained_weight: '../pretrain/outputs/2022-05-11/06-32-51/epoch=103-val_loss=0.07-best.ckpt'
 weight: ''
 
-gpus: [2]
+gpus: [0]
 
 seed: 98765
 
@@ -21,7 +21,7 @@ init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
 gate_set: ['h', 'cx', 't', 'tdg']
 ecc_file: 'bfs_verified_simplified.json'
 no_increase: True
-include_nop: True
+include_nop: False
 
 batch_size: 1024
 gamma: 0.9
@@ -33,3 +33,8 @@ restart_from_best: False
 restore_weight_after_better: False
 clear_buf_after_better: False
 agent_episode: True
+
+qgnn_h_feats: 64
+qgnn_inter_dim: 64
+
+test_topk: 3

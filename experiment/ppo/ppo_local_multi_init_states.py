@@ -12,6 +12,7 @@ import time
 from tqdm import tqdm
 import wandb
 from collections import deque
+import random
 
 wandb.init(project='ppo_local_multi_init_states')
 
@@ -19,7 +20,7 @@ wandb.init(project='ppo_local_multi_init_states')
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:1')
+    device = torch.device('cuda:2')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -136,8 +137,11 @@ class ActorCritic(nn.Module):
                 # node_list contains "next nodes" and their neighbors
                 # we choose the max as the next value
                 node_list = next_node_lists[i]
-                next_value = torch.max(
-                    next_node_vs_list[i][node_list.to(device)])
+                if list(node_list) == []:
+                    next_value = torch.tensor(0).to(device)
+                else:
+                    next_value = torch.max(
+                        next_node_vs_list[i][node_list.to(device)])
             next_values.append(next_value)
 
         # t_2 = time.time()
@@ -294,24 +298,24 @@ class PPO:
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
             loss = actor_loss + 0.5 * critic_loss - 0.01 * xfer_entropy
 
-            self.log_file_handle.write(f"epoch: {_}\n")
-            for i in range(len(self.buffer.graphs)):
-                message = f"node: {self.buffer.nodes[i]}, xfer: {self.buffer.xfers[i]}, reward: {self.buffer.rewards[i]}, value: {values[i]:.3f}, next value: {next_values[i]:.3f}"
-                if self.buffer.rewards[i] > 0:
-                    message += ", Reduced!!!"
-                # print(message)
-                self.log_file_handle.write(message + '\n')
-                self.log_file_handle.flush()
-                if self.buffer.is_terminals[i]:
-                    # print("terminated")
-                    self.log_file_handle.write('terminated\n')
-
             # take gradient step
             self.optimizer.zero_grad()
             loss.backward()
             for param in self.policy.parameters():
                 param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
+
+        self.log_file_handle.write(f"epoch: {_}\n")
+        for i in range(len(self.buffer.graphs)):
+            message = f"node: {self.buffer.nodes[i]}, xfer: {self.buffer.xfers[i]}, reward: {self.buffer.rewards[i]}, value: {values[i]:.3f}, next value: {next_values[i]:.3f}"
+            if self.buffer.rewards[i] > 0:
+                message += ", Reduced!!!"
+            # print(message)
+            self.log_file_handle.write(message + '\n')
+            self.log_file_handle.flush()
+            if self.buffer.is_terminals[i]:
+                # print("terminated")
+                self.log_file_handle.write('terminated\n')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -341,14 +345,16 @@ class PPO:
 experiment_name = "rl_ppo_local_multi_init_states"
 
 # max timesteps in one trajectory
-max_seq_len = 100
+max_seq_len = 200
 batch_size = 128
+max_init_states = 64
 episodes = int(1e5)
 
 # log in the interval (in num episodes)
 log_freq = 1
+cuda_clear_cache_freq = 10
 # save model frequency (in num timesteps)
-save_model_freq = int(2e2)
+save_model_freq = 50
 
 #####################################################
 
@@ -376,17 +382,16 @@ parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(
 #     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_dag = parser.load_qasm(filename="../near_56.qasm")
-init_graph = quartz.PyGraph(context=context, dag=init_dag)
+init_circ = quartz.PyGraph(context=context, dag=init_dag)
 xfer_dim = context.num_xfers
 
 global init_graphs
 global new_init_states
 global new_init_state_hash_set
 
-init_graphs = [init_graph]
-new_init_graphs = deque([], maxlen=49)
-new_init_state_hash_set = set([init_graph.hash()])
-best_gate_cnt = init_graph.gate_count
+new_init_graphs = []
+new_init_state_hash_set = set([init_circ.hash()])
+best_gate_cnt = init_circ.gate_count
 
 ###################### logging ######################
 
@@ -578,14 +583,15 @@ i_episode = 0
 for i_episode in tqdm(range(episodes)):
 
     current_ep_reward = 0
-    ep_best_gate_cnt = init_graph.gate_count
+    ep_best_gate_cnt = init_circ.gate_count
     ep_seq_len = 0
     ep_best_reward = 0
 
-    ep_init_graphs = init_graphs + list(new_init_graphs)
-    if batch_size < len(ep_init_graphs):
-        # Will run out of memory
-        batch_size *= 2
+    if len(new_init_graphs) < max_init_states - 1:
+        ep_init_graphs = [init_circ] + new_init_graphs
+    else:
+        ep_init_graphs = [init_circ] + random.sample(new_init_graphs,
+                                                     max_init_states - 1)
 
     for i in range(batch_size):
 
@@ -605,6 +611,9 @@ for i_episode in tqdm(range(episodes)):
 
     log_running_reward += current_ep_reward
     log_running_episodes += 1
+
+    if i_episode % cuda_clear_cache_freq == 0:
+        torch.cuda.empty_cache()
 
     # log in logging file
     if i_episode % log_freq == 0:

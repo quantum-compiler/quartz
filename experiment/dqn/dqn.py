@@ -27,6 +27,26 @@ import quartz
 sys.path.append(os.path.join(os.getcwd(), '..'))
 from pretrain.pretrain import PretrainNet
 
+def topk_2d(
+    x: torch.Tensor, k: int, as_tuple: bool = False
+) -> Tuple[torch.Tensor, torch.tensor | Tuple[torch.tensor, torch.tensor]]:
+    x_f = x.flatten()
+    v_topk, i_f_topk = torch.topk(x_f, k)
+    i_f_topk = i_f_topk.tolist()
+    i_topk = [
+        (i_f // x.shape[1], i_f % x.shape[1])
+        for i_f in i_f_topk
+    ]
+    if not as_tuple:
+        i_topk = torch.tensor(i_topk, device=x.device)
+    else:
+        i_topk_sep = list(zip(*i_topk))
+        i_topk = (
+            torch.tensor(i_topk_sep[0], device=x.device),
+            torch.tensor(i_topk_sep[1], device=x.device),
+        )
+    return v_topk, i_topk
+
 class SpecialMinHeap:
     def __init__(self, max_size = math.inf):
         self.arr= []
@@ -173,14 +193,16 @@ class RLDataset(torch.utils.data.dataset.IterableDataset):
                 states[i], action_nodes[i], action_xfers[i], rewards[i], next_states[i], game_overs[i]
             )
 
-class DummyDataset(torch.utils.data.dataset.IterableDataset):
+class DummyDataset(torch.utils.data.Dataset):
 
-    def __init__(self, size: int = 100):
+    def __init__(self, size: int = 1):
         self.size = size
+    
+    def __getitem__(self, idx):
+        return idx
 
-    def __iter__(self):
-        for i in range(self.size):
-            yield i
+    def __len__(self):
+        return self.size
 
 class Environment:
 
@@ -263,6 +285,11 @@ class Environment:
         exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
         self.exp_seq.append(exp);
         return exp
+    
+    def back_step(self):
+        self.state = self.exp_seq[-1].state
+        self.cur_step -= 1
+        self.exp_seq.pop()
 
 class Agent:
 
@@ -276,19 +303,21 @@ class Agent:
         self.choices = [ ('s', 0) ]
 
     @torch.no_grad()
-    def _get_action(self, q_net: nn.Module, eps: float) -> Tuple[int, int]:
+    def _get_action(
+        self, q_net: nn.Module, eps: float, topk: int = 1, append_choice: bool = True,
+    ) -> Tuple[torch.tensor]:
         if np.random.random() < (1 - eps):
             # greedy
             cur_state: dgl.graph = self.env.state.to_dgl_graph().to(self.device)
             # (num_nodes, num_actions)
             q_values = q_net(cur_state)
-            max_q_values, optimal_xfers = torch.max(q_values, dim=1)
-            q_value, optimal_node = torch.max(max_q_values, dim=0)
-            optimal_xfer = optimal_xfers[optimal_node]
+            topk_q_values, topk_actions = topk_2d(q_values, topk, as_tuple=False)
+            # only append the first q_value; should not be used when topk > 1
+            if append_choice:
+                self.choices.append( ('q', eps, topk_q_values[0].item()) )
             # return values will be added into data buffer, which latter feeds the dataset
-            # they cannot be cuda tensors, or CUDA error will occur in collate_fn
-            self.choices.append( ('q', eps) )
-            return optimal_node.item(), optimal_xfer.item()
+            # they cannot be CUDA tensors, or CUDA error will occur in collate_fn
+            return topk_actions, topk_q_values
         else:
             # random
             # TODO  whether we need to include invalid xfers in action space?
@@ -300,18 +329,46 @@ class Agent:
                 if len(av_xfers) > 0:
                     xfer_space = av_xfers
             xfer = np.random.choice(xfer_space)
-            self.choices.append( ('r', eps) )
-            return node, xfer
+            self.choices.append( ('r', eps, 0) )
+            return torch.tensor([ [node, xfer] ]), torch.Tensor([0])
 
-    @torch.no_grad()
     def play_step(self, q_net: nn.Module, eps: float) -> Experience:
-        action_node, action_xfer = self._get_action(q_net, eps)
-        exp = self.env.act(action_node, action_xfer)        
+        action, _ = self._get_action(q_net, eps) # [ [node, xfer] ]
+        exp = self.env.act(action[0, 0].item(), action[0, 1].item())        
         return exp
 
     def clear_choices(self):
-        self.choices = [ ('s', 0) ]
+        self.choices = [ ('s', 0, 0) ]
 
+    def tree_explore(
+        self, q_net: nn.Module, topk: int = 1,
+        exp_seq_list: list = [], choices_list: list = [], visited: set = set(),
+    ) -> None:
+        cur_hash = self.env.state.hash()
+        if cur_hash in visited:
+            return
+        visited.add(cur_hash)
+        # ic(self.env.exp_seq[-1])
+        ic(cur_hash)
+        ic(self.env.cur_step)
+        ic(self.env.state.gate_count)
+        # (k, 2)
+        topk_actions, topk_q_values = self._get_action(q_net, 0, topk=topk, append_choice=False)
+        for action, q_value in zip(topk_actions, topk_q_values):
+            self.choices.append( ('q', 0, q_value.item()) )
+            exp = self.env.act(action[0].item(), action[1].item())
+            if exp.game_over:
+                ic(exp.reward)
+                exp_seq_list.append(self.env.exp_seq)
+                choices_list.append(self.choices)
+                embed()
+            else:
+                assert exp.reward > -2
+                self.tree_explore(q_net, topk, exp_seq_list, choices_list, visited)
+            self.env.back_step()
+            self.choices.pop()
+        # end for
+        visited.remove(cur_hash)
 
 class DQNMod(pl.LightningModule):
 
@@ -340,6 +397,10 @@ class DQNMod(pl.LightningModule):
         clear_buf_after_better: bool = False,
         init_state_buf_size: int = 512,
         agent_episode: bool = True,
+        qgnn_h_feats: int = 64,
+        qgnn_inter_dim: int = 64,
+        test_topk: int = 3,
+        mode: str = 'unknown',
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -353,14 +414,15 @@ class DQNMod(pl.LightningModule):
             no_increase=no_increase,
             include_nop=include_nop,
         )
+        self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
         init_dag = parser.load_qasm_str(init_graph_qasm_str)
         init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
         self.init_graph = init_graph
 
-        self.q_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
-        self.target_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
+        self.q_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
+        self.target_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
         self.target_net.load_state_dict(self.q_net.state_dict())
         self.loss_fn = nn.MSELoss()
 
@@ -381,10 +443,11 @@ class DQNMod(pl.LightningModule):
         self.episode_reward = 0
         self.total_reward = 0
         self.num_out_graphs = 0
-        self.pretrained_q_net = QGNN(self.hparams.gate_type_num, 64, quartz_context.num_xfers, 64)
+        self.pretrained_q_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
 
         self.load_pretrained_weight()
-        self.populate(self.hparams.warm_start_steps)
+        if mode != 'test':
+            self.populate(self.hparams.warm_start_steps)
 
     def load_pretrained_weight(self):
         if self.hparams.pretrained_weight_path is not None:
@@ -400,7 +463,7 @@ class DQNMod(pl.LightningModule):
             self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
             self.target_net.load_state_dict(self.q_net.state_dict())
 
-    def _output_seq(self):
+    def _output_seq(self, exp_seq: list = None, choices: list = None):
         # output sequence
         self.num_out_graphs += 1
         out_dir = os.path.join(
@@ -410,12 +473,16 @@ class DQNMod(pl.LightningModule):
         )
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
-        for i_step, exp in enumerate(self.env.exp_seq):
+        if exp_seq is None:
+            exp_seq = self.env.exp_seq
+        if choices is None:
+            choices = self.agent.choices
+        for i_step, exp in enumerate(exp_seq):
             out_path = os.path.join(
                 out_dir,
                 f'{i_step}_{exp.next_state.gate_count}_{exp.action_node}_{exp.action_xfer}_'
-                f'{self.agent.choices[i_step][0]}_{self.agent.choices[i_step][1]:.3f}.qasm',
-            ) # TODO  wrong filename
+                f'{choices[i_step][0]}_{choices[i_step][1]:.3f}_{choices[i_step][2]:.3f}.qasm',
+            )
             qasm_str = exp.next_state.to_qasm_str()
             with open(out_path, 'w') as f:
                 print(qasm_str, file=f)
@@ -440,7 +507,7 @@ class DQNMod(pl.LightningModule):
                 self.best_graph = exp.next_state
                 print(
                     f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}'
+                    f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
                 )
                 self._output_seq()
                 # reset
@@ -474,7 +541,7 @@ class DQNMod(pl.LightningModule):
     def agent_episode(self, eps: float) -> Tuple[Experience, int]:
         while True:
             exp, env_cur_step = self.agent_step(eps)
-            if exp.game_over == True:
+            if exp.game_over is True:
                 break
         return exp, env_cur_step
 
@@ -657,12 +724,99 @@ class DQNMod(pl.LightningModule):
         dataset = DummyDataset()
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
+            batch_size=1,
         )
         return dataloader
     
-    def test_step(self, batch, batch_idx):
+    def __test_step(self, batch, batch_idx) -> int :
+        assert self.env.state == self.init_graph
+        exp_seq_list: list = []
+        choices_list: list = []
+        self.agent.tree_explore(self.q_net, self.hparams.test_topk, exp_seq_list, choices_list, set())
+        best_graph = self.init_graph
+        for exp_seq, choices in zip(exp_seq_list, choices_list):
+            exp = exp_seq[-1]
+            assert exp.game_over
+            if exp.next_state and \
+                exp.next_state.gate_count < best_graph.gate_count:
+                # a better graph is found
+                best_graph = exp.next_state
+                print(
+                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
+                    f' method: {choices[-1][0]}, eps: {choices[-1][1]: .3f}, q: {choices[-1][2]: .3f}'
+                )
+                self._output_seq(exp_seq, choices)
+            else:
+                print(f'Failed to find a better graph this time.')
+                pass
         
-        return 0
+        return 0.0
+    
+    @torch.no_grad()
+    def test_step(self, batch, batch_idx) -> int:
+        assert self.env.state == self.init_graph
+
+        cur_graph = self.init_graph
+        cur_hash = cur_graph.hash()
+        q = [ (cur_graph, 0, 0, cur_hash) ]
+        visited = set()
+        visited.add(cur_hash)
+        hash_2_graph = {} # hash -> graph
+        hash_2_exp = {}
+
+        best_graph, best_gc = cur_graph, cur_graph.gate_count
+        print(f'Start BFS')
+        with tqdm(
+            total=self.init_graph.gate_count,
+            desc='num of gates reduced',
+            bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
+        ) as pbar:
+
+            while len(q) > 0:
+                cur_graph, m_cur_q, cur_depth, cur_hash = heapq.heappop(q)
+                hash_2_graph[cur_hash] = cur_graph
+                if cur_graph.gate_count < best_gc:
+                    pbar.update(best_gc - cur_graph.gate_count)
+                    best_graph = cur_graph
+                    best_gc = cur_graph.gate_count
+                    print(
+                        f'Better graph with gc {best_gc} is found!'
+                        f' Q: {hash_2_exp[cur_hash][3]}'
+                    )
+
+                if cur_depth >= self.hparams.episode_length:
+                    continue
+                
+                cur_dgl_graph: dgl.graph = cur_graph.to_dgl_graph().to(self.device)
+                # (num_nodes, num_actions)
+                q_values = self.q_net(cur_dgl_graph)
+                topk_q_values, topk_actions = topk_2d(q_values, self.hparams.test_topk, as_tuple=False)
+                for q_value, action in zip(topk_q_values, topk_actions):
+                    action_node = action[0].item()
+                    action_xfer = action[1].item()
+                    next_graph = cur_graph.apply_xfer(
+                        xfer=self.quartz_context.get_xfer_from_id(id=action_xfer),
+                        node=cur_graph.all_nodes()[action_node],
+                    )
+                    if next_graph is not None:
+                        next_hash = next_graph.hash()
+                        if next_hash not in visited:
+                            visited.add(next_hash)
+                            hash_2_exp[next_hash] = (cur_hash, action_node, action_xfer, q_value)
+                            heapq.heappush(q, (next_graph, -q_value, cur_depth + 1, next_hash))
+                            if next_graph.gate_count < cur_graph.gate_count:
+                                pass
+                
+                pbar.set_postfix({
+                    'cur_gate_cnt': cur_graph.gate_count,
+                    'best_gate_cnt': best_gc,
+                    '|q|': len(q),
+                    '|visited|': len(visited),
+                })
+                pbar.refresh()
+                
+                # end for
+            # end while
 
 def seed_all(seed: int):
     if seed is not None:
@@ -782,6 +936,10 @@ def main(cfg):
         restart_from_best=cfg.restart_from_best,
         clear_buf_after_better=cfg.clear_buf_after_better,
         agent_episode=cfg.agent_episode,
+        qgnn_h_feats=cfg.qgnn_h_feats,
+        qgnn_inter_dim=cfg.qgnn_inter_dim,
+        test_topk=cfg.test_topk,
+        mode=cfg.mode,
     )
 
     # TODO  how to resume RL training? how to save the state and buffer?

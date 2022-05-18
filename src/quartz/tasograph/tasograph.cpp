@@ -1920,12 +1920,14 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
             }
           }
         }
-        if (outEdges.find((*it)->mapOp) != outEdges.end()) {
-          auto out_es = outEdges.find((*it)->mapOp)->second;
-          for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
-            op_set.insert(e_it->dstOp);
-          }
-        }
+        // if(op_set.empty()){
+        //     if (outEdges.find((*it)->mapOp) != outEdges.end()) {
+        //     auto out_es = outEdges.find((*it)->mapOp)->second;
+        //     for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
+        //         op_set.insert(e_it->dstOp);
+        //     }
+        //     }
+        // }
       }
       for (size_t i = 0; i < ops_num; ++i) {
         if (op_set.find(all_ops[i]) != op_set.end()) {

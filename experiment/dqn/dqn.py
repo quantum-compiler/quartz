@@ -340,35 +340,6 @@ class Agent:
     def clear_choices(self):
         self.choices = [ ('s', 0, 0) ]
 
-    def tree_explore(
-        self, q_net: nn.Module, topk: int = 1,
-        exp_seq_list: list = [], choices_list: list = [], visited: set = set(),
-    ) -> None:
-        cur_hash = self.env.state.hash()
-        if cur_hash in visited:
-            return
-        visited.add(cur_hash)
-        # ic(self.env.exp_seq[-1])
-        ic(cur_hash)
-        ic(self.env.cur_step)
-        ic(self.env.state.gate_count)
-        # (k, 2)
-        topk_actions, topk_q_values = self._get_action(q_net, 0, topk=topk, append_choice=False)
-        for action, q_value in zip(topk_actions, topk_q_values):
-            self.choices.append( ('q', 0, q_value.item()) )
-            exp = self.env.act(action[0].item(), action[1].item())
-            if exp.game_over:
-                ic(exp.reward)
-                exp_seq_list.append(self.env.exp_seq)
-                choices_list.append(self.choices)
-                embed()
-            else:
-                assert exp.reward > -2
-                self.tree_explore(q_net, topk, exp_seq_list, choices_list, visited)
-            self.env.back_step()
-            self.choices.pop()
-        # end for
-        visited.remove(cur_hash)
 
 class DQNMod(pl.LightningModule):
 
@@ -556,7 +527,7 @@ class DQNMod(pl.LightningModule):
             self.agent_step(1.0)
     
     def _compute_loss(self, batch) -> torch.Tensor:
-        states, action_nodes, action_xfers, rewards, next_states, _ = batch
+        states, action_nodes, action_xfers, rewards, next_states, game_overs = batch
         cur_num_nodes = states.batch_num_nodes().tolist()
         next_num_nodes = next_states.batch_num_nodes().tolist()
 
@@ -566,25 +537,29 @@ class DQNMod(pl.LightningModule):
             with torch.no_grad():
                 target_next_q_values = self.target_net(next_states)
             # ( sum(num of nodes), )
-            target_next_max_q_values_all_nodes, _ = torch.max(target_next_q_values, dim=-1)
-        # pad neg rewards for empty graphs
+            target_next_max_q_values_all_nodes, _ = torch.max(target_next_q_values, dim=1)
+        # compute max q values for next states
         target_next_max_q_values = []
-        next_num_nodes_fixed = []
-        r_start, r_end = 0, 0
-        for i_batch, next_num_node in enumerate(next_num_nodes):
-            r_end += next_num_node
-            r = slice(r_start, r_end)
+        r_next_start, r_next_end = 0, 0
+        r_cur_start, r_cur_end = 0, 0
+        presum_cur_num_nodes = 0
+        for i_batch in range(len(cur_num_nodes)):
+            r_next_end += next_num_nodes[i_batch]
+            r_next = slice(r_next_start, r_next_end)
+            r_cur_end += cur_num_nodes[i_batch]
+            r_cur = slice(r_cur_start, r_cur_end)
+
             target_next_max_q_values.append(
-                torch.max(target_next_max_q_values_all_nodes[r])
-                if next_num_node > 0 else
-                torch.Tensor([-2]) # TODO  neg reward
-            )
-            next_num_nodes_fixed.append(max(1, next_num_node))
-            r_start = r_end
+                torch.max(target_next_max_q_values_all_nodes[r_next])
+                if not game_overs[i_batch] else torch.tensor(0.0).to(self.device)
+            ) # each elem has size [] (0-dim tensor)
+            action_nodes[i_batch] += presum_cur_num_nodes
+            presum_cur_num_nodes += cur_num_nodes[i_batch]
+
+            r_next_start = r_next_end
+            r_cur_start = r_cur_end
         # (batch_size, )
-        target_next_max_q_values = torch.Tensor(
-            target_next_max_q_values
-        ).to(self.device)
+        target_next_max_q_values = torch.stack(target_next_max_q_values)
         # pred_Q = reward_of_action + gamma * target_next_max_Q
         acted_pred_q_values = pred_q_values[action_nodes, action_xfers]
         target_max_q_values = rewards + self.hparams.gamma * target_next_max_q_values
@@ -719,7 +694,6 @@ class DQNMod(pl.LightningModule):
         self.agent.device = self.device
         return super().on_after_batch_transfer(batch, dataloader_idx)
 
-    # TODO  no val or test
     def test_dataloader(self) -> torch.utils.data.DataLoader:
         dataset = DummyDataset()
         dataloader = torch.utils.data.DataLoader(
@@ -728,32 +702,7 @@ class DQNMod(pl.LightningModule):
         )
         return dataloader
     
-    def __test_step(self, batch, batch_idx) -> int :
-        assert self.env.state == self.init_graph
-        exp_seq_list: list = []
-        choices_list: list = []
-        self.agent.tree_explore(self.q_net, self.hparams.test_topk, exp_seq_list, choices_list, set())
-        best_graph = self.init_graph
-        for exp_seq, choices in zip(exp_seq_list, choices_list):
-            exp = exp_seq[-1]
-            assert exp.game_over
-            if exp.next_state and \
-                exp.next_state.gate_count < best_graph.gate_count:
-                # a better graph is found
-                best_graph = exp.next_state
-                print(
-                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    f' method: {choices[-1][0]}, eps: {choices[-1][1]: .3f}, q: {choices[-1][2]: .3f}'
-                )
-                self._output_seq(exp_seq, choices)
-            else:
-                print(f'Failed to find a better graph this time.')
-                pass
-        
-        return 0.0
-    
-    @torch.no_grad()
-    def test_step(self, batch, batch_idx) -> int:
+    def beam_search(self):
         assert self.env.state == self.init_graph
 
         cur_graph = self.init_graph
@@ -814,9 +763,14 @@ class DQNMod(pl.LightningModule):
                     '|visited|': len(visited),
                 })
                 pbar.refresh()
-                
                 # end for
             # end while
+        # end with
+    
+    @torch.no_grad()
+    def test_step(self, batch, batch_idx) -> int:
+        self.beam_search()
+
 
 def seed_all(seed: int):
     if seed is not None:

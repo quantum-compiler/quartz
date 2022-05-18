@@ -27,14 +27,17 @@ batch_size: 1024
 gamma: 0.9
 target_update_interval: 100
 replaybuf_size: 10240
-init_state_buf_size: 256
+init_state_buf_size: 1024
 nop_policy: ['s', 0.0]
+sample_init: True
 restart_from_best: False
+game_over_when_better: True
+strict_better: True
 restore_weight_after_better: False
 clear_buf_after_better: False
 agent_episode: True
 
 qgnn_h_feats: 64
 qgnn_inter_dim: 64
-
+episode_length: 30
 test_topk: 3

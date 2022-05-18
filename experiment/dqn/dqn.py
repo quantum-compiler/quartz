@@ -211,12 +211,14 @@ class Environment:
         quartz_context: quartz.QuartzContext,
         max_steps_per_episode: int = 100,
         nop_policy: list = ['c', 0.0],
+        game_over_when_better: bool = True,
     ):
         self.init_graph = init_graph
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         self.max_steps_per_episode = max_steps_per_episode
         self.nop_policy = nop_policy
+        self.game_over_when_better = game_over_when_better
         
         self.state = None
         self.cur_step = 0
@@ -278,8 +280,8 @@ class Environment:
             game_over = True
             # TODO  whether we need to change this_step_reward here?
         
-        if this_step_reward > 0:
-            game_over = True # TODO  only apply one xfer each episode
+        if self.game_over_when_better and this_step_reward > 0:
+            game_over = True # TODO  only reduce gate count once in each episode
             # TODO  note this case: 58 -> 80 -> 78
 
         exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
@@ -356,7 +358,7 @@ class DQNMod(pl.LightningModule):
         eps_decay: float = 0.0001,
         eps_min: float = 0.05,
         gamma: float = 0.9,
-        episode_length: int = 100, # TODO  check these hparams
+        episode_length: int = 30, # TODO  check these hparams
         replaybuf_size: int = 10_000,
         warm_start_steps: int = 512,
         target_update_interval: int = 100,
@@ -364,7 +366,10 @@ class DQNMod(pl.LightningModule):
         pretrained_weight_path: str = None,
         restore_weight_after_better: bool = False,
         nop_policy: list = ['c', 0.0],
+        sample_init: bool = False,
         restart_from_best: bool = False,
+        game_over_when_better: bool = True,
+        strict_better: bool = True,
         clear_buf_after_better: bool = False,
         init_state_buf_size: int = 512,
         agent_episode: bool = True,
@@ -402,6 +407,7 @@ class DQNMod(pl.LightningModule):
             quartz_context=quartz_context,
             max_steps_per_episode=episode_length,
             nop_policy=nop_policy,
+            game_over_when_better=game_over_when_better,
         )
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
@@ -463,49 +469,45 @@ class DQNMod(pl.LightningModule):
         self.buffer.append(exp)
         env_cur_step = self.env.cur_step
 
-        if exp.game_over and exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count:
+        if exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count \
+            and (not self.hparams.strict_better or self.agent.choices[-1][0] == 'q'):
             # better graph found, add it to init_state_buffer
             self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
-        elif exp.next_state:
-            if np.random.random() < 0.10 or len(self.init_state_buffer) < 10:
-                self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
+        elif exp.next_state and (np.random.random() < 0.10 or len(self.init_state_buffer) < 10):
+            self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
+
+        if exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count:
+            # a better graph is found
+            print(
+                f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
+                f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
+            )
+            if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
+                print(f'Best graph updated to {exp.next_state.gate_count} .')
+                self.best_graph = exp.next_state
+                self._output_seq()
 
         if exp.game_over:
             # TODO  if a better graph is found, clear the buffer and populate it with the new graph?
-            if exp.next_state and \
-                exp.next_state.gate_count < self.best_graph.gate_count:
-                # a better graph is found
-                self.best_graph = exp.next_state
-                print(
-                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
-                )
-                self._output_seq()
-                # reset
-                if self.hparams.restart_from_best:
-                    # start from the best graph
-                    self.env.set_init_state(exp.next_state)
-                else:
-                    # sample a init state
-                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
-                    self.env.set_init_state(init_state_pair[1])
-                
-                self.agent.clear_choices()
-                if self.hparams.clear_buf_after_better:
-                    # clear and re-populate
-                    self.buffer.buffer.clear()
-                    # may meet gate count reduction again, which introduces recursions
-                    self.populate(self.hparams.warm_start_steps)
-                if self.hparams.restore_weight_after_better:
-                    self._restore_pretrained_weight()
+            # reset
+            if self.hparams.sample_init:
+                # sample a init state
+                init_state_pair = self.init_state_buffer.sample(k=1)[0]
+                self.env.set_init_state(init_state_pair[1])
+            elif self.hparams.restart_from_best:
+                # start from the best graph
+                self.env.set_init_state(self.best_graph)
             else:
-                self.agent.clear_choices()
-                if self.hparams.restart_from_best:
-                    self.env.reset()
-                else:
-                    # sample a init state
-                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
-                    self.env.set_init_state(init_state_pair[1])
+                self.env.reset()
+            
+            self.agent.clear_choices()
+            if self.hparams.clear_buf_after_better:
+                # clear and re-populate
+                self.buffer.buffer.clear()
+                # may meet gate count reduction again, which introduces recursions
+                self.populate(self.hparams.warm_start_steps)
+            if self.hparams.restore_weight_after_better:
+                self._restore_pretrained_weight()
         # end if
         return exp, env_cur_step
 
@@ -887,11 +889,14 @@ def main(cfg):
         restore_weight_after_better=cfg.restore_weight_after_better,
         target_update_interval=cfg.target_update_interval,
         nop_policy=cfg.nop_policy,
+        sample_init=cfg.sample_init,
         restart_from_best=cfg.restart_from_best,
+        game_over_when_better=cfg.game_over_when_better,
         clear_buf_after_better=cfg.clear_buf_after_better,
         agent_episode=cfg.agent_episode,
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,
+        episode_length=cfg.episode_length,
         test_topk=cfg.test_topk,
         mode=cfg.mode,
     )

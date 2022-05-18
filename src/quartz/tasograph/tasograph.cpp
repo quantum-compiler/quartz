@@ -2214,4 +2214,19 @@ void Graph::add_swap(const Edge& e1, const Edge& e2) {
     propagate_mapping();
 }
 
+void Graph::set_physical_mapping(const std::vector<int>& logical2physical) {
+    // set a trivial mapping
+    qubit_mapping_table.clear();
+    _trivial_mapping();
+    // modify it to our target and propagate
+    QubitMappingTable new_table;
+    for (const auto& op_pair : qubit_mapping_table) {
+        int logical_idx = op_pair.second.first;
+        int physical_idx = logical2physical[logical_idx];
+        new_table.insert({op_pair.first, std::pair<int, int>(logical_idx, physical_idx)});
+    }
+    qubit_mapping_table = new_table;
+    propagate_mapping();
+}
+
 }; // namespace quartz

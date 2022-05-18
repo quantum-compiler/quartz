@@ -248,6 +248,8 @@ public:
   double circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGraph>& device);
   // physical mapping with RL
   void add_swap(const Edge& e1, const Edge& e2);
+  // utils
+  void set_physical_mapping(const std::vector<int>& logical2physical);
 
 
 private:

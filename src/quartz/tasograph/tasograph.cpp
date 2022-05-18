@@ -4,6 +4,10 @@
 
 #include <cassert>
 #include <iomanip>
+#include <random>
+#include <algorithm>
+#include <iterator>
+#include <vector>
 
 namespace quartz {
 
@@ -1963,9 +1967,13 @@ void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, i
     _trivial_mapping();
     size_t num_qubits = qubit_mapping_table.size();
     std::vector<int> l2p;
+    l2p.reserve(num_qubits);
     for (int i = 0; i < num_qubits; ++i) {
         l2p.emplace_back(i);
     }
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(l2p.begin(), l2p.end(), g);
     set_physical_mapping(l2p);
 
     // perform sabre search

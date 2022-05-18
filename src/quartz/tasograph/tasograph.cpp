@@ -1909,7 +1909,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     auto ops_num = all_ops.size();
     // The destination graph in xfer is an empty graph
     if (xfer->dstOps.size() == 0) {
-      std::set<Op> op_set;
+      std::unordered_set<Op, OpHash> op_set;
       for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
         if (inEdges.find((*it)->mapOp) != inEdges.end()) {
           auto in_es = inEdges.find((*it)->mapOp)->second;
@@ -1923,7 +1923,8 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
         // if(op_set.empty()){
         //     if (outEdges.find((*it)->mapOp) != outEdges.end()) {
         //     auto out_es = outEdges.find((*it)->mapOp)->second;
-        //     for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
+        //     for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it)
+        //     {
         //         op_set.insert(e_it->dstOp);
         //     }
         //     }

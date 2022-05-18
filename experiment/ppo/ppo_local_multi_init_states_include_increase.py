@@ -158,7 +158,7 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward):
 
             trajectory_reward += reward
 
-            if trajectory_reward >= 0:
+            if trajectory_reward > 0:
                 intermediate_graphs.append(next_graph)
 
             reward = torch.tensor(reward, dtype=torch.float)
@@ -296,8 +296,8 @@ for i_episode in tqdm(range(episodes)):
         # Sample from intermediate_graphs
         for g in intermediate_graphs:
             g_hash = g.hash()
-            if g_hash % 1000 == 0:
-                if g_hash not in new_init_state_hash_set:
+            if g_hash not in new_init_state_hash_set:
+                if random.random() < 0.005:
                     new_init_state_hash_set.add(g_hash)
                     new_init_graphs.append(g)
 

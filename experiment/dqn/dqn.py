@@ -383,12 +383,14 @@ class DQNMod(pl.LightningModule):
         eps_decay: float = 0.0001,
         eps_min: float = 0.05,
         target_update_interval: int = 100,
+        agent_play_interval: int = 4,
         warm_start_steps: int = 512,
         replaybuf_size: int = 10_000,
         init_state_buf_size: int = 512,
         prioritized_buffer: bool = True,
         prio_alpha: float = 0.2,
         prio_init_beta: float = 0.6,
+        double_dqn: bool = False,
         # how to play
         agent_episode: bool = True,
         strict_better: bool = True,
@@ -496,7 +498,9 @@ class DQNMod(pl.LightningModule):
                 print(qasm_str, file=f)
     
     def save_ckpt(self, name: str):
-        self.trainer.save_checkpoint(filepath=os.path.join(self.output_dir, f'{name}.ckpt'))
+        self.trainer.save_checkpoint(
+            filepath=os.path.join(self.hparams.output_dir, f'{name}.ckpt')
+        )
 
     def agent_step(self, eps: float) -> Tuple[Experience, int]:
         exp = self.agent.play_step(self.q_net, eps)
@@ -599,11 +603,17 @@ class DQNMod(pl.LightningModule):
         """predict max next Q values"""
         if max(next_num_nodes) > 0:
             with torch.no_grad():
-                next_q_values = self.target_net(b_next_state)
-            # ( sum(next_num_nodes), )
-            next_max_q_values, _ = torch.max(next_q_values, dim=1)
+                # ( sum(next_num_nodes), num_actions)
+                next_q_values_tnet = self.target_net(b_next_state)
+                if self.hparams.double_dqn:
+                    next_q_values_qnet = self.q_net(b_next_state)
+            if self.hparams.double_dqn:
+                pass
+            else:
+                # ( sum(next_num_nodes), )
+                next_max_q_values_tnet, _ = torch.max(next_q_values_tnet, dim=1)
         # compute max q values for next states
-        target_next_max_q_values = []
+        target_next_q_values = []
         r_next_start, r_next_end = 0, 0
         r_cur_start, r_cur_end = 0, 0
         presum_cur_num_nodes = 0
@@ -613,19 +623,28 @@ class DQNMod(pl.LightningModule):
             r_cur_end += cur_num_nodes[i_batch]
             r_cur = slice(r_cur_start, r_cur_end)
             # NOTE: zero if game over
-            target_next_max_q_values.append(
-                torch.max(next_max_q_values[r_next])
-                if not game_overs[i_batch] else torch.tensor(0.0).to(self.device)
-            ) # each elem has size [] (0-dim tensor)
+            if game_overs[i_batch]:
+                target_next_q = torch.tensor(0.0).to(self.device)
+            else:
+                # each elem has size [] (0-dim tensor)
+                if self.hparams.double_dqn:
+                    """double DQN"""
+                    # Ref: https://arxiv.org/pdf/1509.06461.pdf
+                    max_q, opt_action = topk_2d(next_q_values_qnet[r_next, :], k=1)
+                    opt_action = opt_action[0]
+                    target_next_q = next_q_values_tnet[r_next, :][opt_action[0], opt_action[1]]
+                else:
+                    target_next_q = torch.max(next_max_q_values_tnet[r_next])
+            target_next_q_values.append(target_next_q)
             action_nodes[i_batch] += presum_cur_num_nodes
             presum_cur_num_nodes += cur_num_nodes[i_batch]
 
             r_next_start = r_next_end
             r_cur_start = r_cur_end
         # (batch_size, )
-        target_next_max_q_values = torch.stack(target_next_max_q_values)
+        target_next_q_values = torch.stack(target_next_q_values)
         acted_pred_q_values = pred_q_values[action_nodes, action_xfers]
-        target_max_q_values = rewards + self.hparams.gamma * target_next_max_q_values
+        target_max_q_values = rewards + self.hparams.gamma * target_next_q_values
         if self.hparams.prioritized_buffer:
             # Ref: https://github.com/Curt-Park/rainbow-is-all-you-need
             """compute element-wise loss and weighted loss"""
@@ -643,12 +662,12 @@ class DQNMod(pl.LightningModule):
 
         self.log_dict({
             f'mean_batch_reward': rewards.mean(),
-            f'mean_target_next_max_Q': target_next_max_q_values.mean(),
+            f'mean_target_next_max_Q': target_next_q_values.mean(),
             f'mean_target_max_Q': target_max_q_values.mean(),
             f'mean_pred_Q': acted_pred_q_values.mean(),
 
             f'max_batch_reward': rewards.max(),
-            f'max_target_next_max_Q': target_next_max_q_values.max(),
+            f'max_target_next_max_Q': target_next_q_values.max(),
             f'max_target_max_Q': target_max_q_values.max(),
             f'max_pred_Q': acted_pred_q_values.max(),
         }, on_step=True)
@@ -675,18 +694,19 @@ class DQNMod(pl.LightningModule):
             self.hparams.eps_min
         )
         # if self.hparams.agent_episode:
-        last_exp, tot_steps, acc_reward = self.agent_episode(self.eps)
+        if self.global_step % self.hparams.agent_play_interval == 0:
+            last_exp, tot_steps, acc_reward = self.agent_episode(self.eps)
+            self.log_dict({
+                f'eps': self.eps,
+                f'epsisode_steps': tot_steps,
+                f'episode_reward': acc_reward,
+                f'prio_beta': self.prio_beta,
+            }, on_step=True)
         
         if self.global_step and self.global_step % self.hparams.target_update_interval == 0:
             self.target_net.load_state_dict(self.q_net.state_dict())
         
         self.log(f'train_loss', loss)
-        self.log_dict({
-            f'eps': self.eps,
-            f'epsisode_steps': tot_steps,
-            f'episode_reward': acc_reward,
-            f'prio_beta': self.prio_beta,
-        }, on_step=True)
         self.log_dict({
             f'best_gc': self.best_graph.gate_count,
             f'init':    self.env.init_graph.gate_count,
@@ -1002,12 +1022,14 @@ def main(cfg):
         scheduler=cfg.scheduler,
         batch_size=cfg.batch_size,
         target_update_interval=cfg.target_update_interval,
+        agent_play_interval=cfg.agent_play_interval,
         warm_start_steps=cfg.batch_size * 2,
         replaybuf_size=cfg.replaybuf_size,
         init_state_buf_size=cfg.init_state_buf_size,
         prioritized_buffer=cfg.prioritized_buffer,
         prio_alpha=cfg.prio_alpha,
         prio_init_beta=cfg.prio_init_beta,
+        double_dqn=cfg.double_dqn,
         
         agent_episode=cfg.agent_episode,
         strict_better=cfg.strict_better,

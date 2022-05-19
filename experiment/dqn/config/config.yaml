@@ -23,15 +23,15 @@ ecc_file: 'bfs_verified_simplified.json'
 no_increase: True
 include_nop: False
 
-batch_size: 1024
+batch_size: 256
 gamma: 0.9
 target_update_interval: 100
-replaybuf_size: 10240
+replaybuf_size: 102400
 init_state_buf_size: 1024
 nop_policy: ['s', 0.0]
-sample_init: True
+sample_init: False
 restart_from_best: False
-game_over_when_better: True
+game_over_when_better: False
 strict_better: True
 restore_weight_after_better: False
 clear_buf_after_better: False

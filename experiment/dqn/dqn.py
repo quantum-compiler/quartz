@@ -186,22 +186,23 @@ class ReplayBuffer:
     def update_prios(self, indices: List[int] | torch.Tensor, prios: torch.Tensor) -> None:
         self.prios[indices] = prios
     
-    def sample(self, sample_size: int = 100) -> Tuple[List[Experience], torch.Tensor, torch.Tensor]:
+    def sample(self, sample_size: int = 100) -> Tuple[List[Experience], torch.Tensor, torch.Tensor, torch.tensor]:
         sample_size = min(sample_size, len(self.buffer))
         if self.prioritized:
-            normed_prios = self.prios / self.prios.sum()
+            sum_prios = self.prios.sum()
+            normed_prios = self.prios / sum_prios
             indices = torch.multinomial(self.prios, sample_size, replacement=False)
             indices_list = indices.tolist()
             exps = [self.buffer[idx] for idx in indices_list]
-            return exps, indices, normed_prios[indices]
+            return exps, indices, normed_prios[indices], self.prios.min() / sum_prios
         else:
             indices = torch.multinomial(torch.ones(len(self)), sample_size, replacement=False)
             indices_list = indices.tolist()
             exps = [self.buffer[idx] for idx in indices_list]
-            return exps, indices, None
+            return exps, indices, None, None
     
     def min_prio(self) -> torch.tensor:
-        return self.prios.min()
+        return 
 
 class DummyDataset(torch.utils.data.Dataset):
 
@@ -570,8 +571,8 @@ class DQNMod(pl.LightningModule):
             self.agent_step(1.0)
     
     def _compute_loss(
-        self, exps: List[Experience],
-        indices: torch.Tensor, sampled_normed_prios: torch.Tensor
+        self, exps: List[Experience], indices: torch.Tensor,
+        normed_prios: torch.Tensor, min_normed_prio: torch.tensor,
     ) -> torch.Tensor:
         """prepare batched data"""
         states, action_nodes, action_xfers, \
@@ -585,13 +586,14 @@ class DQNMod(pl.LightningModule):
         cur_num_nodes = b_state.batch_num_nodes().tolist()
         next_num_nodes = b_next_state.batch_num_nodes().tolist()
         rewards = torch.Tensor(rewards).to(self.device)
+        action_nodes = list(action_nodes)
         """predict Q values"""
         # ( sum(cur_num_nodes), num_xfers )
-        pred_q_values = self.q_net(states)
+        pred_q_values = self.q_net(b_state)
         """predict max next Q values"""
         if max(next_num_nodes) > 0:
             with torch.no_grad():
-                next_q_values = self.target_net(next_states)
+                next_q_values = self.target_net(b_next_state)
             # ( sum(next_num_nodes), )
             next_max_q_values, _ = torch.max(next_q_values, dim=1)
         # compute max q values for next states
@@ -623,16 +625,16 @@ class DQNMod(pl.LightningModule):
             """compute element-wise loss and weighted loss"""
             # pred_Q = reward_of_action + gamma * target_next_max_Q
             elementwise_loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
-            loss_weights = (len(self.buffer) * sampled_normed_prios) ** (-self.prio_beta)
-            max_loss_weights = (len(self.buffer) * self.buffer.min_prio()) ** (-self.prio_beta)
+            loss_weights = (len(self.buffer) * normed_prios) ** (-self.prio_beta)
+            max_loss_weights = (len(self.buffer) * min_normed_prio) ** (-self.prio_beta)
             normed_loss_weights = loss_weights / max_loss_weights
-            loss = normed_loss_weights.dot(elementwise_loss) / elementwise_loss.shape[0]
+            loss = torch.mean(normed_loss_weights * elementwise_loss)
             """compute priorities and update them to the buffer"""
             prios = (elementwise_loss.detach() + 1e-6) ** self.hparams.prio_alpha
             self.buffer.update_prios(indices, prios)
         else:
             loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
-
+        
         self.log_dict({
             f'mean_batch_reward': rewards.mean(),
             f'mean_target_next_max_Q': target_next_max_q_values.mean(),
@@ -659,8 +661,8 @@ class DQNMod(pl.LightningModule):
         # schedule prio_beta
         self.prio_beta = self.hparams.prio_init_beta + \
             (1.0 - self.hparams.prio_init_beta) * self.global_step / 1e5
-        exps, indices, normed_prios = self.buffer.sample(self.hparams.batch_size)
-        loss = self._compute_loss(exps, indices, normed_prios)
+        exps, indices, normed_prios, min_normed_prio = self.buffer.sample(self.hparams.batch_size)
+        loss = self._compute_loss(exps, indices, normed_prios, min_normed_prio)
 
         """play an episode"""
         self.eps = max(
@@ -770,7 +772,7 @@ class DQNMod(pl.LightningModule):
         return dataloader
     
     def train_dataloader(self) -> torch.utils.data.DataLoader:
-        dataset = DummyDataset(size=100)
+        dataset = DummyDataset(size=self.hparams.target_update_interval)
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
             batch_size=1,

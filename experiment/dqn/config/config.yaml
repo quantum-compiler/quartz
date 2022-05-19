@@ -26,7 +26,7 @@ nop_policy: ['s', 0.0]
 gamma: 0.9
 episode_length: 60
 
-batch_size: 256
+batch_size: 1024
 scheduler: 'reduce'
 target_update_interval: 100
 replaybuf_size: 102400

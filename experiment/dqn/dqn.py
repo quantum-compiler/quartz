@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -520,10 +521,16 @@ class DQNMod(pl.LightningModule):
                 f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
             )
             if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
-                print(f'Best graph updated to {exp.next_state.gate_count} .')
+                info = f'Best graph updated to {exp.next_state.gate_count} .'
+                print(info)
                 self.best_graph = exp.next_state
                 self._output_seq()
                 self.save_ckpt(f'best_{exp.next_state.gate_count}_step_{self.global_step}')
+                wandb.alert(
+                    title='Better graph is found!',
+                    text=info, level=wandb.AlertLevel.INFO,
+                    wait_duration=0,
+                )
 
         if exp.game_over:
             """reset env"""
@@ -570,10 +577,9 @@ class DQNMod(pl.LightningModule):
         for i in tqdm(range(steps), desc='Populating the buffer'):
             self.agent_step(1.0)
     
-    def _compute_loss(
-        self, exps: List[Experience], indices: torch.Tensor,
-        normed_prios: torch.Tensor, min_normed_prio: torch.tensor,
-    ) -> torch.Tensor:
+    def _compute_loss(self) -> torch.Tensor:
+        exps, indices, normed_prios, min_normed_prio = \
+            self.buffer.sample(self.hparams.batch_size)
         """prepare batched data"""
         states, action_nodes, action_xfers, \
             rewards, next_states, game_overs = zip(*exps)
@@ -634,7 +640,7 @@ class DQNMod(pl.LightningModule):
             self.buffer.update_prios(indices, prios)
         else:
             loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
-        
+
         self.log_dict({
             f'mean_batch_reward': rewards.mean(),
             f'mean_target_next_max_Q': target_next_max_q_values.mean(),
@@ -661,8 +667,7 @@ class DQNMod(pl.LightningModule):
         # schedule prio_beta
         self.prio_beta = self.hparams.prio_init_beta + \
             (1.0 - self.hparams.prio_init_beta) * self.global_step / 1e5
-        exps, indices, normed_prios, min_normed_prio = self.buffer.sample(self.hparams.batch_size)
-        loss = self._compute_loss(exps, indices, normed_prios, min_normed_prio)
+        loss = self._compute_loss()
 
         """play an episode"""
         self.eps = max(

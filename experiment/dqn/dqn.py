@@ -517,27 +517,32 @@ class DQNMod(pl.LightningModule):
             elif exp.next_state and (np.random.random() < 0.10 or len(self.init_state_buffer) < 10):
                 self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
 
-        """maintain the best graph info"""
-        if exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count:
-            # a better graph is found
-            print(
-                f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
-            )
-            if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
-                info = f'Best graph updated to {exp.next_state.gate_count} .'
-                print(info)
-                self.best_graph = exp.next_state
-                self._output_seq()
-                self.save_ckpt(f'best_{exp.next_state.gate_count}_step_{self.global_step}')
-                wandb.alert(
-                    title='Better graph is found!',
-                    text=info, level=wandb.AlertLevel.INFO,
-                    wait_duration=0,
+        """maintain the best graph info"""        
+        if exp.next_state and exp.next_state.gate_count < self.episode_best_gc:
+            self.episode_best_gc = exp.next_state.gate_count
+            if exp.next_state.gate_count < self.best_graph.gate_count:
+                # a better graph is found
+                print(
+                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
+                    f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
                 )
+                if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
+                    info = f'Best graph updated to {exp.next_state.gate_count} .'
+                    print(info)
+                    self.best_graph = exp.next_state
+                    self._output_seq()
+                    self.save_ckpt(f'best_{exp.next_state.gate_count}_step_{self.global_step}')
+                    wandb.alert(
+                        title='Better graph is found!',
+                        text=info, level=wandb.AlertLevel.INFO,
+                        wait_duration=0,
+                    )
+            # end if
+        # end if
 
         if exp.game_over:
             """reset env"""
+            self.episode_best_gc = 0x7fffffff
             if self.hparams.sample_init:
                 raise NotImplementedError('init state sampling is deprecated')
                 # sample a init state
@@ -564,6 +569,7 @@ class DQNMod(pl.LightningModule):
 
     def agent_episode(self, eps: float) -> Tuple[Experience, int, float]:
         acc_reward = 0
+        self.episode_best_gc = 0x7fffffff
         while True:
             exp, env_cur_step = self.agent_step(eps)
             acc_reward += exp.reward

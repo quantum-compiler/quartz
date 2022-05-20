@@ -202,8 +202,8 @@ class ReplayBuffer:
             exps = [self.buffer[idx] for idx in indices_list]
             return exps, indices, None, None
     
-    def min_prio(self) -> torch.tensor:
-        return 
+    def __str__(self):
+        return self.buffer.__str__()
 
 class DummyDataset(torch.utils.data.Dataset):
 
@@ -442,6 +442,7 @@ class DQNMod(pl.LightningModule):
         # self.init_state_buffer = SpecialMinHeap(max_size=init_state_buf_size)
         # self.init_state_buffer.push((0, init_graph))
         self.best_graph = init_graph
+        self.episode_best_gc = 0x7fffffff
 
         self.eps = eps_init
         self.prio_beta = prio_init_beta
@@ -650,12 +651,12 @@ class DQNMod(pl.LightningModule):
         # (batch_size, )
         target_next_q_values = torch.stack(target_next_q_values)
         acted_pred_q_values = pred_q_values[action_nodes, action_xfers]
-        target_max_q_values = rewards + self.hparams.gamma * target_next_q_values
+        target_q_values = rewards + self.hparams.gamma * target_next_q_values
         if self.hparams.prioritized_buffer:
             # Ref: https://github.com/Curt-Park/rainbow-is-all-you-need
             """compute element-wise loss and weighted loss"""
             # pred_Q = reward_of_action + gamma * target_next_max_Q
-            elementwise_loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
+            elementwise_loss = self.loss_fn(acted_pred_q_values, target_q_values)
             loss_weights = (len(self.buffer) * normed_prios) ** (-self.prio_beta)
             max_loss_weights = (len(self.buffer) * min_normed_prio) ** (-self.prio_beta)
             normed_loss_weights = loss_weights / max_loss_weights
@@ -664,17 +665,17 @@ class DQNMod(pl.LightningModule):
             prios = (elementwise_loss.detach() + 1e-6) ** self.hparams.prio_alpha
             self.buffer.update_prios(indices, prios)
         else:
-            loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
-
+            loss = self.loss_fn(acted_pred_q_values, target_q_values)
+        
         self.log_dict({
             f'mean_batch_reward': rewards.mean(),
             f'mean_target_next_max_Q': target_next_q_values.mean(),
-            f'mean_target_max_Q': target_max_q_values.mean(),
+            f'mean_target_max_Q': target_q_values.mean(),
             f'mean_pred_Q': acted_pred_q_values.mean(),
 
             f'max_batch_reward': rewards.max(),
             f'max_target_next_max_Q': target_next_q_values.max(),
-            f'max_target_max_Q': target_max_q_values.max(),
+            f'max_target_max_Q': target_q_values.max(),
             f'max_pred_Q': acted_pred_q_values.max(),
         }, on_step=True)
 
@@ -704,7 +705,7 @@ class DQNMod(pl.LightningModule):
             last_exp, tot_steps, acc_reward = self.agent_episode(self.eps)
             self.log_dict({
                 f'eps': self.eps,
-                f'epsisode_steps': tot_steps,
+                f'episode_steps': tot_steps,
                 f'episode_reward': acc_reward,
                 f'prio_beta': self.prio_beta,
             }, on_step=True)
@@ -742,65 +743,6 @@ class DQNMod(pl.LightningModule):
             }
         else:
             return optimizer
-    
-    def __dataloader(self) -> torch.utils.data.DataLoader:
-        """Initialize the Replay Buffer dataset used for retrieving experiences."""
-        default_collate = torch.utils.data.dataloader.default_collate
-        
-        def collate_fn(batch):
-            """
-            Args:
-                batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
-                    states: [ quartz.PyGraph ]
-                    action_nodes: [ action_node: int ]
-                    action_xfers: [ action_xfer: int ]
-                    rewards: [ reward: float ]
-                    next_states: [ quartz.PyGraph ]
-                    game_overs: [ bool ]
-            
-            Return: batched data
-                batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
-                    b_states: dgl.graph (batched_graph)
-                    b_action_nodes: torch.tensor
-                    b_action_xfers: torch.tensor
-                    b_rewards: torch.Tensor
-                    b_next_states: dgl.graph (batched_graph)
-                    b_game_overs: torch.tensor of 
-            """
-            states, action_nodes, action_xfers, rewards, next_states, game_overs, ids = \
-                list(zip(*batch))
-            states = [state.to_dgl_graph() for state in states]
-            next_states = [
-                next_state.to_dgl_graph()
-                if next_state is not None else dgl.DGLGraph()
-                for next_state in next_states
-            ]
-            b_states = dgl.batch(states)
-            b_next_states = dgl.batch(next_states)
-            b_action_nodes = torch.tensor(action_nodes)
-            b_action_xfers = torch.tensor(action_xfers)
-            b_rewards = torch.Tensor(rewards)
-            b_game_overs = torch.tensor(game_overs, dtype=torch.bool)
-            b_ids = default_collate(ids)
-            return (
-                b_states, b_action_nodes, b_action_xfers, b_rewards, b_next_states, b_game_overs,
-            )
-        
-        # Ref: https://pytorch.org/docs/master/notes/randomness.html#dataloader
-        g = torch.Generator()
-        g.manual_seed(0)
-        
-        dataset = RLDataset(self.buffer, 10 * self.hparams.batch_size)
-        # TODO  not sure if it can avoid duplicate data when using DDP
-        dataloader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            num_workers=4,
-            batch_size=self.hparams.batch_size,
-            # shuffle=self.training, # this would be overwritten by PL
-            collate_fn=collate_fn,
-            generator=g,
-        )
-        return dataloader
     
     def train_dataloader(self) -> torch.utils.data.DataLoader:
         dataset = DummyDataset(size=self.hparams.target_update_interval)
@@ -1025,6 +967,7 @@ def main(cfg):
         gamma=cfg.gamma,
         episode_length=cfg.episode_length,
 
+        lr=cfg.lr,
         scheduler=cfg.scheduler,
         batch_size=cfg.batch_size,
         target_update_interval=cfg.target_update_interval,

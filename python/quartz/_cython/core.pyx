@@ -234,17 +234,26 @@ cdef class QuartzContext:
 
         eq_sets = self.eqs.get_all_equivalence_sets()
 
+        # for i in range(eq_sets.size()):
+        #     for j in range(eq_sets[i].size()):
+        #         if j != 0:
+        #             dag_ptr_0 = eq_sets[i][0]
+        #             dag_ptr_1 = eq_sets[i][j]
+        #             xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+        #             xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
+        #             if xfer_0 != NULL:
+        #                 self.v_xfers.push_back(xfer_0)
+        #             if xfer_1 != NULL:
+        #                 self.v_xfers.push_back(xfer_1)
         for i in range(eq_sets.size()):
             for j in range(eq_sets[i].size()):
-                if j != 0:
-                    dag_ptr_0 = eq_sets[i][0]
-                    dag_ptr_1 = eq_sets[i][j]
-                    xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
-                    xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
-                    if xfer_0 != NULL:
-                        self.v_xfers.push_back(xfer_0)
-                    if xfer_1 != NULL:
-                        self.v_xfers.push_back(xfer_1)
+                for k in range(eq_sets[i].size()):
+                    if j != k:
+                        dag_ptr_0 = eq_sets[i][j]
+                        dag_ptr_1 = eq_sets[i][k]
+                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                        if xfer != NULL:
+                            self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
 
     cdef load_json(self, filename):

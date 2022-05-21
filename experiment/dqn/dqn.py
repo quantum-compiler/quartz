@@ -205,6 +205,30 @@ class ReplayBuffer:
     def __str__(self):
         return self.buffer.__str__()
 
+class InitStateBuffer:
+
+    def __init__(self, capacity: int = 100, init_state: quartz.PyGraph = None):
+        self.capacity = capacity
+        assert init_state is not None
+        self.init_state = init_state
+        self.q = deque(maxlen=capacity)
+    
+    def append(self, item):
+        self.q.append(item)
+    
+    def __len__(self):
+        return len(self.q) + 1
+    
+    def sample(self) -> quartz.PyGraph:
+        idx = np.random.choice(len(self))
+        if idx == len(self.q):
+            return self.init_state
+        else:
+            return self.q[idx]
+    
+    def __str__(self):
+        return self.q.__str__() + f'\ninit_state: {self.init_state}'
+    
 class DummyDataset(torch.utils.data.Dataset):
 
     def __init__(self, size: int = 1):
@@ -224,6 +248,7 @@ class Environment:
         max_steps_per_episode: int = 100,
         nop_policy: list = ['c', 0.0],
         game_over_when_better: bool = True,
+        max_additional_gates: int = 10,
     ):
         self.init_graph = init_graph
         self.quartz_context = quartz_context
@@ -231,6 +256,7 @@ class Environment:
         self.max_steps_per_episode = max_steps_per_episode
         self.nop_policy = nop_policy
         self.game_over_when_better = game_over_when_better
+        self.max_additional_gates = max_additional_gates
         
         self.state = None
         self.cur_step = 0
@@ -279,23 +305,22 @@ class Environment:
         else:
             game_over = False
             this_step_reward = cur_state.gate_count - next_state.gate_count
+            if self.cur_step + 1 >= self.max_steps_per_episode or \
+                next_state.gate_count > self.init_graph.gate_count + self.max_additional_gates:
+                game_over = True
         
         # handle NOP
         if self.quartz_context.xfer_id_is_nop(xfer_id=action_xfer):
-        # if action_xfer == self.quartz_context.num_xfers:
             game_over = (self.nop_policy[0] == 's')
             this_step_reward = self.nop_policy[1]
-        
-        self.cur_step += 1
-        self.state = next_state
-        if self.cur_step >= self.max_steps_per_episode:
-            game_over = True
-            # TODO  whether we need to change this_step_reward here?
         
         if self.game_over_when_better and this_step_reward > 0:
             game_over = True # TODO  only reduce gate count once in each episode
             # TODO  note this case: 58 -> 80 -> 78
 
+        self.cur_step += 1
+        self.state = next_state
+        
         exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
         self.exp_seq.append(exp);
         return exp
@@ -375,6 +400,7 @@ class DQNMod(pl.LightningModule):
         nop_policy: list = ['c', 0.0],
         gamma: float = 0.9,
         episode_length: int = 60,
+        max_additional_gates: int = 10,
         # module
         lr: float = 1e-3,
         scheduler: str = None,
@@ -386,7 +412,6 @@ class DQNMod(pl.LightningModule):
         agent_play_interval: int = 4,
         warm_start_steps: int = 512,
         replaybuf_size: int = 10_000,
-        init_state_buf_size: int = 512,
         prioritized_buffer: bool = True,
         prio_alpha: float = 0.2,
         prio_init_beta: float = 0.6,
@@ -395,12 +420,13 @@ class DQNMod(pl.LightningModule):
         agent_episode: bool = True,
         strict_better: bool = True,
         restart_from_best: bool = False,
+        sample_init: bool = False,
+        init_state_buf_size: int = 256,
         # network
         qgnn_h_feats: int = 64,
         qgnn_inter_dim: int = 64,
         # deprecated
         restore_weight_after_better: bool = False,
-        sample_init: bool = False,
         game_over_when_better: bool = False,
         clear_buf_after_better: bool = False,
     ):
@@ -439,8 +465,7 @@ class DQNMod(pl.LightningModule):
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
         self.buffer = ReplayBuffer(replaybuf_size, self.device, self.hparams.prioritized_buffer)
-        # self.init_state_buffer = SpecialMinHeap(max_size=init_state_buf_size)
-        # self.init_state_buffer.push((0, init_graph))
+        self.init_state_buffer = InitStateBuffer(capacity=init_state_buf_size, init_state=init_graph)
         self.best_graph = init_graph
         self.episode_best_gc = 0x7fffffff
 
@@ -508,15 +533,9 @@ class DQNMod(pl.LightningModule):
         self.buffer.append(exp)
         env_cur_step = self.env.cur_step
 
-        if self.hparams.sample_init:
-            raise NotImplementedError('init state sampling is deprecated')
+        if self.hparams.sample_init and exp.next_state and np.random.random() < 0.2:
             """fill init state buffer"""
-            if exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count \
-                and (not self.hparams.strict_better or self.agent.choices[-1][0] == 'q'):
-                # better graph found, add it to init_state_buffer
-                self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
-            elif exp.next_state and (np.random.random() < 0.10 or len(self.init_state_buffer) < 10):
-                self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
+            self.init_state_buffer.append(exp.next_state)
 
         """maintain the best graph info"""        
         if exp.next_state and exp.next_state.gate_count < self.episode_best_gc:
@@ -545,10 +564,9 @@ class DQNMod(pl.LightningModule):
             """reset env"""
             self.episode_best_gc = 0x7fffffff
             if self.hparams.sample_init:
-                raise NotImplementedError('init state sampling is deprecated')
                 # sample a init state
-                init_state_pair = self.init_state_buffer.sample(k=1)[0]
-                self.env.set_init_state(init_state_pair[1])
+                init_state = self.init_state_buffer.sample()
+                self.env.set_init_state(init_state)
             elif self.hparams.restart_from_best:
                 # start from the best graph
                 self.env.set_init_state(self.best_graph)
@@ -708,6 +726,7 @@ class DQNMod(pl.LightningModule):
                 f'episode_steps': tot_steps,
                 f'episode_reward': acc_reward,
                 f'prio_beta': self.prio_beta,
+                f'lr': self.optimizers().param_groups[0]['lr'],
             }, on_step=True)
         
         if self.global_step and self.global_step % self.hparams.target_update_interval == 0:
@@ -729,9 +748,9 @@ class DQNMod(pl.LightningModule):
         if self.hparams.scheduler == 'reduce':
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer=optimizer,
-                patience=128,
+                patience=10000,
                 factor=0.2,
-                threshold=0.001,
+                threshold=0.005,
             )
             return {
                 'optimizer': optimizer,
@@ -966,6 +985,7 @@ def main(cfg):
         nop_policy=cfg.nop_policy,
         gamma=cfg.gamma,
         episode_length=cfg.episode_length,
+        max_additional_gates=cfg.max_additional_gates,
 
         lr=cfg.lr,
         scheduler=cfg.scheduler,
@@ -974,7 +994,6 @@ def main(cfg):
         agent_play_interval=cfg.agent_play_interval,
         warm_start_steps=cfg.batch_size * 2,
         replaybuf_size=cfg.replaybuf_size,
-        init_state_buf_size=cfg.init_state_buf_size,
         prioritized_buffer=cfg.prioritized_buffer,
         prio_alpha=cfg.prio_alpha,
         prio_init_beta=cfg.prio_init_beta,
@@ -983,6 +1002,8 @@ def main(cfg):
         agent_episode=cfg.agent_episode,
         strict_better=cfg.strict_better,
         restart_from_best=cfg.restart_from_best,
+        sample_init=cfg.sample_init,
+        init_state_buf_size=cfg.init_state_buf_size,
 
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,

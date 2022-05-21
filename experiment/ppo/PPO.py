@@ -29,6 +29,7 @@ class RolloutBuffer:
         self.rewards = []
         self.is_terminals = []
         self.is_start_point = []
+        self.masks = []
 
     def clear(self):
         self.__init__()
@@ -82,25 +83,29 @@ class PPO:
         # Use the old policy network to select an action
         # No gradient needed
         with torch.no_grad():
-            node, xfer, xfer_logprob = self.policy_old.act(self.context, graph)
+            node, xfer, xfer_logprob, mask = self.policy_old.act(
+                self.context, graph)
 
         self.buffer.graphs.append(graph)
         self.buffer.nodes.append(node)
         self.buffer.xfers.append(xfer)
         self.buffer.xfer_logprobs.append(xfer_logprob)
+        self.buffer.masks.append(mask)
 
         return node.item(), xfer.item()
 
     def update(self):
         # start = time.time()
 
-        masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
-                            dtype=torch.bool).to(self.device)
-        for i, (graph,
-                node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
-            available_xfers = graph.available_xfers(
-                context=self.context, node=graph.get_node_from_id(id=node))
-            masks[i][available_xfers] = True
+        # masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
+        #                     dtype=torch.bool).to(self.device)
+        # for i, (graph,
+        #         node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
+        #     available_xfers = graph.available_xfers(
+        #         context=self.context, node=graph.get_node_from_id(id=node))
+        #     masks[i][available_xfers] = True
+
+        masks = torch.stack(self.buffer.masks)
 
         # t_0 = time.time()
         # print(f"mask time: {t_0 - start}")

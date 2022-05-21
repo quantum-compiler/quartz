@@ -63,7 +63,7 @@ class ActorCritic(nn.Module):
         # Detach here because we use old policy to select actions
         # return node.detach(), xfer.detach(), node_logprob.detach(
         # ), xfer_logprob.detach()
-        return node.detach(), xfer.detach(), xfer_logprob.detach()
+        return node.detach(), xfer.detach(), xfer_logprob.detach(), mask
 
     # def evaluate(self, batched_dgl_gs, nodes, xfers, batched_dgl_next_gs,
     #              next_node_lists, is_terminals, masks, node_nums,

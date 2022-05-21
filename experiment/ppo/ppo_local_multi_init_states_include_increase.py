@@ -243,7 +243,7 @@ for i_episode in tqdm(range(episodes)):
     avg_seq_len = ep_seq_len / ep_batch_size
     new_init_num = new_init['num']
 
-    message = f'ep: {i_episode}\trealize%: {reward_realization_rate:.4f}\tavg_r: {avg_reward:.4f}\tbest_r: {ep_best_reward}\tavg_seq_len: {avg_seq_len:.2f}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt}\tinit_state_num: {new_init_num}'
+    message = f'ep: {i_episode}\trealize: {reward_realization_rate * 100:.2f}%\tavg_r: {avg_reward:.4f}\tbest_r: {ep_best_reward}\tavg_seq_len: {avg_seq_len:.2f}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt}\tinit_state_num: {new_init_num}'
     log_f.write(message + '\n')
     print(message)
     log_f.flush()

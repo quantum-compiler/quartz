@@ -16,12 +16,12 @@ wandb.init(project='ppo_local_multi_init_states_with_increase')
 # set device to cpu or cuda
 device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
-    device = torch.device('cuda:2')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+# if (torch.cuda.is_available()):
+#     device = torch.device('cuda:3')
+#     torch.cuda.empty_cache()
+#     print("Device set to : " + str(torch.cuda.get_device_name(device)))
+# else:
+#     print("Device set to : cpu")
 
 ################################### Training ###################################
 
@@ -33,12 +33,15 @@ experiment_name = "rl_ppo_local_multi_init_states_with_increase"
 # max timesteps in one trajectory
 max_seq_len = 300
 batch_size = 128
-ep_budget = 3000
+if device == torch.device('cpu'):
+    ep_budget = 16384
+else:
+    ep_budget = 3000
 max_init_states = 127
 episodes = int(1e5)
 
 # save model frequency (in num timesteps)
-save_model_freq = 50
+save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
@@ -78,7 +81,7 @@ new_init['values'] = []
 new_init['hash_set'] = set([])
 new_init['num'] = 0
 best_gate_cnt = init_circ.gate_count
-ground_truth_minimum = 46  # TODO: change this if use other circuits
+ground_truth_minimum = 38  # TODO: change this if use other circuits
 
 ###################### logging ######################
 
@@ -153,7 +156,7 @@ print(
 log_f = open(log_f_name, "w+")
 
 # initialize a PPO agent
-ppo_agent = PPO(num_gate_type, context, 128, 256, 64, xfer_dim,
+ppo_agent = PPO(num_gate_type, context, 128, 256, 128, xfer_dim,
                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
                 eps_clip, log_f, device)
 
@@ -171,6 +174,8 @@ print(
 
 # training loop
 for i_episode in tqdm(range(episodes)):
+
+    start = time.time()
 
     current_ep_reward = 0
     ep_best_gate_cnt = init_circ.gate_count
@@ -223,8 +228,14 @@ for i_episode in tqdm(range(episodes)):
 
     torch.cuda.empty_cache()
 
+    t_0 = time.time()
+    print(f'get trajectory time: {t_0 - start}')
+
     # update PPO agent
     ppo_agent.update()
+
+    t_1 = time.time()
+    print(f'update time: {t_1 - t_0}')
 
     reward_realization_rate = current_ep_reward / total_possible_reward
     avg_reward = current_ep_reward / ep_batch_size

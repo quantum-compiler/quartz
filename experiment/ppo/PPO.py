@@ -70,7 +70,8 @@ class PPO:
 
         self.policy_old = ActorCritic(num_gate_type, graph_embed_size,
                                       actor_hidden_size, critic_hidden_size,
-                                      action_dim, self.device).to(self.device)
+                                      action_dim, torch.device('cuda:0')).to(
+                                          torch.device('cuda:0'))
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()

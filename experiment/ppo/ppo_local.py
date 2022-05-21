@@ -16,7 +16,7 @@ wandb.init(project='ppo_local')
 device = torch.device('cpu')
 
 if (torch.cuda.is_available()):
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:1')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -116,41 +116,16 @@ print(
 print("running episodes : ", episodes)
 print("max timesteps per trajectory : ", max_seq_len)
 print("batch size: ", batch_size)
-
 print("model saving frequency : " + str(save_model_freq) + " episodes")
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("xfer dimension : ", xfer_dim)
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
-print("Initializing a discrete action space policy")
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("PPO K epochs : ", K_epochs)
 print("PPO epsilon clip : ", eps_clip)
 print("discount factor (gamma) : ", gamma)
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("optimizer learning rate graph embeddng: ", lr_graph_embedding)
 print("optimizer learning rate actor : ", lr_actor)
 print("optimizer learning rate critic : ", lr_critic)
 
 if random_seed:
-    print(
-        "--------------------------------------------------------------------------------------------"
-    )
     print("setting random seed to ", random_seed)
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
@@ -193,6 +168,9 @@ for i_episode in tqdm(range(episodes)):
     total_possible_reward = 0
 
     for i in range(batch_size):
+
+        total_possible_reward += (init_circ.gate_count -
+                                  ground_truth_minimum) * 3
 
         t_reward, t_best_gate_cnt, t_seq_len, _ = get_trajectory(
             ppo_agent, context, init_circ, max_seq_len, invalid_reward)

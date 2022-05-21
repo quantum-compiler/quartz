@@ -44,7 +44,7 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
 
             trajectory_reward += reward
 
-            if trajectory_reward >= 0:
+            if trajectory_reward > 0:
                 intermediate_graphs.append(next_graph)
 
             reward = torch.tensor(reward, dtype=torch.float)

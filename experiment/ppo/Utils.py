@@ -62,4 +62,7 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
     trajectory_best_gate_count = min(graph.gate_count,
                                      trajectory_best_gate_count)
 
+    if trajectory_len == 0:
+        trajectory_len = max_seq_len
+
     return trajectory_reward, trajectory_best_gate_count, trajectory_len, intermediate_graphs

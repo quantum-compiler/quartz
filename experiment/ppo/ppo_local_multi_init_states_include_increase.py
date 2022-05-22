@@ -34,7 +34,7 @@ experiment_name = "rl_ppo_local_multi_init_states_with_increase"
 max_seq_len = 300
 batch_size = 128
 if device == torch.device('cpu'):
-    ep_budget = 16384
+    ep_budget = 8192
 else:
     ep_budget = 3000
 max_init_states = 127

@@ -250,6 +250,7 @@ class Environment:
         game_over_when_better: bool = True,
         max_additional_gates: int = 10,
     ):
+        self.input_init_graph = init_graph
         self.init_graph = init_graph
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
@@ -306,7 +307,7 @@ class Environment:
             game_over = False
             this_step_reward = cur_state.gate_count - next_state.gate_count
             if self.cur_step + 1 >= self.max_steps_per_episode or \
-                next_state.gate_count > self.init_graph.gate_count + self.max_additional_gates:
+                next_state.gate_count > self.input_init_graph.gate_count + self.max_additional_gates:
                 game_over = True
         
         # handle NOP
@@ -461,6 +462,7 @@ class DQNMod(pl.LightningModule):
             max_steps_per_episode=episode_length,
             nop_policy=nop_policy,
             game_over_when_better=game_over_when_better,
+            max_additional_gates=max_additional_gates,
         )
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
@@ -533,7 +535,7 @@ class DQNMod(pl.LightningModule):
         self.buffer.append(exp)
         env_cur_step = self.env.cur_step
 
-        if self.hparams.sample_init and exp.next_state and np.random.random() < 0.2:
+        if self.hparams.sample_init and exp.next_state and np.random.random() < 1:
             """fill init state buffer"""
             self.init_state_buffer.append(exp.next_state)
 
@@ -543,11 +545,11 @@ class DQNMod(pl.LightningModule):
             if exp.next_state.gate_count < self.best_graph.gate_count:
                 # a better graph is found
                 print(
-                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
+                    f'\nBetter graph with gate_count {exp.next_state.gate_count} found!'
                     f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
                 )
                 if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
-                    info = f'Best graph updated to {exp.next_state.gate_count} .'
+                    info = f'!!! Best graph updated to {exp.next_state.gate_count} .'
                     print(info)
                     self.best_graph = exp.next_state
                     self._output_seq()

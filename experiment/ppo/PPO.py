@@ -29,6 +29,7 @@ class RolloutBuffer:
         self.rewards = []
         self.is_terminals = []
         self.is_start_point = []
+        self.masks = []
 
     def clear(self):
         self.__init__()
@@ -69,7 +70,8 @@ class PPO:
 
         self.policy_old = ActorCritic(num_gate_type, graph_embed_size,
                                       actor_hidden_size, critic_hidden_size,
-                                      action_dim, self.device).to(self.device)
+                                      action_dim, torch.device('cuda:0')).to(
+                                          torch.device('cuda:0'))
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -82,26 +84,29 @@ class PPO:
         # Use the old policy network to select an action
         # No gradient needed
         with torch.no_grad():
-            node, xfer, xfer_logprob = self.policy_old.act(self.context, graph)
+            node, xfer, xfer_logprob, mask = self.policy_old.act(
+                self.context, graph)
 
         self.buffer.graphs.append(graph)
         self.buffer.nodes.append(node)
         self.buffer.xfers.append(xfer)
         self.buffer.xfer_logprobs.append(xfer_logprob)
+        self.buffer.masks.append(mask)
 
         return node.item(), xfer.item()
 
     def update(self):
         # start = time.time()
 
-        masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
-                            dtype=torch.bool).to(self.device)
-        # print(masks.shape)
-        for i, (graph,
-                node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
-            available_xfers = graph.available_xfers(
-                context=self.context, node=graph.get_node_from_id(id=node))
-            masks[i][available_xfers] = True
+        # masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
+        #                     dtype=torch.bool).to(self.device)
+        # for i, (graph,
+        #         node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
+        #     available_xfers = graph.available_xfers(
+        #         context=self.context, node=graph.get_node_from_id(id=node))
+        #     masks[i][available_xfers] = True
+
+        masks = torch.stack(self.buffer.masks)
 
         # t_0 = time.time()
         # print(f"mask time: {t_0 - start}")
@@ -137,7 +142,6 @@ class PPO:
         # t_0 = time.time()
         # print(f"preprocessing time: {t_0 - start}")
 
-        # Optimize policy for K epochs
         for _ in range(self.K_epochs):
             # Evaluating old actions and values
             # Entropy is not needed when using old policy
@@ -147,7 +151,8 @@ class PPO:
                 batched_dgl_next_gs, next_node_lists, self.buffer.is_terminals,
                 masks, node_nums, next_node_nums)
 
-            # print(torch.cuda.memory_summary())
+            # if _ == 0:
+            #     print(torch.cuda.memory_summary())
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(xfer_logprobs - old_xfer_logprobs.detach())

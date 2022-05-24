@@ -1508,21 +1508,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1539,6 +1524,21 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];
@@ -1652,21 +1652,6 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1683,6 +1668,21 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];
@@ -1798,21 +1798,6 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1829,6 +1814,21 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];

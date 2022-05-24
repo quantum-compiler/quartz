@@ -8,6 +8,7 @@ from tqdm import tqdm
 import wandb
 import random
 from PPO import PPO
+from torch.distributions import Categorical
 from Utils import get_trajectory
 
 wandb.init(project='ppo_local_multi_init_states_with_increase')
@@ -15,29 +16,32 @@ wandb.init(project='ppo_local_multi_init_states_with_increase')
 # set device to cpu or cuda
 device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
-    device = torch.device('cuda:2')
-    torch.cuda.empty_cache()
-    print("Device set to : " + str(torch.cuda.get_device_name(device)))
-else:
-    print("Device set to : cpu")
+# if (torch.cuda.is_available()):
+#     device = torch.device('cuda:3')
+#     torch.cuda.empty_cache()
+#     print("Device set to : " + str(torch.cuda.get_device_name(device)))
+# else:
+#     print("Device set to : cpu")
 
 ################################### Training ###################################
 
 ####### initialize environment hyperparameters ######
 
 # TODO: Change this in new experiments
-experiment_name = "rl_ppo_local_multi_init_states_include_increase"
+experiment_name = "rl_ppo_local_multi_init_states_with_increase"
 
 # max timesteps in one trajectory
 max_seq_len = 300
-batch_size = 256
-max_init_states = 64
+batch_size = 128
+if device == torch.device('cpu'):
+    ep_budget = 8192
+else:
+    ep_budget = 3000
+max_init_states = 127
 episodes = int(1e5)
 
 # save model frequency (in num timesteps)
-save_model_freq = 50
-start_using_more_init_states = 10
+save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
@@ -71,8 +75,11 @@ global new_init_states
 global new_init_state_hash_set
 global ground_truth_minimum
 
-new_init_graphs = []
-new_init_state_hash_set = set([init_circ.hash()])
+new_init = {}
+new_init['graphs'] = []
+new_init['values'] = []
+new_init['hash_set'] = set([])
+new_init['num'] = 0
 best_gate_cnt = init_circ.gate_count
 ground_truth_minimum = 38  # TODO: change this if use other circuits
 
@@ -123,41 +130,16 @@ print(
 print("running episodes : ", episodes)
 print("max timesteps per trajectory : ", max_seq_len)
 print("batch size: ", batch_size)
-
 print("model saving frequency : " + str(save_model_freq) + " episodes")
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("xfer dimension : ", xfer_dim)
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
-print("Initializing a discrete action space policy")
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("PPO K epochs : ", K_epochs)
 print("PPO epsilon clip : ", eps_clip)
 print("discount factor (gamma) : ", gamma)
-
-print(
-    "--------------------------------------------------------------------------------------------"
-)
-
 print("optimizer learning rate graph embeddng: ", lr_graph_embedding)
 print("optimizer learning rate actor : ", lr_actor)
 print("optimizer learning rate critic : ", lr_critic)
 
 if random_seed:
-    print(
-        "--------------------------------------------------------------------------------------------"
-    )
     print("setting random seed to ", random_seed)
     torch.manual_seed(random_seed)
     np.random.seed(random_seed)
@@ -193,25 +175,24 @@ print(
 # training loop
 for i_episode in tqdm(range(episodes)):
 
+    start = time.time()
+
     current_ep_reward = 0
     ep_best_gate_cnt = init_circ.gate_count
     ep_seq_len = 0
     ep_best_reward = 0
     total_possible_reward = 0
+    ep_batch_size = 0
 
-    # if i_episode > start_using_more_init_states:
-    #     if len(new_init_graphs) < max_init_states - 1:
-    #         ep_init_graphs = [init_circ] + new_init_graphs
-    #     else:
-    #         ep_init_graphs = [init_circ] + random.sample(
-    #             new_init_graphs, max_init_states - 1)
-    # else:
-    #     ep_init_graphs = [init_circ]
-    if len(new_init_graphs) < max_init_states - 1:
-        ep_init_graphs = [init_circ] + new_init_graphs
+    if new_init['num'] < max_init_states - 1:
+        ep_init_graphs = [init_circ] + new_init['graphs']
     else:
-        ep_init_graphs = [init_circ] + random.sample(new_init_graphs,
-                                                     max_init_states - 1)
+        logits = torch.tensor(new_init['values'])
+        dist = Categorical(logits=logits)
+        sample_idxs = dist.sample(torch.Size([max_init_states - 1]))
+        ep_init_graphs = [init_circ]
+        for idx in sample_idxs:
+            ep_init_graphs.append(new_init["graphs"][idx])
 
     for i in range(batch_size):
 
@@ -225,44 +206,58 @@ for i_episode in tqdm(range(episodes)):
         current_ep_reward += t_reward
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
         ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
-        ep_seq_len += t_seq_len
         ep_best_reward = max(ep_best_reward, t_reward)
+        ep_seq_len += t_seq_len
 
         # Sample from intermediate_graphs
         for g in intermediate_graphs:
             g_hash = g.hash()
-            if g_hash not in new_init_state_hash_set:
-                if random.random() < 0.005:
-                    new_init_state_hash_set.add(g_hash)
-                    new_init_graphs.append(g)
+            if g_hash not in new_init['hash_set']:
+                if random.random() < 0.2:
+                    new_init['hash_set'].add(g_hash)
+                    new_init['graphs'].append(g)
+                    new_init['values'].append(1 / g.gate_count)
+                    new_init['num'] += 1
+
+        if ep_seq_len > ep_budget:
+            ep_batch_size = i + 1
+            break
+
+    if ep_batch_size == 0:
+        ep_batch_size = batch_size
 
     torch.cuda.empty_cache()
+
+    t_0 = time.time()
+    print(f'get trajectory time: {t_0 - start}')
 
     # update PPO agent
     ppo_agent.update()
 
-    torch.cuda.empty_cache()
+    t_1 = time.time()
+    print(f'update time: {t_1 - t_0}')
 
     reward_realization_rate = current_ep_reward / total_possible_reward
-    avg_reward = current_ep_reward / batch_size
+    avg_reward = current_ep_reward / ep_batch_size
     avg_reward = round(avg_reward, 4)
-    avg_seq_len = ep_seq_len / batch_size
+    avg_seq_len = ep_seq_len / ep_batch_size
+    new_init_num = new_init['num']
 
-    message = f'ep: {i_episode}\trealize%: {reward_realization_rate:.4f}\tavg_r: {avg_reward:.4f}\tbest_r: {ep_best_reward}\tavg_seq_len: {avg_seq_len:.2f}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt}\tinit_state_num: {len(new_init_graphs)}'
+    message = f'ep: {i_episode}\trealize: {reward_realization_rate * 100:.2f}%\tavg_r: {avg_reward:.4f}\tbest_r: {ep_best_reward}\tavg_seq_len: {avg_seq_len:.2f}\tep_best_cnt: {ep_best_gate_cnt}\tbest_cnt: {best_gate_cnt}\tinit_state_num: {new_init_num}'
     log_f.write(message + '\n')
     print(message)
     log_f.flush()
 
     wandb.log({
         'episode': i_episode,
-        'batch_size': batch_size,
+        'batch_size': ep_batch_size,
         'rewrad_realization_rate': reward_realization_rate,
         'avg_reward': avg_reward,
         'avg_seq_len': avg_seq_len,
         'ep_best': ep_best_gate_cnt,
         'ep_best_reward': ep_best_reward,
         'best': best_gate_cnt,
-        'sampled_new_state_num': len(new_init_graphs)
+        'sampled_new_state_num': new_init_num
     })
 
     # save model weights

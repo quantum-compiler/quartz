@@ -503,12 +503,12 @@ cdef class PyGraph:
         reverse = [0] * len(src_id) + [1] * len(src_id)
 
         g = dgl.graph((torch.tensor(src_id2), torch.tensor(dst_id2)))
-        g.edata['src_idx'] = torch.tensor(src_idx2)
-        g.edata['dst_idx'] = torch.tensor(dst_idx2)
-        g.edata['reversed'] = torch.tensor(reverse)
+        g.edata['src_idx'] = torch.tensor(src_idx2, dtype=torch.int32)
+        g.edata['dst_idx'] = torch.tensor(dst_idx2, dtype=torch.int32)
+        g.edata['reversed'] = torch.tensor(reverse, dtype=torch.int32)
 
         node_gate_tp = [node.gate_tp for node in self.nodes]
-        g.ndata['gate_type'] = torch.tensor(node_gate_tp)
+        g.ndata['gate_type'] = torch.tensor(node_gate_tp, dtype=torch.int32)
 
         return g
 

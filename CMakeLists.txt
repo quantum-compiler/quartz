@@ -74,6 +74,17 @@ target_link_libraries(quartz_runtime ${QUARTZ_LINK_LIBS})
 target_include_directories(quartz_runtime
   PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
+execute_process(COMMAND cat /proc/version RESULT_VARIABLE NOT_LINUX)
+if (NOT_LINUX)
+    message("build on macOS, link openmp lib")
+    include_directories(/usr/local/include)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
+    find_library(OPENMP_LIB libomp.dylib /usr/local/lib)
+    target_link_libraries(quartz_runtime LINK_PUBLIC ${OPENMP_LIB})
+else()
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+endif()
+
 #install library
 install(TARGETS quartz_runtime
     LIBRARY DESTINATION lib)

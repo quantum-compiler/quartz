@@ -96,21 +96,9 @@ class PPO:
         return node.item(), xfer.item()
 
     def update(self):
-        # start = time.time()
-
-        # masks = torch.zeros((len(self.buffer.nodes), self.context.num_xfers),
-        #                     dtype=torch.bool).to(self.device)
-        # for i, (graph,
-        #         node) in enumerate(zip(self.buffer.graphs, self.buffer.nodes)):
-        #     available_xfers = graph.available_xfers(
-        #         context=self.context, node=graph.get_node_from_id(id=node))
-        #     masks[i][available_xfers] = True
+        start = time.time()
 
         masks = torch.stack(self.buffer.masks)
-
-        # t_0 = time.time()
-        # print(f"mask time: {t_0 - start}")
-        # print(torch.cuda.memory_summary())
 
         gs = [g.to_dgl_graph() for g in self.buffer.graphs]
         batched_dgl_gs = dgl.batch(gs).to(self.device)
@@ -118,10 +106,10 @@ class PPO:
         dgl_next_gs = [g.to_dgl_graph() for g in self.buffer.next_graphs]
         batched_dgl_next_gs = dgl.batch(dgl_next_gs).to(self.device)
 
-        # print(torch.cuda.memory_summary())
-
         node_nums = batched_dgl_gs.batch_num_nodes().tolist()
         next_node_nums = batched_dgl_next_gs.batch_num_nodes().tolist()
+
+        t_0 = time.time()
 
         next_node_lists = []
         for i in range(len(self.buffer.next_graphs)):
@@ -137,12 +125,12 @@ class PPO:
             torch.stack(self.buffer.xfer_logprobs,
                         dim=0)).detach().to(self.device)
 
-        # print(torch.cuda.memory_summary())
-
-        # t_0 = time.time()
-        # print(f"preprocessing time: {t_0 - start}")
+        t_1 = time.time()
+        print(f'prepare node time: {t_1 - t_0}')
+        print(f"preprocessing time: {t_1 - start}")
 
         for _ in range(self.K_epochs):
+            t_2 = time.time()
             # Evaluating old actions and values
             # Entropy is not needed when using old policy
             # But needed in current policy
@@ -151,8 +139,8 @@ class PPO:
                 batched_dgl_next_gs, next_node_lists, self.buffer.is_terminals,
                 masks, node_nums, next_node_nums)
 
-            # if _ == 0:
-            #     print(torch.cuda.memory_summary())
+            t_3 = time.time()
+            print(f'evaluate: {t_3 - t_2}')
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(xfer_logprobs - old_xfer_logprobs.detach())
@@ -177,6 +165,7 @@ class PPO:
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
             loss = actor_loss + 0.5 * critic_loss - 0.1 * xfer_entropy
+            t_5 = time.time()
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -186,6 +175,10 @@ class PPO:
             self.optimizer.step()
 
             torch.cuda.empty_cache()
+
+            t_4 = time.time()
+            print(f'back time: {t_4 - t_5}')
+            print(f'after evaluate: {t_4 - t_3}')
 
         for i in range(len(self.buffer.graphs)):
             if self.buffer.is_start_point[i]:
@@ -210,7 +203,8 @@ class PPO:
         # clear buffer
         self.buffer.clear()
 
-        # print(f"update time: {time.time() - start}")
+        print(f'evaluation time: {time.time() - t_0}')
+        print(f"update time: {time.time() - start}")
 
     def save(self, checkpoint_path):
         torch.save(self.policy_old.state_dict(), checkpoint_path)

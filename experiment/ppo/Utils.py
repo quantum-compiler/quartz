@@ -55,6 +55,9 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
             ppo_agent.buffer.next_nodes.append(next_nodes)
             ppo_agent.buffer.is_start_point.append(t == 0)
             graph = next_graph
+
+            # if graph.gate_count > init_state.gate_count * 1.1:
+            #     done = True
         else:
             trajectory_len = t
             break

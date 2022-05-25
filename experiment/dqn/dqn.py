@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import wandb
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -149,7 +150,6 @@ class QGNN(nn.Module):
         h = self.linear2(h)
         return h
 
-
 Experience = namedtuple(
     'Experience',
     field_names=['state', 'action_node', 'action_xfer', 'reward', 'next_state', 'game_over'],
@@ -157,42 +157,78 @@ Experience = namedtuple(
 
 class ReplayBuffer:
 
-    def __init__(self, capacity: int = 100):
+    def __init__(self, capacity: int = 100, device: str = 'cpu', prioritized: bool = False):
+        self.capacity = capacity
+        self.device = device
+        self.prioritized = prioritized
         self.buffer = deque(maxlen=capacity)
+        self.prios = torch.Tensor([]).to(device)
+        self.max_prio = torch.Tensor([1e5]).to(device)
     
     def __len__(self) -> int:
         return len(self.buffer)
     
-    def append(self, exp: Experience):
+    def to(self, device: str):
+        self.device = device
+        self.prios = self.prios.to(device)
+        self.max_prio = self.max_prio.to(device)
+    
+    def append(self, exp: Experience, prio: torch.tensor = None) -> None:
         self.buffer.append(exp)
-    
-    def sample(self, sample_size: int = 100) -> Tuple:
-        indices = np.random.choice(
-            len(self.buffer), min(sample_size, len(self.buffer)), replace=False)
-        states, action_nodes, action_xfers, rewards, next_states, game_overs = \
-            list(zip(*(self.buffer[idx] for idx in indices)))
-        
-        return (
-            states, action_nodes, action_xfers, rewards, next_states, game_overs
-        )
+        if self.prioritized:
+            """manually append priority"""
+            if prio is None:
+                prio = self.max_prio
+            prio = prio.reshape(1,).to(self.device)
+            self.prios = torch.cat([self.prios, prio])
+            if self.prios.shape[0] > self.capacity:
+                self.prios = self.prios[1:]
 
-class RLDataset(torch.utils.data.dataset.IterableDataset):
+    def update_prios(self, indices: List[int] | torch.Tensor, prios: torch.Tensor) -> None:
+        self.prios[indices] = prios
     
-    def __init__(self, buffer: ReplayBuffer, sample_size: int = 100):
-        self.buffer = buffer
-        self.sample_size = sample_size
+    def sample(self, sample_size: int = 100) -> Tuple[List[Experience], torch.Tensor, torch.Tensor, torch.tensor]:
+        sample_size = min(sample_size, len(self.buffer))
+        if self.prioritized:
+            sum_prios = self.prios.sum()
+            normed_prios = self.prios / sum_prios
+            indices = torch.multinomial(self.prios, sample_size, replacement=False)
+            indices_list = indices.tolist()
+            exps = [self.buffer[idx] for idx in indices_list]
+            return exps, indices, normed_prios[indices], self.prios.min() / sum_prios
+        else:
+            indices = torch.multinomial(torch.ones(len(self)), sample_size, replacement=False)
+            indices_list = indices.tolist()
+            exps = [self.buffer[idx] for idx in indices_list]
+            return exps, indices, None, None
     
-    def __iter__(self) -> Tuple:
-        """
-        Samples many items from buffer, but only yield one each time
-        """
-        states, action_nodes, action_xfers, rewards, next_states, game_overs = \
-            self.buffer.sample(self.sample_size)
-        for i in range(len(states)):
-            yield (
-                states[i], action_nodes[i], action_xfers[i], rewards[i], next_states[i], game_overs[i]
-            )
+    def __str__(self):
+        return self.buffer.__str__()
 
+class InitStateBuffer:
+
+    def __init__(self, capacity: int = 100, init_state: quartz.PyGraph = None):
+        self.capacity = capacity
+        assert init_state is not None
+        self.init_state = init_state
+        self.q = deque(maxlen=capacity)
+    
+    def append(self, item):
+        self.q.append(item)
+    
+    def __len__(self):
+        return len(self.q) + 1
+    
+    def sample(self) -> quartz.PyGraph:
+        idx = np.random.choice(len(self))
+        if idx == len(self.q):
+            return self.init_state
+        else:
+            return self.q[idx]
+    
+    def __str__(self):
+        return self.q.__str__() + f'\ninit_state: {self.init_state}'
+    
 class DummyDataset(torch.utils.data.Dataset):
 
     def __init__(self, size: int = 1):
@@ -211,12 +247,17 @@ class Environment:
         quartz_context: quartz.QuartzContext,
         max_steps_per_episode: int = 100,
         nop_policy: list = ['c', 0.0],
+        game_over_when_better: bool = True,
+        max_additional_gates: int = 10,
     ):
+        self.input_init_graph = init_graph
         self.init_graph = init_graph
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         self.max_steps_per_episode = max_steps_per_episode
         self.nop_policy = nop_policy
+        self.game_over_when_better = game_over_when_better
+        self.max_additional_gates = max_additional_gates
         
         self.state = None
         self.cur_step = 0
@@ -265,23 +306,22 @@ class Environment:
         else:
             game_over = False
             this_step_reward = cur_state.gate_count - next_state.gate_count
+            if self.cur_step + 1 >= self.max_steps_per_episode or \
+                next_state.gate_count > self.input_init_graph.gate_count + self.max_additional_gates:
+                game_over = True
         
         # handle NOP
         if self.quartz_context.xfer_id_is_nop(xfer_id=action_xfer):
-        # if action_xfer == self.quartz_context.num_xfers:
             game_over = (self.nop_policy[0] == 's')
             this_step_reward = self.nop_policy[1]
         
-        self.cur_step += 1
-        self.state = next_state
-        if self.cur_step >= self.max_steps_per_episode:
-            game_over = True
-            # TODO  whether we need to change this_step_reward here?
-        
-        if this_step_reward > 0:
-            game_over = True # TODO  only apply one xfer each episode
+        if self.game_over_when_better and this_step_reward > 0:
+            game_over = True # TODO  only reduce gate count once in each episode
             # TODO  note this case: 58 -> 80 -> 78
 
+        self.cur_step += 1
+        self.state = next_state
+        
         exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
         self.exp_seq.append(exp);
         return exp
@@ -301,6 +341,9 @@ class Agent:
         self.device = device
 
         self.choices = [ ('s', 0) ]
+
+    def to(self, device: str):
+        self.device = device
 
     @torch.no_grad()
     def _get_action(
@@ -340,67 +383,53 @@ class Agent:
     def clear_choices(self):
         self.choices = [ ('s', 0, 0) ]
 
-    def tree_explore(
-        self, q_net: nn.Module, topk: int = 1,
-        exp_seq_list: list = [], choices_list: list = [], visited: set = set(),
-    ) -> None:
-        cur_hash = self.env.state.hash()
-        if cur_hash in visited:
-            return
-        visited.add(cur_hash)
-        # ic(self.env.exp_seq[-1])
-        ic(cur_hash)
-        ic(self.env.cur_step)
-        ic(self.env.state.gate_count)
-        # (k, 2)
-        topk_actions, topk_q_values = self._get_action(q_net, 0, topk=topk, append_choice=False)
-        for action, q_value in zip(topk_actions, topk_q_values):
-            self.choices.append( ('q', 0, q_value.item()) )
-            exp = self.env.act(action[0].item(), action[1].item())
-            if exp.game_over:
-                ic(exp.reward)
-                exp_seq_list.append(self.env.exp_seq)
-                choices_list.append(self.choices)
-                embed()
-            else:
-                assert exp.reward > -2
-                self.tree_explore(q_net, topk, exp_seq_list, choices_list, visited)
-            self.env.back_step()
-            self.choices.pop()
-        # end for
-        visited.remove(cur_hash)
 
 class DQNMod(pl.LightningModule):
 
     def __init__(self,
-        init_graph_qasm_str: str,
-        gate_type_num: int = 26,
+        mode: str = 'unknown',
+        test_topk: int = 3,
+        output_dir: str = 'output_dir',
+        pretrained_weight_path: str = None,
+        # envs
+        init_graph_qasm_str: str = '',
         gate_set: List = ['h', 'cx', 't', 'tdg'],
+        gate_type_num: int = 26,
         ecc_file: str = 'bfs_verified_simplified.json',
         no_increase: bool = True,
         include_nop: bool = False,
+        nop_policy: list = ['c', 0.0],
+        gamma: float = 0.9,
+        episode_length: int = 60,
+        max_additional_gates: int = 10,
+        # module
         lr: float = 1e-3,
+        scheduler: str = None,
         batch_size: int = 128,
         eps_init: float = 0.5,
         eps_decay: float = 0.0001,
         eps_min: float = 0.05,
-        gamma: float = 0.9,
-        episode_length: int = 100, # TODO  check these hparams
-        replaybuf_size: int = 10_000,
-        warm_start_steps: int = 512,
         target_update_interval: int = 100,
-        seq_out_dir: str = 'out_graphs',
-        pretrained_weight_path: str = None,
-        restore_weight_after_better: bool = False,
-        nop_policy: list = ['c', 0.0],
-        restart_from_best: bool = False,
-        clear_buf_after_better: bool = False,
-        init_state_buf_size: int = 512,
+        agent_play_interval: int = 4,
+        warm_start_steps: int = 512,
+        replaybuf_size: int = 10_000,
+        prioritized_buffer: bool = True,
+        prio_alpha: float = 0.2,
+        prio_init_beta: float = 0.6,
+        double_dqn: bool = False,
+        # how to play
         agent_episode: bool = True,
+        strict_better: bool = True,
+        restart_from_best: bool = False,
+        sample_init: bool = False,
+        init_state_buf_size: int = 256,
+        # network
         qgnn_h_feats: int = 64,
         qgnn_inter_dim: int = 64,
-        test_topk: int = 3,
-        mode: str = 'unknown',
+        # deprecated
+        restore_weight_after_better: bool = False,
+        game_over_when_better: bool = False,
+        clear_buf_after_better: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -417,6 +446,7 @@ class DQNMod(pl.LightningModule):
         self.quartz_context = quartz_context
         self.num_xfers = quartz_context.num_xfers
         parser = quartz.PyQASMParser(context=quartz_context)
+        assert len(init_graph_qasm_str) > 0
         init_dag = parser.load_qasm_str(init_graph_qasm_str)
         init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
         self.init_graph = init_graph
@@ -424,22 +454,25 @@ class DQNMod(pl.LightningModule):
         self.q_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
         self.target_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
         self.target_net.load_state_dict(self.q_net.state_dict())
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.MSELoss(reduction='none' if self.hparams.prioritized_buffer else 'mean')
 
         self.env = Environment(
             init_graph=init_graph,
             quartz_context=quartz_context,
             max_steps_per_episode=episode_length,
             nop_policy=nop_policy,
+            game_over_when_better=game_over_when_better,
+            max_additional_gates=max_additional_gates,
         )
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
-        self.buffer = ReplayBuffer(replaybuf_size)
-        self.init_state_buffer = SpecialMinHeap(max_size=init_state_buf_size)
-        self.init_state_buffer.push((0, init_graph))
+        self.buffer = ReplayBuffer(replaybuf_size, self.device, self.hparams.prioritized_buffer)
+        self.init_state_buffer = InitStateBuffer(capacity=init_state_buf_size, init_state=init_graph)
         self.best_graph = init_graph
+        self.episode_best_gc = 0x7fffffff
 
         self.eps = eps_init
+        self.prio_beta = prio_init_beta
         self.episode_reward = 0
         self.total_reward = 0
         self.num_out_graphs = 0
@@ -463,11 +496,16 @@ class DQNMod(pl.LightningModule):
             self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
             self.target_net.load_state_dict(self.q_net.state_dict())
 
+    def on_after_batch_transfer(self, batch, dataloader_idx: int):
+        self.agent.to(self.device)
+        self.buffer.to(self.device)
+        return super().on_after_batch_transfer(batch, dataloader_idx)
+
     def _output_seq(self, exp_seq: list = None, choices: list = None):
         # output sequence
         self.num_out_graphs += 1
         out_dir = os.path.join(
-            self.hparams.seq_out_dir,
+            self.hparams.output_dir,
             'out_graphs',
             f'{self.num_out_graphs}',
         )
@@ -486,120 +524,178 @@ class DQNMod(pl.LightningModule):
             qasm_str = exp.next_state.to_qasm_str()
             with open(out_path, 'w') as f:
                 print(qasm_str, file=f)
+    
+    def save_ckpt(self, name: str):
+        self.trainer.save_checkpoint(
+            filepath=os.path.join(self.hparams.output_dir, f'{name}.ckpt')
+        )
 
     def agent_step(self, eps: float) -> Tuple[Experience, int]:
         exp = self.agent.play_step(self.q_net, eps)
         self.buffer.append(exp)
         env_cur_step = self.env.cur_step
 
-        if exp.game_over and exp.next_state and exp.next_state.gate_count < self.best_graph.gate_count:
-            # better graph found, add it to init_state_buffer
-            self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
-        elif exp.next_state:
-            if np.random.random() < 0.10 or len(self.init_state_buffer) < 10:
-                self.init_state_buffer.push((self.init_graph.gate_count - exp.next_state.gate_count, exp.next_state))
+        if self.hparams.sample_init and exp.next_state and np.random.random() < 1:
+            """fill init state buffer"""
+            self.init_state_buffer.append(exp.next_state)
 
-        if exp.game_over:
-            # TODO  if a better graph is found, clear the buffer and populate it with the new graph?
-            if exp.next_state and \
-                exp.next_state.gate_count < self.best_graph.gate_count:
+        """maintain the best graph info"""        
+        if exp.next_state and exp.next_state.gate_count < self.episode_best_gc:
+            self.episode_best_gc = exp.next_state.gate_count
+            if exp.next_state.gate_count < self.best_graph.gate_count:
                 # a better graph is found
-                self.best_graph = exp.next_state
                 print(
-                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
+                    f'\nBetter graph with gate_count {exp.next_state.gate_count} found!'
                     f' method: {self.agent.choices[-1][0]}, eps: {self.agent.choices[-1][1]: .3f}, q: {self.agent.choices[-1][2]: .3f}'
                 )
-                self._output_seq()
-                # reset
-                if self.hparams.restart_from_best:
-                    # start from the best graph
-                    self.env.set_init_state(exp.next_state)
-                else:
-                    # sample a init state
-                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
-                    self.env.set_init_state(init_state_pair[1])
-                
-                self.agent.clear_choices()
-                if self.hparams.clear_buf_after_better:
-                    # clear and re-populate
-                    self.buffer.buffer.clear()
-                    # may meet gate count reduction again, which introduces recursions
-                    self.populate(self.hparams.warm_start_steps)
-                if self.hparams.restore_weight_after_better:
-                    self._restore_pretrained_weight()
-            else:
-                self.agent.clear_choices()
-                if self.hparams.restart_from_best:
-                    self.env.reset()
-                else:
-                    # sample a init state
-                    init_state_pair = self.init_state_buffer.sample(k=1)[0]
-                    self.env.set_init_state(init_state_pair[1])
+                if not self.hparams.strict_better or self.agent.choices[-1][0] == 'q':
+                    info = f'!!! Best graph updated to {exp.next_state.gate_count} .'
+                    print(info)
+                    self.best_graph = exp.next_state
+                    self._output_seq()
+                    self.save_ckpt(f'best_{exp.next_state.gate_count}_step_{self.global_step}')
+                    wandb.alert(
+                        title='Better graph is found!',
+                        text=info, level=wandb.AlertLevel.INFO,
+                        wait_duration=0,
+                    )
+            # end if
+        # end if
+
+        if exp.game_over:
+            """reset env"""
+            self.episode_best_gc = 0x7fffffff
+            if self.hparams.sample_init:
+                # sample a init state
+                init_state = self.init_state_buffer.sample()
+                self.env.set_init_state(init_state)
+            elif self.hparams.restart_from_best:
+                # start from the best graph
+                self.env.set_init_state(self.best_graph)
+            else: # default setting: just return to the init state
+                self.env.reset()
+            
+            self.agent.clear_choices()
+
+            # below are deprecated
+            if self.hparams.clear_buf_after_better:
+                # clear and re-populate
+                self.buffer.buffer.clear()
+                # may meet gate count reduction again, which introduces recursions
+                self.populate(self.hparams.warm_start_steps)
+            if self.hparams.restore_weight_after_better:
+                self._restore_pretrained_weight()
         # end if
         return exp, env_cur_step
 
-    def agent_episode(self, eps: float) -> Tuple[Experience, int]:
+    def agent_episode(self, eps: float) -> Tuple[Experience, int, float]:
+        acc_reward = 0
+        self.episode_best_gc = 0x7fffffff
         while True:
             exp, env_cur_step = self.agent_step(eps)
+            acc_reward += exp.reward
             if exp.game_over is True:
                 break
-        return exp, env_cur_step
+        return exp, env_cur_step, acc_reward
 
     def populate(self, steps: int = 1000):
         """
         Carries out several random steps through the environment to initially fill up the replay buffer with
         experiences.
         Args:
-            steps: number of random steps to populate the buffer with
+            steps: number of random steps to populate the buffer
         """
         for i in tqdm(range(steps), desc='Populating the buffer'):
             self.agent_step(1.0)
     
-    def _compute_loss(self, batch) -> torch.Tensor:
-        states, action_nodes, action_xfers, rewards, next_states, _ = batch
-        cur_num_nodes = states.batch_num_nodes().tolist()
-        next_num_nodes = next_states.batch_num_nodes().tolist()
-
-        # ( sum(num of nodes), num_xfers )
-        pred_q_values = self.q_net(states)
+    def _compute_loss(self) -> torch.Tensor:
+        exps, indices, normed_prios, min_normed_prio = \
+            self.buffer.sample(self.hparams.batch_size)
+        """prepare batched data"""
+        states, action_nodes, action_xfers, \
+            rewards, next_states, game_overs = zip(*exps)
+        b_state = dgl.batch([state.to_dgl_graph() for state in states]).to(self.device)
+        b_next_state = dgl.batch([
+            state.to_dgl_graph()
+            if state is not None else dgl.DGLGraph()
+            for state in next_states
+        ]).to(self.device)
+        cur_num_nodes = b_state.batch_num_nodes().tolist()
+        next_num_nodes = b_next_state.batch_num_nodes().tolist()
+        rewards = torch.Tensor(rewards).to(self.device)
+        action_nodes = list(action_nodes)
+        """predict Q values"""
+        # ( sum(cur_num_nodes), num_xfers )
+        pred_q_values = self.q_net(b_state)
+        """predict max next Q values"""
         if max(next_num_nodes) > 0:
             with torch.no_grad():
-                target_next_q_values = self.target_net(next_states)
-            # ( sum(num of nodes), )
-            target_next_max_q_values_all_nodes, _ = torch.max(target_next_q_values, dim=-1)
-        # pad neg rewards for empty graphs
-        target_next_max_q_values = []
-        next_num_nodes_fixed = []
-        r_start, r_end = 0, 0
-        for i_batch, next_num_node in enumerate(next_num_nodes):
-            r_end += next_num_node
-            r = slice(r_start, r_end)
-            target_next_max_q_values.append(
-                torch.max(target_next_max_q_values_all_nodes[r])
-                if next_num_node > 0 else
-                torch.Tensor([-2]) # TODO  neg reward
-            )
-            next_num_nodes_fixed.append(max(1, next_num_node))
-            r_start = r_end
-        # (batch_size, )
-        target_next_max_q_values = torch.Tensor(
-            target_next_max_q_values
-        ).to(self.device)
-        # pred_Q = reward_of_action + gamma * target_next_max_Q
-        acted_pred_q_values = pred_q_values[action_nodes, action_xfers]
-        target_max_q_values = rewards + self.hparams.gamma * target_next_max_q_values
-        
-        loss = self.loss_fn(acted_pred_q_values, target_max_q_values)
+                # ( sum(next_num_nodes), num_actions)
+                next_q_values_tnet = self.target_net(b_next_state)
+                if self.hparams.double_dqn:
+                    next_q_values_qnet = self.q_net(b_next_state)
+            if self.hparams.double_dqn:
+                pass
+            else:
+                # ( sum(next_num_nodes), )
+                next_max_q_values_tnet, _ = torch.max(next_q_values_tnet, dim=1)
+        # compute max q values for next states
+        target_next_q_values = []
+        r_next_start, r_next_end = 0, 0
+        r_cur_start, r_cur_end = 0, 0
+        presum_cur_num_nodes = 0
+        for i_batch in range(len(cur_num_nodes)):
+            r_next_end += next_num_nodes[i_batch]
+            r_next = slice(r_next_start, r_next_end)
+            r_cur_end += cur_num_nodes[i_batch]
+            r_cur = slice(r_cur_start, r_cur_end)
+            # NOTE: zero if game over
+            if game_overs[i_batch]:
+                target_next_q = torch.tensor(0.0).to(self.device)
+            else:
+                # each elem has size [] (0-dim tensor)
+                if self.hparams.double_dqn:
+                    """double DQN"""
+                    # Ref: https://arxiv.org/pdf/1509.06461.pdf
+                    max_q, opt_action = topk_2d(next_q_values_qnet[r_next, :], k=1)
+                    opt_action = opt_action[0]
+                    target_next_q = next_q_values_tnet[r_next, :][opt_action[0], opt_action[1]]
+                else:
+                    target_next_q = torch.max(next_max_q_values_tnet[r_next])
+            target_next_q_values.append(target_next_q)
+            action_nodes[i_batch] += presum_cur_num_nodes
+            presum_cur_num_nodes += cur_num_nodes[i_batch]
 
+            r_next_start = r_next_end
+            r_cur_start = r_cur_end
+        # (batch_size, )
+        target_next_q_values = torch.stack(target_next_q_values)
+        acted_pred_q_values = pred_q_values[action_nodes, action_xfers]
+        target_q_values = rewards + self.hparams.gamma * target_next_q_values
+        if self.hparams.prioritized_buffer:
+            # Ref: https://github.com/Curt-Park/rainbow-is-all-you-need
+            """compute element-wise loss and weighted loss"""
+            # pred_Q = reward_of_action + gamma * target_next_max_Q
+            elementwise_loss = self.loss_fn(acted_pred_q_values, target_q_values)
+            loss_weights = (len(self.buffer) * normed_prios) ** (-self.prio_beta)
+            max_loss_weights = (len(self.buffer) * min_normed_prio) ** (-self.prio_beta)
+            normed_loss_weights = loss_weights / max_loss_weights
+            loss = torch.mean(normed_loss_weights * elementwise_loss)
+            """compute priorities and update them to the buffer"""
+            prios = (elementwise_loss.detach() + 1e-6) ** self.hparams.prio_alpha
+            self.buffer.update_prios(indices, prios)
+        else:
+            loss = self.loss_fn(acted_pred_q_values, target_q_values)
+        
         self.log_dict({
             f'mean_batch_reward': rewards.mean(),
-            f'mean_target_next_max_Q': target_next_max_q_values.mean(),
-            f'mean_target_max_Q': target_max_q_values.mean(),
+            f'mean_target_next_max_Q': target_next_q_values.mean(),
+            f'mean_target_max_Q': target_q_values.mean(),
             f'mean_pred_Q': acted_pred_q_values.mean(),
 
             f'max_batch_reward': rewards.max(),
-            f'max_target_next_max_Q': target_next_max_q_values.max(),
-            f'max_target_max_Q': target_max_q_values.max(),
+            f'max_target_next_max_Q': target_next_q_values.max(),
+            f'max_target_max_Q': target_q_values.max(),
             f'max_pred_Q': acted_pred_q_values.max(),
         }, on_step=True)
 
@@ -607,44 +703,43 @@ class DQNMod(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         """
-        1. Carries out a single step to add one experience to the replay buffer.
-        2. GD on the q_net with a batch of data
+        1. Carries out an episode to add some experiences to the replay buffer.
+        2. GD on the q_net with a batch of sampled data
 
         Args:
-            batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
+            batch: dummy data, not used
         """
-        # play one step
+        """sample a batch of data from the buffer to update the network"""
+        # schedule prio_beta
+        self.prio_beta = self.hparams.prio_init_beta + \
+            (1.0 - self.hparams.prio_init_beta) * self.global_step / 1e5
+        loss = self._compute_loss()
+
+        """play an episode"""
         self.eps = max(
             self.eps - self.hparams.eps_decay,
             self.hparams.eps_min
         )
-        # TODO  for _ in range(self.hparams.batch_size // 10):
-        if self.hparams.agent_episode:
-            exp, env_cur_step = self.agent_episode(self.eps)
-        else:
-            exp, env_cur_step = self.agent_step(self.eps)
-        self.episode_reward += exp.reward
-        self.log(f'episode_reward', self.episode_reward, on_step=True)
-        # GD with sampled data
-        loss = self._compute_loss(batch)
+        # if self.hparams.agent_episode:
+        if self.global_step % self.hparams.agent_play_interval == 0:
+            last_exp, tot_steps, acc_reward = self.agent_episode(self.eps)
+            self.log_dict({
+                f'eps': self.eps,
+                f'episode_steps': tot_steps,
+                f'episode_reward': acc_reward,
+                f'prio_beta': self.prio_beta,
+                f'lr': self.optimizers().param_groups[0]['lr'],
+            }, on_step=True)
         
-        if exp.game_over:
-            self.total_reward += self.episode_reward
-            self.episode_reward = 0
-
         if self.global_step and self.global_step % self.hparams.target_update_interval == 0:
             self.target_net.load_state_dict(self.q_net.state_dict())
-
+        
         self.log(f'train_loss', loss)
-        self.log(f'step_reward', exp.reward, on_step=True, prog_bar=True)
-        self.log(f'total_reward', self.total_reward, on_step=True)
-        self.log(f'eps', self.eps, on_step=True)
-        self.log(f'env_step', env_cur_step, on_step=True, prog_bar=True)
-        self.log(f'best_gc', self.best_graph.gate_count, on_step=True, prog_bar=True)
-        self.log(f'init', self.env.init_graph.gate_count, on_step=True, prog_bar=True)
-        self.log(f'|buf|', len(self.buffer.buffer), on_step=True, prog_bar=True)
-        self.log(f'|init_state_buf|', len(self.init_state_buffer), on_step=True, prog_bar=True)
-
+        self.log_dict({
+            f'best_gc': self.best_graph.gate_count,
+            f'init':    self.env.init_graph.gate_count,
+            f'|buf|':   len(self.buffer.buffer),
+        }, on_step=True, prog_bar=True)
         return loss
     
     def configure_optimizers(self):
@@ -652,108 +747,41 @@ class DQNMod(pl.LightningModule):
             params=self.q_net.parameters(),
             lr=self.hparams.lr,
         )
-        return optimizer
-    
-    def __dataloader(self) -> torch.utils.data.DataLoader:
-        """Initialize the Replay Buffer dataset used for retrieving experiences."""
-        default_collate = torch.utils.data.dataloader.default_collate
-        
-        def collate_fn(batch):
-            """
-            Args:
-                batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
-                    states: [ quartz.PyGraph ]
-                    action_nodes: [ action_node: int ]
-                    action_xfers: [ action_xfer: int ]
-                    rewards: [ reward: float ]
-                    next_states: [ quartz.PyGraph ]
-                    game_overs: [ bool ]
-            
-            Return: batched data
-                batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
-                    b_states: dgl.graph (batched_graph)
-                    b_action_nodes: torch.tensor
-                    b_action_xfers: torch.tensor
-                    b_rewards: torch.Tensor
-                    b_next_states: dgl.graph (batched_graph)
-                    b_game_overs: torch.tensor of 
-            """
-            states, action_nodes, action_xfers, rewards, next_states, game_overs = \
-                list(zip(*batch))
-            states = [state.to_dgl_graph() for state in states]
-            next_states = [
-                next_state.to_dgl_graph()
-                if next_state is not None else dgl.DGLGraph()
-                for next_state in next_states
-            ]
-            b_states = dgl.batch(states)
-            b_next_states = dgl.batch(next_states)
-            b_action_nodes = torch.tensor(action_nodes)
-            b_action_xfers = torch.tensor(action_xfers)
-            b_rewards = torch.Tensor(rewards)
-            b_game_overs = torch.tensor(game_overs, dtype=torch.bool)
-            return (
-                b_states, b_action_nodes, b_action_xfers, b_rewards, b_next_states, b_game_overs
+        if self.hparams.scheduler == 'reduce':
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer=optimizer,
+                patience=10000,
+                factor=0.2,
+                threshold=0.005,
             )
-        
-        # Ref: https://pytorch.org/docs/master/notes/randomness.html#dataloader
-        g = torch.Generator()
-        g.manual_seed(0)
-        
-        dataset = RLDataset(self.buffer, self.hparams.episode_length * self.hparams.batch_size)
-        # TODO  not sure if it can avoid duplicate data when using DDP
-        dataloader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            num_workers=4,
-            batch_size=self.hparams.batch_size,
-            # shuffle=self.training, # this would be overwritten by PL
-            collate_fn=collate_fn,
-            generator=g,
-        )
-        return dataloader
+            return {
+                'optimizer': optimizer,
+                'lr_scheduler': {
+                    'scheduler': scheduler,
+                    'monitor': 'train_loss',
+                    'strict': False, # consider resuming from checkpoint
+                }
+            }
+        else:
+            return optimizer
     
     def train_dataloader(self) -> torch.utils.data.DataLoader:
-        return self.__dataloader()
-    
-    def on_after_batch_transfer(self, batch, dataloader_idx: int):
-        self.agent.device = self.device
-        return super().on_after_batch_transfer(batch, dataloader_idx)
+        dataset = DummyDataset(size=self.hparams.target_update_interval)
+        dataloader = torch.utils.data.DataLoader(
+            dataset=dataset,
+            batch_size=1,
+        )
+        return dataloader
 
-    # TODO  no val or test
     def test_dataloader(self) -> torch.utils.data.DataLoader:
-        dataset = DummyDataset()
+        dataset = DummyDataset(size=1)
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
             batch_size=1,
         )
         return dataloader
     
-    def __test_step(self, batch, batch_idx) -> int :
-        assert self.env.state == self.init_graph
-        exp_seq_list: list = []
-        choices_list: list = []
-        self.agent.tree_explore(self.q_net, self.hparams.test_topk, exp_seq_list, choices_list, set())
-        best_graph = self.init_graph
-        for exp_seq, choices in zip(exp_seq_list, choices_list):
-            exp = exp_seq[-1]
-            assert exp.game_over
-            if exp.next_state and \
-                exp.next_state.gate_count < best_graph.gate_count:
-                # a better graph is found
-                best_graph = exp.next_state
-                print(
-                    f'\n!!! Better graph with gate_count {exp.next_state.gate_count} found!'
-                    f' method: {choices[-1][0]}, eps: {choices[-1][1]: .3f}, q: {choices[-1][2]: .3f}'
-                )
-                self._output_seq(exp_seq, choices)
-            else:
-                print(f'Failed to find a better graph this time.')
-                pass
-        
-        return 0.0
-    
-    @torch.no_grad()
-    def test_step(self, batch, batch_idx) -> int:
+    def beam_search(self):
         assert self.env.state == self.init_graph
 
         cur_graph = self.init_graph
@@ -762,9 +790,11 @@ class DQNMod(pl.LightningModule):
         visited = set()
         visited.add(cur_hash)
         hash_2_graph = {} # hash -> graph
-        hash_2_exp = {}
+        hash_2_exp = {
+            cur_hash: (None, 0, 0, 0)
+        }
 
-        best_graph, best_gc = cur_graph, cur_graph.gate_count
+        best_graph, best_gc, best_hash = cur_graph, cur_graph.gate_count, cur_hash
         print(f'Start BFS')
         with tqdm(
             total=self.init_graph.gate_count,
@@ -777,8 +807,7 @@ class DQNMod(pl.LightningModule):
                 hash_2_graph[cur_hash] = cur_graph
                 if cur_graph.gate_count < best_gc:
                     pbar.update(best_gc - cur_graph.gate_count)
-                    best_graph = cur_graph
-                    best_gc = cur_graph.gate_count
+                    best_graph, best_gc, best_hash = cur_graph, cur_graph.gate_count, cur_hash
                     print(
                         f'Better graph with gc {best_gc} is found!'
                         f' Q: {hash_2_exp[cur_hash][3]}'
@@ -814,9 +843,36 @@ class DQNMod(pl.LightningModule):
                     '|visited|': len(visited),
                 })
                 pbar.refresh()
-                
                 # end for
             # end while
+        # end with
+        """save the path of finding the best graph"""
+        out_dir = os.path.join(
+            self.hparams.output_dir,
+            'out_graphs',
+        )
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        print(f'saving the path to {out_dir} ...')
+        output_list = []
+        cur_hash = best_hash
+        while cur_hash is not None:
+            cur_graph = hash_2_graph[cur_hash]
+            to_cur_exp = hash_2_exp[cur_hash]
+            pre_hash, action_node, action_xfer, q_value = to_cur_exp
+            out_name = f'{cur_graph.gate_count}_{action_node}_{action_xfer}_{q_value:.3f}.qasm'
+            out_qasm = cur_graph.to_qasm_str()
+            output_list = [(out_name, out_qasm)] + output_list
+            cur_hash = pre_hash
+        for i_step, (out_name, out_qasm) in enumerate(output_list):
+            out_path = os.path.join(out_dir, f'{i_step}_{out_name}')
+            with open(out_path, 'w') as f:
+                print(out_qasm, file=f)
+
+    @torch.no_grad()
+    def test_step(self, batch, batch_idx) -> int:
+        self.beam_search()
+
 
 def seed_all(seed: int):
     if seed is not None:
@@ -918,31 +974,44 @@ def main(cfg):
         init_graph_qasm_str = f.read()
     
     dqnmod = DQNMod(
+        mode=cfg.mode,
+        test_topk=cfg.test_topk,
+        output_dir=output_dir,
+        pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
+
         init_graph_qasm_str=init_graph_qasm_str,
         gate_set=cfg.gate_set,
         ecc_file=cfg.ecc_file,
         no_increase=cfg.no_increase,
         include_nop=cfg.include_nop,
-        seq_out_dir=output_dir,
-        pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
-        batch_size=cfg.batch_size,
-        warm_start_steps=cfg.batch_size * 2,
-        gamma=cfg.gamma,
-        replaybuf_size=cfg.replaybuf_size,
-        init_state_buf_size=cfg.init_state_buf_size,
-        restore_weight_after_better=cfg.restore_weight_after_better,
-        target_update_interval=cfg.target_update_interval,
         nop_policy=cfg.nop_policy,
-        restart_from_best=cfg.restart_from_best,
-        clear_buf_after_better=cfg.clear_buf_after_better,
+        gamma=cfg.gamma,
+        episode_length=cfg.episode_length,
+        max_additional_gates=cfg.max_additional_gates,
+
+        lr=cfg.lr,
+        scheduler=cfg.scheduler,
+        batch_size=cfg.batch_size,
+        target_update_interval=cfg.target_update_interval,
+        agent_play_interval=cfg.agent_play_interval,
+        warm_start_steps=cfg.batch_size * 2,
+        replaybuf_size=cfg.replaybuf_size,
+        prioritized_buffer=cfg.prioritized_buffer,
+        prio_alpha=cfg.prio_alpha,
+        prio_init_beta=cfg.prio_init_beta,
+        double_dqn=cfg.double_dqn,
+        
         agent_episode=cfg.agent_episode,
+        strict_better=cfg.strict_better,
+        restart_from_best=cfg.restart_from_best,
+        sample_init=cfg.sample_init,
+        init_state_buf_size=cfg.init_state_buf_size,
+
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,
-        test_topk=cfg.test_topk,
-        mode=cfg.mode,
     )
 
-    # TODO  how to resume RL training? how to save the state and buffer?
+    # TODO  how to resume RL training perfectly? how to save the state and buffer?
 
     if cfg.mode == 'train':
         train(cfg)

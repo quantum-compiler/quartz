@@ -45,7 +45,7 @@ save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
-K_epochs = 20  # update policy for K epochs
+K_epochs = 30  # update policy for K epochs
 eps_clip = 0.2  # clip parameter for PPO
 gamma = 0.95  # discount factor
 lr_graph_embedding = 3e-4  # learning rate for graph embedding network

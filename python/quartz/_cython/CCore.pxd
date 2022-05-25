@@ -102,6 +102,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
         pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op) except +
         vector[size_t] appliable_xfers(Op, const vector[GraphXfer *] &)
+        vector[size_t] appliable_xfers_parallel(Op, const vector[GraphXfer *] &)
         void all_ops(vector[Op]&) const
         int gate_count() const
         size_t hash()

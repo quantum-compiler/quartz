@@ -164,8 +164,7 @@ class PPO:
             # final loss of clipped objective PPO
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
-            loss = actor_loss + 0.5 * critic_loss - 0.1 * xfer_entropy
-            t_5 = time.time()
+            loss = actor_loss + 0.5 * critic_loss - 0.02 * xfer_entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -190,12 +189,15 @@ class PPO:
                 message += "\tReduced!!!"
             elif self.buffer.rewards[i] < 0:
                 message += "\tIncreased..."
+                message += f'\n{masks[i].nonzero()}'
+                message += f'\n{torch.exp(old_xfer_logprobs[i])}'
+                message += f'\n{torch.exp(xfer_logprobs[i])}'
             # print(message)
             self.log_file_handle.write(message + '\n')
             self.log_file_handle.flush()
             if self.buffer.is_terminals[i]:
-                # print("terminated")
                 self.log_file_handle.write('terminated\n')
+                self.log_file_handle.write(f'\n{masks[i].nonzero()}')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())

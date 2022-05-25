@@ -1963,7 +1963,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
 }
 
 std::vector<size_t>
-Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) {
+Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
   std::vector<size_t> appliable_xfer_v;
   auto xfer_v_s = xfer_v.size();
   for (size_t i = 0; i < xfer_v_s; ++i)
@@ -1972,6 +1972,22 @@ Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) {
     }
   return appliable_xfer_v;
 }
+
+  std::vector<size_t>
+  Graph::appliable_xfers_parallel(Op op, const std::vector<GraphXfer*> &xfer_v) const {
+    std::vector<bool> xfer_is_appliable(xfer_v.size(), false);
+#pragma omp parallel for schedule(runtime) default(none) shared(xfer_is_appliable, xfer_v, op)
+    for (size_t i = 0; i < xfer_v.size(); i++) {
+      xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);
+    }
+    std::vector<size_t> appliable_xfer_v;
+    for (size_t i = 0; i < xfer_is_appliable.size(); i++) {
+      if (xfer_is_appliable[i]) {
+        appliable_xfer_v.emplace_back(i);
+      }
+    }
+    return appliable_xfer_v;
+  }
 
 // bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
 //   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {

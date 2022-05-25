@@ -71,6 +71,12 @@ int main()
     const auto ans_para = graph.appliable_xfers_parallel(all_ops[idx], xfers);
     const auto t2_end = std::chrono::high_resolution_clock::now();
 
+    const auto dur1 = std::chrono::duration_cast<std::chrono::milliseconds>(t1_end - t1_start).count();
+    const auto dur2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2_end - t2_start).count();
+    std::cout << "ans_ref : " << output_vec(ans_ref) << std::endl;
+    std::cout << "ans_para: " << output_vec(ans_para) << std::endl;
+    std::cout << "dur1 = " << dur1 << "  dur2 = " << dur2 << std::endl << std::endl;
+
     for (size_t i = 0; i < ans_ref.size(); i++) {
       if (i >= ans_para.size()) {
         std::cerr << i << " >= ans_para.size()  " << "ans_ref.size(): "<< ans_ref.size()
@@ -83,12 +89,6 @@ int main()
         return 1;
       }
     }
-
-    const auto dur1 = std::chrono::duration_cast<std::chrono::milliseconds>(t1_end - t1_start).count();
-    const auto dur2 = std::chrono::duration_cast<std::chrono::milliseconds>(t2_end - t2_start).count();
-    std::cout << "ans_ref : " << output_vec(ans_ref) << std::endl;
-    std::cout << "ans_para: " << output_vec(ans_para) << std::endl;
-    std::cout << "dur1 = " << dur1 << "  dur2 = " << dur2 << std::endl << std::endl;
   }
 
   return 0;

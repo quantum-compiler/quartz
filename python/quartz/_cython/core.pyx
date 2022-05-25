@@ -431,6 +431,12 @@ cdef class PyGraph:
         if context.include_nop:
             result.push_back(context.num_xfers - 1)
         return result
+
+    def available_xfers_parallel(self, *, QuartzContext context, PyNode node, output_format="int"):
+        result = deref(self.graph).appliable_xfers_parallel(node.node, context.v_xfers)
+        if context.include_nop:
+            result.push_back(context.num_xfers - 1)
+        return result
                     
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:

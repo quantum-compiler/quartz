@@ -9,7 +9,7 @@ import math
 from collections import deque
 
 global fn
-fn = 't_tdg_h_cx_toffoli_flip_dataset/tof_3_after_toffoli_flip.qasm'
+fn = 't_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm'
 
 
 def check(graph):
@@ -35,7 +35,8 @@ hash_set = set()
 hash_set.add(init_graph.hash())
 best_graph = init_graph
 best_gate_cnt = init_graph.gate_count
-max_gate_cnt = 64
+#####
+max_gate_cnt = best_gate_cnt * 1.05
 budget = 5_000_000
 
 start = time.time()
@@ -50,7 +51,7 @@ while candidate_hq != [] and budget >= 0:
         return first_graph.available_xfers(context=quartz_context, node=node)
 
     with ProcessPoolExecutor(max_workers=32) as executor:
-        results = executor.map(ax, list(range(len(all_nodes))), chunksize=2)
+        results = executor.map(ax, list(range(len(all_nodes))), chunksize=3)
         appliable_xfers_nodes = []
         for r in results:
             appliable_xfers_nodes.append(r)

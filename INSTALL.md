@@ -20,7 +20,7 @@ cd quartz
 * Set up the environment (including Python, OpenMP) by conda.
 
 ```shell
-conda create --name quartz --file env.yml
+conda env create --name quartz --file env.yml
 conda activate quartz
 ```
 

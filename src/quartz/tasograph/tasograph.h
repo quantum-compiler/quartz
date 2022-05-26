@@ -209,7 +209,8 @@ public:
   toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                               GraphXfer *inverse_xfer,
                               std::vector<int> instruction);
-  std::vector<size_t> appliable_xfers(Op op, const std::vector<GraphXfer *> &);
+  std::vector<size_t> appliable_xfers(Op op, const std::vector<GraphXfer *> &) const;
+  std::vector<size_t> appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   std::pair<std::shared_ptr<Graph>, std::vector<int>>

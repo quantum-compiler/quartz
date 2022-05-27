@@ -1,16 +1,17 @@
 #pragma once
+
 #include "../tasograph/tasograph.h"
 
 namespace quartz {
     using QubitMappingTable = std::unordered_map<Op, std::pair<int, int>, OpHash>;
 
-    double basic_sabre_heuristic(const std::vector<std::pair<int, int>>& front_set,
-                                 const std::shared_ptr<DeviceTopologyGraph>& device) {
+    double basic_sabre_heuristic(const std::vector<std::pair<int, int>> &front_set,
+                                 const std::shared_ptr<DeviceTopologyGraph> &device) {
         double total_cost = 0;
-        for (const auto& qubit_pair : front_set) {
+        for (const auto &qubit_pair: front_set) {
             double min_swap_cost = device->unconnected_swap_penalty;
             auto input_neighbours = device->get_input_neighbours(qubit_pair.second);
-            for (const auto& neighbour : input_neighbours) {
+            for (const auto &neighbour: input_neighbours) {
                 double swap_cost = device->cal_swap_cost(qubit_pair.first, neighbour);
                 min_swap_cost = std::min(min_swap_cost, swap_cost);
             }
@@ -19,10 +20,10 @@ namespace quartz {
         return total_cost;
     }
 
-    double extended_sabre_heuristic(const std::vector<std::pair<int, int>>& front_set,
-                                    const std::vector<std::pair<int, int>>& extended_set,
-                                    const std::vector<double>& decay_list, std::pair<int, int> swap,
-                                    const std::shared_ptr<DeviceTopologyGraph>& device,
+    double extended_sabre_heuristic(const std::vector<std::pair<int, int>> &front_set,
+                                    const std::vector<std::pair<int, int>> &extended_set,
+                                    const std::vector<double> &decay_list, std::pair<int, int> swap,
+                                    const std::shared_ptr<DeviceTopologyGraph> &device,
                                     double w_value) {
         double F_score = basic_sabre_heuristic(front_set, device);
         F_score /= double(front_set.size());
@@ -30,12 +31,13 @@ namespace quartz {
         if (!extended_set.empty()) {
             E_score /= double(extended_set.size());
         }
-        double decay_factor = decay_list[swap.first] > decay_list[swap.second] ? decay_list[swap.first] : decay_list[swap.second];
+        double decay_factor =
+                decay_list[swap.first] > decay_list[swap.second] ? decay_list[swap.first] : decay_list[swap.second];
         double final_score = decay_factor * F_score + w_value * E_score;
         return final_score;
     }
 
-    std::vector<int> sabre_main_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph>& device,
+    std::vector<int> sabre_main_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph> &device,
                                      bool use_extensive, double w_value) {
         // returns the logical mapping at the end after sabre pass
         // initialize mapping
@@ -52,7 +54,7 @@ namespace quartz {
         for (int i = 0; i < initial_qubit_mapping.size(); i++) {
             logical2physical.emplace_back(-1);
         }
-        for (const auto& qubit_mapping : graph.qubit_mapping_table) {
+        for (const auto &qubit_mapping: graph.qubit_mapping_table) {
             int logical = qubit_mapping.second.first;
             int physical = qubit_mapping.second.second;
             logical2physical[logical] = physical;
@@ -61,7 +63,7 @@ namespace quartz {
         // initialize front set f
         std::unordered_set<Op, OpHash> front_set;
         std::unordered_set<Op, OpHash> executed_set;
-        for (const auto& op_edge : graph.outEdges) {
+        for (const auto &op_edge: graph.outEdges) {
             if (op_edge.first.ptr->tp == GateType::input_qubit) {
                 front_set.insert(op_edge.first);
             }
@@ -70,7 +72,7 @@ namespace quartz {
         while (!front_set.empty()) {
             // line 2 - 7, find executable gates
             std::vector<Op> executable_gate_list;
-            for (const auto& front_gate : front_set) {
+            for (const auto &front_gate: front_set) {
                 // one qubit gate / input gate is always executable
                 if (front_gate.ptr->tp == GateType::input_qubit || graph.inEdges[front_gate].size() == 1) {
                     executable_gate_list.emplace_back(front_gate);
@@ -80,7 +82,7 @@ namespace quartz {
                     int physical1 = logical2physical[first_input.logical_qubit_idx];
                     int physical2 = logical2physical[second_input.logical_qubit_idx];
                     std::vector<int> first_neighbour = device->get_input_neighbours(physical1);
-                    for (int neighbour : first_neighbour) {
+                    for (int neighbour: first_neighbour) {
                         if (neighbour == physical2) {
                             executable_gate_list.emplace_back(front_gate);
                             break;
@@ -95,9 +97,9 @@ namespace quartz {
             // line 8 - 27
             if (!executable_gate_list.empty()) {
                 // heuristic: reset decay to one if we found an executable gate
-                for (double& decay : decay_list) { decay = 1.0; }
+                for (double &decay: decay_list) { decay = 1.0; }
                 // line 9 - 16
-                for (const Op& gate : executable_gate_list) {
+                for (const Op &gate: executable_gate_list) {
                     // line 10, execute
                     front_set.erase(gate);
                     executed_set.insert(gate);
@@ -119,13 +121,13 @@ namespace quartz {
                         continue;
                     }
                     std::vector<Op> successor_list;
-                    for (const auto& edge: graph.outEdges[gate]) {
+                    for (const auto &edge: graph.outEdges[gate]) {
                         successor_list.emplace_back(edge.dstOp);
                     }
                     // line 12 - 14, check whether successor's dependency has been resolved
-                    for (const auto &successor : successor_list) {
+                    for (const auto &successor: successor_list) {
                         int resolved_count = 0;
-                        for (const auto& successor_edge : graph.inEdges[successor]) {
+                        for (const auto &successor_edge: graph.inEdges[successor]) {
                             if (executed_set.find(successor_edge.srcOp) != executed_set.end()) {
                                 // found in executed
                                 resolved_count += 1;
@@ -141,28 +143,28 @@ namespace quartz {
             } else {
                 // line 18 -19, obtain swaps
                 std::vector<std::pair<int, int>> swap_candidate_list;
-                for (const auto& gate : front_set) {
+                for (const auto &gate: front_set) {
                     // all gates in F must be two qubit gates
                     auto edge_set = graph.inEdges[gate];
                     assert(edge_set.size() == 2);
                     // swaps are between input qubits and all physical neighbours
-                    for (const auto& edge : edge_set) {
+                    for (const auto &edge: edge_set) {
                         int logical_idx = edge.logical_qubit_idx;
                         int physical_idx = logical2physical[logical_idx];
                         auto neighbour_list = device->get_input_neighbours(physical_idx);
-                        for (int neighbour : neighbour_list) {
+                        for (int neighbour: neighbour_list) {
                             swap_candidate_list.emplace_back(std::pair<int, int>{physical_idx, neighbour});
                         }
                     }
                 }
                 // heuristic: get extended set from front set
                 std::unordered_set<Op, OpHash> extensive_set;
-                for (const auto& gate: front_set) {
+                for (const auto &gate: front_set) {
                     if (graph.outEdges[gate].empty()) {
                         // this means that the current gate in front set a final gate
                         continue;
                     }
-                    for (const auto& edge: graph.outEdges[gate]) {
+                    for (const auto &edge: graph.outEdges[gate]) {
                         // we only consider two qubit gates in extensive set
                         if (graph.inEdges[edge.dstOp].size() == 2) {
                             extensive_set.emplace(edge.dstOp);
@@ -172,7 +174,7 @@ namespace quartz {
                 // line 20 - 24, find swap with minimal score
                 double min_swap_cost = 10000000;
                 std::pair<int, int> optimal_swap{-1, -1};
-                for (const auto& swap: swap_candidate_list) {
+                for (const auto &swap: swap_candidate_list) {
                     // line 21, generate \pi_tmp
                     std::vector<int> tmp_logical2physical = logical2physical;
                     std::vector<int> tmp_physical2logical = physical2logical;
@@ -189,7 +191,7 @@ namespace quartz {
                     if (logical_2 != -1) tmp_logical2physical[logical_2] = physical_1;
                     // line 22, calculate heuristic score
                     std::vector<std::pair<int, int>> front_mapping;
-                    for (const auto& gate : front_set) {
+                    for (const auto &gate: front_set) {
                         int f_logical_1 = graph.inEdges[gate].begin()->logical_qubit_idx;
                         int f_logical_2 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
                         int f_physical_1 = tmp_logical2physical[f_logical_1];
@@ -198,7 +200,7 @@ namespace quartz {
                     }
                     // heuristic: get extensive set mapping
                     std::vector<std::pair<int, int>> extensive_set_mapping;
-                    for (const auto& gate : extensive_set) {
+                    for (const auto &gate: extensive_set) {
                         assert(graph.inEdges[gate].size() == 2);
                         int e_logical1 = graph.inEdges[gate].begin()->logical_qubit_idx;
                         int e_logical2 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
@@ -237,7 +239,7 @@ namespace quartz {
         return logical2physical;
     }
 
-    QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph>& device,
+    QubitMappingTable calculate_sabre_mapping(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph> &device,
                                               bool use_extensive, double w_value) {
         // returns a logical2physical mapping at beginning
 
@@ -247,29 +249,29 @@ namespace quartz {
         QubitMappingTable initial_qubit_mapping = initial_graph.qubit_mapping_table;
         QubitMappingTable final_qubit_mapping;
         auto tmp_inEdges = initial_graph.inEdges;
-        for (const auto& op_edge : tmp_inEdges) {
+        for (const auto &op_edge: tmp_inEdges) {
             if (initial_graph.outEdges.find(op_edge.first) == initial_graph.outEdges.end()) {
                 // Case 1: the gate has no output
                 // initialize output edges for this gate
-                for (const auto& in_edge : op_edge.second) {
+                for (const auto &in_edge: op_edge.second) {
                     // generate final op and corresp. edge
                     Op final_op = Op(initial_graph.context->next_global_unique_id(),
-                                      initial_graph.context->get_gate(GateType::input_qubit));
+                                     initial_graph.context->get_gate(GateType::input_qubit));
                     Edge edge_to_final = Edge(op_edge.first, final_op, in_edge.dstIdx, 0,
                                               in_edge.logical_qubit_idx, in_edge.physical_qubit_idx);
                     // put into graph's edge list
                     initial_graph.outEdges[op_edge.first].insert(edge_to_final);
                     initial_graph.inEdges[final_op].insert(edge_to_final);
                     // put into final qubit mapping
-                    final_qubit_mapping.insert({final_op,std::pair<int, int>(edge_to_final.logical_qubit_idx,
-                                                                             edge_to_final.physical_qubit_idx)});
+                    final_qubit_mapping.insert({final_op, std::pair<int, int>(edge_to_final.logical_qubit_idx,
+                                                                              edge_to_final.physical_qubit_idx)});
                 }
             } else if (initial_graph.outEdges[op_edge.first].size() < op_edge.second.size()) {
                 // Case 2: the gate has fewer outputs than inputs
-                for (const auto& in_edge : op_edge.second) {
+                for (const auto &in_edge: op_edge.second) {
                     // check whether this input edge has corresp. output
                     bool has_output = false;
-                    for (const auto& out_edge : initial_graph.outEdges[op_edge.first]) {
+                    for (const auto &out_edge: initial_graph.outEdges[op_edge.first]) {
                         if (out_edge.srcIdx == in_edge.dstIdx) has_output = true;
                     }
                     if (has_output) continue;
@@ -282,8 +284,8 @@ namespace quartz {
                     initial_graph.outEdges[op_edge.first].insert(edge_to_final);
                     initial_graph.inEdges[final_op].insert(edge_to_final);
                     // put into final qubit mapping
-                    final_qubit_mapping.insert({final_op,std::pair<int, int>(edge_to_final.logical_qubit_idx,
-                                                                             edge_to_final.physical_qubit_idx)});
+                    final_qubit_mapping.insert({final_op, std::pair<int, int>(edge_to_final.logical_qubit_idx,
+                                                                              edge_to_final.physical_qubit_idx)});
                 }
             }
         }
@@ -296,8 +298,8 @@ namespace quartz {
         // init in / out edges
         reversed_graph.inEdges = initial_graph.outEdges;
         reversed_graph.outEdges = initial_graph.inEdges;
-        for (auto& op_edge : reversed_graph.inEdges) {
-            for (auto& edge : op_edge.second) {
+        for (auto &op_edge: reversed_graph.inEdges) {
+            for (auto &edge: op_edge.second) {
                 Op src_op = edge.srcOp;
                 Op dst_op = edge.dstOp;
                 int src_idx = edge.srcIdx;
@@ -308,8 +310,8 @@ namespace quartz {
                 edge.dstIdx = src_idx;
             }
         }
-        for (auto& op_edge : reversed_graph.outEdges) {
-            for (auto& edge : op_edge.second) {
+        for (auto &op_edge: reversed_graph.outEdges) {
+            for (auto &edge: op_edge.second) {
                 Op src_op = edge.srcOp;
                 Op dst_op = edge.dstOp;
                 int src_idx = edge.srcIdx;
@@ -322,7 +324,7 @@ namespace quartz {
         }
         // init qubit mapping table
         reversed_graph.qubit_mapping_table.clear();
-        for (const auto& op_edge : reversed_graph.outEdges) {
+        for (const auto &op_edge: reversed_graph.outEdges) {
             if (op_edge.first.ptr->tp == GateType::input_qubit) {
                 auto out_edge_list = reversed_graph.outEdges[op_edge.first];
                 assert(out_edge_list.size() == 1);
@@ -338,7 +340,7 @@ namespace quartz {
 
         // return final mapping
         QubitMappingTable final_result;
-        for (auto& mapping : initial_graph.qubit_mapping_table) {
+        for (auto &mapping: initial_graph.qubit_mapping_table) {
             int logical_idx = mapping.second.first;
             int physical_idx = initial_logical2physical[logical_idx];
             final_result.insert({mapping.first, std::pair<int, int>{logical_idx, physical_idx}});

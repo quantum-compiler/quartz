@@ -312,4 +312,19 @@ namespace quartz {
 
         return execution_history;
     }
+
+    int execution_cost(const std::vector<ExecutionHistory> &execution_history_list) {
+        int cost = 0;
+        for (const auto &execution_history: execution_history_list) {
+            assert (execution_history.gate_type != GateType::input_qubit
+                    && execution_history.gate_type != GateType::input_param);
+            if (execution_history.gate_type == GateType::swap) {
+                cost += 3;
+            } else {
+                cost += 1;
+            }
+        }
+        return cost;
+    }
+
 }

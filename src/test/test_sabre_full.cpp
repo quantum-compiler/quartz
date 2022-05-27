@@ -123,7 +123,7 @@ int main() {
     for (const auto& iter_cnt : iter_list) {
         for (const auto& w_value : W_list) {
             for (const auto& use_extensive : use_extensive_list) {
-                for (int repeat = 0; repeat < 5; ++repeat) {
+                for (int repeat = 0; repeat < 10; ++repeat) {
                     auto tmp_graph = graph;
                     tmp_graph.init_physical_mapping(InitialMappingType::SABRE, device,
                                                     iter_cnt, use_extensive, w_value);

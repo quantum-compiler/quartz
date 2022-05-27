@@ -327,4 +327,40 @@ namespace quartz {
         return cost;
     }
 
+    enum class ExecutionHistoryStatus {
+        VALID,
+        UNINITIALIZED_EH,
+        INVALID_EH
+    };
+
+    ExecutionHistoryStatus check_execution_history(const Graph &graph,
+                                                   const std::shared_ptr<DeviceTopologyGraph> &device,
+                                                   const std::vector<ExecutionHistory> &execution_history_list) {
+        // check whether an execution history is valid on device
+        int executed_gate_count = 0;
+        for (const auto &execution_history: execution_history_list) {
+            // check initialization
+            if (execution_history.guid == -10 || execution_history.logical0 == -10 ||
+                execution_history.physical0 == -10) {
+                return ExecutionHistoryStatus::UNINITIALIZED_EH;
+            }
+            // check gate count
+            if (!(execution_history.gate_type == GateType::swap && execution_history.guid == -1)) {
+                executed_gate_count += 1;
+            }
+            // check whether the gate is valid on device
+            int physical_0 = execution_history.physical0;
+            int physical_1 = execution_history.physical1;
+            if (physical_1 != -10) {
+                auto neighbours = device->get_input_neighbours(physical_0);
+                auto iterator = std::find(neighbours.begin(), neighbours.end(), physical_1);
+                if (iterator == neighbours.end()) {
+                    return ExecutionHistoryStatus::INVALID_EH;
+                }
+            }
+        }
+        assert(executed_gate_count == graph.gate_count());
+        return ExecutionHistoryStatus::VALID;
+    }
+
 }

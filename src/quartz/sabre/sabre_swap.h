@@ -250,6 +250,7 @@ namespace quartz {
                 execution_history.logical1 = logical_2;
                 execution_history.physical0 = physical_1;
                 execution_history.physical1 = physical_2;
+                execution_history_list.emplace_back(execution_history);
             }
         }
         return execution_history_list;

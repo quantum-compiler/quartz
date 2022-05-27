@@ -14,8 +14,8 @@ namespace quartz {
         int physical0;
         int physical1;
     public:
-        ExecutionHistory() : guid{-1}, logical0{-1}, logical1{-1},
-                             physical0{-1}, physical1{-1}, gate_type{GateType::input_param} {}
+        ExecutionHistory() : guid{-10}, logical0{-10}, logical1{-10},
+                             physical0{-10}, physical1{-10}, gate_type{GateType::input_param} {}
     };
 
     std::string gate_type_to_string(GateType t) {
@@ -28,8 +28,10 @@ namespace quartz {
     }
 
     std::vector<ExecutionHistory> _sabre_swap_loop(Graph graph, const std::shared_ptr<DeviceTopologyGraph> &device,
-                                      bool use_extensive, double w_value) {
+                                                   bool use_extensive, double w_value) {
         // returns the logical mapping at the end after sabre pass
+        // initialize execution history list
+        std::vector<ExecutionHistory> execution_history_list;
         // initialize mapping
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
@@ -93,6 +95,22 @@ namespace quartz {
                     // line 10, execute
                     front_set.erase(gate);
                     executed_set.insert(gate);
+                    // sabre swap: add gate to execution history
+                    if (gate.ptr->tp != GateType::input_qubit) {
+                        size_t qubit_num = graph.inEdges[gate].size();
+                        assert(qubit_num == 1 || qubit_num == 2);
+                        ExecutionHistory execution_history;
+                        execution_history.guid = int(gate.guid);
+                        execution_history.gate_type = gate.ptr->tp;
+                        execution_history.logical0 = graph.inEdges[gate].begin()->logical_qubit_idx;
+                        execution_history.physical0 = logical2physical[execution_history.logical0];
+                        if (qubit_num == 2) {
+                            execution_history.logical1 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
+                            execution_history.physical1 = logical2physical[execution_history.logical1];
+                        }
+                        execution_history_list.emplace_back(execution_history);
+                    }
+                    // apply swap to the mapping
                     if (gate.ptr->tp == GateType::swap) {
                         // need to update mapping if we have executed a swap
                         int first_logical = graph.inEdges[gate].begin()->logical_qubit_idx;
@@ -224,17 +242,25 @@ namespace quartz {
                 // heuristic: increase decay when applying swap
                 decay_list[physical_1] += 0.001;
                 decay_list[physical_2] += 0.001;
+                // sabre swap: add swap to execution history
+                ExecutionHistory execution_history;
+                execution_history.guid = -1;
+                execution_history.gate_type = GateType::swap;
+                execution_history.logical0 = logical_1;
+                execution_history.logical1 = logical_2;
+                execution_history.physical0 = physical_1;
+                execution_history.physical1 = physical_2;
             }
         }
-        return logical2physical;
+        return execution_history_list;
     }
 
-    QubitMappingTable sabre_swap(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph> &device,
-                                 bool use_extensive, double w_value) {
+    std::vector<ExecutionHistory> sabre_swap(Graph initial_graph, const std::shared_ptr<DeviceTopologyGraph> &device,
+                                             bool use_extensive, double w_value) {
         // applies sabre swap on an initialized circuit
 
         // STEP1: Generate initial, final qubit mapping table
-        // Note that we suppose a trivial initial mapping is already provided.
+        // Note that we suppose an initial mapping is already provided.
         // <logical, physical>
         QubitMappingTable initial_qubit_mapping = initial_graph.qubit_mapping_table;
         QubitMappingTable final_qubit_mapping;
@@ -281,60 +307,9 @@ namespace quartz {
         }
 
         // STEP2: SWAP-based heuristic search
-        std::vector<int> final_logical2physical = sabre_main_loop(initial_graph, device, use_extensive, w_value);
+        std::vector<ExecutionHistory> execution_history = _sabre_swap_loop(initial_graph, device,
+                                                                           use_extensive, w_value);
 
-        // STEP3: reverse the graph
-        Graph reversed_graph = initial_graph;
-        // init in / out edges
-        reversed_graph.inEdges = initial_graph.outEdges;
-        reversed_graph.outEdges = initial_graph.inEdges;
-        for (auto &op_edge: reversed_graph.inEdges) {
-            for (auto &edge: op_edge.second) {
-                Op src_op = edge.srcOp;
-                Op dst_op = edge.dstOp;
-                int src_idx = edge.srcIdx;
-                int dst_idx = edge.dstIdx;
-                edge.srcOp = dst_op;
-                edge.dstOp = src_op;
-                edge.srcIdx = dst_idx;
-                edge.dstIdx = src_idx;
-            }
-        }
-        for (auto &op_edge: reversed_graph.outEdges) {
-            for (auto &edge: op_edge.second) {
-                Op src_op = edge.srcOp;
-                Op dst_op = edge.dstOp;
-                int src_idx = edge.srcIdx;
-                int dst_idx = edge.dstIdx;
-                edge.srcOp = dst_op;
-                edge.dstOp = src_op;
-                edge.srcIdx = dst_idx;
-                edge.dstIdx = src_idx;
-            }
-        }
-        // init qubit mapping table
-        reversed_graph.qubit_mapping_table.clear();
-        for (const auto &op_edge: reversed_graph.outEdges) {
-            if (op_edge.first.ptr->tp == GateType::input_qubit) {
-                auto out_edge_list = reversed_graph.outEdges[op_edge.first];
-                assert(out_edge_list.size() == 1);
-                auto logical_idx = out_edge_list.begin()->logical_qubit_idx;
-                auto physical_idx = final_logical2physical[logical_idx];
-                reversed_graph.qubit_mapping_table.insert({op_edge.first,
-                                                           std::pair<int, int>{logical_idx, physical_idx}});
-            }
-        }
-
-        // STEP4: SWAP-based heuristic search
-        std::vector<int> initial_logical2physical = sabre_main_loop(reversed_graph, device, use_extensive, w_value);
-
-        // return final mapping
-        QubitMappingTable final_result;
-        for (auto &mapping: initial_graph.qubit_mapping_table) {
-            int logical_idx = mapping.second.first;
-            int physical_idx = initial_logical2physical[logical_idx];
-            final_result.insert({mapping.first, std::pair<int, int>{logical_idx, physical_idx}});
-        }
-        return final_result;
+        return execution_history;
     }
 }

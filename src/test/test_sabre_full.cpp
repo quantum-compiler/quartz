@@ -119,6 +119,7 @@ int main() {
     std::vector<double> W_list{0.5};
     std::vector<bool> use_extensive_list{true};
     double min_sabre_cost = 100000;
+    Graph best_graph = graph;
     for (const auto& iter_cnt : iter_list) {
         for (const auto& w_value : W_list) {
             for (const auto& use_extensive : use_extensive_list) {
@@ -131,12 +132,23 @@ int main() {
                         std::cout << "Mapping test failed!" << endl;
                     }
                     double sabre_cost = tmp_graph.circuit_implementation_cost(device);
-                    min_sabre_cost = min(min_sabre_cost, sabre_cost);
+                    if (sabre_cost < min_sabre_cost) {
+                        min_sabre_cost = sabre_cost;
+                        best_graph = tmp_graph;
+                    }
                 }
             }
         }
     }
     cout << "Sabre search implementation cost is " << min_sabre_cost << endl;
 
+    // sabre swap
+    auto execution_history = sabre_swap(best_graph, device, true, 0.5);
+    auto eh_status = check_execution_history(best_graph, device, execution_history);
+    if (eh_status != ExecutionHistoryStatus::VALID) {
+        cout << "Invalid execution history!" << endl;
+    }
+    int real_cost = execution_cost(execution_history);
+    cout << "Sabre swap real cost is " << real_cost << endl;
 };
 

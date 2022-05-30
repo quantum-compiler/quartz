@@ -158,6 +158,6 @@ int main() {
             }
         }
     }
-    cout << "#gates in new circuit is" << best_gate_count << endl;
+    cout << "#gates in new circuit is " << best_gate_count << endl;
 };
 

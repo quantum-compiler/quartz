@@ -143,12 +143,21 @@ int main() {
     cout << "Sabre search implementation cost is " << min_sabre_cost << endl;
 
     // sabre swap
-    auto execution_history = sabre_swap(best_graph, device, true, 0.5);
-    auto eh_status = check_execution_history(best_graph, device, execution_history);
-    if (eh_status != ExecutionHistoryStatus::VALID) {
-        cout << "Invalid execution history!" << endl;
+    double best_gate_count = 100000;
+    for (bool use_extensive : use_extensive_list) {
+        for (double w_value : W_list) {
+            auto execution_history = sabre_swap(best_graph, device,
+                                                use_extensive, w_value);
+            auto eh_status = check_execution_history(best_graph, device, execution_history);
+            if (eh_status != ExecutionHistoryStatus::VALID) {
+                cout << "Invalid execution history!" << endl;
+            }
+            int real_cost = execution_cost(execution_history);
+            if (real_cost < best_gate_count) {
+                best_gate_count = real_cost;
+            }
+        }
     }
-    int real_cost = execution_cost(execution_history);
-    cout << "Sabre swap real cost is " << real_cost << endl;
+    cout << "#gates in new circuit is" << best_gate_count << endl;
 };
 

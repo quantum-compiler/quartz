@@ -1,10 +1,10 @@
+import quartz
 import torch
 from gnn import QGNN
 import os
 from datetime import datetime
 import torch.nn as nn
 from torch.distributions import Categorical
-import quartz
 import torch.nn.functional as F
 import numpy as np
 import dgl
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     context = quartz.QuartzContext(
         gate_set=['h', 'cx', 't', 'tdg', 'x'],
         filename='../../bfs_verified_simplified.json',
-        no_increase=True)
+        no_increase=False)
     num_gate_type = 29
     parser = quartz.PyQASMParser(context=context)
     # init_dag = parser.load_qasm(
@@ -338,7 +338,7 @@ if __name__ == '__main__':
                     eps_clip,
                     log_file_handle=log_f)
     ppo_agent.load(
-        'PPO_preTrained/rl_ppo_local_multi_init_states/PPO_rl_ppo_local_multi_init_states_0_0.pth'
+        'PPO_preTrained/rl_ppo_local_multi_init_states_with_increase/PPO_rl_ppo_local_multi_init_states_with_increase_0_6.pth'
     )
 
     # track total training time
@@ -356,7 +356,8 @@ if __name__ == '__main__':
     ep_best_gate_cnt = init_graph.gate_count
     ep_seq_len = 0
 
-    for i in tqdm(range(batch_size)):
+    tqdm_bar = tqdm(range(batch_size))
+    for i in tqdm_bar:
         log_f.write(f'trajectory {i}\n')
         t_reward, t_best_gate_cnt, t_seq_len = get_trajectory(
             ppo_agent, init_graph, max_seq_len, invalid_reward, log_f)
@@ -365,6 +366,7 @@ if __name__ == '__main__':
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
         ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
         ep_seq_len += t_seq_len
+        tqdm_bar.set_description(f'best: {best_gate_cnt}')
 
     log_running_reward += current_ep_reward
     log_running_episodes += 1

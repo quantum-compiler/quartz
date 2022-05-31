@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cmath>
 #include <random>
+#include <mutex>
 
 namespace quartz {
 	Context::Context(const std::vector< GateType > &supported_gates)
@@ -31,7 +32,11 @@ namespace quartz {
         get_and_gen_parameters(num_params);
     }
 
-	size_t Context::next_global_unique_id(void) { return global_unique_id++; }
+	size_t Context::next_global_unique_id(void) {
+      static std::mutex lock;
+      std::lock_guard<std::mutex> lg(lock);
+      return global_unique_id++;
+    }
 
 	void Context::set_generated_parameter(int id, ParamType param) {
 		get_generated_parameters(id);

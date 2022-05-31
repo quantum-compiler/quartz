@@ -1978,7 +1978,8 @@ Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
 
   std::vector<size_t>
   Graph::appliable_xfers_parallel(Op op, const std::vector<GraphXfer*> &xfer_v) const {
-    std::vector<bool> xfer_is_appliable(xfer_v.size(), false);
+  // cannot use std::vector<bool> here because it's not thread-safe to write different elements of it
+  std::vector<int> xfer_is_appliable(xfer_v.size(), false);
 #pragma omp parallel for schedule(runtime) default(none) shared(xfer_is_appliable, xfer_v, op)
     for (size_t i = 0; i < xfer_v.size(); i++) {
       xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);

@@ -245,6 +245,19 @@ cdef class QuartzContext:
         #                 self.v_xfers.push_back(xfer_0)
         #             if xfer_1 != NULL:
         #                 self.v_xfers.push_back(xfer_1)
+
+        # for i in range(eq_sets.size()):
+        #     for j in range(eq_sets[i].size()):
+        #         if j != 0:
+        #             dag_ptr_0 = eq_sets[i][0]
+        #             dag_ptr_1 = eq_sets[i][j]
+        #             xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+        #             xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
+        #             if xfer_0 != NULL and xfer_0.num_dst_op() - xfer_0.num_src_op() < 2:
+        #                 self.v_xfers.push_back(xfer_0)
+        #             if xfer_1 != NULL and xfer_1.num_dst_op() - xfer_1.num_src_op() < 2:
+        #                 self.v_xfers.push_back(xfer_1)
+
         for i in range(eq_sets.size()):
             for j in range(eq_sets[i].size()):
                 for k in range(eq_sets[i].size()):

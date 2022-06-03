@@ -14,9 +14,9 @@ namespace quartz {
 		// Return the number of DAGs removed.
 		int remove_singletons(Context *ctx);
 
-		// Normalize each DAG to have the minimal circuit representation.
+		// Normalize each DAG to have the canonical representation.
 		// Return the number of DAGs removed.
-		int normalize_to_minimal_circuit_representations(Context *ctx);
+		int normalize_to_canonical_representations(Context *ctx);
 
 		// This function runs in O(1).
 		[[nodiscard]] int num_hash_values() const;

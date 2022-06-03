@@ -1044,8 +1044,8 @@ namespace quartz {
 		return result;
 	}
 
-	bool DAG::minimal_circuit_representation(std::unique_ptr< DAG > *output_dag,
-	                                         bool output) const {
+	bool DAG::canonical_representation(std::unique_ptr<DAG > *output_dag,
+                                       bool output) const {
 		if (output) {
 			// |output_dag| cannot be nullptr but its content can (and should)
 			// be nullptr.
@@ -1227,8 +1227,8 @@ namespace quartz {
 		return this_is_minimal_circuit_representation;
 	}
 
-	bool DAG::is_minimal_circuit_representation() const {
-		return minimal_circuit_representation(nullptr, false);
+	bool DAG::is_canonical_representation() const {
+		return canonical_representation(nullptr, false);
 	}
 
 	std::unique_ptr< DAG >

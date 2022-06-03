@@ -91,27 +91,33 @@ namespace quartz {
 		static std::unique_ptr< DAG > read_json(Context *ctx,
 		                                        std::istream &fin);
 
-		// Returns true iff the DAG is already under the minimal circuit
+		// Returns true iff the DAG is already under the canonical
 		// representation.
-		// Minimal circuit representation is a sequence representation of a
-		// circuit such that:
-		// 1. The gates are ordered column by column. If we see each circuit as
-		//    a grid of gates such that each row represents a qubit, and put
-		//    each gate at the leftmost possible position, gate A is placed
-		//    before gate B iff A is in a column before B or they are in the
-		//    same column and the smallest qubit index of A is smaller than the
-		//    smallest qubit index of B.
-		// 2. The parameter "gates" are placed at the beginning.
-		// If |output| is true, store the minimal circuit representation into
+		// Canonical representation is a sequence representation of a
+		// circuit such that the sequence is the lexicographically smallest
+        // topological order of the circuit, where the gates are compared by:
+		// 1. The qubit indices in lexicographical order.
+        //    If the smallest qubit indices two gates operate on
+        //    are different, the gate with the smaller one is considered
+        //    smaller. For example,
+        //      (q1, q4) < (q2, q3);
+        //      (q1, q3) < (q1, q4);
+        //      (q1, q3) < (q2);
+        //      (q1) < (q1, q3).
+        // 2. If the qubit indices are all the same, compare the gate type.
+        //
+		// The parameter "gates" are placed at the beginning.
+        //
+		// If |output| is true, store the canonical representation into
 		// |output_dag|.
 		// The parameter |output_dag| should be a pointer containing nullptr
 		// (otherwise its content will be deleted).
-		// This functions guarantees that if two sequence representations
-		// share the same "minimal_circuit_representation", they have the same
-		// circuit representation.
-		bool minimal_circuit_representation(std::unique_ptr< DAG > *output_dag,
-		                                    bool output = true) const;
-		[[nodiscard]] bool is_minimal_circuit_representation() const;
+		// This functions guarantees that if and only if two sequence
+        // representations share the same canonical representation, they have
+        // the same circuit representation.
+		bool canonical_representation(std::unique_ptr<DAG > *output_dag,
+                                      bool output = true) const;
+		[[nodiscard]] bool is_canonical_representation() const;
 		[[nodiscard]] std::unique_ptr< DAG >
 		get_permuted_dag(const std::vector< int > &qubit_permutation,
 		                 const std::vector< int > &param_permutation) const;

@@ -80,6 +80,8 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
         GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr, bool no_increase)
         int num_src_op()
         int num_dst_op()
+        string src_str()
+        string dst_str()
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Op:
@@ -112,6 +114,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         void to_qasm(const string &, bool, bool) const
         string to_qasm(bool, bool) const
         shared_ptr[Graph] ccz_flip_greedy_rz()
+        bool equal(const Graph &) const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

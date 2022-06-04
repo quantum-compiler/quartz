@@ -214,6 +214,14 @@ cdef class PyXfer:
     def is_NOP(self):
         return self.is_nop
 
+    @property
+    def src_str(self):
+        return self.graphXfer.src_str().decode('utf-8')
+
+    @property
+    def dst_str(self):
+        return self.graphXfer.dst_str().decode('utf-8')
+
 cdef class QuartzContext:
     cdef Context *context
     cdef EquivalenceSet *eqs
@@ -321,40 +329,6 @@ cdef class QuartzContext:
 
 from functools import partial
 
-# cdef class PyNode:
-#     cdef Op node
-
-#     cdef int guid
-#     cdef object gate
-
-#     def __cinit__(self, *, int guid = -1, PyGate gate = None):
-#         self.guid = guid
-#         self.gate = gate
-#         if id != -1 and gate != None:
-#             self.node = Op(guid, gate.gate)
-#         else:
-#             self.node = Op()
-
-#     def __dealloc__(self):
-#         pass
-    
-#     @property
-#     def node_guid(self):
-#         return self.node.guid
-
-#     @property
-#     def gate(self):
-#         return PyGate().set_this(self.node.ptr)
-
-#     @property
-#     def gate_tp(self):
-#         return self.node.ptr.tp
-
-#     def __reduce__(self):
-#         return (
-#             partial(self.__class__, guid=self.guid, gate=self.gate), ()
-#         )
-
 cdef class PyNode:
     cdef Op node
 
@@ -409,6 +383,9 @@ cdef class PyGraph:
 
     def __dealloc__(self):
         self.graph.reset()
+
+    def __hash__(self):
+        return deref(self.graph).hash()
 
     def get_nodes(self):
         gate_count = self.gate_count

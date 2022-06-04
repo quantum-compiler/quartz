@@ -68,6 +68,7 @@ build/*
 # others
 .DS_Store
 **/wandb
+**/.mypy_cache
 
 experiment/pretrain/dataset
 experiment/pretrain/pretrain_dataset*
@@ -83,3 +84,5 @@ experiment/ppo/pretrain/pretrain_dataset_g9
 experiment/ppo/pretrain/pretrain_dataset_g99
 
 experiment/a2c/*txt
+
+experiment/ppo-new/outputs

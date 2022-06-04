@@ -33,7 +33,7 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
             if next_graph == None:
                 reward = invalid_reward
                 done = True
-                next_graph = graph
+                next_graph = graph # ???
             elif context.get_xfer_from_id(id=xfer).is_nop:
                 reward = 0
                 done = True

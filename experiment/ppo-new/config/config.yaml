@@ -2,7 +2,8 @@ mode: train
 resume: False
 ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
 
-gpus: [0]
+gpus: [2]
+num_workers: 8
 
 seed: 98765
 wandb:
@@ -17,6 +18,12 @@ ecc_file: 'bfs_verified_simplified.json'
 no_increase: False
 include_nop: True
 
+# exp collection
+collect_batch: 128
+max_steps: 300
+invalid_reward: -1.0
+
 # training
 max_iterations: 1e8
+
 

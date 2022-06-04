@@ -12,7 +12,7 @@ void OpX::add_input(const TensorX &input) { inputs.push_back(input); }
 
 void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 
-GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(10) {}
+GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(0) {}
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
                                        const DAG *dst_graph,
@@ -254,7 +254,7 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
 
 GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
                      const DAG *dst_graph)
-    : context(_context), tensorId(10) {
+    : context(_context), tensorId(0) {
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   assert(src_graph->get_num_input_parameters() ==
          dst_graph->get_num_input_parameters());
@@ -726,5 +726,48 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
 }
 int GraphXfer::num_src_op() { return srcOps.size(); }
 int GraphXfer::num_dst_op() { return dstOps.size(); }
+
+std::string GraphXfer::to_str(std::vector<OpX *> const & v) const{
+    // TODO: Currenty only support non-parameter gates
+    std::string s;
+    std::ostringstream oss(s);
+    // return s;
+    std::unordered_map<TensorX, int, TensorXHash> mp;
+    for(auto const & opx : v){
+        int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+        int num_params = context->get_gate(opx->type)->get_num_parameters();
+        int num_inputs = num_qubits + num_params;
+
+        std::vector<int> input_qubits(num_qubits);
+
+        for(int i = 0; i < num_qubits; ++i){
+           if(opx->inputs[i].op == nullptr){
+               input_qubits[i] = opx->inputs[i].idx;
+           }
+            else{
+                input_qubits[i] = mp[opx->inputs[i]];
+            }
+        }
+
+       oss << gate_type_name(opx->type);
+       for(auto const & idx : input_qubits){
+           oss << " " << idx;
+       }
+       oss << std::endl;
+
+        for(int i = 0; i < num_qubits; ++i) {
+            mp[opx->outputs[i]] = input_qubits[i];
+        }
+    }
+    return oss.str();
+}
+
+std::string GraphXfer::src_str() const{
+    return to_str(srcOps);
+}
+
+std::string GraphXfer::dst_str() const{
+    return to_str(dstOps);
+}
 
 }; // namespace quartz

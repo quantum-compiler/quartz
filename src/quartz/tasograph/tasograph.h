@@ -174,6 +174,7 @@ public:
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
   bool has_loop() const;
   size_t hash();
+  bool equal(const Graph & other) const;
   bool check_correctness();
   float total_cost() const;
   int gate_count() const;

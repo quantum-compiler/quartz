@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "tasograph.h"
 #include <queue>
+#include <ostream>
 
 namespace quartz {
 
@@ -82,6 +83,12 @@ public:
   bool create_new_operator(const OpX *opx, Op &op);
   int num_src_op();
   int num_dst_op();
+  std::string to_str(std::vector<OpX *> const & v) const;
+  std::string src_str() const;
+  std::string dst_str() const;
+  // TODO: not implemented
+//   std::string to_qasm(std::vector<OpX *> const &v) const;
+
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,

@@ -2135,4 +2135,9 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
     }
   }
 }
+
+// TODO
+bool Graph::equal(const Graph & other) const{
+    return true;
+}
 }; // namespace quartz

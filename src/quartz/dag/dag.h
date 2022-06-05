@@ -104,6 +104,9 @@ namespace quartz {
         //      (q1, q3) < (q1, q4);
         //      (q1, q3) < (q2);
         //      (q1) < (q1, q3).
+        //    Note that two gates operating on the same qubit is impossible
+        //    for the topological order of one circuit, but we still define it
+        //    for the completeness of comparing different circuits.
         // 2. If the qubit indices are all the same, compare the gate type.
         //
 		// The parameter "gates" are placed at the beginning.

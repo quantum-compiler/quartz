@@ -108,7 +108,7 @@ int Dataset::remove_singletons(Context *ctx) {
   return num_removed;
 }
 
-int Dataset::normalize_to_minimal_circuit_representations(Context *ctx) {
+int Dataset::normalize_to_canonical_representations(Context *ctx) {
   int num_removed = 0;
   std::vector<std::unique_ptr<DAG> > dags_to_insert_afterwards;
   auto dag_already_exists =
@@ -130,8 +130,8 @@ int Dataset::normalize_to_minimal_circuit_representations(Context *ctx) {
     std::unique_ptr<DAG> new_dag;
 
     for (auto &dag : dags) {
-      bool is_minimal = dag->minimal_circuit_representation(&new_dag);
-      if (!is_minimal) {
+      bool is_canonical = dag->canonical_representation(&new_dag);
+      if (!is_canonical) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));
         }

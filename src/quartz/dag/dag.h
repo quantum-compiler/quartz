@@ -121,6 +121,9 @@ namespace quartz {
 		bool canonical_representation(std::unique_ptr<DAG > *output_dag,
                                       bool output = true) const;
 		[[nodiscard]] bool is_canonical_representation() const;
+		// Returns true iff this is NOT canonical representation
+		// (so the function changes this DAG to canonical representation).
+		bool to_canonical_representation();
 		[[nodiscard]] std::unique_ptr< DAG >
 		get_permuted_dag(const std::vector< int > &qubit_permutation,
 		                 const std::vector< int > &param_permutation) const;

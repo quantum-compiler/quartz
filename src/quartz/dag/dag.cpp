@@ -1056,8 +1056,6 @@ bool DAG::canonical_representation(std::unique_ptr<DAG> *output_dag,
                                         get_num_input_parameters());
   }
 
-  std::vector<int> qubit_depth(get_num_qubits(), 0);
-
   bool this_is_canonical_representation = true;
   // map this DAG to the canonical representation
   int num_mapped_edges = 0;
@@ -1105,8 +1103,9 @@ bool DAG::canonical_representation(std::unique_ptr<DAG> *output_dag,
       auto get_min_qubit_index = [&](DAGHyperEdge *edge) {
         int result = -1;
         for (auto &input_node : edge->input_nodes) {
-          if (result == -1 || input_node->is_qubit()) {
-            result = std::min(result, input_node->index);
+          if (result == -1
+              || (input_node->is_qubit() && input_node->index < result)) {
+            result = input_node->index;
           }
         }
         return result;
@@ -1210,6 +1209,15 @@ bool DAG::canonical_representation(std::unique_ptr<DAG> *output_dag,
 		return canonical_representation(nullptr, false);
 	}
 
+bool DAG::to_canonical_representation() {
+  std::unique_ptr<DAG> output_dag;
+  if (!canonical_representation(&output_dag, true)) {
+    clone_from(*output_dag, {}, {});
+    return true;
+  }
+  return false;
+}
+
 	std::unique_ptr< DAG >
 	DAG::get_permuted_dag(const std::vector< int > &qubit_permutation,
 	                      const std::vector< int > &param_permutation) const {
@@ -1229,9 +1237,13 @@ bool DAG::canonical_representation(std::unique_ptr<DAG> *output_dag,
 		original_fingerprint_ = other.original_fingerprint_;
 		std::unordered_map< DAGNode *, DAGNode * > nodes_mapping;
 		std::unordered_map< DAGHyperEdge *, DAGHyperEdge * > edges_mapping;
+		nodes.clear();
 		nodes.reserve(other.nodes.size());
+		edges.clear();
 		edges.reserve(other.edges.size());
+		outputs.clear();
 		outputs.reserve(other.outputs.size());
+		parameters.clear();
 		parameters.reserve(other.parameters.size());
 		if (qubit_permutation.empty() && param_permutation.empty()) {
 			for (int i = 0; i < (int)other.nodes.size(); i++) {

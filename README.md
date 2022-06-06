@@ -36,7 +36,10 @@ We show the steps to super-optimize a quantum circuit in Quartz.
 
 #### Input the circuit
 
-To optimize a circuit, you can write your circuit in the `qasm` language and write it to a `qasm` file. Currently we only support a subset of `qasm`'s gramma. Specifically, the `qasm` files we support should consist of a header and lines of `qasm` instructions. The header should be in the format below:
+To optimize a circuit, you can write your circuit in the `qasm` language and write it to a `qasm` file.
+Currently, we only support a subset of `qasm`'s grammar.
+Specifically, the `qasm` files we support should consist of a header and lines of `qasm` instructions.
+The header should be in the format below:
 
 ```
 OPENQASM 2.0;
@@ -139,7 +142,7 @@ Please let us know if you encounter any bugs or have any suggestions by [submitt
 
 We welcome all contributions to Quartz from bug fixes to new features and extensions.
 
-Please subscribe to the Quartz users mailing list for 
+Please subscribe to the Quartz users mailing list (TODO)
 
 ## Citations
 

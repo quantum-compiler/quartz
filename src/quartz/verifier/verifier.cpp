@@ -34,12 +34,10 @@ bool Verifier::redundant(Context *ctx, DAG *dag) {
 
 bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs,
                          DAG *dag) {
-  // Representative pruning.
-  // Check if DAG is in canonical representation.
-  if (!dag->is_canonical_representation()) {
-    return true;
-  }
-  // Check if canonicalize(dropfirst) already exists.
+  // RepGen.
+  // We have already known that |dag| is a canonical sequence and DropLast(dag)
+  // is a representative.
+  // Check if canonicalize(DropFirst(dag)) is a representative.
   auto dropfirst = std::make_unique<DAG>(*dag);
   dropfirst->remove_first_quantum_gate();
   dropfirst->to_canonical_representation();

@@ -1084,19 +1084,9 @@ bool DAG::canonical_representation(std::unique_ptr<DAG> *output_dag,
   class CompareByMinQubitIndex {
    public:
     bool operator()(DAGHyperEdge *edge1, DAGHyperEdge *edge2) const {
-      auto get_min_qubit_index = [&](DAGHyperEdge *edge) {
-        int result = -1;
-        for (auto &input_node : edge->input_nodes) {
-          if (result == -1
-              || (input_node->is_qubit() && input_node->index < result)) {
-            result = input_node->index;
-          }
-        }
-        return result;
-      };
       // std::priority_queue maintains the largest element,
       // so we use ">" to get the gate with minimum qubit index.
-      return get_min_qubit_index(edge1) > get_min_qubit_index(edge2);
+      return edge1->get_min_qubit_index() > edge2->get_min_qubit_index();
     }
   };
 

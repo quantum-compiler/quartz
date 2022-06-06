@@ -2,15 +2,16 @@ import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
 from functools import partial
-
+from IPython import embed # type: ignore
 
 def train(task, net):
     print(f'task {task} : net')
+    embed()
 
 
 def main():
     mp.set_start_method('spawn')
-    net = nn.Linear(3, 5).cuda(0)
+    net = nn.Linear(3, 5)
     net = net.share_memory()
     p_train = partial(train, net=net)
     

@@ -10,6 +10,7 @@ import time
 
 import torch
 import torch.nn as nn
+from torch.distributions import Categorical
 import torch.multiprocessing as mp
 import torch.distributed.rpc as rpc
 import numpy as np
@@ -145,7 +146,7 @@ class Observer:
             #     PPOAgent.select_action,
             #     args=(agent_rref, self.id, state)
             # )
-            action = agent_rref.rpc_sync().select_action(rpc.RRef(self), self.id, state)
+            action = agent_rref.rpc_sync().select_action_batch(rpc.RRef(self), self.id, state)
             print(f'obs {self.id} get action {action}')
         
         return self.id * 1000
@@ -161,11 +162,16 @@ class PPOAgent:
         self.ob_rrefs = []
 
         for rank in range(1, world_size):
-            ob_info = rpc.get_worker_info(f'observer_{rank}')
+            ob_info = rpc.get_worker_info(f'observer_{rank - 1}')
             self.ob_rrefs.append(rpc.remote(ob_info, Observer, args=(batch,)))
         
+        self.future_actions = torch.futures.Future() # type: ignore
+        self.pending_states = len(self.ob_rrefs)
+        self.states_buf = [None] * len(self.ob_rrefs)
+        self.lock = threading.Lock()
+        
         # self.buffer = RolloutBuffer()
-        print('agnet init finished')
+        print('agent init finished')
     
     def select_action(self, agent_rref, obs_id, state):
         print(f'select action for {obs_id} with net {self.policy_net}')
@@ -173,6 +179,29 @@ class PPOAgent:
         y = self.policy_net(x)
         print(y)
         return obs_id
+
+    @rpc.functions.async_execution
+    def select_action_batch(self, agent_rref, obs_id, state):
+        future_action = self.future_actions.then(
+            lambda future_actions: future_actions.wait()[obs_id]
+        )
+        self.states_buf[obs_id] = state
+        
+        with self.lock:
+            self.pending_states -= 1
+            if self.pending_states == 0:
+                self.pending_states = len(self.ob_rrefs)
+                print(f'select action with net {self.policy_net} for:')
+                for s in self.states_buf:
+                    print(f'    state: {s}')
+                x = torch.rand(3).cuda(0)
+                y = self.policy_net(x)
+                # future_actions = self.future_actions
+                # self.future_actions = torch.futures.Future()
+                # future_actions.set_result(actions.cpu())
+                self.future_actions.set_result([i for i in range(len(self.ob_rrefs))])
+                self.future_actions = torch.futures.Future()
+        return future_action
     
     def run_episode(self, len_episode):
         futs = []
@@ -260,7 +289,7 @@ class PPOMod:
         else:
             """other ranks are the observer"""
             print(f'rank {rank}')
-            rpc.init_rpc(f'observer_{rank}', rank=rank, world_size=world_size)
+            rpc.init_rpc(f'observer_{rank - 1}', rank=rank, world_size=world_size)
             """observers passively waiting for instructions from agents"""
         
         rpc.shutdown()

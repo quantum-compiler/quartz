@@ -20,11 +20,6 @@ from IPython import embed # type: ignore
 # global vars to avoid serialization when multiprocessing
 quartz_context: quartz.QuartzContext
 quartz_parser: quartz.PyQASMParser
-shared_net: nn.Module
-
-def init_shared_net(net: nn.Module) -> None:
-    global shared_net
-    shared_net = net
 
 def init_quartz_context(
     gate_set: List[str],
@@ -77,7 +72,7 @@ class RolloutBuffer:
 class PPOAgent():
     
     def __init__(self) -> None:
-        # self.actor_net = torch.rand(3, 5).cuda(2)
+        # self.actor_net = nn.Linear(3, 5).cuda(2)
         # self.buffer = RolloutBuffer()
         pass
     
@@ -99,6 +94,7 @@ def get_trajectory(
     agent: PPOAgent,
     max_steps: int = 300,
     invalid_reward: float = 1.0,
+    net = None,
 ) -> List[SerializableExperience]:
     global quartz_context
     
@@ -140,7 +136,7 @@ def get_trajectory(
             break
     # end for 
     
-
+    print(net)
     return exp_list
     
     
@@ -205,20 +201,24 @@ class PPOMod:
     def train(self) -> None:
         for i_iteration in range(self.max_iterations):
             
+            net = nn.Linear(10240, 1024)
+            # net.share_memory()
             
             pf_get_trajectory = partial(
                 get_trajectory,
                 agent=self.agent,
                 max_steps=self.cfg.max_steps,
                 invalid_reward=self.cfg.invalid_reward,
+                net=net
             )
             
-            init_graphs: List[str] = [self.init_graph.to_qasm_str()] * self.cfg.collect_batch
+            init_graphs: List[str] = [self.init_graph.to_qasm_str()] * 16 #self.cfg.collect_batch
             with mp.Pool(
-                processes=4, #self.cfg.num_workers,
-                initializer=self.init_quartz_context_func
+                processes=16, #self.cfg.num_workers,
+                initializer=self.init_quartz_context_func,
+                maxtasksperchild=1,
             ) as pool: # we use spawn to support CUDA here, so we need to init global vars in each process again
-                sr_exp_lists = pool.map(pf_get_trajectory, init_graphs)
+                sr_exp_lists = pool.map(pf_get_trajectory, init_graphs, chunksize=1)
             
             embed()
     

@@ -213,10 +213,6 @@ class PPOAgent:
         rets = torch.futures.wait_all(futs)
         print(f'rets: {rets}')
         return rets
-    
-    # def select_action(self, graph: quartz.PyGraph) -> Tuple[int, int]:
-        
-    #     return 0, 0
 
 
 
@@ -281,15 +277,31 @@ class PPOMod:
         os.environ['MASTER_PORT'] = '23333'
         if rank == 0:
             print('rank 0!!!')
-            rpc.init_rpc('agent', rank=rank, world_size=world_size)
+            rpc.init_rpc(
+                name='agent', rank=rank, world_size=world_size,
+                backend=rpc.BackendType.TENSORPIPE, # type: ignore
+                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
+                    rpc_timeout=6000,
+                    init_method='env://',
+                    _transports=["uv"],
+                )
+            )
             agent = PPOAgent(world_size, True)
-            for i_episode in range(4):
+            for i_episode in range(2):
                 agent.run_episode(8)
-                time.sleep(5)
+
         else:
             """other ranks are the observer"""
             print(f'rank {rank}')
-            rpc.init_rpc(f'observer_{rank - 1}', rank=rank, world_size=world_size)
+            rpc.init_rpc(
+                name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
+                backend=rpc.BackendType.TENSORPIPE, # type: ignore
+                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
+                    rpc_timeout=6000,
+                    init_method='env://',
+                    _transports=["uv"],
+                )
+            )
             """observers passively waiting for instructions from agents"""
         
         rpc.shutdown()
@@ -306,7 +318,7 @@ def main(cfg) -> None:
     
     mp.set_start_method('fork')
     num_cpus = 4
-    world_size = 8
+    world_size = 128
     with mp.Pool(processes=world_size) as pool:
         pool.starmap(ppo_mod.train, [(r, world_size) for r in range(world_size)])
     # ppo_mod.train()

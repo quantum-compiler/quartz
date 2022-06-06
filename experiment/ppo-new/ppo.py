@@ -5,12 +5,15 @@ from typing import Tuple, List
 import warnings
 from collections import deque, namedtuple
 from functools import partial
+import threading
+import time
 
 import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
-import quartz # type: ignore
+import torch.distributed.rpc as rpc
 import numpy as np
+import quartz # type: ignore
 
 import hydra
 import wandb
@@ -67,19 +70,6 @@ class RolloutBuffer:
     def append(self, exp: Experience) -> RolloutBuffer:
         self.exps.append(exp)
         return self
-    
-
-class PPOAgent():
-    
-    def __init__(self) -> None:
-        # self.actor_net = nn.Linear(3, 5).cuda(2)
-        # self.buffer = RolloutBuffer()
-        pass
-    
-    def select_action(self, graph: quartz.PyGraph) -> Tuple[int, int]:
-        
-        return 0, 0
-
 
 def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
     global quartz_context
@@ -140,6 +130,63 @@ def get_trajectory(
     return exp_list
     
     
+class Observer:
+    
+    def __init__(self, batch) -> None:
+        self.id = rpc.get_worker_info().id - 1
+        print(f'obs {self.id} init finished')
+    
+    def run_episode(self, agent_rref, len_episode):
+        for i_step in range(len_episode):
+            state = f'obs_{self.id}_step_{i_step}_state'
+        
+            action = rpc.rpc_sync(
+                agent_rref.owner(),
+                PPOAgent.select_action,
+                args=(agent_rref, self.id, state)
+            )
+        
+        return self.id * 1000
+            
+            
+
+class PPOAgent:
+    
+    def __init__(self, world_size, batch) -> None:
+        self.policy_net = nn.Linear(3, 5).cuda(2)
+        print(self.policy_net)
+        
+        self.ob_rrefs = []
+
+        for rank in range(1, world_size):
+            ob_info = rpc.get_worker_info(f'observer_{rank}')
+            self.ob_rrefs.append(rpc.remote(ob_info, Observer, args=(batch,)))
+        
+        # self.buffer = RolloutBuffer()
+        print('agnet init finished')
+    
+    @staticmethod
+    def select_action(agent_rref, obs_id, state):
+        agent = agent_rref.local_value()
+        print(f'select action for {obs_id} with net {agent.policy_net}')
+        return obs_id
+    
+    def run_episode(self, len_episode):
+        futs = []
+        for ob_rref in self.ob_rrefs:
+            # make async RPC to kick off an episode on all observers
+            futs.append(ob_rref.rpc_async().run_episode(rpc.RRef(self), len_episode))
+
+        # wait until all obervers have finished this episode
+        rets = torch.futures.wait_all(futs)
+        print(f'rets: {rets}')
+        return rets
+    
+    # def select_action(self, graph: quartz.PyGraph) -> Tuple[int, int]:
+        
+    #     return 0, 0
+
+
 
 class PPOMod:
     
@@ -173,20 +220,19 @@ class PPOMod:
             cfg.include_nop,
         )
         self.init_quartz_context_func()
-        self.context = quartz_context
-        self.parser = quartz_parser
+        # self.context = quartz_context
+        # self.parser = quartz_parser
         with open(cfg.init_graph_path) as f:
             qasm_str = f.read()
-        self.init_graph = qasm_to_graph(qasm_str)
+        # self.init_graph = qasm_to_graph(qasm_str)
         self.num_gate_type = 29
         
         # init training related parameters
         self.max_iterations = int(cfg.max_iterations)
         self.collect_batch = int(cfg.collect_batch)
-        mp.set_start_method('spawn')
         
         # networks
-        self.agent = PPOAgent()
+        # self.agent = PPOAgent()
         
         
         
@@ -198,29 +244,23 @@ class PPOMod:
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
     
-    def train(self) -> None:
-        for i_iteration in range(self.max_iterations):
-            
-            net = nn.Linear(10240, 1024)
-            # net.share_memory()
-            
-            pf_get_trajectory = partial(
-                get_trajectory,
-                agent=self.agent,
-                max_steps=self.cfg.max_steps,
-                invalid_reward=self.cfg.invalid_reward,
-                net=net
-            )
-            
-            init_graphs: List[str] = [self.init_graph.to_qasm_str()] * 16 #self.cfg.collect_batch
-            with mp.Pool(
-                processes=16, #self.cfg.num_workers,
-                initializer=self.init_quartz_context_func,
-                maxtasksperchild=1,
-            ) as pool: # we use spawn to support CUDA here, so we need to init global vars in each process again
-                sr_exp_lists = pool.map(pf_get_trajectory, init_graphs, chunksize=1)
-            
-            embed()
+    def train(self, rank, world_size) -> None:
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '23333'
+        if rank == 0:
+            print('rank 0!!!')
+            rpc.init_rpc('agent', rank=rank, world_size=world_size)
+            agent = PPOAgent(world_size, True)
+            for i_episode in range(4):
+                agent.run_episode(8)
+                time.sleep(5)
+        else:
+            """other ranks are the observer"""
+            print(f'rank {rank}')
+            rpc.init_rpc(f'observer_{rank}', rank=rank, world_size=world_size)
+            """observers passively waiting for instructions from agents"""
+        
+        rpc.shutdown()
     
 
 @hydra.main(config_path='config', config_name='config')
@@ -231,7 +271,13 @@ def main(cfg) -> None:
     warnings.simplefilter('ignore')
     
     ppo_mod = PPOMod(cfg, output_dir)
-    ppo_mod.train()
+    
+    mp.set_start_method('fork')
+    num_cpus = 4
+    world_size = 8
+    with mp.Pool(processes=world_size) as pool:
+        pool.starmap(ppo_mod.train, [(r, world_size) for r in range(world_size)])
+    # ppo_mod.train()
     
 
 if __name__ == '__main__':

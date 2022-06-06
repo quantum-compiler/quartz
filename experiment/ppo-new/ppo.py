@@ -140,11 +140,13 @@ class Observer:
         for i_step in range(len_episode):
             state = f'obs_{self.id}_step_{i_step}_state'
         
-            action = rpc.rpc_sync(
-                agent_rref.owner(),
-                PPOAgent.select_action,
-                args=(agent_rref, self.id, state)
-            )
+            # action = rpc.rpc_sync(
+            #     agent_rref.owner(),
+            #     PPOAgent.select_action,
+            #     args=(agent_rref, self.id, state)
+            # )
+            action = agent_rref.rpc_sync().select_action(rpc.RRef(self), self.id, state)
+            print(f'obs {self.id} get action {action}')
         
         return self.id * 1000
             
@@ -153,7 +155,7 @@ class Observer:
 class PPOAgent:
     
     def __init__(self, world_size, batch) -> None:
-        self.policy_net = nn.Linear(3, 5).cuda(2)
+        self.policy_net = nn.Linear(3, 5).cuda(0)
         print(self.policy_net)
         
         self.ob_rrefs = []
@@ -165,10 +167,11 @@ class PPOAgent:
         # self.buffer = RolloutBuffer()
         print('agnet init finished')
     
-    @staticmethod
-    def select_action(agent_rref, obs_id, state):
-        agent = agent_rref.local_value()
-        print(f'select action for {obs_id} with net {agent.policy_net}')
+    def select_action(self, agent_rref, obs_id, state):
+        print(f'select action for {obs_id} with net {self.policy_net}')
+        x = torch.rand(3).cuda(0)
+        y = self.policy_net(x)
+        print(y)
         return obs_id
     
     def run_episode(self, len_episode):

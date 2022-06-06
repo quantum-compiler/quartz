@@ -11,16 +11,21 @@ wandb:
   offline: False
   entity: quartz
 
+# multiprocessing
+mp_start_method: spawn # fork
+world_size: 128
+
 # quartz
-init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+input_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
 gate_set: ['h', 'cx', 't', 'tdg']
 ecc_file: 'bfs_verified_simplified.json'
 no_increase: False
 include_nop: True
 
 # exp collection
-collect_batch: 128
-max_steps: 300
+collect_batch_size: 128
+batch_inference: True
+len_episode: 300
 invalid_reward: -1.0
 
 # training

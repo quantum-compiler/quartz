@@ -65,11 +65,12 @@ bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs,
         return true;
       } else {
         // |dropfirst| already exists and is the representative.
-        break;
+        return false;
       }
     }
   }
-  return false;
+  // |dropfirst| is not found and therefore is not a representative.
+  return true;
 }
 
 } // namespace quartz

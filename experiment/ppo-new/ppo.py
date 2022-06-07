@@ -427,64 +427,6 @@ class PPOMod:
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
     
-    # def start(self, rank, world_size) -> None:
-    #     print(f'{rank}', end=' ')
-    #     """RPC init"""
-    #     os.environ['MASTER_ADDR'] = 'localhost'
-    #     os.environ['MASTER_PORT'] = '23333'
-    #     rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-    #         rpc_timeout=10000,
-    #         init_method='env://',
-    #         _transports=["uv"],
-    #     ) # uv means TCP, to overwrie default SHM which may hit ulimit
-    #     """init Quartz for each process"""
-    #     global quartz_context
-    #     global quartz_parser
-    #     self.init_quartz_context_func()
-    #     if rank == 0:
-    #         """Agent runs on rank 0. Initialize it, and run many iterations to train the network"""
-    #         rpc.init_rpc(
-    #             name='agent', rank=rank, world_size=world_size,
-    #             backend=rpc.BackendType.TENSORPIPE, # type: ignore
-    #             rpc_backend_options=rpc_backend_options,
-    #         )
-    #         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-    #             agent_device = torch.device('cpu')
-    #         else:
-    #             agent_device = torch.device(f'cuda:{self.cfg.gpus[0]}')
-    #         agent = PPOAgent(
-    #             world_size=world_size,
-    #             batch_inference=self.cfg.batch_inference,
-    #             num_gate_type=self.num_gate_type,
-    #             invalid_reward=self.cfg.invalid_reward,
-    #             graph_embed_size=self.cfg.graph_embed_size,
-    #             actor_hidden_size=self.cfg.actor_hidden_size,
-    #             critic_hidden_size=self.cfg.critic_hidden_size,
-    #             action_dim=quartz_context.num_xfers,
-    #             lr_graph_embedding=self.cfg.lr_graph_embedding,
-    #             lr_actor=self.cfg.lr_actor,
-    #             lr_critic=self.cfg.lr_critic,
-    #             device=agent_device,
-    #         )
-    #         for i_iter in range(int(self.cfg.max_iterations)):
-    #             agent.run_iter(
-    #                 i_iter,
-    #                 self.cfg.len_episode,
-    #                 self.input_qasm_str,
-    #             )
-
-    #     else:
-    #         """Observers run on other ranks (>1).
-    #             They passively wait for callings from the agent to interact with the env.
-    #         """
-    #         rpc.init_rpc(
-    #             name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
-    #             backend=rpc.BackendType.TENSORPIPE, # type: ignore
-    #             rpc_backend_options=rpc_backend_options,
-    #         )
-    #     # end if
-    #     rpc.shutdown()
-
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
         """init Quartz for each process"""
         global quartz_context

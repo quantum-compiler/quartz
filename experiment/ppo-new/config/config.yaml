@@ -7,13 +7,13 @@ num_workers: 8
 
 seed: 98765
 wandb:
-  en: True
+  en: False
   offline: False
   entity: quartz
 
 # multiprocessing
 mp_start_method: spawn # fork
-world_size: 128
+world_size: 4 #128
 
 # quartz
 input_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
@@ -30,5 +30,10 @@ invalid_reward: -1.0
 
 # training
 max_iterations: 1e8
-
+graph_embed_size: 128
+actor_hidden_size: 256
+critic_hidden_size: 128
+lr_graph_embedding: 3e-4
+lr_actor: 3e-4
+lr_critic: 1e-3
 

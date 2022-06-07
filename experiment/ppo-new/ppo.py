@@ -14,8 +14,8 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 import torch.multiprocessing as mp
 import torch.distributed.rpc as rpc
-import torch.futures.Future as Future
-import dgl
+from torch.futures import Future
+import dgl # type: ignore
 import numpy as np
 import quartz # type: ignore
 
@@ -131,15 +131,16 @@ class Observer:
         
         graph = init_graph
         for i_step in range(len_episode):
+            print(f'obs {self.id} step {i_step}')
             """get action from agent"""
             action: Action
             if self.batch_inference:
                 action = agent_rref.rpc_sync().select_action_batch(
-                    rpc.RRef(self), self.id, graph.to_qasm_str(),
+                    self.id, graph.to_qasm_str(),
                 )
             else:
                 action = agent_rref.rpc_sync().select_action(
-                    rpc.RRef(self), self.id, graph.to_qasm_str(),
+                    self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
             
             next_nodes: List[int]
@@ -166,10 +167,13 @@ class Observer:
             )
             exp_list.append(exp)
             
-            if game_over:
+            if game_over and not self.batch_inference:
                 break
             else:
-                graph = next_graph
+                if self.batch_inference:
+                    graph = init_graph
+                else:
+                    graph = next_graph
         # end for
         return exp_list
             
@@ -240,7 +244,7 @@ class QGNN(nn.Module):
         return h
 
 
-class PPOAgent(nn.Module):
+class PPOAgent:
     
     def __init__(
         self,
@@ -257,35 +261,35 @@ class PPOAgent(nn.Module):
         lr_critic: float,
         device: torch.device,
     ) -> None:
-        super().__init__()
         self.device = device
         """networks related"""
         # TODO may combine these networks into a single module ActorCritic
-        self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
-        self.actor = nn.Sequential(
-            nn.Linear(graph_embed_size, actor_hidden_size),
-            nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim)
-        )
-        self.critic = nn.Sequential(
-            nn.Linear(graph_embed_size, critic_hidden_size),
-            nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1)
-        )
-        
+        # self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
+        # self.actor = nn.Sequential(
+        #     nn.Linear(graph_embed_size, actor_hidden_size),
+        #     nn.ReLU(),
+        #     nn.Linear(actor_hidden_size, action_dim)
+        # )
+        # self.critic = nn.Sequential(
+        #     nn.Linear(graph_embed_size, critic_hidden_size),
+        #     nn.ReLU(),
+        #     nn.Linear(critic_hidden_size, 1)
+        # )
+        self.naive_model = nn.Linear(64, 64).to(device)
         
         """init Observers on the other processes and hold the refs to them"""
         self.ob_rrefs: List[rpc.RRef] = []
         for rank in range(1, world_size):
             ob_info = rpc.get_worker_info(f'observer_{rank - 1}')
             self.ob_rrefs.append(
-                rpc.remote(ob_info, Observer, args=(batch_inference, invalid_reward))
+                rpc.remote(ob_info, Observer, args=(batch_inference, invalid_reward,))
             )
         
         """vars for select action"""
         self.future_actions: Future[List[Action]] = Future()
         self.pending_states = len(self.ob_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
+        
         self.lock = threading.Lock()
         
         # self.buffer = RolloutBuffer()
@@ -319,16 +323,21 @@ class PPOAgent(nn.Module):
                 # TODO get action for each observer's query
                 
                 # TODO store actions in obs_id order
-                self.future_actions.set_result([i for i in range(len(self.ob_rrefs))])
+                actions = [Action(0, 0) for i in range(len(self.ob_rrefs))]
+                self.future_actions.set_result(actions)
                 """re-init"""
                 self.pending_states = len(self.ob_rrefs)
                 self.future_actions = torch.futures.Future()
         return future_action
     
+    def update(self):
+        pass
+    
     def run_iter(
         self,
         i_iter: int,
-        len_episode: int
+        len_episode: int,
+        input_qasm_str: str,
     ):
         """_summary_
 
@@ -340,12 +349,13 @@ class PPOAgent(nn.Module):
             _type_: _description_
         """
         """collect experiences from observers"""
+        print(f'Run iter #{i_iter}')
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         for ob_rref in self.ob_rrefs:
             # make async RPC to kick off an episode on all observers
             future_exp_lists.append(ob_rref.rpc_async().run_episode(
                 rpc.RRef(self),
-                'init_state_str',
+                input_qasm_str,
                 len_episode,
             ))
         # wait until all obervers have finished their episode
@@ -403,11 +413,12 @@ class PPOMod:
         print('=========================================')
     
     def start(self, rank, world_size) -> None:
+        print(f'{rank}', end=' ')
         """RPC init"""
         os.environ['MASTER_ADDR'] = 'localhost'
         os.environ['MASTER_PORT'] = '23333'
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            rpc_timeout=6000,
+            rpc_timeout=10000,
             init_method='env://',
             _transports=["uv"],
         ) # uv means TCP, to overwrie default SHM which may hit ulimit
@@ -420,7 +431,11 @@ class PPOMod:
             rpc.init_rpc(
                 name='agent', rank=rank, world_size=world_size,
                 backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc_backend_options,
+                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
+            rpc_timeout=10000,
+            init_method='env://',
+            _transports=["uv"],
+        ),
             )
             if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
                 agent_device = torch.device('cpu')
@@ -429,21 +444,22 @@ class PPOMod:
             agent = PPOAgent(
                 world_size=world_size,
                 batch_inference=self.cfg.batch_inference,
-                num_gate_type=self.cfg.num_gate_type,
+                num_gate_type=self.num_gate_type,
                 invalid_reward=self.cfg.invalid_reward,
                 graph_embed_size=self.cfg.graph_embed_size,
                 actor_hidden_size=self.cfg.actor_hidden_size,
                 critic_hidden_size=self.cfg.critic_hidden_size,
-                action_dim=self.cfg.action_dim,
+                action_dim=quartz_context.num_xfers,
                 lr_graph_embedding=self.cfg.lr_graph_embedding,
                 lr_actor=self.cfg.lr_actor,
                 lr_critic=self.cfg.lr_critic,
                 device=agent_device,
             )
-            for i_iter in range(self.cfg.max_iterations):
+            for i_iter in range(int(self.cfg.max_iterations)):
                 agent.run_iter(
                     i_iter,
-                    self.cfg.len_episode
+                    self.cfg.len_episode,
+                    self.input_qasm_str,
                 )
 
         else:
@@ -453,7 +469,11 @@ class PPOMod:
             rpc.init_rpc(
                 name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
                 backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc_backend_options,
+                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
+            rpc_timeout=10000,
+            init_method='env://',
+            _transports=["uv"],
+        ),
             )
         # end if
         rpc.shutdown()
@@ -471,6 +491,7 @@ def main(cfg) -> None:
     mp.set_start_method(cfg.mp_start_method)
     world_size = cfg.world_size
     starmap_args = [(r, world_size) for r in range(world_size)]
+    print(f'spawn... ')
     with mp.Pool(processes=world_size) as pool:
         pool.starmap(ppo_mod.start, starmap_args)
     

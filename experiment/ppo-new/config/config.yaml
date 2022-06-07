@@ -13,7 +13,7 @@ wandb:
 
 # multiprocessing
 mp_start_method: spawn # fork
-world_size: 4 #128
+obs_per_gpu: 4 #128
 
 # quartz
 input_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'

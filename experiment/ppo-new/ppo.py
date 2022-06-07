@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 import torch.multiprocessing as mp
 import torch.distributed.rpc as rpc
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.futures import Future
 import dgl # type: ignore
 import numpy as np
@@ -27,6 +29,11 @@ from IPython import embed # type: ignore
 # global vars to avoid serialization when multiprocessing
 quartz_context: quartz.QuartzContext
 quartz_parser: quartz.PyQASMParser
+rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
+    rpc_timeout=10000,
+    init_method='env://',
+    _transports=["uv"],
+) # uv means TCP, to overwrie default SHM which may hit ulimit
 
 def seed_all(seed: int) -> None:
     if seed is not None:
@@ -431,11 +438,7 @@ class PPOMod:
             rpc.init_rpc(
                 name='agent', rank=rank, world_size=world_size,
                 backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
-            rpc_timeout=10000,
-            init_method='env://',
-            _transports=["uv"],
-        ),
+                rpc_backend_options=rpc_backend_options,
             )
             if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
                 agent_device = torch.device('cpu')
@@ -469,13 +472,82 @@ class PPOMod:
             rpc.init_rpc(
                 name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
                 backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc.TensorPipeRpcBackendOptions(
-            rpc_timeout=10000,
-            init_method='env://',
-            _transports=["uv"],
-        ),
+                rpc_backend_options=rpc_backend_options,
             )
         # end if
+        rpc.shutdown()
+    
+    def init_ddp(self, rank: int, world_size: int) -> None:
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '12345'
+        dist.init_process_group("nccl", rank=rank, world_size=world_size)
+        
+        obs_processes = []
+        for obs_rank in range(self.cfg.obs_per_gpu):
+            p = mp.Process(
+                target=self.init_observer,
+                args=(rank, obs_rank, self.cfg.obs_per_gpu,)
+            )
+            p.start()
+            obs_processes.append(p)
+        # os.environ['MASTER_PORT'] = f'{44445 + rank}'
+        # print(f'init agent')
+        # rpc.init_rpc(
+        #     name='agent_{rank}', rank=0, world_size=(self.cfg.obs_per_gpu + 1),
+        #     backend=rpc.BackendType.TENSORPIPE, # type: ignore
+        #     rpc_backend_options=rpc_backend_options,
+        # )
+        
+        for p in obs_processes:
+            p.join()
+
+        print(f'agent rpc inited')
+        # rpc.shutdown()
+    
+    def init_observer(self, ddp_rank, obs_rank, world_size):
+        print(f'init_observer')
+        os.environ['MASTER_PORT'] = f'{12346 + ddp_rank}'
+        rpc.init_rpc(
+            name=f'observer_{ddp_rank}_{obs_rank}', rank=obs_rank, world_size=world_size,
+            backend=rpc.BackendType.TENSORPIPE, # type: ignore
+            rpc_backend_options=rpc_backend_options,
+        )
+        print(f'observer rpc inited')
+        rpc.shutdown()
+        
+    def init_process(self, rank, ddp_processes, obs_processes):
+        tot_processes = ddp_processes + obs_processes
+        rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
+            init_method='tcp://localhost:39501'
+        )
+        
+        if rank < ddp_processes:
+            dist.init_process_group(
+                backend='nccl',
+                init_method="tcp://localhost:39500",
+                rank=rank, world_size=ddp_processes,
+            )
+            agent_name = f'agent_{rank}'
+            rpc.init_rpc(
+                name=agent_name, rank=rank, world_size=tot_processes,
+                rpc_backend_options=rpc_backend_options,
+            )
+            print(f'{agent_name} inited')
+            
+            naive_model = nn.Linear(64, 64).to(f'cuda:{self.cfg.gpus[rank]}')
+            ddp_model = DDP(naive_model, device_ids=[rank])
+
+            print(f'{ddp_model} created')
+        else:
+            obs_rank = rank - ddp_processes
+            agent_rref_id = int(obs_rank / self.cfg.obs_per_gpu)
+            obs_name = f'obs_{agent_rref_id}_{obs_rank}'
+            rpc.init_rpc(
+                name=obs_name, rank=rank, world_size=tot_processes,
+                rpc_backend_options=rpc_backend_options,
+            )
+            print(f'{obs_name} inited')
+        # block until all rpcs finish
         rpc.shutdown()
     
 
@@ -489,11 +561,17 @@ def main(cfg) -> None:
     ppo_mod = PPOMod(cfg, output_dir)
     
     mp.set_start_method(cfg.mp_start_method)
-    world_size = cfg.world_size
-    starmap_args = [(r, world_size) for r in range(world_size)]
-    print(f'spawn... ')
-    with mp.Pool(processes=world_size) as pool:
-        pool.starmap(ppo_mod.start, starmap_args)
+    ddp_processes = 1
+    if len(cfg.gpus) > 1:
+        ddp_processes = len(cfg.gpus)
+    obs_processes = ddp_processes * cfg.obs_per_gpu
+    tot_processes = ddp_processes + obs_processes
+    mp.spawn(
+        fn=ppo_mod.init_process,
+        args=(ddp_processes, obs_processes,),
+        nprocs=tot_processes,
+        join=True,
+    )
     
 
 if __name__ == '__main__':

@@ -64,6 +64,10 @@ Action = namedtuple(
     'Action',
     ['node', 'xfer'],
 )
+
+AGENT_NAME = 'agent_{}'
+OBS_NAME = 'obs_{}_{}'
+
 def get_quartz_context(init_args: QuartzInitArgs) -> Tuple[quartz.QuartzContext, quartz.PyQASMParser]:
     quartz_context = quartz.QuartzContext(
         gate_set=init_args.gate_set,
@@ -255,7 +259,9 @@ class PPOAgent:
     
     def __init__(
         self,
-        world_size: int,
+        agent_id: int,
+        num_observers: int,
+        device: torch.device,
         batch_inference: bool,
         num_gate_type: int,
         invalid_reward: float,
@@ -266,8 +272,9 @@ class PPOAgent:
         lr_graph_embedding: float,
         lr_actor: float,
         lr_critic: float,
-        device: torch.device,
+        
     ) -> None:
+        self.id = agent_id
         self.device = device
         """networks related"""
         # TODO may combine these networks into a single module ActorCritic
@@ -283,16 +290,17 @@ class PPOAgent:
         #     nn.Linear(critic_hidden_size, 1)
         # )
         self.naive_model = nn.Linear(64, 64).to(device)
+        self.ddp_model = DDP(self.naive_model, [device],)
         
         """init Observers on the other processes and hold the refs to them"""
         self.ob_rrefs: List[rpc.RRef] = []
-        for rank in range(1, world_size):
-            ob_info = rpc.get_worker_info(f'observer_{rank - 1}')
+        for obs_rank in range(0, num_observers):
+            ob_info = rpc.get_worker_info(OBS_NAME.format(self.id, obs_rank))
             self.ob_rrefs.append(
                 rpc.remote(ob_info, Observer, args=(batch_inference, invalid_reward,))
             )
         
-        """vars for select action"""
+        """helper vars for select_action"""
         self.future_actions: Future[List[Action]] = Future()
         self.pending_states = len(self.ob_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
@@ -419,103 +427,71 @@ class PPOMod:
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
     
-    def start(self, rank, world_size) -> None:
-        print(f'{rank}', end=' ')
-        """RPC init"""
-        os.environ['MASTER_ADDR'] = 'localhost'
-        os.environ['MASTER_PORT'] = '23333'
-        rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            rpc_timeout=10000,
-            init_method='env://',
-            _transports=["uv"],
-        ) # uv means TCP, to overwrie default SHM which may hit ulimit
+    # def start(self, rank, world_size) -> None:
+    #     print(f'{rank}', end=' ')
+    #     """RPC init"""
+    #     os.environ['MASTER_ADDR'] = 'localhost'
+    #     os.environ['MASTER_PORT'] = '23333'
+    #     rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
+    #         rpc_timeout=10000,
+    #         init_method='env://',
+    #         _transports=["uv"],
+    #     ) # uv means TCP, to overwrie default SHM which may hit ulimit
+    #     """init Quartz for each process"""
+    #     global quartz_context
+    #     global quartz_parser
+    #     self.init_quartz_context_func()
+    #     if rank == 0:
+    #         """Agent runs on rank 0. Initialize it, and run many iterations to train the network"""
+    #         rpc.init_rpc(
+    #             name='agent', rank=rank, world_size=world_size,
+    #             backend=rpc.BackendType.TENSORPIPE, # type: ignore
+    #             rpc_backend_options=rpc_backend_options,
+    #         )
+    #         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+    #             agent_device = torch.device('cpu')
+    #         else:
+    #             agent_device = torch.device(f'cuda:{self.cfg.gpus[0]}')
+    #         agent = PPOAgent(
+    #             world_size=world_size,
+    #             batch_inference=self.cfg.batch_inference,
+    #             num_gate_type=self.num_gate_type,
+    #             invalid_reward=self.cfg.invalid_reward,
+    #             graph_embed_size=self.cfg.graph_embed_size,
+    #             actor_hidden_size=self.cfg.actor_hidden_size,
+    #             critic_hidden_size=self.cfg.critic_hidden_size,
+    #             action_dim=quartz_context.num_xfers,
+    #             lr_graph_embedding=self.cfg.lr_graph_embedding,
+    #             lr_actor=self.cfg.lr_actor,
+    #             lr_critic=self.cfg.lr_critic,
+    #             device=agent_device,
+    #         )
+    #         for i_iter in range(int(self.cfg.max_iterations)):
+    #             agent.run_iter(
+    #                 i_iter,
+    #                 self.cfg.len_episode,
+    #                 self.input_qasm_str,
+    #             )
+
+    #     else:
+    #         """Observers run on other ranks (>1).
+    #             They passively wait for callings from the agent to interact with the env.
+    #         """
+    #         rpc.init_rpc(
+    #             name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
+    #             backend=rpc.BackendType.TENSORPIPE, # type: ignore
+    #             rpc_backend_options=rpc_backend_options,
+    #         )
+    #     # end if
+    #     rpc.shutdown()
+
+    def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
         """init Quartz for each process"""
         global quartz_context
         global quartz_parser
         self.init_quartz_context_func()
-        if rank == 0:
-            """Agent runs on rank 0. Initialize it, and run many iterations to train the network"""
-            rpc.init_rpc(
-                name='agent', rank=rank, world_size=world_size,
-                backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc_backend_options,
-            )
-            if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-                agent_device = torch.device('cpu')
-            else:
-                agent_device = torch.device(f'cuda:{self.cfg.gpus[0]}')
-            agent = PPOAgent(
-                world_size=world_size,
-                batch_inference=self.cfg.batch_inference,
-                num_gate_type=self.num_gate_type,
-                invalid_reward=self.cfg.invalid_reward,
-                graph_embed_size=self.cfg.graph_embed_size,
-                actor_hidden_size=self.cfg.actor_hidden_size,
-                critic_hidden_size=self.cfg.critic_hidden_size,
-                action_dim=quartz_context.num_xfers,
-                lr_graph_embedding=self.cfg.lr_graph_embedding,
-                lr_actor=self.cfg.lr_actor,
-                lr_critic=self.cfg.lr_critic,
-                device=agent_device,
-            )
-            for i_iter in range(int(self.cfg.max_iterations)):
-                agent.run_iter(
-                    i_iter,
-                    self.cfg.len_episode,
-                    self.input_qasm_str,
-                )
 
-        else:
-            """Observers run on other ranks (>1).
-                They passively wait for callings from the agent to interact with the env.
-            """
-            rpc.init_rpc(
-                name=f'observer_{rank - 1}', rank=rank, world_size=world_size,
-                backend=rpc.BackendType.TENSORPIPE, # type: ignore
-                rpc_backend_options=rpc_backend_options,
-            )
-        # end if
-        rpc.shutdown()
-    
-    def init_ddp(self, rank: int, world_size: int) -> None:
-        os.environ['MASTER_ADDR'] = 'localhost'
-        os.environ['MASTER_PORT'] = '12345'
-        dist.init_process_group("nccl", rank=rank, world_size=world_size)
-        
-        obs_processes = []
-        for obs_rank in range(self.cfg.obs_per_gpu):
-            p = mp.Process(
-                target=self.init_observer,
-                args=(rank, obs_rank, self.cfg.obs_per_gpu,)
-            )
-            p.start()
-            obs_processes.append(p)
-        # os.environ['MASTER_PORT'] = f'{44445 + rank}'
-        # print(f'init agent')
-        # rpc.init_rpc(
-        #     name='agent_{rank}', rank=0, world_size=(self.cfg.obs_per_gpu + 1),
-        #     backend=rpc.BackendType.TENSORPIPE, # type: ignore
-        #     rpc_backend_options=rpc_backend_options,
-        # )
-        
-        for p in obs_processes:
-            p.join()
-
-        print(f'agent rpc inited')
-        # rpc.shutdown()
-    
-    def init_observer(self, ddp_rank, obs_rank, world_size):
-        print(f'init_observer')
-        os.environ['MASTER_PORT'] = f'{12346 + ddp_rank}'
-        rpc.init_rpc(
-            name=f'observer_{ddp_rank}_{obs_rank}', rank=obs_rank, world_size=world_size,
-            backend=rpc.BackendType.TENSORPIPE, # type: ignore
-            rpc_backend_options=rpc_backend_options,
-        )
-        print(f'observer rpc inited')
-        rpc.shutdown()
-        
-    def init_process(self, rank, ddp_processes, obs_processes):
+        """RPC and DDP initialization"""
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
             init_method='tcp://localhost:39501'
@@ -527,26 +503,45 @@ class PPOMod:
                 init_method="tcp://localhost:39500",
                 rank=rank, world_size=ddp_processes,
             )
-            agent_name = f'agent_{rank}'
+            agent_name = AGENT_NAME.format(rank)
             rpc.init_rpc(
                 name=agent_name, rank=rank, world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
-            print(f'{agent_name} inited')
+            """init agent network"""
+            if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+                agent_device = torch.device('cpu')
+            else:
+                agent_device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
             
-            naive_model = nn.Linear(64, 64).to(f'cuda:{self.cfg.gpus[rank]}')
-            ddp_model = DDP(naive_model, device_ids=[rank])
-
-            print(f'{ddp_model} created')
+            agent = PPOAgent(
+                agent_id=rank,
+                num_observers=self.cfg.obs_per_agent,
+                device=agent_device,
+                batch_inference=self.cfg.batch_inference,
+                num_gate_type=self.num_gate_type,
+                invalid_reward=self.cfg.invalid_reward,
+                graph_embed_size=self.cfg.graph_embed_size,
+                actor_hidden_size=self.cfg.actor_hidden_size,
+                critic_hidden_size=self.cfg.critic_hidden_size,
+                action_dim=quartz_context.num_xfers,
+                lr_graph_embedding=self.cfg.lr_graph_embedding,
+                lr_actor=self.cfg.lr_actor,
+                lr_critic=self.cfg.lr_critic,
+            )
+            print(f'{agent_name} initialized')
+            
+            
         else:
             obs_rank = rank - ddp_processes
-            agent_rref_id = int(obs_rank / self.cfg.obs_per_gpu)
-            obs_name = f'obs_{agent_rref_id}_{obs_rank}'
+            agent_rref_id = int(obs_rank / self.cfg.obs_per_agent)
+            obs_in_agent_rank = int(obs_rank % self.cfg.obs_per_agent)
+            obs_name = OBS_NAME.format(agent_rref_id, obs_in_agent_rank)
             rpc.init_rpc(
                 name=obs_name, rank=rank, world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
-            print(f'{obs_name} inited')
+            # print(f'{obs_name} initialized')
         # block until all rpcs finish
         rpc.shutdown()
     
@@ -564,7 +559,7 @@ def main(cfg) -> None:
     ddp_processes = 1
     if len(cfg.gpus) > 1:
         ddp_processes = len(cfg.gpus)
-    obs_processes = ddp_processes * cfg.obs_per_gpu
+    obs_processes = int(ddp_processes * cfg.obs_per_agent)
     tot_processes = ddp_processes + obs_processes
     mp.spawn(
         fn=ppo_mod.init_process,

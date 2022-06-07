@@ -7,6 +7,8 @@ from collections import deque, namedtuple
 from functools import partial
 import threading
 import time
+import copy
+import itertools
 
 import torch
 import torch.nn as nn
@@ -24,59 +26,16 @@ import quartz # type: ignore
 import hydra
 import wandb
 
+from utils import *
+from model import ActorCritic
 from IPython import embed # type: ignore
 
-# global vars to avoid serialization when multiprocessing
+DDP_PORT = int(23333)
+RPC_PORT = DDP_PORT + 1
+
+"""global vars"""
 quartz_context: quartz.QuartzContext
 quartz_parser: quartz.PyQASMParser
-rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-    rpc_timeout=10000,
-    init_method='env://',
-    _transports=["uv"],
-) # uv means TCP, to overwrie default SHM which may hit ulimit
-
-def seed_all(seed: int) -> None:
-    if seed is not None:
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
-Experience = namedtuple(
-    'Experience',
-    ['state', 'action', 'reward', 'next_state', 'game_over'],
-)
-
-SerializableExperience = namedtuple(
-    'SerializableExperience',
-    ['state', 'action', 'reward', 'next_state', 'game_over'],
-)
-
-QuartzInitArgs = namedtuple(
-    'QuartzInitArgs',
-    ['gate_set', 'ecc_file_path', 'no_increase', 'include_nop'],
-)
-
-Action = namedtuple(
-    'Action',
-    ['node', 'xfer'],
-)
-
-AGENT_NAME = 'agent_{}'
-OBS_NAME = 'obs_{}_{}'
-
-def get_quartz_context(init_args: QuartzInitArgs) -> Tuple[quartz.QuartzContext, quartz.PyQASMParser]:
-    quartz_context = quartz.QuartzContext(
-        gate_set=init_args.gate_set,
-        filename=init_args.ecc_file_path,
-        no_increase=init_args.no_increase,
-        include_nop=init_args.include_nop,
-    )
-    quartz_parser = quartz.PyQASMParser(context=quartz_context)
-    return quartz_context, quartz_parser
 
 def init_quartz_context(
     gate_set: List[str],
@@ -94,6 +53,21 @@ def init_quartz_context(
     )
     quartz_parser = quartz.PyQASMParser(context=quartz_context)
 
+def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
+    global quartz_context
+    global quartz_parser
+    dag = quartz_parser.load_qasm_str(qasm_str)
+    graph = quartz.PyGraph(context=quartz_context, dag=dag)
+    return graph
+
+def convert_exp(s_exp: SerializableExperience) -> Experience:
+    return Experience(
+        qasm_to_graph(s_exp.state),
+        s_exp.action, s_exp.reward,
+        qasm_to_graph(s_exp.next_state),
+        s_exp.game_over,
+    )
+
 class RolloutBuffer:
     
     def __init__(self) -> None:
@@ -103,21 +77,15 @@ class RolloutBuffer:
         self.exps.append(exp)
         return self
 
-def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
-    global quartz_context
-    global quartz_parser
-    dag = quartz_parser.load_qasm_str(qasm_str)
-    graph = quartz.PyGraph(context=quartz_context, dag=dag)
-    return graph
-    
 class Observer:
     
     def __init__(
         self,
+        obs_id: int,
         batch_inference: bool,
         invalid_reward: float,
     ) -> None:
-        self.id = rpc.get_worker_info().id - 1
+        self.id = obs_id
         self.batch_inference = batch_inference
         self.invalid_reward = invalid_reward
     
@@ -127,7 +95,7 @@ class Observer:
         init_state_str: str,
         len_episode: int,
     ) -> List[SerializableExperience]:
-        """Interact many steps with env to collect data.
+        """Interact with env for many steps to collect data.
         If `batch_inference` is `True`, we call `select_action_batch` of the agent,
         so we have to run a fixed number of steps.
         If an episode stops in advance, we start a new one to continue running.
@@ -141,8 +109,9 @@ class Observer:
         exp_list: List[SerializableExperience] = []
         
         graph = init_graph
+        graph_str = init_state_str
         for i_step in range(len_episode):
-            print(f'obs {self.id} step {i_step}')
+            # print(f'obs {self.id} step {i_step}')
             """get action from agent"""
             action: Action
             if self.batch_inference:
@@ -164,17 +133,18 @@ class Observer:
             if next_graph is None:
                 reward = self.invalid_reward
                 game_over = True
-                next_graph_str = '' # TODO
+                next_graph_str = graph_str # TODO placeholder?
             elif quartz_context.get_xfer_from_id(id=action.xfer).is_nop:
                 reward = 0
                 game_over = True
+                next_graph_str = graph_str # unchanged
                 next_nodes = [action.node]
             else:
                 reward = (graph.gate_count - next_graph.gate_count) * 3
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
-                graph.to_qasm_str(), action, reward, next_graph_str, game_over,
+                graph_str, action, reward, next_graph_str, game_over,
             )
             exp_list.append(exp)
             
@@ -183,77 +153,12 @@ class Observer:
             else:
                 if self.batch_inference:
                     graph = init_graph
+                    graph_str = init_state_str
                 else:
                     graph = next_graph
+                    graph_str = next_graph_str
         # end for
         return exp_list
-            
-
-class QConv(nn.Module):
-    def __init__(self, in_feat, inter_dim, out_feat):
-        super(QConv, self).__init__()
-        self.linear2 = nn.Linear(in_feat + inter_dim, out_feat)
-        self.linear1 = nn.Linear(in_feat + 3, inter_dim, bias=False)
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.linear1.weight, gain=gain)
-        nn.init.xavier_normal_(self.linear2.weight, gain=gain)
-
-    def message_func(self, edges):
-        #print(f'node h {edges.src["h"].shape}')
-        #print(f'node w {edges.data["w"].shape}')
-        return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
-
-    def reduce_func(self, nodes):
-        # print(f'node m {nodes.mailbox["m"].shape}')
-        tmp = self.linear1(nodes.mailbox['m'])
-        tmp = F.leaky_relu(tmp)
-        h = torch.mean(tmp, dim=1)
-        # h = torch.max(tmp, dim=1).values
-        return {'h_N': h}
-
-    def forward(self, g, h):
-        g.ndata['h'] = h
-        #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
-        g.update_all(self.message_func, self.reduce_func)
-        h_N = g.ndata['h_N']
-        h_total = torch.cat([h, h_N], dim=1)
-        h_linear = self.linear2(h_total)
-        h_relu = F.relu(h_linear)
-        # h_norm = torch.unsqueeze(torch.linalg.norm(h_relu, dim=1), dim=1)
-        # h_normed = torch.divide(h_relu, h_norm)
-        # return h_normed
-        return h_relu
-
-class QGNN(nn.Module):
-    def __init__(self, num_layers, in_feats, h_feats, inter_dim) -> None:
-        super(QGNN, self).__init__()
-        self.embedding = nn.Embedding(in_feats, in_feats)
-        self.conv_0 = QConv(in_feats, inter_dim, h_feats)
-        convs: List[nn.Module] = []
-        for _ in range(num_layers - 1):
-            convs.append(QConv(h_feats, inter_dim, h_feats))
-        self.convs: nn.Module = nn.ModuleList(convs)
-
-    def forward(self, g):
-        #print(g.ndata['gate_type'])
-        #print(self.embedding)
-        g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-                      dim=1)
-        g.edata['w'] = w
-        h = self.conv_0(g, g.ndata['h'])
-        for i in range(len(self.convs)):
-            h = self.convs[i](g, h)
-        return h
-
 
 class PPOAgent:
     
@@ -263,41 +168,20 @@ class PPOAgent:
         num_observers: int,
         device: torch.device,
         batch_inference: bool,
-        num_gate_type: int,
         invalid_reward: float,
-        graph_embed_size: int,
-        actor_hidden_size: int,
-        critic_hidden_size: int,
-        action_dim: int,
-        lr_graph_embedding: float,
-        lr_actor: float,
-        lr_critic: float,
-        
+        policy_net: ActorCritic,
     ) -> None:
         self.id = agent_id
         self.device = device
         """networks related"""
-        # TODO may combine these networks into a single module ActorCritic
-        # self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
-        # self.actor = nn.Sequential(
-        #     nn.Linear(graph_embed_size, actor_hidden_size),
-        #     nn.ReLU(),
-        #     nn.Linear(actor_hidden_size, action_dim)
-        # )
-        # self.critic = nn.Sequential(
-        #     nn.Linear(graph_embed_size, critic_hidden_size),
-        #     nn.ReLU(),
-        #     nn.Linear(critic_hidden_size, 1)
-        # )
-        self.naive_model = nn.Linear(64, 64).to(device)
-        self.ddp_model = DDP(self.naive_model, [device],)
+        self.policy_net = policy_net # NOTE: just a ref
         
         """init Observers on the other processes and hold the refs to them"""
         self.ob_rrefs: List[rpc.RRef] = []
         for obs_rank in range(0, num_observers):
-            ob_info = rpc.get_worker_info(OBS_NAME.format(self.id, obs_rank))
+            ob_info = rpc.get_worker_info(get_obs_name(self.id, obs_rank))
             self.ob_rrefs.append(
-                rpc.remote(ob_info, Observer, args=(batch_inference, invalid_reward,))
+                rpc.remote(ob_info, Observer, args=(obs_rank, batch_inference, invalid_reward,))
             )
         
         """helper vars for select_action"""
@@ -306,10 +190,10 @@ class PPOAgent:
         self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
         
         self.lock = threading.Lock()
-        
-        # self.buffer = RolloutBuffer()
-    
+            
+    @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> Action:
+        """respond to a single query"""
         pygraph: quartz.PyGraph = qasm_to_graph(state_str)
         dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
         
@@ -320,6 +204,7 @@ class PPOAgent:
         return Action(action_node, action_xfer)
         
     @rpc.functions.async_execution
+    @torch.no_grad()
     def select_action_batch(self, obs_id: int, state_str: str) -> Future[Action]:
         """inference a batch of queries queried by all of the observers at once"""
         future_action: Future[Action] = self.future_actions.then(
@@ -335,7 +220,7 @@ class PPOAgent:
                 """collected a batch, start batch inference"""
                 b_state: dgl.graph = dgl.batch(self.states_buf)
                 
-                # TODO get action for each observer's query
+                # TODO get action to respond each observer's query
                 
                 # TODO store actions in obs_id order
                 actions = [Action(0, 0) for i in range(len(self.ob_rrefs))]
@@ -348,23 +233,12 @@ class PPOAgent:
     def update(self):
         pass
     
-    def run_iter(
+    def collect_data(
         self,
-        i_iter: int,
         len_episode: int,
         input_qasm_str: str,
-    ):
-        """_summary_
-
-        Args:
-            i_iter (int): _description_
-            len_episode (int): _description_
-
-        Returns:
-            _type_: _description_
-        """
+    ) -> List[Experience]:
         """collect experiences from observers"""
-        print(f'Run iter #{i_iter}')
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         for ob_rref in self.ob_rrefs:
             # make async RPC to kick off an episode on all observers
@@ -374,13 +248,11 @@ class PPOAgent:
                 len_episode,
             ))
         # wait until all obervers have finished their episode
-        exp_lists = torch.futures.wait_all(future_exp_lists)
-        """parse collected experiences"""
-        
-        """train networks"""
-        
-
-
+        s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
+        """convert collected experiences to Quartz format"""
+        s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
+        exps: List[Experience] = [convert_exp(s_exp) for s_exp in s_exps]
+        return exps
 
 class PPOMod:
     
@@ -399,7 +271,7 @@ class PPOMod:
             entity=cfg.wandb.entity,
             mode=wandb_mode,
             config=cfg,
-        )
+        ) # NOTE Not sure if it's ok to init wandb here under multiprocessing setting.
         self.print_cfg()
         seed_all(cfg.seed)
         
@@ -416,10 +288,8 @@ class PPOMod:
         self.num_gate_type: int = 29
         
         """init training related parameters"""
-        self.max_iterations = int(cfg.max_iterations)
         self.collect_batch_size = int(cfg.collect_batch_size)
                 
-    
     def print_cfg(self) -> None:
         print('================ Configs ================')
         for k, v in self.cfg.items():
@@ -432,53 +302,34 @@ class PPOMod:
         global quartz_context
         global quartz_parser
         self.init_quartz_context_func()
-
+        
         """RPC and DDP initialization"""
+        # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
+        self.rank = rank
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            init_method='tcp://localhost:39501'
+            init_method=f'tcp://localhost:{RPC_PORT}'
         )
         
         if rank < ddp_processes:
-            dist.init_process_group(
-                backend='nccl',
-                init_method="tcp://localhost:39500",
-                rank=rank, world_size=ddp_processes,
-            )
-            agent_name = AGENT_NAME.format(rank)
+            """init agent processes"""
+            agent_name = get_agent_name(rank)
             rpc.init_rpc(
                 name=agent_name, rank=rank, world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
-            """init agent network"""
-            if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-                agent_device = torch.device('cpu')
-            else:
-                agent_device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
-            
-            agent = PPOAgent(
-                agent_id=rank,
-                num_observers=self.cfg.obs_per_agent,
-                device=agent_device,
-                batch_inference=self.cfg.batch_inference,
-                num_gate_type=self.num_gate_type,
-                invalid_reward=self.cfg.invalid_reward,
-                graph_embed_size=self.cfg.graph_embed_size,
-                actor_hidden_size=self.cfg.actor_hidden_size,
-                critic_hidden_size=self.cfg.critic_hidden_size,
-                action_dim=quartz_context.num_xfers,
-                lr_graph_embedding=self.cfg.lr_graph_embedding,
-                lr_actor=self.cfg.lr_actor,
-                lr_critic=self.cfg.lr_critic,
+            dist.init_process_group(
+                backend='nccl',
+                init_method=f'tcp://localhost:{DDP_PORT}',
+                rank=rank, world_size=ddp_processes,
             )
-            print(f'{agent_name} initialized')
-            
-            
+            self.train()
         else:
+            """init observer processes"""
             obs_rank = rank - ddp_processes
             agent_rref_id = int(obs_rank / self.cfg.obs_per_agent)
             obs_in_agent_rank = int(obs_rank % self.cfg.obs_per_agent)
-            obs_name = OBS_NAME.format(agent_rref_id, obs_in_agent_rank)
+            obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
             rpc.init_rpc(
                 name=obs_name, rank=rank, world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
@@ -487,6 +338,85 @@ class PPOMod:
         # block until all rpcs finish
         rpc.shutdown()
     
+    def train(self) -> None:
+        """init agent and network"""
+        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+            agent_device = torch.device('cpu')
+        else:
+            agent_device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
+        self.policy_net = ActorCritic(
+            num_gate_type=self.num_gate_type,
+            graph_embed_size=self.cfg.graph_embed_size,
+            actor_hidden_size=self.cfg.actor_hidden_size,
+            critic_hidden_size=self.cfg.critic_hidden_size,
+            action_dim=quartz_context.num_xfers,
+            device=agent_device,
+        ).to(agent_device)
+        self.policy_net_old = copy.deepcopy(self.policy_net)
+        self.agent = PPOAgent(
+            agent_id=self.rank,
+            num_observers=self.cfg.obs_per_agent,
+            device=agent_device,
+            batch_inference=self.cfg.batch_inference,
+            invalid_reward=self.cfg.invalid_reward,
+            policy_net=self.policy_net_old,
+        )
+        self.ddp_policy_net = DDP(self.policy_net, device_ids=[self.rank])
+        self.optimizer = torch.optim.Adam([
+            {
+                'params': self.policy_net.graph_embedding.parameters(),
+                'lr': self.cfg.lr_graph_embedding,
+            }, 
+            {
+                'params': self.policy_net.actor.parameters(),
+                'lr': self.cfg.lr_actor,
+            },
+            {
+                'params': self.policy_net.critic.parameters(),
+                'lr': self.cfg.lr_critic,
+            }
+        ])
+        print(f'rank {self.rank} initialized')
+        """train"""
+        max_iterations = int(self.cfg.max_iterations)
+        self.i_iter = 0
+        if self.cfg.resume:
+            self.load_ckpt(self.cfg.ckpt_path)
+        while self.i_iter < max_iterations:
+            self.train_iter()
+            if self.i_iter % self.cfg.save_ckpt_interval == 0:
+                self.save_ckpt(f'iter_{self.i_iter}.pt') # TODO add loss and best_gc in the name
+            self.i_iter += 1            
+        
+    def train_iter(self) -> None:
+        """collect data and build batched data in dgl or tensor format"""
+        exps = self.agent.collect_data(self.cfg.len_episode, self.input_qasm_str)
+        # print(exps)
+        """evaluate, compute loss, and update (DDP)"""
+        # NOTE: Each agent has different data, so it is DDP training
+        # TODO
+        """logging"""
+        
+        
+    def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
+        # TODO save top-k model
+        ckpt_path = os.path.join(self.output_dir, ckpt_name)
+        if not only_rank_zero or self.rank == 0:
+            torch.save({
+                'i_iter': self.i_iter,
+                'model_state_dict': self.ddp_policy_net.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                # 'loss': LOSS,
+            }, ckpt_path)
+            print(f'saved "{ckpt_path}"!')
+        
+    def load_ckpt(self, ckpt_path: str) -> None:
+        ckpt = torch.load(ckpt_path)
+        self.i_iter = ckpt['i_iter']
+        self.ddp_policy_net.load_state_dict(ckpt['model_state_dict'])
+        self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        print(f'resumed from "{ckpt}"!')
+        
 
 @hydra.main(config_path='config', config_name='config')
 def main(cfg) -> None:

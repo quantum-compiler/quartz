@@ -36,4 +36,4 @@ critic_hidden_size: 128
 lr_graph_embedding: 3e-4
 lr_actor: 3e-4
 lr_critic: 1e-3
-
+save_ckpt_interval: 10

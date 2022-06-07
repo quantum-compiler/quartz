@@ -83,5 +83,7 @@ experiment/ppo/pretrain/pretrain_dataset_g9
 experiment/ppo/pretrain/pretrain_dataset_g99
 experiment/ppo/ppo_multi_step/PPO_logs
 experiment/ppo/ppo_multi_step/PPO_preTrained
+experiment/ppo/fine-tune/PPO_logs
+experiment/ppo/fine-tune/PPO_preTrained
 
 experiment/a2c/*txt

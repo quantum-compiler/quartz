@@ -170,6 +170,7 @@ class PPOAgent:
         batch_inference: bool,
         invalid_reward: float,
         policy_net: ActorCritic,
+        input_qasm_str: str,
     ) -> None:
         self.id = agent_id
         self.device = device
@@ -188,8 +189,10 @@ class PPOAgent:
         self.future_actions: Future[List[Action]] = Future()
         self.pending_states = len(self.ob_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
-        
         self.lock = threading.Lock()
+        
+        # TODO init state buffer
+        self.input_qasm_str = input_qasm_str
             
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> Action:
@@ -230,28 +233,25 @@ class PPOAgent:
                 self.future_actions = torch.futures.Future()
         return future_action
     
-    def update(self):
-        pass
-    
-    def collect_data(
-        self,
-        len_episode: int,
-        input_qasm_str: str,
-    ) -> List[Experience]:
+    def collect_data(self, len_episode: int) -> List[Experience]:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         for ob_rref in self.ob_rrefs:
             # make async RPC to kick off an episode on all observers
             future_exp_lists.append(ob_rref.rpc_async().run_episode(
                 rpc.RRef(self),
-                input_qasm_str,
+                self.input_qasm_str, # TODO init state buffer and sampling
                 len_episode,
             ))
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
         """convert collected experiences to Quartz format"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
-        exps: List[Experience] = [convert_exp(s_exp) for s_exp in s_exps]
+        exps: List[Experience] = []
+        for s_exp in s_exps:
+            exp = convert_exp(s_exp)
+            exps.append(exp)
+            # TODO add state into the init state buffer
         return exps
 
 class PPOMod:
@@ -288,8 +288,8 @@ class PPOMod:
         self.num_gate_type: int = 29
         
         """init training related parameters"""
-        self.collect_batch_size = int(cfg.collect_batch_size)
-                
+        self.global_batch_size = int(cfg.global_batch_size)
+        
     def print_cfg(self) -> None:
         print('================ Configs ================')
         for k, v in self.cfg.items():
@@ -306,6 +306,8 @@ class PPOMod:
         """RPC and DDP initialization"""
         # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
         self.rank = rank
+        self.agent_batch_size = int(self.global_batch_size // ddp_processes)
+        self.ddp_processes = ddp_processes
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
             init_method=f'tcp://localhost:{RPC_PORT}'
@@ -327,7 +329,7 @@ class PPOMod:
         else:
             """init observer processes"""
             obs_rank = rank - ddp_processes
-            agent_rref_id = int(obs_rank / self.cfg.obs_per_agent)
+            agent_rref_id = int(obs_rank // self.cfg.obs_per_agent)
             obs_in_agent_rank = int(obs_rank % self.cfg.obs_per_agent)
             obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
             rpc.init_rpc(
@@ -353,6 +355,7 @@ class PPOMod:
             device=agent_device,
         ).to(agent_device)
         self.policy_net_old = copy.deepcopy(self.policy_net)
+        # NOTE should not use self.policy_net later
         self.agent = PPOAgent(
             agent_id=self.rank,
             num_observers=self.cfg.obs_per_agent,
@@ -360,19 +363,20 @@ class PPOMod:
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
             policy_net=self.policy_net_old,
+            input_qasm_str=self.input_qasm_str,
         )
         self.ddp_policy_net = DDP(self.policy_net, device_ids=[self.rank])
         self.optimizer = torch.optim.Adam([
             {
-                'params': self.policy_net.graph_embedding.parameters(),
+                'params': self.ddp_policy_net.module.graph_embedding.parameters(), # type: ignore
                 'lr': self.cfg.lr_graph_embedding,
             }, 
             {
-                'params': self.policy_net.actor.parameters(),
+                'params': self.ddp_policy_net.module.actor.parameters(), # type: ignore
                 'lr': self.cfg.lr_actor,
             },
             {
-                'params': self.policy_net.critic.parameters(),
+                'params': self.ddp_policy_net.module.critic.parameters(), # type: ignore
                 'lr': self.cfg.lr_critic,
             }
         ])
@@ -384,17 +388,28 @@ class PPOMod:
             self.load_ckpt(self.cfg.ckpt_path)
         while self.i_iter < max_iterations:
             self.train_iter()
+            if self.i_iter % self.cfg.update_policy_interval == 0:
+                self.policy_net_old.load_state_dict(self.ddp_policy_net.module.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt') # TODO add loss and best_gc in the name
             self.i_iter += 1            
         
     def train_iter(self) -> None:
         """collect data and build batched data in dgl or tensor format"""
-        exps = self.agent.collect_data(self.cfg.len_episode, self.input_qasm_str)
+        exps: List[Experience] = []
+        # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
+        for _ in range(self.agent_batch_size // self.cfg.obs_per_agent):
+            exps += self.agent.collect_data(self.cfg.len_episode)
         # print(exps)
         """evaluate, compute loss, and update (DDP)"""
         # NOTE: Each agent has different data, so it is DDP training
         # TODO
+        # self.optimizer.zero_grad()
+        # y = self.ddp_policy_net(x)
+        # loss = loss_fn(y, x)
+        # loss.backward()
+        # self.optimizer.step()
+        
         """logging"""
         
         
@@ -404,16 +419,18 @@ class PPOMod:
         if not only_rank_zero or self.rank == 0:
             torch.save({
                 'i_iter': self.i_iter,
-                'model_state_dict': self.ddp_policy_net.state_dict(),
+                'model_state_dict': self.ddp_policy_net.module.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 # 'loss': LOSS,
             }, ckpt_path)
             print(f'saved "{ckpt_path}"!')
         
     def load_ckpt(self, ckpt_path: str) -> None:
-        ckpt = torch.load(ckpt_path)
+        ckpt = torch.load(ckpt_path, map_location=self.agent.device)
         self.i_iter = ckpt['i_iter']
-        self.ddp_policy_net.load_state_dict(ckpt['model_state_dict'])
+        model_state_dict = ckpt['model_state_dict']
+        self.ddp_policy_net.module.load_state_dict(model_state_dict)
+        self.policy_net_old.load_state_dict(model_state_dict)
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         print(f'resumed from "{ckpt}"!')
         

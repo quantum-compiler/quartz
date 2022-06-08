@@ -43,7 +43,6 @@ bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs,
   // Check if canonicalize(DropFirst(dag)) is a representative.
   auto dropfirst = std::make_unique<DAG>(*dag);
   dropfirst->remove_first_quantum_gate();
-  dropfirst->to_canonical_representation();
   DAGHashType hash_value = dropfirst->hash(ctx);
   auto possible_classes = eqs->get_possible_classes(hash_value);
   for (const auto &other_hash : dropfirst->other_hash_values()) {

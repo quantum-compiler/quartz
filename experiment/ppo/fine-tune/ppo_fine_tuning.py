@@ -277,7 +277,9 @@ for i_episode in tqdm(range(episodes)):
     for circ_name, info in trajectory_infos.items():
         info_dict = {}
 
-        useless_keys = ['reward', 'possible_reward', 'seq_len', 'num']
+        useless_keys = [
+            'reward', 'possible_reward', 'seq_len', 'num', 'best_circ'
+        ]
 
         message = f'circ_name: {circ_name}\n'
         for key_name, value in info.items():

@@ -36,22 +36,22 @@ device = torch.device('cpu')
 experiment_name = "rl_ppo_fine_tune"
 
 # max timesteps in one trajectory
-max_seq_len = 400
+max_seq_len = 512
 batch_size = 128
 episodes = int(1e5)
 save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
-K_epochs = 40  # update policy for K epochs
+K_epochs = 30  # update policy for K epochs
 eps_clip = 0.2  # clip parameter for PPO
-gamma = 0.995  # discount factor
+gamma = 0.95  # discount factor
 lr_graph_embedding = 3e-4  # learning rate for graph embedding network
 lr_actor = 3e-4  # learning rate for actor network
 lr_critic = 5e-4  # learning rate for critic network
 random_seed = 0  # set random seed if required (0 = no random seed)
 entropy_coefficient = 0.02
-gnn_layers = 8
+gnn_layers = 6
 invalid_reward = -1
 
 #####################################################
@@ -76,7 +76,9 @@ global circ_info
 global circ_dataset
 global circ_names
 
-circ_names = ['barenco_tof_3']  # , 'mod5_4']
+# circ_names = ['barenco_tof_3']  # , 'mod5_4']
+# circ_names = ['mod5_4']  # , 'mod5_4']
+circ_names = ['qcla_adder_10']
 
 circ_dataset = {}
 for circ_name in circ_names:
@@ -98,6 +100,7 @@ for circ_name in circ_names:
     circ_dataset[circ_name]['hash_set'] = set([init_circ.hash()])
     circ_dataset[circ_name]['num'] = 1
     circ_dataset[circ_name]['best'] = init_circ.gate_count
+    circ_dataset[circ_name]['best_circ'] = init_circ
 
 ###################### logging ######################
 
@@ -136,6 +139,22 @@ if not os.path.exists(directory):
 checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(
     experiment_name, random_seed, run_num)
 print("save checkpoint path : " + checkpoint_path)
+
+################### save circuits ###################
+
+global circ_directory
+
+circ_directory = "PPO_circs"
+if not os.path.exists(circ_directory):
+    os.makedirs(circ_directory)
+
+circ_directory = circ_directory + '/' + str(run_num) + '/'
+if not os.path.exists(circ_directory):
+    os.makedirs(circ_directory)
+
+for circ_name in circ_names:
+    circ_path = f"{circ_directory}{circ_name}_best.qasm"
+    circ_dataset[circ_name]['best_circ'].to_qasm(filename=circ_path)
 
 ############# print all hyperparameters #############
 
@@ -178,7 +197,7 @@ log_f = open(log_f_name, "w+")
 ppo_agent = PPO(num_gate_type, context, gnn_layers, 128, 256, 128, xfer_dim,
                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
                 eps_clip, entropy_coefficient, log_f, device)
-# ppo_agent.load('pretrained_model.pth')
+ppo_agent.load('pretrained_model.pth')
 
 # track total training time
 start_time = datetime.now().replace(microsecond=0)
@@ -245,9 +264,14 @@ for i_episode in tqdm(range(episodes)):
 
     # Update best
     for circ_name in trajectory_infos:
-        circ_dataset[circ_name]['best'] = min(
-            trajectory_infos[circ_name]['best_gate_cnt'],
-            circ_dataset[circ_name]['best'])
+        if trajectory_infos[circ_name]['best_gate_cnt'] < circ_dataset[
+                circ_name]['best']:
+            circ_dataset[circ_name]['best'] = trajectory_infos[circ_name][
+                'best_gate_cnt']
+            circ_dataset[circ_name]['best_circ'] = trajectory_infos[circ_name][
+                'best_circ']
+            circ_path = f"{circ_directory}{circ_name}_best.qasm"
+            circ_dataset[circ_name]['best_circ'].to_qasm(filename=circ_path)
 
     # Wandb log & print & log
     for circ_name, info in trajectory_infos.items():

@@ -150,7 +150,8 @@ class ActorCritic(nn.Module):
         return values[nodes].max()
 
     def evaluate(self, batched_dgl_gs, nodes, xfers, batched_dgl_next_gs,
-                 next_node_lists, is_nops, masks, node_nums, next_node_nums):
+                 next_node_lists, is_nops, is_terminals, masks, node_nums,
+                 next_node_nums):
         batched_dgl_gs = batched_dgl_gs.to(self.device)
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
         batched_node_vs = self.critic(batched_graph_embeds).squeeze()
@@ -191,6 +192,8 @@ class ActorCritic(nn.Module):
         next_values = []
         for i in range(batched_dgl_gs.batch_size):
             if is_nops[i]:
+                next_value = torch.tensor(0).to(self.device)
+            elif is_terminals[i]:
                 next_value = torch.tensor(0).to(self.device)
             else:
                 # node_list contains "next nodes" and their neighbors

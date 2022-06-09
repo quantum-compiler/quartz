@@ -23,6 +23,7 @@ class Trajectory:
         self.t_reward = 0
         self.t_best_gate_cnt = self.init_gate_cnt
         self.t_gate_cnt = self.init_gate_cnt
+        self.t_best_circ = init_circ
         self.t_len = 0
 
         self.intermediate_circ_buffer = {}
@@ -63,7 +64,7 @@ class Trajectory:
         elif self.is_nop:
             self.done = True
         # Gate count too large
-        elif next_circ.gate_count > self.init_gate_cnt * 1.1:
+        elif next_circ.gate_count > self.init_gate_cnt * 1.2:
             self.done = True
 
         # Compute next nodes
@@ -110,7 +111,9 @@ class Trajectory:
             self.intermediate_circ_buffer['hash'].append(next_circ.hash())
 
         # Update trajectory best gate count
-        self.t_best_gate_cnt = min(self.t_best_gate_cnt, next_circ.gate_count)
+        if next_circ != None and next_circ.gate_count < self.t_best_gate_cnt:
+            self.t_best_gate_cnt = next_circ.gate_count
+            self.t_best_circ = next_circ
 
         # Update trajectory gate count
         if self.done:
@@ -184,6 +187,8 @@ def get_trajectory_batch(ppo_agent: PPO, context: QuartzContext,
             trajectory_infos[trajectory.init_circ_name][
                 'best_gate_cnt'] = trajectory.t_best_gate_cnt
             trajectory_infos[trajectory.init_circ_name][
+                'best_circ'] = trajectory.t_best_circ
+            trajectory_infos[trajectory.init_circ_name][
                 'best_final_gate_cnt'] = trajectory.t_gate_cnt
         else:
             trajectory_infos[trajectory.init_circ_name]['num'] += 1
@@ -194,9 +199,12 @@ def get_trajectory_batch(ppo_agent: PPO, context: QuartzContext,
             trajectory_infos[trajectory.init_circ_name]['best_reward'] = max(
                 trajectory.t_reward,
                 trajectory_infos[trajectory.init_circ_name]['best_reward'])
-            trajectory_infos[trajectory.init_circ_name]['best_gate_cnt'] = min(
-                trajectory.t_best_gate_cnt,
-                trajectory_infos[trajectory.init_circ_name]['best_gate_cnt'])
+            if trajectory.t_best_gate_cnt < trajectory_infos[
+                    trajectory.init_circ_name]['best_gate_cnt']:
+                trajectory_infos[trajectory.init_circ_name][
+                    'best_gate_cnt'] = trajectory.t_best_gate_cnt
+                trajectory_infos[trajectory.init_circ_name][
+                    'best_circ'] = trajectory.t_best_circ
             trajectory_infos[
                 trajectory.init_circ_name]['best_final_gate_cnt'] = min(
                     trajectory.t_gate_cnt, trajectory_infos[

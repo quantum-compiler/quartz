@@ -72,12 +72,13 @@ class PPO:
             'lr':
             lr_critic
         }])
+        wandb.watch(self.policy, log='all', log_freq=10)
 
         self.policy_old = ActorCritic(gnn_layers, num_gate_type,
                                       graph_embed_size, actor_hidden_size,
                                       critic_hidden_size, action_dim,
-                                      torch.device('cuda:0')).to(
-                                          torch.device('cuda:0'))
+                                      torch.device('cuda:1')).to(
+                                          torch.device('cuda:1'))
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -126,19 +127,6 @@ class PPO:
 
         next_node_lists = self.buffer.next_nodes
 
-        # next_node_lists = [
-        #     torch.tensor(next_nodes) for next_nodes in self.buffer.next_nodes
-        # ]
-
-        # for i in range(len(self.buffer.next_graphs)):
-        #     node_list = torch.tensor(self.buffer.next_nodes[i],
-        #                              dtype=torch.int64)
-        #     src_node_ids, _, edge_ids = dgl_next_gs[i].in_edges(node_list,
-        #                                                         form='all')
-        #     mask = dgl_next_gs[i].edata['reversed'][edge_ids] == 0
-        #     node_list = torch.cat((node_list, src_node_ids[mask]))
-        #     next_node_lists.append(node_list)
-
         old_xfer_logprobs = torch.squeeze(
             torch.stack(self.buffer.xfer_logprobs,
                         dim=0)).detach().to(self.device)
@@ -147,7 +135,7 @@ class PPO:
             values, next_values, xfer_logprobs, xfer_entropys = self.policy.evaluate(
                 batched_dgl_gs, self.buffer.nodes, self.buffer.xfers,
                 batched_dgl_next_gs, next_node_lists, self.buffer.is_nops,
-                masks, node_nums, next_node_nums)
+                self.buffer.is_terminals, masks, node_nums, next_node_nums)
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(xfer_logprobs - old_xfer_logprobs.detach())

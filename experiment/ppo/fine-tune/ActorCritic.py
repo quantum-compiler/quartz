@@ -154,24 +154,19 @@ class ActorCritic(nn.Module):
                  next_node_nums):
         batched_dgl_gs = batched_dgl_gs.to(self.device)
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
-        batched_node_vs = self.critic(batched_graph_embeds).squeeze()
 
         # Split batched tensors into lists
         graph_embed_list = torch.split(batched_graph_embeds, node_nums)
-        node_vs_list = torch.split(batched_node_vs, node_nums)
 
-        # Get node values
-        values = []
-        for i in range(batched_dgl_gs.batch_size):
-            value = node_vs_list[i][nodes[i]]
-            values.append(value)
-        values = torch.stack(values)
-
-        # Get xfer logprobs and xfer entropy
         selected_node_embeds = []
         for i in range(batched_dgl_gs.batch_size):
             selected_node_embeds.append(graph_embed_list[i][nodes[i]])
         selected_node_embeds = torch.stack(selected_node_embeds)
+
+        # Get values
+        values = self.critic(selected_node_embeds).squeeze()
+
+        # Get xfer logprobs and xfer entropy
         xfer_logits = self.actor(selected_node_embeds)
         xfer_probs = masked_softmax(xfer_logits, masks)
         xfer_dists = Categorical(xfer_probs)

@@ -82,10 +82,7 @@ class ActorCritic(nn.Module):
         # ), xfer_logprob.detach()
         return node.detach(), xfer.detach(), xfer_logprob.detach(), mask
 
-    def act_batch(self,
-                  context: QuartzContext,
-                  graphs: list[PyGraph],
-                  node_ranges: list[list[int]] = None):
+    def act_batch(self, context: QuartzContext, graphs, node_ranges=None):
         dgl_gs = [g.to_dgl_graph() for g in graphs]
         batched_dgl_gs = dgl.batch(dgl_gs).to(self.device)
 

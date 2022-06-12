@@ -1,6 +1,7 @@
 from PPO import PPO, RolloutBuffer
 from quartz import QuartzContext, PyGraph
 import torch
+import time
 
 
 class Trajectory:
@@ -39,9 +40,12 @@ class Trajectory:
     def apply_action_and_record(self, context: QuartzContext, node: int,
                                 xfer: int, xfer_logprob: torch.Tensor,
                                 mask: torch.Tensor):
+        # start = time.time()
         next_circ, next_nodes = self.current_circ.apply_xfer_with_local_state_tracking(
             xfer=context.get_xfer_from_id(id=xfer),
             node=self.current_circ.get_node_from_id(id=node))
+        # t_0 = time.time()
+        # print(f'action time: {t_0 - start}')
 
         # Update states
         # Update t_len
@@ -145,6 +149,7 @@ def get_trajectory_batch(ppo_agent: PPO, context: QuartzContext,
             Trajectory(i, *circ_info, max_seq_len, invalid_reward))
 
     for _ in range(max_seq_len):
+        # start = time.time()
         undone_ts = {}
         undone_ts['id'] = []
         undone_ts['curr_circ'] = []
@@ -159,13 +164,19 @@ def get_trajectory_batch(ppo_agent: PPO, context: QuartzContext,
         if len(undone_ts['id']) == 0:
             break
         else:
+            # t_1 = time.time()
             nodes, xfers, xfer_logprobs, masks = ppo_agent.select_actions(
                 undone_ts['curr_circ'])
+            # t_2 = time.time()
+            # print(f'network time: {t_2 - t_1}')
 
             for i, id in enumerate(undone_ts['id']):
                 trajectory_list[id].apply_action_and_record(
                     context, nodes[i], xfers[i], xfer_logprobs[i],
                     masks[i].clone())
+
+        # t_0 = time.time()
+        # print(f'time: {t_0 - start}')
 
     intermediate_circs = {}
     trajectory_infos = {}

@@ -19,7 +19,8 @@ wandb.init(project='ppo_fine_tune')
 os.environ['OMP_SCHEDULE'] = 'dynamic'
 
 # set device to cpu or cuda
-device = torch.device('cpu')
+device_get_trajectory = torch.device('cuda:0')
+device_update = torch.device('cuda:3')
 
 # if (torch.cuda.is_available()):
 #     device = torch.device('cuda:3')
@@ -36,7 +37,7 @@ device = torch.device('cpu')
 experiment_name = "rl_ppo_fine_tune"
 
 # max timesteps in one trajectory
-max_seq_len = 512
+max_seq_len = 256
 batch_size = 128
 episodes = int(1e5)
 save_model_freq = 20
@@ -52,6 +53,7 @@ lr_critic = 5e-4  # learning rate for critic network
 random_seed = 0  # set random seed if required (0 = no random seed)
 entropy_coefficient = 0.02
 gnn_layers = 6
+mini_batch_size = 1024
 invalid_reward = -1
 
 #####################################################
@@ -78,7 +80,11 @@ global circ_names
 
 # circ_names = ['barenco_tof_3']  # , 'mod5_4']
 # circ_names = ['mod5_4']  # , 'mod5_4']
-circ_names = ['qcla_adder_10']
+# circ_names = ['qcla_mod_7']
+# circ_names = ['csla_mux_3']
+# circ_names = ['gf2^6_mult']
+# circ_names = ['tof_3']
+circ_names = ['rc_adder_6']
 
 circ_dataset = {}
 for circ_name in circ_names:
@@ -175,6 +181,7 @@ print("optimizer learning rate actor : ", lr_actor)
 print("optimizer learning rate critic : ", lr_critic)
 print(f"entropy coefficient : {entropy_coefficient}")
 print(f"GNN layers: {gnn_layers}")
+print(f"Mini batch size: {mini_batch_size}")
 print(f"circuits used in training: {circ_names}")
 
 if random_seed:
@@ -196,7 +203,8 @@ log_f = open(log_f_name, "w+")
 # initialize a PPO agent
 ppo_agent = PPO(num_gate_type, context, gnn_layers, 128, 256, 128, xfer_dim,
                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                eps_clip, entropy_coefficient, log_f, device)
+                eps_clip, entropy_coefficient, mini_batch_size, log_f,
+                device_get_trajectory, device_update)
 ppo_agent.load('pretrained_model.pth')
 
 # track total training time
@@ -217,7 +225,7 @@ for i_episode in tqdm(range(episodes)):
     for circ_name in circ_names:
         keys = list(circ_dataset[circ_name]['circs'].keys())
         values = torch.tensor(keys, dtype=torch.float)
-        values = 1 / values.pow(2)
+        values = 1 / values.pow(4)
         dist = Categorical(logits=values)
         samplers[circ_name] = (keys, dist)
 
@@ -246,7 +254,7 @@ for i_episode in tqdm(range(episodes)):
     print(f'get trajectory time: {t_0 - start}')
 
     # update PPO agent
-    ppo_agent.update()
+    ppo_agent.update_mini_batch()
 
     t_1 = time.time()
     print(f'update time: {t_1 - t_0}')

@@ -8,6 +8,7 @@ from quartz import PyGraph, QuartzContext
 import torch.nn.functional as F
 import dgl
 from Utils import masked_softmax
+import time
 
 
 class ActorCritic(nn.Module):
@@ -82,7 +83,7 @@ class ActorCritic(nn.Module):
         # ), xfer_logprob.detach()
         return node.detach(), xfer.detach(), xfer_logprob.detach(), mask
 
-    def act_batch(self, context: QuartzContext, graphs, node_ranges=None):
+    def act_batch(self, context: QuartzContext, graphs):
         dgl_gs = [g.to_dgl_graph() for g in graphs]
         batched_dgl_gs = dgl.batch(dgl_gs).to(self.device)
 
@@ -101,20 +102,7 @@ class ActorCritic(nn.Module):
 
             node_vs = node_vs_list[i]
 
-            if node_ranges != None:
-                node_range = node_ranges[i]
-            else:
-                node_range = None
-
-            if node_range == [] or node_range == None:
-                node_mask = torch.ones(node_nums[i],
-                                       dtype=torch.bool).to(self.device)
-            else:
-                node_mask = torch.zeros(node_nums[i],
-                                        dtype=torch.bool).to(self.device)
-                node_mask[node_range] = True
-
-            node_probs = masked_softmax(node_vs, node_mask)
+            node_probs = F.softmax(node_vs, dim=-1)
             node_dist = Categorical(probs=node_probs)
             node = node_dist.sample()
             nodes.append(node.item())
@@ -149,8 +137,12 @@ class ActorCritic(nn.Module):
     def evaluate(self, batched_dgl_gs, nodes, xfers, batched_dgl_next_gs,
                  next_node_lists, is_nops, is_terminals, masks, node_nums,
                  next_node_nums):
+
         batched_dgl_gs = batched_dgl_gs.to(self.device)
+        # start = time.time()
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
+        # t_0 = time.time()
+        # print(f'graph time: {t_0 - start}')
 
         # Split batched tensors into lists
         graph_embed_list = torch.split(batched_graph_embeds, node_nums)
@@ -162,6 +154,8 @@ class ActorCritic(nn.Module):
 
         # Get values
         values = self.critic(selected_node_embeds).squeeze()
+        # t_1 = time.time()
+        # print(f'get value time: {t_1 - t_0}')
 
         # Get xfer logprobs and xfer entropy
         xfer_logits = self.actor(selected_node_embeds)
@@ -170,6 +164,8 @@ class ActorCritic(nn.Module):
         xfer_logprobs = xfer_dists.log_prob(
             torch.tensor(xfers, dtype=torch.int).to(self.device))
         xfer_entropys = xfer_dists.entropy()
+        # t_2 = time.time()
+        # print(f'get xfer time: {t_2 - t_1}')
 
         # Get next node values
         with torch.no_grad():
@@ -197,5 +193,7 @@ class ActorCritic(nn.Module):
                     next_value = torch.max(next_node_vs_list[i][node_list])
             next_values.append(next_value)
         next_values = torch.stack(next_values)
+        # t_3 = time.time()
+        # print(f'get next node value time: {t_3 - t_2}')
 
         return values, next_values, xfer_logprobs, xfer_entropys

@@ -1,29 +1,23 @@
 import torch
-from gnn import QGNN
+from GNN import QGNN
 import os
 from datetime import datetime
 import torch.nn as nn
 from torch.distributions import Categorical
-import quartz
+from quartz import PyGraph, QuartzContext
 import torch.nn.functional as F
-import numpy as np
 import dgl
-import time
-from tqdm import tqdm
-import wandb
-from collections import deque
-import random
-import sys
 from Utils import masked_softmax
+import time
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, num_gate_type, graph_embed_size, actor_hidden_size,
-                 critic_hidden_size, action_dim, device):
+    def __init__(self, gnn_layers, num_gate_type, graph_embed_size,
+                 actor_hidden_size, critic_hidden_size, action_dim, device):
         super(ActorCritic, self).__init__()
 
-        self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size,
-                                    graph_embed_size)
+        self.graph_embedding = QGNN(gnn_layers, num_gate_type,
+                                    graph_embed_size, graph_embed_size)
 
         self.actor = nn.Sequential(
             nn.Linear(graph_embed_size, actor_hidden_size), nn.ReLU(),
@@ -33,81 +27,145 @@ class ActorCritic(nn.Module):
             nn.Linear(graph_embed_size, critic_hidden_size), nn.ReLU(),
             nn.Linear(critic_hidden_size, 1))
 
+        def _weight_init(m):
+            if isinstance(m, nn.Linear):
+                gain = nn.init.calculate_gain('relu')
+                torch.nn.init.xavier_uniform_(m.weight, gain=gain)
+
+        self.actor.apply(_weight_init)
+        self.critic.apply(_weight_init)
+
         self.device = device
+        self.action_dim = action_dim
 
     def forward(self):
         raise NotImplementedError
 
-    def act(self, context, g):
-        # t_0 = time.time()
+    def act(self, context, g, node_range):
         dgl_g = g.to_dgl_graph().to(self.device)
-        # t_1 = time.time()
-        # print(f'to dgl time {t_1 - t_0}')
 
-        # Used critic network to select node
         graph_embed = self.graph_embedding(dgl_g)
-        # t_2 = time.time()
-        # print(f'graph embed time {t_2 - t_1}')
 
         node_vs = self.critic(graph_embed).squeeze()
+
+        if node_range == []:
+            node_mask = torch.ones((dgl_g.number_of_nodes()),
+                                   dtype=torch.bool).to(self.device)
+        else:
+            node_mask = torch.zeros((dgl_g.number_of_nodes()),
+                                    dtype=torch.bool).to(self.device)
+            node_mask[node_range] = True
+
         node_prob = F.softmax(node_vs, dim=-1)
+        node_prob = masked_softmax(node_vs, node_mask)
         node_dist = Categorical(node_prob)
         node = node_dist.sample()
 
-        # t_3 = time.time()
-        # print(f'select node time {t_3 - t_2}')
+        # if node_range == []:
+        #     print(node_vs)
+        #     print(
+        #         f'node: {node}, node value: {node_vs[node]}, max: {node_vs.max()}'
+        #     )
 
         mask = torch.zeros((context.num_xfers),
                            dtype=torch.bool).to(self.device)
-        # available_xfers = g.available_xfers(context=context,
-        #                                     node=g.get_node_from_id(id=node))
         available_xfers = g.available_xfers_parallel(
             context=context, node=g.get_node_from_id(id=node))
         mask[available_xfers] = True
-        # t_4 = time.time()
-        # print(f'get mask time {t_4 - t_3}')
         xfer_logits = self.actor(graph_embed[node])
         xfer_probs = masked_softmax(xfer_logits, mask)
         xfer_dist = Categorical(xfer_probs)
         xfer = xfer_dist.sample()
         xfer_logprob = xfer_dist.log_prob(xfer)
-        # t_5 = time.time()
-        # print(f'get xfer time {t_5 - t_4}')
 
         # Detach here because we use old policy to select actions
         # return node.detach(), xfer.detach(), node_logprob.detach(
         # ), xfer_logprob.detach()
         return node.detach(), xfer.detach(), xfer_logprob.detach(), mask
 
+    def act_batch(self, context: QuartzContext, graphs):
+        dgl_gs = [g.to_dgl_graph() for g in graphs]
+        batched_dgl_gs = dgl.batch(dgl_gs).to(self.device)
+
+        node_nums = batched_dgl_gs.batch_num_nodes().tolist()
+
+        graph_embeds = self.graph_embedding(batched_dgl_gs)
+        node_vss = self.critic(graph_embeds).squeeze()
+
+        graph_embeds_list = torch.split(graph_embeds, node_nums)
+        node_vs_list = torch.split(node_vss, node_nums)
+
+        nodes = []
+        node_embeds = []
+        masks = []
+        for i in range(len(graphs)):
+
+            node_vs = node_vs_list[i]
+
+            node_probs = F.softmax(node_vs, dim=-1)
+            node_dist = Categorical(probs=node_probs)
+            node = node_dist.sample()
+            nodes.append(node.item())
+
+            node_embeds.append(graph_embeds_list[i][node])
+
+            mask = torch.zeros(self.action_dim, dtype=torch.bool)
+            available_xfers = graphs[i].available_xfers_parallel(
+                context=context, node=graphs[i].get_node_from_id(id=node))
+            mask[available_xfers] = True
+            masks.append(mask)
+
+        node_embeds = torch.stack(node_embeds)
+        xfer_logits = self.actor(node_embeds)
+
+        masks = torch.stack(masks).to(self.device)
+        xfer_probs = masked_softmax(xfer_logits, masks)
+
+        xfer_dist = Categorical(probs=xfer_probs)
+        xfers = xfer_dist.sample()
+        xfer_logprobs = xfer_dist.log_prob(xfers)
+
+        return nodes, xfers.tolist(), xfer_logprobs.detach(), masks
+
+    def get_local_max_value(self, g, nodes):
+        with torch.no_grad():
+            dgl_g = g.to_dgl_graph().to(self.device)
+            graph_embed = self.graph_embedding(dgl_g)
+            values = self.critic(graph_embed).squeeze()
+        return values[nodes].max()
+
     def evaluate(self, batched_dgl_gs, nodes, xfers, batched_dgl_next_gs,
-                 next_node_lists, is_terminals, masks, node_nums,
+                 next_node_lists, is_nops, is_terminals, masks, node_nums,
                  next_node_nums):
+
         batched_dgl_gs = batched_dgl_gs.to(self.device)
+        # start = time.time()
         batched_graph_embeds = self.graph_embedding(batched_dgl_gs)
-        batched_node_vs = self.critic(batched_graph_embeds).squeeze()
+        # t_0 = time.time()
+        # print(f'graph time: {t_0 - start}')
 
         # Split batched tensors into lists
         graph_embed_list = torch.split(batched_graph_embeds, node_nums)
-        node_vs_list = torch.split(batched_node_vs, node_nums)
 
-        # Get node values
-        values = []
-        for i in range(batched_dgl_gs.batch_size):
-            value = node_vs_list[i][nodes[i]]
-            values.append(value)
-        values = torch.stack(values)
-
-        # Get xfer logprobs and xfer entropy
         selected_node_embeds = []
         for i in range(batched_dgl_gs.batch_size):
             selected_node_embeds.append(graph_embed_list[i][nodes[i]])
         selected_node_embeds = torch.stack(selected_node_embeds)
+
+        # Get values
+        values = self.critic(selected_node_embeds).squeeze()
+        # t_1 = time.time()
+        # print(f'get value time: {t_1 - t_0}')
+
+        # Get xfer logprobs and xfer entropy
         xfer_logits = self.actor(selected_node_embeds)
         xfer_probs = masked_softmax(xfer_logits, masks)
         xfer_dists = Categorical(xfer_probs)
         xfer_logprobs = xfer_dists.log_prob(
             torch.tensor(xfers, dtype=torch.int).to(self.device))
         xfer_entropys = xfer_dists.entropy()
+        # t_2 = time.time()
+        # print(f'get xfer time: {t_2 - t_1}')
 
         # Get next node values
         with torch.no_grad():
@@ -121,7 +179,9 @@ class ActorCritic(nn.Module):
 
         next_values = []
         for i in range(batched_dgl_gs.batch_size):
-            if is_terminals[i]:
+            if is_nops[i]:
+                next_value = torch.tensor(0).to(self.device)
+            elif is_terminals[i]:
                 next_value = torch.tensor(0).to(self.device)
             else:
                 # node_list contains "next nodes" and their neighbors
@@ -130,9 +190,10 @@ class ActorCritic(nn.Module):
                 if list(node_list) == []:
                     next_value = torch.tensor(0).to(self.device)
                 else:
-                    next_value = torch.max(next_node_vs_list[i][node_list.to(
-                        self.device)])
+                    next_value = torch.max(next_node_vs_list[i][node_list])
             next_values.append(next_value)
         next_values = torch.stack(next_values)
+        # t_3 = time.time()
+        # print(f'get next node value time: {t_3 - t_2}')
 
         return values, next_values, xfer_logprobs, xfer_entropys

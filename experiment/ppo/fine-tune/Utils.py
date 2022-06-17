@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import time
 
 
 def masked_softmax(logits, mask):
@@ -24,12 +25,16 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
 
         if not done:
             # t_0 = time.time()
+
             node, xfer = ppo_agent.select_action(graph)
+
             # t_1 = time.time()
-            # print(f'time network: {t_1 - t_0}')
+            # print(f'time select action: {t_1 - t_0}')
+
             next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
                 xfer=context.get_xfer_from_id(id=xfer),
                 node=graph.get_node_from_id(id=node))
+
             # t_2 = time.time()
             # print(f'time apply xfer: {t_2 - t_1}')
 
@@ -52,7 +57,7 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
                 # nop_stop = True
                 # next_nodes = [node]
             else:
-                reward = (graph.gate_count - next_graph.gate_count) * 4
+                reward = (graph.gate_count - next_graph.gate_count) * 3
 
             trajectory_reward += reward
 

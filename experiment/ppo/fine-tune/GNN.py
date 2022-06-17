@@ -1,8 +1,6 @@
-import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl.function as fn
 
 
 class QConv(nn.Module):
@@ -70,40 +68,3 @@ class QGNN(nn.Module):
         for i in range(len(self.convs)):
             h = self.convs[i](g, h)
         return h
-
-
-# class QGNN(nn.Module):
-#     def __init__(self, in_feats, h_feats, inter_dim):
-#         super(QGNN, self).__init__()
-#         self.conv1 = QConv(in_feats, inter_dim, h_feats)
-#         self.conv2 = QConv(h_feats, inter_dim, h_feats)
-#         self.conv3 = QConv(h_feats, inter_dim, h_feats)
-#         self.conv4 = QConv(h_feats, inter_dim, h_feats)
-#         self.conv5 = QConv(h_feats, inter_dim, h_feats)
-#         # self.linear1 = nn.Linear(h_feats, 32)
-#         # self.linear2 = nn.Linear(32, num_classes)
-#         # gain = nn.init.calculate_gain('relu')
-#         # nn.init.xavier_normal_(self.linear1.weight, gain=gain)
-#         # nn.init.xavier_normal_(self.linear2.weight, gain=gain)
-#         self.embedding = nn.Embedding(in_feats, in_feats)
-
-#     def forward(self, g):
-#         #print(g.ndata['gate_type'])
-#         #print(self.embedding)
-#         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-#         w = torch.cat([
-#             torch.unsqueeze(g.edata['src_idx'], 1),
-#             torch.unsqueeze(g.edata['dst_idx'], 1),
-#             torch.unsqueeze(g.edata['reversed'], 1)
-#         ],
-#                       dim=1)
-#         g.edata['w'] = w
-#         h = self.conv1(g, g.ndata['h'])
-#         h = self.conv2(g, h)
-#         h = self.conv3(g, h)
-#         h = self.conv4(g, h)
-#         h = self.conv5(g, h)
-#         # h = self.linear1(h)
-#         # h = F.relu(h)
-#         # h = self.linear2(h)
-#         return h

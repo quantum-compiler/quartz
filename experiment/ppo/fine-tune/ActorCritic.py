@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import dgl
 from Utils import masked_softmax
 import time
-
+from IPython import embed
 
 class ActorCritic(nn.Module):
     def __init__(self, gnn_layers, num_gate_type, graph_embed_size,
@@ -88,8 +88,9 @@ class ActorCritic(nn.Module):
         batched_dgl_gs = dgl.batch(dgl_gs).to(self.device)
 
         node_nums = batched_dgl_gs.batch_num_nodes().tolist()
-
+        # ( sum(num of nodes in each graph), embed_size )
         graph_embeds = self.graph_embedding(batched_dgl_gs)
+        # ( sum(num of nodes in each graph), )
         node_vss = self.critic(graph_embeds).squeeze()
 
         graph_embeds_list = torch.split(graph_embeds, node_nums)
@@ -100,9 +101,9 @@ class ActorCritic(nn.Module):
         masks = []
         for i in range(len(graphs)):
 
-            node_vs = node_vs_list[i]
+            node_vs = node_vs_list[i] # (num of nodes, )
 
-            node_probs = F.softmax(node_vs, dim=-1)
+            node_probs = F.softmax(node_vs, dim=-1) # (num of nodes, )
             node_dist = Categorical(probs=node_probs)
             node = node_dist.sample()
             nodes.append(node.item())
@@ -115,8 +116,8 @@ class ActorCritic(nn.Module):
             mask[available_xfers] = True
             masks.append(mask)
 
-        node_embeds = torch.stack(node_embeds)
-        xfer_logits = self.actor(node_embeds)
+        node_embeds = torch.stack(node_embeds) # (num of graph, embed_size)
+        xfer_logits = self.actor(node_embeds) # (num of graph, action_dim)
 
         masks = torch.stack(masks).to(self.device)
         xfer_probs = masked_softmax(xfer_logits, masks)
@@ -124,7 +125,7 @@ class ActorCritic(nn.Module):
         xfer_dist = Categorical(probs=xfer_probs)
         xfers = xfer_dist.sample()
         xfer_logprobs = xfer_dist.log_prob(xfers)
-
+        
         return nodes, xfers.tolist(), xfer_logprobs.detach(), masks
 
     def get_local_max_value(self, g, nodes):

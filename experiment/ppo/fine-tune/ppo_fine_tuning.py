@@ -14,7 +14,7 @@ import math
 import json
 import copy
 
-wandb.init(project='ppo_fine_tune')
+wandb.init(project='ppo_fine_tune', mode='disabled')
 
 os.environ['OMP_SCHEDULE'] = 'dynamic'
 
@@ -205,7 +205,7 @@ ppo_agent = PPO(num_gate_type, context, gnn_layers, 128, 256, 128, xfer_dim,
                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
                 eps_clip, entropy_coefficient, mini_batch_size, log_f,
                 device_get_trajectory, device_update)
-ppo_agent.load('pretrained_model.pth')
+# ppo_agent.load('pretrained_model.pth')
 
 # track total training time
 start_time = datetime.now().replace(microsecond=0)

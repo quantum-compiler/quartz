@@ -112,17 +112,30 @@ class Observer:
         graph_str = init_state_str
         for i_step in range(len_episode):
             # print(f'obs {self.id} step {i_step}')
-            """get action from agent"""
-            action: Action
+            """get action (action_node, xfer_dist) from agent"""
+            _action: Action
             if self.batch_inference:
-                action = agent_rref.rpc_sync().select_action_batch(
+                _action = agent_rref.rpc_sync().select_action_batch(
                     self.id, graph.to_qasm_str(),
                 )
             else:
-                action = agent_rref.rpc_sync().select_action(
+                _action = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
+           
+            """sample action_xfer with mask"""
+            av_xfers = graph.available_xfers_parallel(
+                context=quartz_context, node=graph.get_node_from_id(id=_action.node))
+            av_xfer_mask = torch.zeros(quartz_context.num_xfers, dtype=torch.bool)
+            av_xfer_mask[av_xfers] = True
+            xfer_logits: torch.Tensor = _action.xfer # (action_dim, )
+            xfer_logits[~av_xfer_mask] -= 1e10 # only sample from available xfers
+            # TODO use softmax temperature
+            softmax_xfer_logits = F.softmax(xfer_logits)
+            action_xfer = torch.multinomial(softmax_xfer_logits, num_samples=1)
             
+            """apply action"""
+            action = Action(_action.node, action_xfer.item())
             next_nodes: List[int]
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
@@ -140,7 +153,7 @@ class Observer:
                 next_graph_str = graph_str # unchanged
                 next_nodes = [action.node]
             else:
-                reward = (graph.gate_count - next_graph.gate_count) * 3
+                reward = graph.gate_count - next_graph.gate_count
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
@@ -213,6 +226,7 @@ class PPOAgent:
         future_action: Future[Action] = self.future_actions.then(
             lambda future_actions: future_actions.wait()[obs_id]
         ) # this single action is returned for the obs that calls this function
+        # It is available after self.future_actions is set
         pygraph: quartz.PyGraph = qasm_to_graph(state_str)
         dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
         self.states_buf[obs_id] = dgl_graph
@@ -222,16 +236,42 @@ class PPOAgent:
             if self.pending_states == 0:
                 """collected a batch, start batch inference"""
                 b_state: dgl.graph = dgl.batch(self.states_buf)
-                
-                # TODO get action to respond each observer's query
-                
+                node_nums = b_state.batch_num_nodes().tolist() # assert each elem > 0
+                """compute embeds and use Critic to evaluate each node"""
+                # (batch_num_nodes, embed_dim)
+                b_node_embeds: torch.Tensor = self.policy_net.graph_embedding(b_state)
+                # (batch_num_nodes, )
+                b_node_values: torch.Tensor = self.policy_net.critic(b_node_embeds).squeeze()
+                # list with length num_graphs; each member is a tensor of node values in a graph
+                node_values_list: List[torch.Tensor] = torch.split(b_node_values, node_nums)
+                """sample node for each graph"""
+                # (num_graphs, max_num_nodes)
+                b_pad_node_values = nn.utils.rnn.pad_sequence(
+                    node_values_list, batch_first=True, padding_value=0.)
+                # (num_graphs, )
+                b_sampled_nodes = torch.multinomial(b_pad_node_values, 1).flatten()
+                """collect embeddings of sampled nodes"""
+                # (num_graphs, )
+                node_offsets = torch.zeros(b_sampled_nodes.shape[0], device=b_state.device)
+                node_offsets[1:] = torch.cumsum(b_state.batch_num_nodes(), dim=0)[:-1]
+                sampled_node_ids = b_sampled_nodes + node_offsets
+                # (num_graphs, embed_dim)
+                sampled_node_embeds = b_node_embeds[sampled_node_ids]
+                """use Actor to evaluate xfers for sampled nodes"""
+                # (num_graphs, action_dim)
+                xfer_logits: torch.Tensor = self.policy_net.actor(sampled_node_embeds).cpu()
+                # return the xfer dist. to observers who are responsible for sample xfer with masks
                 # TODO store actions in obs_id order
-                actions = [Action(0, 0) for i in range(len(self.ob_rrefs))]
+                actions = [
+                    Action(b_sampled_nodes[i], xfer_logits[i])
+                    for i in range(len(self.ob_rrefs))
+                ]
                 self.future_actions.set_result(actions)
                 """re-init"""
                 self.pending_states = len(self.ob_rrefs)
                 self.future_actions = torch.futures.Future()
-        return future_action
+                self.states_buf = [None] * len(self.ob_rrefs)
+        return future_action # return a future
     
     def collect_data(self, len_episode: int) -> List[Experience]:
         """collect experiences from observers"""
@@ -400,7 +440,7 @@ class PPOMod:
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _ in range(self.agent_batch_size // self.cfg.obs_per_agent):
             exps += self.agent.collect_data(self.cfg.len_episode)
-        # print(exps)
+        print(exps)
         """evaluate, compute loss, and update (DDP)"""
         # NOTE: Each agent has different data, so it is DDP training
         # TODO

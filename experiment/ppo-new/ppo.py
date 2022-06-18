@@ -131,7 +131,7 @@ class Observer:
             xfer_logits: torch.Tensor = _action.xfer # (action_dim, )
             xfer_logits[~av_xfer_mask] -= 1e10 # only sample from available xfers
             # TODO use softmax temperature
-            softmax_xfer_logits = F.softmax(xfer_logits)
+            softmax_xfer_logits = F.softmax(xfer_logits, dim=-1)
             action_xfer = torch.multinomial(softmax_xfer_logits, num_samples=1)
             
             """apply action"""
@@ -154,6 +154,7 @@ class Observer:
                 next_nodes = [action.node]
             else:
                 reward = graph.gate_count - next_graph.gate_count
+                game_over = False
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
@@ -246,13 +247,14 @@ class PPOAgent:
                 node_values_list: List[torch.Tensor] = torch.split(b_node_values, node_nums)
                 """sample node for each graph"""
                 # (num_graphs, max_num_nodes)
-                b_pad_node_values = nn.utils.rnn.pad_sequence(
+                b_node_values_pad = nn.utils.rnn.pad_sequence(
                     node_values_list, batch_first=True, padding_value=0.)
                 # (num_graphs, )
-                b_sampled_nodes = torch.multinomial(b_pad_node_values, 1).flatten()
+                b_softmax_node_values_pad = F.softmax(b_node_values_pad, dim=-1)
+                b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 """collect embeddings of sampled nodes"""
                 # (num_graphs, )
-                node_offsets = torch.zeros(b_sampled_nodes.shape[0], device=b_state.device)
+                node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long, device=b_state.device)
                 node_offsets[1:] = torch.cumsum(b_state.batch_num_nodes(), dim=0)[:-1]
                 sampled_node_ids = b_sampled_nodes + node_offsets
                 # (num_graphs, embed_dim)
@@ -263,7 +265,7 @@ class PPOAgent:
                 # return the xfer dist. to observers who are responsible for sample xfer with masks
                 # TODO store actions in obs_id order
                 actions = [
-                    Action(b_sampled_nodes[i], xfer_logits[i])
+                    Action(b_sampled_nodes[i].item(), xfer_logits[i])
                     for i in range(len(self.ob_rrefs))
                 ]
                 self.future_actions.set_result(actions)

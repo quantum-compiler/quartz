@@ -86,7 +86,7 @@ experiment/ppo/ppo_multi_step/PPO_logs
 experiment/ppo/ppo_multi_step/PPO_preTrained
 experiment/ppo/fine-tune/PPO_logs
 experiment/ppo/fine-tune/PPO_preTrained
- experiment/ppo/fine-tune/PPO_circs
+experiment/ppo/fine-tune/PPO_circs
 
 experiment/a2c/*txt
 

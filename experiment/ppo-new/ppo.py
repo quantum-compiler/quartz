@@ -60,23 +60,6 @@ def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
     graph = quartz.PyGraph(context=quartz_context, dag=dag)
     return graph
 
-def convert_exp(s_exp: SerializableExperience) -> Experience:
-    return Experience(
-        qasm_to_graph(s_exp.state),
-        s_exp.action, s_exp.reward,
-        qasm_to_graph(s_exp.next_state),
-        s_exp.game_over,
-    )
-
-class RolloutBuffer:
-    
-    def __init__(self) -> None:
-        self.exps: List[Experience] = []
-    
-    def append(self, exp: Experience) -> RolloutBuffer:
-        self.exps.append(exp)
-        return self
-
 class Observer:
     
     def __init__(
@@ -113,7 +96,7 @@ class Observer:
         for i_step in range(len_episode):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
-            _action: Action
+            _action: ActionTmp
             if self.batch_inference:
                 _action = agent_rref.rpc_sync().select_action_batch(
                     self.id, graph.to_qasm_str(),
@@ -126,13 +109,15 @@ class Observer:
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
                 context=quartz_context, node=graph.get_node_from_id(id=_action.node))
-            av_xfer_mask = torch.zeros(quartz_context.num_xfers, dtype=torch.bool)
+            av_xfer_mask = torch.BoolTensor([0] * quartz_context.num_xfers)
             av_xfer_mask[av_xfers] = True
-            xfer_logits: torch.Tensor = _action.xfer # (action_dim, )
-            xfer_logits[~av_xfer_mask] -= 1e10 # only sample from available xfers
             # TODO use softmax temperature
-            softmax_xfer_logits = F.softmax(xfer_logits, dim=-1)
-            action_xfer = torch.multinomial(softmax_xfer_logits, num_samples=1)
+            # (action_dim, )  only sample from available xfers
+            softmax_xfer = masked_softmax(_action.xfer_dist, av_xfer_mask)
+            # action_xfer = torch.multinomial(softmax_xfer, num_samples=1)
+            xfer_dist = Categorical(softmax_xfer)
+            action_xfer = xfer_dist.sample()
+            action_xfer_logp: torch.Tensor = xfer_dist.log_prob(action_xfer)
             
             """apply action"""
             action = Action(_action.node, action_xfer.item())
@@ -159,6 +144,7 @@ class Observer:
             
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
+                next_nodes, av_xfer_mask, action_xfer_logp.item(),
             )
             exp_list.append(exp)
             
@@ -200,7 +186,7 @@ class PPOAgent:
             )
         
         """helper vars for select_action"""
-        self.future_actions: Future[List[Action]] = Future()
+        self.future_actions: Future[List[ActionTmp]] = Future()
         self.pending_states = len(self.ob_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
         self.lock = threading.Lock()
@@ -222,9 +208,9 @@ class PPOAgent:
         
     @rpc.functions.async_execution
     @torch.no_grad()
-    def select_action_batch(self, obs_id: int, state_str: str) -> Future[Action]:
+    def select_action_batch(self, obs_id: int, state_str: str) -> Future[ActionTmp]:
         """inference a batch of queries queried by all of the observers at once"""
-        future_action: Future[Action] = self.future_actions.then(
+        future_action: Future[ActionTmp] = self.future_actions.then(
             lambda future_actions: future_actions.wait()[obs_id]
         ) # this single action is returned for the obs that calls this function
         # It is available after self.future_actions is set
@@ -240,6 +226,7 @@ class PPOAgent:
                 node_nums = b_state.batch_num_nodes().tolist() # assert each elem > 0
                 """compute embeds and use Critic to evaluate each node"""
                 # (batch_num_nodes, embed_dim)
+                # TODO check whether this policy_net is updated
                 b_node_embeds: torch.Tensor = self.policy_net.graph_embedding(b_state)
                 # (batch_num_nodes, )
                 b_node_values: torch.Tensor = self.policy_net.critic(b_node_embeds).squeeze()
@@ -265,7 +252,7 @@ class PPOAgent:
                 # return the xfer dist. to observers who are responsible for sample xfer with masks
                 # TODO store actions in obs_id order
                 actions = [
-                    Action(b_sampled_nodes[i].item(), xfer_logits[i])
+                    ActionTmp(int(b_sampled_nodes[i]), xfer_logits[i])
                     for i in range(len(self.ob_rrefs))
                 ]
                 self.future_actions.set_result(actions)
@@ -275,7 +262,7 @@ class PPOAgent:
                 self.states_buf = [None] * len(self.ob_rrefs)
         return future_action # return a future
     
-    def collect_data(self, len_episode: int) -> List[Experience]:
+    def collect_data(self, len_episode: int) -> BatchedExperience:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         for ob_rref in self.ob_rrefs:
@@ -287,13 +274,23 @@ class PPOAgent:
             ))
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
-        """convert collected experiences to Quartz format"""
+        """convert collected experiences to batched Quartz format"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
-        exps: List[Experience] = []
-        for s_exp in s_exps:
-            exp = convert_exp(s_exp)
-            exps.append(exp)
-            # TODO add state into the init state buffer
+        s_exps_zip = BSerializableExperience(*zip(*s_exps)) # type: ignore
+        # state, action, reward, next_state, game_over, xfer_mask, xfer_logprob
+        exps = BatchedExperience.new_empty()
+        exps.state = dgl.batch(
+            [qasm_to_graph(g).to_dgl_graph for g in s_exps_zip.state]
+        ).to(self.device) # TODO add state into the init state buffer
+        exps.next_state = dgl.batch(
+            [qasm_to_graph(g).to_dgl_graph for g in s_exps_zip.next_state]
+        ).to(self.device)
+        exps.action = torch.stack([a.to_tensor() for a in s_exps_zip.action]).to(self.device) # type: ignore
+        exps.reward = torch.Tensor(s_exps_zip.reward, device=self.device)
+        exps.game_over = torch.BoolTensor(s_exps_zip.game_over, device=self.device)
+        exps.next_nodes = [ torch.LongTensor(ns, device=self.device) for ns in s_exps_zip.next_nodes ]
+        exps.xfer_mask = torch.stack(s_exps_zip.xfer_mask).to(self.device) # type: ignore
+        exps.xfer_logprob = torch.Tensor(s_exps_zip.xfer_logprob)
         return exps
 
 class PPOMod:
@@ -385,23 +382,23 @@ class PPOMod:
     def train(self) -> None:
         """init agent and network"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-            agent_device = torch.device('cpu')
+            self.device = torch.device('cpu')
         else:
-            agent_device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
+            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
         self.policy_net = ActorCritic(
             num_gate_type=self.num_gate_type,
             graph_embed_size=self.cfg.graph_embed_size,
             actor_hidden_size=self.cfg.actor_hidden_size,
             critic_hidden_size=self.cfg.critic_hidden_size,
             action_dim=quartz_context.num_xfers,
-            device=agent_device,
-        ).to(agent_device)
+            device=self.device,
+        ).to(self.device)
         self.policy_net_old = copy.deepcopy(self.policy_net)
         # NOTE should not use self.policy_net later
         self.agent = PPOAgent(
             agent_id=self.rank,
             num_observers=self.cfg.obs_per_agent,
-            device=agent_device,
+            device=self.device,
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
             policy_net=self.policy_net_old,
@@ -428,6 +425,7 @@ class PPOMod:
         self.i_iter = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
+        
         while self.i_iter < max_iterations:
             self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
@@ -438,13 +436,68 @@ class PPOMod:
         
     def train_iter(self) -> None:
         """collect data and build batched data in dgl or tensor format"""
-        exps: List[Experience] = []
+        exps: BatchedExperience = self.agent.collect_data(self.cfg.len_episode)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-        for _ in range(self.agent_batch_size // self.cfg.obs_per_agent):
+        for _ in range(self.agent_batch_size // self.cfg.obs_per_agent - 1):
             exps += self.agent.collect_data(self.cfg.len_episode)
-        print(exps)
+        # print(exps)
         """evaluate, compute loss, and update (DDP)"""
-        # NOTE: Each agent has different data, so it is DDP training
+        # Each agent has different data, so it is DDP training
+        for _ in range(self.cfg.k_epochs):
+            self.optimizer.zero_grad()
+            """get embeds of seleted nodes and evaluate them by Critic"""
+            num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
+            # (batch_num_nodes, embed_dim)
+            b_graph_embeds: torch.Tensor = self.ddp_policy_net.module.graph_embedding(exps.state) # type: ignore
+            nodes_offset = torch.LongTensor([0] * num_nodes.shape[0], device=self.device)
+            nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
+            selected_nodes = exps.action[:, 0] + nodes_offset
+            selected_node_embeds = b_graph_embeds[selected_nodes]
+            selected_node_values: torch.Tensor = self.ddp_policy_net.module.critic(selected_node_embeds).squeeze() # type: ignore
+            """get xfer dist by Actor"""
+            # (batch_num_graphs, action_dim)
+            xfer_logits: torch.Tensor = self.ddp_policy_net.module.actor(selected_node_embeds) # type: ignore
+            softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
+            xfer_dists = Categorical(softmax_xfer)
+            # (batch_num_graphs, )
+            xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
+            xfer_entropys = xfer_dists.entropy()
+            """get embeds of next nodes and evaluate them by Critic without grad"""
+            with torch.no_grad():
+                # (num_next_graphs, )
+                next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
+                """get embeds"""
+                # (batch_next_graphs_nodes, embed_dim)
+                b_next_graph_embeds: torch.Tensor = self.ddp_policy_net.module.graph_embedding(exps.next_state) # type: ignore
+                next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
+                """select embeds"""
+                # ( sum(num_next_nodes), embed_dim )
+                next_node_embeds: torch.Tensor = torch.cat([
+                    graph_embed[next_node_ids]
+                    for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
+                ])
+                """evaluate"""
+                # ( sum(num_next_nodes), )
+                next_node_values: torch.Tensor = self.ddp_policy_net.module.critic(next_node_embeds).squeeze() # type: ignore
+                num_next_nodes = list(map(len, exps.next_nodes))
+                next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
+                """get max next value for each graph"""
+                max_next_values_list: List[torch.Tensor] = []
+                for i in range(len(exps)):
+                    max_next_value: torch.Tensor
+                    if exps.game_over[i] or next_node_values_list[i].shape[0] == 0:
+                        max_next_value = torch.zeros(1, device=self.device)
+                    # elif quartz_context.get_xfer_from_id(id=int(exps.action[i, 1])).is_nop:
+                    #     pass
+                    else:
+                        max_next_value = torch.max(next_node_values_list[i])
+                    max_next_values_list.append(max_next_value)
+                max_next_values = torch.stack(max_next_values_list)
+            # end with
+            
+                
+            
+        
         # TODO
         # self.optimizer.zero_grad()
         # y = self.ddp_policy_net(x)
@@ -452,7 +505,7 @@ class PPOMod:
         # loss.backward()
         # self.optimizer.step()
         
-        """logging"""
+        """logging"""        
         
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:

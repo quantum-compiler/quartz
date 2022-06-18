@@ -36,10 +36,13 @@ class ToyModel(nn.Module):
         super(ToyModel, self).__init__()
         self.net1 = nn.Linear(10, 10)
         self.relu = nn.ReLU()
-        self.net2 = nn.Linear(10, 5)
+        self.net2 = nn.Linear(10, 10)
 
     def forward(self, x):
         return self.net2(self.relu(self.net1(x)))
+    
+    def forward2(self, x):
+        return self.net1(x)
 
 
 def demo_basic(rank, world_size):
@@ -67,8 +70,10 @@ def demo_basic(rank, world_size):
     # optimizer = optim.Adam(ddp_model.parameters())
     
     optimizer.zero_grad()
-    outputs = ddp_model(torch.randn(20, 10) + rank * 100)
-    labels = torch.randn(20, 5).to(rank)
+    x = torch.randn(20, 10) + rank * 100
+    x = x.to(rank)
+    outputs = ddp_model.module.forward2(x)
+    labels = torch.randn(20, 10).to(rank)
     loss_fn(outputs, labels).backward()
     optimizer.step()
     

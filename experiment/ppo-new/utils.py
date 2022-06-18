@@ -1,7 +1,8 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import os
 import random
-from typing import Callable, Tuple, List, Any
+from typing import Callable, Iterable, Tuple, List, Any
 import warnings
 from collections import deque, namedtuple
 from functools import partial
@@ -38,25 +39,75 @@ def seed_all(seed: int) -> None:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-Experience = namedtuple(
-    'Experience',
-    ['state', 'action', 'reward', 'next_state', 'game_over'],
-)
+@dataclass
+class Action:
+    node: int
+    xfer: int
+    
+    def to_tensor(self) -> torch.LongTensor:
+        return torch.LongTensor([self.node, self.xfer])
 
-SerializableExperience = namedtuple(
-    'SerializableExperience',
-    ['state', 'action', 'reward', 'next_state', 'game_over'],
-)
+@dataclass
+class ActionTmp:
+    node: int
+    xfer_dist: torch.Tensor
+@dataclass
+class SerializableExperience:
+    state: str
+    action: Action
+    reward: float
+    next_state: str
+    game_over: bool
+    next_nodes: List[int]
+    xfer_mask: torch.BoolTensor
+    xfer_logprob: float
 
-QuartzInitArgs = namedtuple(
-    'QuartzInitArgs',
-    ['gate_set', 'ecc_file_path', 'no_increase', 'include_nop'],
-)
+@dataclass
+class BSerializableExperience:
+    state: Iterable[str]
+    action: Iterable[Action]
+    reward: Iterable[float]
+    next_state: Iterable[str]
+    game_over: Iterable[bool]
+    next_nodes: Iterable[List[int]]
+    xfer_mask: Iterable[torch.BoolTensor]
+    xfer_logprob: Iterable[float]
+    
+@dataclass
+class BatchedExperience:
+    state: dgl.graph
+    action: torch.LongTensor # (B, 2)
+    reward: torch.Tensor # (B,)
+    next_state: dgl.graph
+    game_over: torch.BoolTensor # (B,)
+    next_nodes: List[torch.LongTensor]
+    xfer_mask: torch.BoolTensor # (B,)
+    xfer_logprob: torch.Tensor # (B,)
+    
+    @staticmethod
+    def new_empty() -> BatchedExperience:
+        return BatchedExperience(None, None, None, None, None, None, None) # type: ignore
 
-Action = namedtuple(
-    'Action',
-    ['node', 'xfer'],
-)
+    def __iadd__(self, other):
+        self.state = dgl.batch([self.state, other.state])
+        self.next_state = dgl.batch([self.next_state, other.next_state])
+        self.action = torch.cat([self.action, other.action])
+        self.reward = torch.cat([self.reward, other.reward])
+        self.game_over = torch.cat([self.game_over, other.game_over])
+        self.next_nodes += other.next_nodes
+        self.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask])
+        self.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
+    
+    def __len__(self) -> int:
+        return len(self.next_nodes)
+
+@dataclass
+class QuartzInitArgs:
+    gate_set: List[str]
+    ecc_file_path: str
+    no_increase: bool
+    include_nop: bool
+    
 
 def get_agent_name(agent_id: int) -> str:
     return f'agent_{agent_id}'
@@ -73,3 +124,7 @@ def get_quartz_context(init_args: QuartzInitArgs) -> Tuple[quartz.QuartzContext,
     )
     quartz_parser = quartz.PyQASMParser(context=quartz_context)
     return quartz_context, quartz_parser
+
+def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor:
+    logits[~mask] -= 1e10
+    return F.softmax(logits, dim=-1)

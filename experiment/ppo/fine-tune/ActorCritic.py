@@ -7,8 +7,9 @@ from torch.distributions import Categorical
 from quartz import PyGraph, QuartzContext
 import torch.nn.functional as F
 import dgl
-from Utils import masked_softmax
+from Utils import masked_softmax, temperature_softmax
 import time
+import math
 
 
 class ActorCritic(nn.Module):
@@ -102,7 +103,15 @@ class ActorCritic(nn.Module):
 
             node_vs = node_vs_list[i]
 
-            node_probs = F.softmax(node_vs, dim=-1)
+            # Compute temperature
+            # TODO: this rate should be a hyper parameter
+            hit_rate = 0.8
+            # Assume values of all nodes except one are 0
+            temperature = 1 / math.log(
+                (node_nums[i] - 1) / (1 - hit_rate) * hit_rate)
+
+            # node_probs = F.softmax(node_vs, dim=-1)
+            node_probs = temperature_softmax(node_vs, temperature)
             node_dist = Categorical(probs=node_probs)
             node = node_dist.sample()
             nodes.append(node.item())

@@ -1,8 +1,8 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import os
 import random
-from typing import Callable, Iterable, Tuple, List, Any
+from typing import Callable, Iterable, Iterator, Tuple, List, Any
 import warnings
 from collections import deque, namedtuple
 from functools import partial
@@ -61,6 +61,12 @@ class SerializableExperience:
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
+    
+    def __iter__(self) -> Iterator:
+        return iter([
+            getattr(self, field.name)
+            for field in fields(self)
+        ])
 
 @dataclass
 class BSerializableExperience:
@@ -86,17 +92,19 @@ class BatchedExperience:
     
     @staticmethod
     def new_empty() -> BatchedExperience:
-        return BatchedExperience(None, None, None, None, None, None, None) # type: ignore
+        return BatchedExperience(*[None]*8) # type: ignore
 
-    def __iadd__(self, other):
-        self.state = dgl.batch([self.state, other.state])
-        self.next_state = dgl.batch([self.next_state, other.next_state])
-        self.action = torch.cat([self.action, other.action])
-        self.reward = torch.cat([self.reward, other.reward])
-        self.game_over = torch.cat([self.game_over, other.game_over])
-        self.next_nodes += other.next_nodes
-        self.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask])
-        self.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
+    def __add__(self, other) -> BatchedExperience:
+        res = BatchedExperience.new_empty()
+        res.state = dgl.batch([self.state, other.state])
+        res.next_state = dgl.batch([self.next_state, other.next_state])
+        res.action = torch.cat([self.action, other.action]) # type: ignore
+        res.reward = torch.cat([self.reward, other.reward])
+        res.game_over = torch.cat([self.game_over, other.game_over]) # type: ignore
+        res.next_nodes = self.next_nodes + other.next_nodes
+        res.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask]) # type: ignore
+        res.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
+        return res
     
     def __len__(self) -> int:
         return len(self.next_nodes)

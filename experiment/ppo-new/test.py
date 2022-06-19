@@ -1,4 +1,5 @@
 import os
+import time
 from pickletools import optimize
 import sys
 import tempfile
@@ -49,36 +50,40 @@ def demo_basic(rank, world_size):
     print(f"Running basic DDP example on rank {rank}.")
     setup(rank, world_size)
 
-    # create model and move it to GPU with id rank
-    model = ToyModel().to(rank)
+    # create model and move it to GPU
+    device = torch.device(f'cuda:{rank+2}')
+    model = ToyModel().to(device)
     # print(model.state_dict())
-    ddp_model = DDP(model, device_ids=[rank])
+    torch.cuda.set_device(device)
+    ddp_model = DDP(model, device_ids=[device])
+    print(f'sleeping...') # 1231+1097
+    time.sleep(20)
 
     loss_fn = nn.MSELoss()
     if rank == 0:
         print(list(ddp_model.parameters()))
-    optimizer = optim.Adam([
-        {
-            'params': ddp_model.module.net1.parameters(),
-            'lr': 1e-3,
-        },
-        {
-            'params': ddp_model.module.net2.parameters(),
-            'lr': 1e-4,
-        }
-    ])
-    # optimizer = optim.Adam(ddp_model.parameters())
+    # optimizer = optim.Adam([
+    #     {
+    #         'params': ddp_model.module.net1.parameters(),
+    #         'lr': 1e-3,
+    #     },
+    #     {
+    #         'params': ddp_model.module.net2.parameters(),
+    #         'lr': 1e-4,
+    #     }
+    # ])
+    optimizer = optim.Adam(ddp_model.parameters())
     
     optimizer.zero_grad()
     x = torch.randn(20, 10) + rank * 100
-    x = x.to(rank)
+    x = x.to(device)
     outputs = ddp_model.module.forward2(x)
-    labels = torch.randn(20, 10).to(rank)
+    labels = torch.randn(20, 10).to(device)
     loss_fn(outputs, labels).backward()
     optimizer.step()
     
     print(ddp_model.state_dict())
-
+    
     cleanup()
 
 

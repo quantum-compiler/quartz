@@ -172,11 +172,13 @@ class PPOAgent:
         invalid_reward: float,
         ac_net: ActorCritic,
         input_qasm_str: str,
+        softmax_hit_rate: float,
     ) -> None:
         self.id = agent_id
         self.device = device
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
+        self.softmax_hit_rate = softmax_hit_rate
         
         """init Observers on the other processes and hold the refs to them"""
         self.ob_rrefs: List[rpc.RRef] = []
@@ -224,7 +226,7 @@ class PPOAgent:
             if self.pending_states == 0:
                 """collected a batch, start batch inference"""
                 b_state: dgl.graph = dgl.batch(self.states_buf)
-                node_nums = b_state.batch_num_nodes().tolist() # assert each elem > 0
+                num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
                 """compute embeds and use Critic to evaluate each node"""
                 # (batch_num_nodes, embed_dim)
                 # TODO check whether this ac_net is updated
@@ -232,18 +234,19 @@ class PPOAgent:
                 # (batch_num_nodes, )
                 b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
                 # list with length num_graphs; each member is a tensor of node values in a graph
-                node_values_list: List[torch.Tensor] = torch.split(b_node_values, node_nums)
-                """sample node for each graph"""
+                node_values_list: List[torch.Tensor] = torch.split(b_node_values, num_nodes.tolist())
+                """sample node by softmax with temperature for each graph as a batch"""
                 # (num_graphs, max_num_nodes)
                 b_node_values_pad = nn.utils.rnn.pad_sequence(
-                    node_values_list, batch_first=True, padding_value=0.)
+                    node_values_list, batch_first=True, padding_value=-torch.inf)
                 # (num_graphs, )
-                b_softmax_node_values_pad = F.softmax(b_node_values_pad, dim=-1)
+                temperature = 1 / (torch.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+                b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature, dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 """collect embeddings of sampled nodes"""
                 # (num_graphs, )
                 node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(self.device)
-                node_offsets[1:] = torch.cumsum(b_state.batch_num_nodes(), dim=0)[:-1]
+                node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 sampled_node_ids = b_sampled_nodes + node_offsets
                 # (num_graphs, embed_dim)
                 sampled_node_embeds = b_node_embeds[sampled_node_ids]

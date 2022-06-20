@@ -1,3 +1,4 @@
+# this file is under mypy's checking
 from __future__ import annotations
 import os
 import random
@@ -742,6 +743,9 @@ def main(cfg) -> None:
         nprocs=tot_processes,
         join=True,
     )
+    # TODO confirm params in config.yaml
+    # TODO find an optimal config of mp, or it will OOM
+    # TODO profiling; some parts of this code are slow
     
 
 if __name__ == '__main__':

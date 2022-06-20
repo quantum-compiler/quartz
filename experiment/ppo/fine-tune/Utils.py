@@ -9,6 +9,10 @@ def masked_softmax(logits, mask):
     return F.softmax(logits, dim=-1)
 
 
+def temperature_softmax(logits, temperature):
+    return F.softmax(logits / temperature, dim=-1)
+
+
 def get_trajectory(ppo_agent, context, init_state, max_seq_len,
                    invalid_reward):
     graph = init_state

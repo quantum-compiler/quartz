@@ -423,22 +423,22 @@ class PPOMod:
                 config=self.cfg,
             )
         print(f'rank {self.rank} on {self.device} initialized')
-        """train"""
+        
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
-        
+        """train loop"""
         while self.i_iter < max_iterations:
             self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt') # TODO add loss and best_gc in the name
-            self.i_iter += 1            
+            self.i_iter += 1
         
     def train_iter(self) -> None:
-        """collect data and build batched data in dgl or tensor format"""
+        """collect batched data in dgl or tensor format"""
         exps: BatchedExperience = self.agent.collect_data(self.cfg.len_episode)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _i in range(self.agent_batch_size // self.cfg.obs_per_agent - 1):

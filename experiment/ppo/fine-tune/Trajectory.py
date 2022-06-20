@@ -91,7 +91,8 @@ class Trajectory:
         elif self.is_nop:
             reward = 0
         else:
-            reward = (self.current_circ.gate_count - next_circ.gate_count) * 4
+            # reward = (self.current_circ.gate_count - next_circ.gate_count) * 5
+            reward = self.current_circ.gate_count - next_circ.gate_count
         self.t_reward += reward
 
         reward: torch.Tensor = torch.tensor(reward)

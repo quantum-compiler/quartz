@@ -61,12 +61,17 @@ class SerializableExperience:
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
+    info: Any
     
     def __iter__(self) -> Iterator:
         return iter([
             getattr(self, field.name)
             for field in fields(self)
         ])
+    
+    @staticmethod
+    def new_empty() -> SerializableExperience:
+        return SerializableExperience(*[None]*len(fields(SerializableExperience))) # type:ignore
 
 @dataclass
 class BSerializableExperience:
@@ -78,6 +83,11 @@ class BSerializableExperience:
     next_nodes: Iterable[List[int]]
     xfer_mask: Iterable[torch.BoolTensor]
     xfer_logprob: Iterable[float]
+    info: Iterable[Any]
+    
+    @staticmethod
+    def new_empty() -> BSerializableExperience:
+        return BSerializableExperience(*[None]*len(fields(BSerializableExperience))) # type: ignore
     
 @dataclass
 class BatchedExperience:
@@ -92,7 +102,7 @@ class BatchedExperience:
     
     @staticmethod
     def new_empty() -> BatchedExperience:
-        return BatchedExperience(*[None]*8) # type: ignore
+        return BatchedExperience(*[None]*len(fields(BatchedExperience))) # type: ignore
 
     def __add__(self, other) -> BatchedExperience:
         res = BatchedExperience.new_empty()

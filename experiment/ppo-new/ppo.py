@@ -1,8 +1,7 @@
 from __future__ import annotations
 import os
-from posixpath import expanduser
 import random
-from typing import Callable, Tuple, List, Any
+from typing import Callable, Set, Tuple, List, Dict, Any
 import warnings
 from collections import deque, namedtuple
 from functools import partial
@@ -10,6 +9,8 @@ import threading
 import time
 import copy
 import itertools
+import math
+from tqdm import tqdm # type: ignore
 
 import torch
 import torch.nn as nn
@@ -30,6 +31,7 @@ import wandb
 from utils import *
 from model import ActorCritic
 from IPython import embed # type: ignore
+from icecream import ic # type: ignore
 
 DDP_PORT = int(23333)
 RPC_PORT = DDP_PORT + 1
@@ -61,6 +63,10 @@ def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
     graph = quartz.PyGraph(context=quartz_context, dag=dag)
     return graph
 
+def is_nop(xfer_id: int) -> bool:
+    global quartz_context
+    return quartz_context.get_xfer_from_id(id=xfer_id).is_nop
+
 class Observer:
     
     def __init__(
@@ -78,6 +84,8 @@ class Observer:
         agent_rref: rpc.RRef[PPOAgent],
         init_state_str: str,
         len_episode: int,
+        max_gate_count_ratio: float,
+        nop_stop: bool,
     ) -> List[SerializableExperience]:
         """Interact with env for many steps to collect data.
         If `batch_inference` is `True`, we call `select_action_batch` of the agent,
@@ -94,6 +102,7 @@ class Observer:
         
         graph = init_graph
         graph_str = init_state_str
+        info: Dict[str, Any] = { 'start': True }
         for i_step in range(len_episode):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
@@ -112,7 +121,7 @@ class Observer:
                 context=quartz_context, node=graph.get_node_from_id(id=_action.node))
             av_xfer_mask = torch.BoolTensor([0] * quartz_context.num_xfers)
             av_xfer_mask[av_xfers] = True
-            # TODO use softmax temperature
+            # TODO use softmax temperature?
             # (action_dim, )  only sample from available xfers
             softmax_xfer = masked_softmax(_action.xfer_dist, av_xfer_mask)
             # action_xfer = torch.multinomial(softmax_xfer, num_samples=1)
@@ -133,33 +142,87 @@ class Observer:
                 reward = self.invalid_reward
                 game_over = True
                 next_graph_str = graph_str # TODO placeholder?
-            elif quartz_context.get_xfer_from_id(id=action.xfer).is_nop:
+            elif is_nop(action.xfer):
                 reward = 0
-                game_over = True
+                game_over = nop_stop
                 next_graph_str = graph_str # unchanged
-                next_nodes = [action.node]
+                next_nodes = [action.node] # TODO
             else:
                 reward = graph.gate_count - next_graph.gate_count
-                game_over = False
+                game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
                 next_graph_str = next_graph.to_qasm_str()
-            
+                            
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
-                next_nodes, av_xfer_mask, action_xfer_logp.item(),
+                next_nodes, av_xfer_mask, action_xfer_logp.item(), info,
             )
             exp_list.append(exp)
+            info['start'] = False
             
             if game_over and not self.batch_inference:
                 break
             else:
-                if self.batch_inference:
+                if self.batch_inference: # game_over
                     graph = init_graph
                     graph_str = init_state_str
-                else:
+                    info['start'] = True
+                else: # not game_over and not self.batch_inference
                     graph = next_graph
                     graph_str = next_graph_str
         # end for
         return exp_list
+
+class GraphBuffer:
+    """store PyGraph of a class of circuits for init state sampling and best info maintenance"""
+    def __init__(
+        self,
+        name: str,
+        original_graph_qasm: str,
+        max_len: int | float,
+        device: torch.device = torch.device('cpu'),
+    ) -> None:
+        self.name = name
+        self.max_len = max_len
+        self.device = device
+        self.original_graph = qasm_to_graph(original_graph_qasm)
+        
+        self.buffer: List[quartz.PyGraph] = []
+        self.hashset: Set[int] = { hash(self.original_graph) }
+        self.gate_counts: torch.Tensor = torch.Tensor([]).to(self.device)
+        
+        self.best_graph = self.original_graph
+    
+    def __len__(self) -> int:
+        return len(self.buffer) + 1
+        
+    def push_back(self, graph: quartz.PyGraph) -> None:
+        hash_value = hash(graph)
+        if hash_value not in self.hashset:
+            self.hashset.add(hash_value)
+            self.buffer.append(graph)
+            self.gate_counts = torch.cat([
+                self.gate_counts,
+                torch.Tensor([graph.gate_count]).to(self.device)
+            ])
+            if len(self) > self.max_len:
+                graph_to_remove = self.buffer.pop(0) # remove and return
+                self.hashset.remove(hash(graph_to_remove))
+                self.gate_counts = self.gate_counts[1:]                
+        
+    def sample(self) -> quartz.PyGraph:
+        gate_counts = torch.cat([
+            self.gate_counts,
+            torch.Tensor([self.original_graph.gate_count]).to(self.device),
+        ]) # always has the probability to start from the original graph
+        weights = 1 / gate_counts ** 4
+        sampled_idx = int(torch.multinomial(weights, num_samples=1))
+        sampled_graph: quartz.PyGraph
+        if sampled_idx == len(self.buffer):
+            sampled_graph = self.original_graph
+        else:
+            sampled_graph = self.buffer[sampled_idx]
+        return sampled_graph
+
 
 class PPOAgent:
     
@@ -171,31 +234,39 @@ class PPOAgent:
         batch_inference: bool,
         invalid_reward: float,
         ac_net: ActorCritic,
-        input_qasm_str: str,
+        input_graphs: List[Dict[str, str]],
         softmax_hit_rate: float,
+        output_dir: str,
     ) -> None:
         self.id = agent_id
         self.device = device
+        self.output_dir = output_dir
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
         self.softmax_hit_rate = softmax_hit_rate
         
         """init Observers on the other processes and hold the refs to them"""
-        self.ob_rrefs: List[rpc.RRef] = []
+        self.obs_rrefs: List[rpc.RRef] = []
         for obs_rank in range(0, num_observers):
             ob_info = rpc.get_worker_info(get_obs_name(self.id, obs_rank))
-            self.ob_rrefs.append(
+            self.obs_rrefs.append(
                 rpc.remote(ob_info, Observer, args=(obs_rank, batch_inference, invalid_reward,))
             )
         
+        self.graph_buffers: List[GraphBuffer] = [
+            GraphBuffer(
+                input_graph['name'], input_graph['qasm'],
+                math.inf, self.device
+            ) for input_graph in input_graphs
+        ]
+        self.init_buffer_turn: int = 0
+
         """helper vars for select_action"""
         self.future_actions: Future[List[ActionTmp]] = Future()
-        self.pending_states = len(self.ob_rrefs)
-        self.states_buf: List[dgl.graph] = [None] * len(self.ob_rrefs)
+        self.pending_states = len(self.obs_rrefs)
+        self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
         
-        # TODO init state buffer
-        self.input_qasm_str = input_qasm_str
             
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> Action:
@@ -241,7 +312,7 @@ class PPOAgent:
                     node_values_list, batch_first=True, padding_value=-torch.inf)
                 # (num_graphs, )
                 temperature = 1 / (torch.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
-                b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature, dim=-1)
+                b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 """collect embeddings of sampled nodes"""
                 # (num_graphs, )
@@ -256,39 +327,112 @@ class PPOAgent:
                 # return the xfer dist. to observers who are responsible for sample xfer with masks
                 actions = [
                     ActionTmp(int(b_sampled_nodes[i]), xfer_logits[i])
-                    for i in range(len(self.ob_rrefs))
+                    for i in range(len(self.obs_rrefs))
                 ]
                 self.future_actions.set_result(actions)
                 """re-init"""
-                self.pending_states = len(self.ob_rrefs)
+                self.pending_states = len(self.obs_rrefs)
                 self.future_actions = torch.futures.Future()
-                self.states_buf = [None] * len(self.ob_rrefs)
+                self.states_buf = [None] * len(self.obs_rrefs)
         return future_action # return a future
     
+    def output_opt_path(
+        self,
+        name: str,
+        best_gc: int,
+        exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]]
+    ) -> str:
+        for try_i in range(int(1e8)):
+            output_dir = os.path.join(self.output_dir, name, f'{best_gc}_{try_i}')
+            # in case of duplication under multi-processing setting
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+                break
+        else:
+            raise Exception(f'Couldn\'t find an available path for {os.path.join(self.output_dir, name, f"{best_gc}")}')
+        """make a s_exp to output the starting graph"""
+        first_s_exp = SerializableExperience.new_empty()
+        first_s_exp.action = Action(0, 0)
+        first_s_exp.reward = 0.0
+        first_s_exp.next_state = exp_seq[0][0].state
+        exp_seq = [(first_s_exp, None, exp_seq[0][1])] + exp_seq
+        """output the seq"""
+        for i_step, (s_exp, graph, next_graph) in enumerate(exp_seq):
+            fname = f'{i_step}_{next_graph.gate_count}_{int(s_exp.reward)}_' \
+                    f'{s_exp.action.node}_{s_exp.action.xfer}.qasm'
+            with open(os.path.join(output_dir, fname), 'w') as f:
+                f.write(s_exp.next_state)
+        return output_dir
+    
     @torch.no_grad()
-    def collect_data(self, len_episode: int) -> BatchedExperience:
+    def collect_data(
+        self,
+        len_episode: int,
+        max_gate_count_ratio: float,
+        nop_stop: bool
+    ) -> BatchedExperience:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
-        for ob_rref in self.ob_rrefs:
-            # make async RPC to kick off an episode on all observers
-            future_exp_lists.append(ob_rref.rpc_async().run_episode(
+        init_buffer_ids: List[int] = []
+        for obs_rref in self.obs_rrefs:
+            """sample init state"""
+            init_graph: quartz.PyGraph = self.graph_buffers[self.init_buffer_turn].sample()
+            init_buffer_ids.append(self.init_buffer_turn)
+            self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
+            """make async RPC to kick off an episode on observers"""
+            future_exp_lists.append(obs_rref.rpc_async().run_episode(
                 rpc.RRef(self),
-                self.input_qasm_str, # TODO init state buffer and sampling
+                init_graph.to_qasm_str(),
                 len_episode,
+                max_gate_count_ratio,
+                nop_stop,
             ))
+            
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
-        """convert collected experiences to batched Quartz format"""
+        """convert graph and maintain graph_buffer"""
+        state_dgl_list: List[dgl.graph] = []
+        next_state_dgl_list: List[dgl.graph] = []
+        for buffer_id, obs_res in zip(init_buffer_ids, s_exp_lists):
+            """for each observer's results (several trajectories)"""
+            graph_buffer = self.graph_buffers[buffer_id]
+            init_graph = None
+            exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]] = [] # for output optimization path
+            for s_exp in obs_res:
+                """for each experience"""
+                if s_exp.info['start']:
+                    init_graph = qasm_to_graph(obs_res[0].state)
+                    exp_seq = []
+                graph = qasm_to_graph(s_exp.state)
+                next_graph = qasm_to_graph(s_exp.next_state)
+                exp_seq.append((s_exp, graph, next_graph))
+                if not s_exp.game_over and \
+                    not is_nop(s_exp.action.xfer) and \
+                    next_graph.gate_count <= init_graph.num_nodes: # NOTE: only add graphs with less gate count
+                    graph_buffer.push_back(next_graph)
+                state_dgl_list.append(graph.to_dgl_graph())
+                next_state_dgl_list.append(next_graph.to_dgl_graph())
+                """best graph maintenance"""
+                if next_graph.gate_count < graph_buffer.best_graph.gate_count:
+                    seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
+                    msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
+                    print(f'\n{msg}\n')
+                    if self.id == 0: # TODO multi-processing logging
+                        wandb.alert(
+                            title='Better graph is found!',
+                            text=msg, level=wandb.AlertLevel.INFO,
+                            wait_duration=0,
+                        ) # send alert to slack
+                    
+                    graph_buffer.best_graph = next_graph
+        
+        """batch the collected experiences"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
         s_exps_zip = BSerializableExperience(*zip(*s_exps)) # type: ignore
         # state, action, reward, next_state, game_over, xfer_mask, xfer_logprob
         exps = BatchedExperience.new_empty()
-        exps.state = dgl.batch(
-            [qasm_to_graph(g).to_dgl_graph() for g in s_exps_zip.state]
-        ).to(self.device) # TODO add state into the init state buffer
-        exps.next_state = dgl.batch(
-            [qasm_to_graph(g).to_dgl_graph() for g in s_exps_zip.next_state]
-        ).to(self.device)
+        exps.state = dgl.batch(state_dgl_list).to(self.device)
+        exps.next_state = dgl.batch(next_state_dgl_list).to(self.device)
         exps.action = torch.stack([a.to_tensor() for a in s_exps_zip.action]).to(self.device) # type: ignore
         exps.reward = torch.Tensor(s_exps_zip.reward).to(self.device)
         exps.game_over = torch.BoolTensor(s_exps_zip.game_over).to(self.device) # type: ignore
@@ -320,8 +464,13 @@ class PPOMod:
             cfg.no_increase,
             cfg.include_nop,
         )
-        with open(cfg.input_graph_path) as f:
-            self.input_qasm_str = f.read()
+        self.input_graphs: List[Dict[str, str]] = []
+        for input_graph in cfg.input_graphs:
+            with open(input_graph.path) as f:
+                self.input_graphs.append({
+                    'name': input_graph['name'],
+                    'qasm': f.read(),
+                })
         self.num_gate_type: int = 29
         
         """init training related parameters"""
@@ -401,7 +550,9 @@ class PPOMod:
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
             ac_net=self.ac_net_old,
-            input_qasm_str=self.input_qasm_str,
+            input_graphs=self.input_graphs,
+            softmax_hit_rate=self.cfg.softmax_hit_rate,
+            output_dir=self.output_dir,
         )
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
         self.optimizer = torch.optim.Adam([
@@ -442,14 +593,20 @@ class PPOMod:
         
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
-        exps: BatchedExperience = self.agent.collect_data(self.cfg.len_episode)
+        exps: BatchedExperience = self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _i in range(self.agent_batch_size // self.cfg.obs_per_agent - 1):
-            exps += self.agent.collect_data(self.cfg.len_episode)
+            exps += self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # print(exps)
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
-        for _ in range(self.cfg.k_epochs):
+        if self.rank == 0:
+            pbar = tqdm(
+                total=self.cfg.k_epochs,
+                desc=f'Iter {self.i_iter}',
+                bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
+            )
+        for epoch_k in range(self.cfg.k_epochs):
             self.optimizer.zero_grad()
             """get embeds of seleted nodes and evaluate them by Critic"""
             num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
@@ -491,10 +648,11 @@ class PPOMod:
                 max_next_values_list: List[torch.Tensor] = []
                 for i in range(len(exps)):
                     max_next_value: torch.Tensor
-                    if exps.game_over[i] or next_node_values_list[i].shape[0] == 0:
+                    # next_nodes == [] means invalid xfer
+                    if next_node_values_list[i].shape[0] == 0 or \
+                        is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
                         max_next_value = torch.zeros(1).to(self.device)
-                    # elif quartz_context.get_xfer_from_id(id=int(exps.action[i, 1])).is_nop:
-                    #     pass
+                    # TODO how to deal with NOP?
                     else:
                         max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
                     max_next_values_list.append(max_next_value)
@@ -514,23 +672,32 @@ class PPOMod:
             """compute loss for Critic (value_net, phi)"""
             critic_loss = torch.sum(advantages ** 2) / len(exps)
             xfer_entropy = torch.sum(xfer_entropys) / len(exps)
-            """compute overall loss"""
+            """compute overall loss""" 
             loss = actor_loss + 0.5 * critic_loss - float(self.cfg.entropy_coeff) * xfer_entropy
             """update"""
             loss.backward()
             for param in self.ddp_ac_net.parameters():
                 param.grad.data.clamp_(-1, 1)
             self.optimizer.step()
+            """logging"""
+            if self.rank == 0:
+                pbar.update(1)
+                log_dict = {
+                    'actor_loss': float(actor_loss),
+                    'critic_loss': float(critic_loss),
+                    'xfer_entropy': float(xfer_entropy),
+                    'loss': float(loss),
+                }
+                pbar.set_postfix(log_dict)
+                # pbar.refresh()
+                wandb.log({
+                    'actor_loss': actor_loss,
+                    'critic_loss': critic_loss,
+                    'xfer_entropy': xfer_entropy,
+                    'loss': loss,
+                })
+            
         # end for k_epochs
-        
-        """logging"""
-        if self.rank == 0:
-            wandb.log({
-                'actor_loss': actor_loss,
-                'critic_loss': critic_loss,
-                'xfer_entropy': xfer_entropy,
-                "loss": loss,
-            })
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO save top-k model

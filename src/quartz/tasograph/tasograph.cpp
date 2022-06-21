@@ -1711,6 +1711,10 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
+      if(it->second.first.ptr->is_quantum_gate() || it->second.first.ptr->tp == GateType::input_qubit){
+        // Only check inputs on a qubit
+        // Excluding input_param gates and arithmetic gates
+        std::cout << gate_type_name(it->second.first.ptr->tp) << std::endl;
       Pos p = Pos(it->second.first, it->second.second);
       auto q = pos_2_logical_qubit.find(p)->second;
       if (qubits.find(q) != qubits.end()) {
@@ -1718,6 +1722,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         break;
       } else {
         qubits.insert(q);
+      }
+
       }
     }
   }
@@ -1855,6 +1861,9 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
+    if(it->second.first.ptr->is_quantum_gate() || it->second.first.ptr->tp == GateType::input_qubit){
+        // Only check inputs on a qubit
+        // Excluding input_param gates and arithmetic gates
       Pos p = Pos(it->second.first, it->second.second);
       auto q = pos_2_logical_qubit.find(p)->second;
       if (qubits.find(q) != qubits.end()) {
@@ -1862,6 +1871,8 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
         break;
       } else {
         qubits.insert(q);
+      }
+
       }
     }
   }

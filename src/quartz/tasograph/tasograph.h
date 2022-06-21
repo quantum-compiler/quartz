@@ -171,6 +171,7 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
   Op add_qubit(int qubit_idx);

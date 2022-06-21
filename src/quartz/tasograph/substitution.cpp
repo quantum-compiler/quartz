@@ -678,96 +678,48 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
       }
   }
 
-  // Construct pos_2_logical_qubit
-  std::unordered_map<Op, int, OpHash> op_in_degree;
-  std::queue<Op> op_q;
-  for (auto it = newGraph->outEdges.cbegin(); it != newGraph->outEdges.cend();
-       ++it) {
-    if (it->first.ptr->tp == GateType::input_qubit ||
-        it->first.ptr->tp == GateType::input_param) {
-      op_q.push(it->first);
-    }
-  }
-
-  for (auto it = newGraph->inEdges.cbegin(); it != newGraph->inEdges.cend();
-       ++it) {
-    op_in_degree[it->first] = it->second.size();
-  }
-
-  while (!op_q.empty()) {
-    auto op = op_q.front();
-    op_q.pop();
-
-    // An input qubit
-    if (newGraph->input_qubit_op_2_qubit_idx.find(op) !=
-        newGraph->input_qubit_op_2_qubit_idx.end()) {
-      newGraph->pos_2_logical_qubit[Pos(op, 0)] =
-          newGraph->input_qubit_op_2_qubit_idx[op];
-    }
-    if (newGraph->outEdges.find(op) != newGraph->outEdges.end()) {
-      auto op_out_edges = newGraph->outEdges.find(op)->second;
-      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
-           ++e_it) {
-        if (newGraph->pos_2_logical_qubit.find(
-                Pos(e_it->srcOp, e_it->srcIdx)) !=
-            newGraph->pos_2_logical_qubit.end()) {
-          newGraph->pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
-              newGraph->pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
-        }
-        assert(op_in_degree[e_it->dstOp] > 0);
-        op_in_degree[e_it->dstOp]--;
-        if (op_in_degree[e_it->dstOp] == 0) {
-          op_q.push(e_it->dstOp);
-        }
-      }
-    }
-  }
+  newGraph->_construct_pos_2_logical_qubit();
   return newGraph;
 }
 int GraphXfer::num_src_op() { return srcOps.size(); }
 int GraphXfer::num_dst_op() { return dstOps.size(); }
 
-std::string GraphXfer::to_str(std::vector<OpX *> const & v) const{
-    // TODO: Currenty only support non-parameter gates
-    std::string s;
-    std::ostringstream oss(s);
-    // return s;
-    std::unordered_map<TensorX, int, TensorXHash> mp;
-    for(auto const & opx : v){
-        int num_qubits = context->get_gate(opx->type)->get_num_qubits();
-        int num_params = context->get_gate(opx->type)->get_num_parameters();
-        int num_inputs = num_qubits + num_params;
+std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
+  // TODO: Currenty only support non-parameter gates
+  std::string s;
+  std::ostringstream oss(s);
+  // return s;
+  std::unordered_map<TensorX, int, TensorXHash> mp;
+  for (auto const &opx : v) {
+    int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+    int num_params = context->get_gate(opx->type)->get_num_parameters();
+    int num_inputs = num_qubits + num_params;
 
-        std::vector<int> input_qubits(num_qubits);
+    std::vector<int> input_qubits(num_qubits);
 
-        for(int i = 0; i < num_qubits; ++i){
-           if(opx->inputs[i].op == nullptr){
-               input_qubits[i] = opx->inputs[i].idx;
-           }
-            else{
-                input_qubits[i] = mp[opx->inputs[i]];
-            }
-        }
-
-       oss << gate_type_name(opx->type);
-       for(auto const & idx : input_qubits){
-           oss << " " << idx;
-       }
-       oss << std::endl;
-
-        for(int i = 0; i < num_qubits; ++i) {
-            mp[opx->outputs[i]] = input_qubits[i];
-        }
+    for (int i = 0; i < num_qubits; ++i) {
+      if (opx->inputs[i].op == nullptr) {
+        input_qubits[i] = opx->inputs[i].idx;
+      } else {
+        input_qubits[i] = mp[opx->inputs[i]];
+      }
     }
-    return oss.str();
+
+    oss << gate_type_name(opx->type);
+    for (auto const &idx : input_qubits) {
+      oss << " " << idx;
+    }
+    oss << std::endl;
+
+    for (int i = 0; i < num_qubits; ++i) {
+      mp[opx->outputs[i]] = input_qubits[i];
+    }
+  }
+  return oss.str();
 }
 
-std::string GraphXfer::src_str() const{
-    return to_str(srcOps);
-}
+std::string GraphXfer::src_str() const { return to_str(srcOps); }
 
-std::string GraphXfer::dst_str() const{
-    return to_str(dstOps);
-}
+std::string GraphXfer::dst_str() const { return to_str(dstOps); }
 
 }; // namespace quartz

@@ -2020,7 +2020,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
-if (it->second.first.ptr->is_quantum_gate() ||
+      if (it->second.first.ptr->is_quantum_gate() ||
           it->second.first.ptr->tp == GateType::input_qubit) {
         // Only check inputs on a qubit
         // Excluding input_param gates and arithmetic gates

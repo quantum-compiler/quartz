@@ -2,8 +2,8 @@ mode: train
 resume: False
 ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
 
-gpus: [2]
-num_workers: 8
+gpus: [2,3]
+# num_workers: 8
 
 seed: 98765
 wandb:
@@ -13,7 +13,7 @@ wandb:
 
 # multiprocessing
 mp_start_method: spawn # fork
-obs_per_agent: 4 # 128
+obs_per_agent: 3 # 128
 
 # quartz
 input_graphs:

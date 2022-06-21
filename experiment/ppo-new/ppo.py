@@ -119,8 +119,8 @@ class Observer:
                 _action = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
-            e_time = get_time_ns()
-            errprint(f'    Obs {self.id} : Action got in {dur_ms(e_time, s_time)} ms.')
+            # e_time = get_time_ns()
+            # errprint(f'    Obs {self.id} : Action got in {dur_ms(e_time, s_time)} ms.')
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
                 context=quartz_context, node=graph.get_node_from_id(id=_action.node))
@@ -156,15 +156,15 @@ class Observer:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
                 next_graph_str = next_graph.to_qasm_str()
-                            
+            
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
                 next_nodes, av_xfer_mask, action_xfer_logp.item(), info,
             )
             exp_list.append(exp)
             info['start'] = False
-            s_time = get_time_ns()
-            errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
+            # s_time = get_time_ns()
+            # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
             if game_over and not self.batch_inference:
                 break
             else:
@@ -176,8 +176,8 @@ class Observer:
                     graph = next_graph
                     graph_str = next_graph_str
         # end for
-        ge_time = get_time_ns()
-        errprint(f'    Obs {self.id} : Trajectory finished in {dur_ms(ge_time, gs_time)} ms.')
+        # ge_time = get_time_ns()
+        # errprint(f'    Obs {self.id} : Trajectory finished in {dur_ms(ge_time, gs_time)} ms.')
         return exp_list
 
 class GraphBuffer:
@@ -305,10 +305,10 @@ class PPOAgent:
         
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
-            errprint(f'    Agent {self.id} : Obs {obs_id} requested.')
+            # errprint(f'    Agent {self.id} : Obs {obs_id} requested.')
             if self.pending_states == 0:
-                errprint(f'    Agent {self.id} : Obs {obs_id} requested. Start inference.')
-                s_time = get_time_ns()
+                # errprint(f'    Agent {self.id} : Obs {obs_id} requested. Start inference.')
+                # s_time = get_time_ns()
                 """collected a batch, start batch inference"""
                 b_state: dgl.graph = dgl.batch(self.states_buf)
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
@@ -344,8 +344,8 @@ class PPOAgent:
                     for i in range(len(self.obs_rrefs))
                 ]
                 self.future_actions.set_result(actions)
-                e_time = get_time_ns()
-                errprint(f'    Agent {self.id} : Obs {obs_id} requested. Finished inference in {dur_ms(e_time, s_time)} ms.')
+                # e_time = get_time_ns()
+                # errprint(f'    Agent {self.id} : Obs {obs_id} requested. Finished inference in {dur_ms(e_time, s_time)} ms.')
                 """re-init"""
                 self.pending_states = len(self.obs_rrefs)
                 self.future_actions = torch.futures.Future()
@@ -390,7 +390,7 @@ class PPOAgent:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         init_buffer_ids: List[int] = []
-        s_time = get_time_ns()
+        # s_time = get_time_ns()
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             init_graph: quartz.PyGraph = self.graph_buffers[self.init_buffer_turn].sample()
@@ -407,8 +407,8 @@ class PPOAgent:
             
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
-        e_time = get_time_ns()
-        errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
+        # e_time = get_time_ns()
+        # errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
         """convert graph and maintain graph_buffer"""
         state_dgl_list: List[dgl.graph] = []
         next_state_dgl_list: List[dgl.graph] = []
@@ -422,21 +422,21 @@ class PPOAgent:
                 if s_exp.info['start']:
                     init_graph = qasm_to_graph(obs_res[0].state)
                     exp_seq = []
-                qasm_s_time = get_time_ns()
+                # qasm_s_time = get_time_ns()
                 graph = qasm_to_graph(s_exp.state)
                 next_graph = qasm_to_graph(s_exp.next_state)
-                qasm_e_time = get_time_ns()
-                errprint(f'         Tow qasm graph convered in {dur_ms(qasm_e_time, qasm_s_time)} ms.')
+                # qasm_e_time = get_time_ns()
+                # errprint(f'         Tow qasm graph convered in {dur_ms(qasm_e_time, qasm_s_time)} ms.')
                 exp_seq.append((s_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not is_nop(s_exp.action.xfer) and \
                     next_graph.gate_count <= init_graph.num_nodes: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
-                dgl_s_time = get_time_ns()
+                # dgl_s_time = get_time_ns()
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
-                dgl_e_time = get_time_ns()
-                errprint(f'         Tow graph convered to dgl in {dur_ms(dgl_e_time, dgl_s_time)} ms.')
+                # dgl_e_time = get_time_ns()
+                # errprint(f'         Tow graph convered to dgl in {dur_ms(dgl_e_time, dgl_s_time)} ms.')
                 """best graph maintenance"""
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
@@ -450,8 +450,8 @@ class PPOAgent:
                         ) # send alert to slack
                     
                     graph_buffer.best_graph = next_graph
-        s_time = get_time_ns()
-        errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
+        # s_time = get_time_ns()
+        # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
         """batch the collected experiences"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
         s_exps_zip = BSerializableExperience(*zip(*s_exps)) # type: ignore
@@ -465,8 +465,8 @@ class PPOAgent:
         exps.next_nodes = [ torch.LongTensor(ns).to(self.device) for ns in s_exps_zip.next_nodes ] # type: ignore
         exps.xfer_mask = torch.stack(s_exps_zip.xfer_mask).to(self.device) # type: ignore
         exps.xfer_logprob = torch.Tensor(s_exps_zip.xfer_logprob).to(self.device)
-        e_time = get_time_ns()
-        errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
+        # e_time = get_time_ns()
+        # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
         return exps
 
 class PPOMod:
@@ -612,15 +612,15 @@ class PPOMod:
             self.load_ckpt(self.cfg.ckpt_path)
         """train loop"""
         while self.i_iter < max_iterations:
-            s_time = get_time_ns()
+            # s_time = get_time_ns()
             self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt') # TODO add loss and best_gc in the name
                 
-            e_time = get_time_ns()
-            errprint(f'Iter {self.i_iter} finished in {dur_ms(s_time, e_time)} ms.')
+            # e_time = get_time_ns()
+            # errprint(f'Iter {self.i_iter} finished in {dur_ms(s_time, e_time)} ms.')
             self.i_iter += 1
 
         
@@ -639,7 +639,7 @@ class PPOMod:
                 desc=f'Iter {self.i_iter}',
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
-        s_time = get_time_ns()
+        # s_time = get_time_ns()
         for epoch_k in range(self.cfg.k_epochs):
             self.optimizer.zero_grad()
             """get embeds of seleted nodes and evaluate them by Critic"""
@@ -732,8 +732,8 @@ class PPOMod:
                 })
             
         # end for k_epochs
-        e_time = get_time_ns()
-        errprint(f'  {self.cfg.k_epochs} epochs finished in {dur_ms(s_time, e_time)} ms.')
+        # e_time = get_time_ns()
+        # errprint(f'  {self.cfg.k_epochs} epochs finished in {dur_ms(s_time, e_time)} ms.')
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO save top-k model
@@ -779,6 +779,8 @@ def main(cfg) -> None:
         nprocs=tot_processes,
         join=True,
     )
+    # TODO mini-batch
+    
     # TODO make sure qasm <-> graph conversion is correct
     # TODO select_action_batch may timeout
     # TODO confirm params in config.yaml

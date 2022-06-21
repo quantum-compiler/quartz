@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
-import os
+import sys
 import random
 from typing import Callable, Iterable, Iterator, Tuple, List, Any
 import warnings
@@ -146,3 +146,12 @@ def get_quartz_context(init_args: QuartzInitArgs) -> Tuple[quartz.QuartzContext,
 def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor:
     logits[~mask] -= 1e10
     return F.softmax(logits, dim=-1)
+
+def errprint(s: str, file = sys.stderr):
+    print(s, file=file)
+
+def get_time_ns() -> int:
+    return time.time_ns()
+
+def dur_ms(t1: int, t2: int) -> float:
+    return abs(t2 - t1) / 1e6

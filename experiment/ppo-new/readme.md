@@ -6,7 +6,7 @@ We use PyTorch RPC and DDP to accelerate the training process.
 
 The multi-processing model is designed as below.
 
-![Program Design](./program_design.svg)
+![Program Design](./program_design.png)
 
 The execuation flow can be summerized as follows.
 

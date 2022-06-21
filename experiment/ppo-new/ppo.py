@@ -159,22 +159,22 @@ class Observer:
             
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
-                next_nodes, av_xfer_mask, action_xfer_logp.item(), info,
+                next_nodes, av_xfer_mask, action_xfer_logp.item(), copy.deepcopy(info),
             )
             exp_list.append(exp)
             info['start'] = False
             # s_time = get_time_ns()
             # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
-            if game_over and not self.batch_inference:
-                break
-            else:
-                if self.batch_inference: # game_over
+            if game_over:
+                if self.batch_inference:
                     graph = init_graph
                     graph_str = init_state_str
                     info['start'] = True
-                else: # not game_over and not self.batch_inference
-                    graph = next_graph
-                    graph_str = next_graph_str
+                else:
+                    break
+            else:
+                graph = next_graph
+                graph_str = next_graph_str
         # end for
         # ge_time = get_time_ns()
         # errprint(f'    Obs {self.id} : Trajectory finished in {dur_ms(ge_time, gs_time)} ms.')
@@ -197,8 +197,9 @@ class GraphBuffer:
         self.buffer: List[quartz.PyGraph] = []
         self.hashset: Set[int] = { hash(self.original_graph) }
         self.gate_counts: torch.Tensor = torch.Tensor([]).to(self.device)
-        
+        """other infos"""
         self.best_graph = self.original_graph
+        self.traj_lengths: List[int] = []
     
     def __len__(self) -> int:
         return len(self.buffer) + 1
@@ -301,7 +302,7 @@ class PPOAgent:
         if self.states_buf[obs_id] is None:
             self.states_buf[obs_id] = dgl_graph
         else:
-            raise Exception(f'self.states_buf[{obs_id}] is not None! Duplicated assignment occurs!')
+            raise Exception(f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicated assignment occurs!')
         
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
@@ -352,6 +353,15 @@ class PPOAgent:
                 self.states_buf = [None] * len(self.obs_rrefs)
         return future_action # return a future
     
+    def other_info_dict(self) -> Dict[str, float]:
+        info_dict: Dict[str, float] = {}
+        for buffer in self.graph_buffers:
+            info_dict[f'{buffer.name}_best_gc'] = float(buffer.best_graph.gate_count)
+            info_dict[f'{buffer.name}_mean_traj_len'] = \
+                torch.Tensor(buffer.traj_lengths).mean().item() \
+                if len(buffer.traj_lengths) > 0 else 0.
+        return info_dict
+    
     def output_opt_path(
         self,
         name: str,
@@ -365,7 +375,7 @@ class PPOAgent:
                 os.makedirs(output_dir)
                 break
         else:
-            raise Exception(f'Couldn\'t find an available path for {os.path.join(self.output_dir, name, f"{best_gc}")}')
+            raise Exception(f'Unexpected: Couldn\'t find an available path for {os.path.join(self.output_dir, name, f"{best_gc}")}')
         """make a s_exp to output the starting graph"""
         first_s_exp = SerializableExperience.new_empty()
         first_s_exp.action = Action(0, 0)
@@ -386,14 +396,16 @@ class PPOAgent:
         len_episode: int,
         max_gate_count_ratio: float,
         nop_stop: bool
-    ) -> BatchedExperience:
+    ) -> ExperienceList:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         init_buffer_ids: List[int] = []
         # s_time = get_time_ns()
         for obs_rref in self.obs_rrefs:
             """sample init state"""
-            init_graph: quartz.PyGraph = self.graph_buffers[self.init_buffer_turn].sample()
+            graph_buffer = self.graph_buffers[self.init_buffer_turn]
+            init_graph: quartz.PyGraph = graph_buffer.sample()
+            graph_buffer.traj_lengths = []
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             """make async RPC to kick off an episode on observers"""
@@ -422,6 +434,7 @@ class PPOAgent:
                 if s_exp.info['start']:
                     init_graph = qasm_to_graph(obs_res[0].state)
                     exp_seq = []
+                    i_step = 0
                 # qasm_s_time = get_time_ns()
                 graph = qasm_to_graph(s_exp.state)
                 next_graph = qasm_to_graph(s_exp.next_state)
@@ -430,7 +443,7 @@ class PPOAgent:
                 exp_seq.append((s_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not is_nop(s_exp.action.xfer) and \
-                    next_graph.gate_count <= init_graph.num_nodes: # NOTE: only add graphs with less gate count
+                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
                 # dgl_s_time = get_time_ns()
                 state_dgl_list.append(graph.to_dgl_graph())
@@ -450,24 +463,23 @@ class PPOAgent:
                         ) # send alert to slack
                     
                     graph_buffer.best_graph = next_graph
+                i_step += 1
+                if s_exp.game_over:
+                    graph_buffer.traj_lengths.append(i_step)
+            # end for s_exp
+            
+        # end for obs
         # s_time = get_time_ns()
         # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
-        """batch the collected experiences"""
+        """collect experiences together"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
-        s_exps_zip = BSerializableExperience(*zip(*s_exps)) # type: ignore
-        # state, action, reward, next_state, game_over, xfer_mask, xfer_logprob
-        exps = BatchedExperience.new_empty()
-        exps.state = dgl.batch(state_dgl_list).to(self.device)
-        exps.next_state = dgl.batch(next_state_dgl_list).to(self.device)
-        exps.action = torch.stack([a.to_tensor() for a in s_exps_zip.action]).to(self.device) # type: ignore
-        exps.reward = torch.Tensor(s_exps_zip.reward).to(self.device)
-        exps.game_over = torch.BoolTensor(s_exps_zip.game_over).to(self.device) # type: ignore
-        exps.next_nodes = [ torch.LongTensor(ns).to(self.device) for ns in s_exps_zip.next_nodes ] # type: ignore
-        exps.xfer_mask = torch.stack(s_exps_zip.xfer_mask).to(self.device) # type: ignore
-        exps.xfer_logprob = torch.Tensor(s_exps_zip.xfer_logprob).to(self.device)
+        
+        s_exps_zip = ExperienceList(*list(map(list, zip(*s_exps)))) # type: ignore
+        s_exps_zip.state = state_dgl_list
+        s_exps_zip.next_state = next_state_dgl_list
         # e_time = get_time_ns()
         # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
-        return exps
+        return s_exps_zip
 
 class PPOMod:
     
@@ -501,9 +513,6 @@ class PPOMod:
                 })
         self.num_gate_type: int = 29
         
-        """init training related parameters"""
-        self.global_batch_size = int(cfg.global_batch_size)
-        
     def print_cfg(self) -> None:
         print('================ Configs ================')
         for k, v in self.cfg.items():
@@ -520,7 +529,6 @@ class PPOMod:
         """RPC and DDP initialization"""
         # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
         self.rank = rank
-        self.agent_batch_size = int(self.global_batch_size // ddp_processes)
         self.ddp_processes = ddp_processes
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
@@ -604,7 +612,7 @@ class PPOMod:
                 mode=self.wandb_mode,
                 config=self.cfg,
             )
-        print(f'rank {self.rank} on {self.device} initialized')
+        print(f'rank {self.rank} on {self.device} initialized', flush=True)
         
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
@@ -626,111 +634,122 @@ class PPOMod:
         
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
-        exps: BatchedExperience = self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+        s_time_collect = get_time_ns()
+        exp_list: ExperienceList = self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-        for _i in range(self.agent_batch_size // self.cfg.obs_per_agent - 1):
-            exps += self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
-        # print(exps)
+        for _i in range(self.cfg.num_trajs_per_iter // self.cfg.obs_per_agent - 1):
+            exp_list += self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+        e_time_collect = get_time_ns()
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
             pbar = tqdm(
-                total=self.cfg.k_epochs,
+                total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
-        # s_time = get_time_ns()
+            wandb.log(self.agent.other_info_dict())
+        
         for epoch_k in range(self.cfg.k_epochs):
-            self.optimizer.zero_grad()
-            """get embeds of seleted nodes and evaluate them by Critic"""
-            num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
-            # (batch_num_nodes, embed_dim)
-            b_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.state) # type: ignore
-            nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
-            nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-            selected_nodes = exps.action[:, 0] + nodes_offset
-            selected_node_embeds = b_graph_embeds[selected_nodes]
-            selected_node_values: torch.Tensor = self.ddp_ac_net.module.critic(selected_node_embeds).squeeze() # type: ignore
-            """get xfer dist by Actor"""
-            # (batch_num_graphs, action_dim)
-            xfer_logits: torch.Tensor = self.ddp_ac_net.module.actor(selected_node_embeds) # type: ignore
-            softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
-            xfer_dists = Categorical(softmax_xfer)
-            # (batch_num_graphs, )
-            xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
-            xfer_entropys = xfer_dists.entropy()
-            """get embeds of next nodes and evaluate them by Critic without grad"""
-            with torch.no_grad():
-                # (num_next_graphs, )
-                next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
-                """get embeds"""
-                # (batch_next_graphs_nodes, embed_dim)
-                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.next_state) # type: ignore
-                next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
-                """select embeds"""
-                # ( sum(num_next_nodes), embed_dim )
-                next_node_embeds: torch.Tensor = torch.cat([
-                    graph_embed[next_node_ids]
-                    for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
-                ])
-                """evaluate"""
-                # ( sum(num_next_nodes), )
-                next_node_values: torch.Tensor = self.ddp_ac_net.module.critic(next_node_embeds).squeeze() # type: ignore
-                num_next_nodes = list(map(len, exps.next_nodes))
-                next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
-                """get max next value for each graph"""
-                max_next_values_list: List[torch.Tensor] = []
-                for i in range(len(exps)):
-                    max_next_value: torch.Tensor
-                    # next_nodes == [] means invalid xfer
-                    if next_node_values_list[i].shape[0] == 0 or \
-                        is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
-                        max_next_value = torch.zeros(1).to(self.device)
-                    # TODO how to deal with NOP?
-                    else:
-                        max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
-                    max_next_values_list.append(max_next_value)
-                max_next_values = torch.cat(max_next_values_list)
-            # end with
-            """compute loss for Actor (policy_net, theta)"""
-            # prob ratio = (pi_theta / pi_theta__old)
-            ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
-            advantages = exps.reward + self.cfg.gamma * max_next_values - selected_node_values
-            with torch.no_grad():
-                # NOTE: is clone().detach() necessary?
-                surr1 = ratios * advantages
-                surr2 = torch.clamp(
-                    ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                ) * advantages
-            actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exps)
-            """compute loss for Critic (value_net, phi)"""
-            critic_loss = torch.sum(advantages ** 2) / len(exps)
-            xfer_entropy = torch.sum(xfer_entropys) / len(exps)
-            """compute overall loss""" 
-            loss = actor_loss + 0.5 * critic_loss - float(self.cfg.entropy_coeff) * xfer_entropy
-            """update"""
-            loss.backward()
-            for param in self.ddp_ac_net.parameters():
-                param.grad.data.clamp_(-1, 1)
-            self.optimizer.step()
-            """logging"""
-            if self.rank == 0:
-                pbar.update(1)
-                log_dict = {
-                    'actor_loss': float(actor_loss),
-                    'critic_loss': float(critic_loss),
-                    'xfer_entropy': float(xfer_entropy),
-                    'loss': float(loss),
-                }
-                pbar.set_postfix(log_dict)
-                # pbar.refresh()
-                wandb.log({
-                    'actor_loss': actor_loss,
-                    'critic_loss': critic_loss,
-                    'xfer_entropy': xfer_entropy,
-                    'loss': loss,
-                })
-            
+            # print(f'epoch {epoch_k}', flush=True)
+            for i_step, exps in enumerate(
+                ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
+            ):
+                # print(f'  step {i_step} {len(exps)}', flush=True)
+                self.optimizer.zero_grad()
+                """get embeds of seleted nodes and evaluate them by Critic"""
+                num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
+                # (batch_num_nodes, embed_dim)
+                b_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.state) # type: ignore
+                nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
+                nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
+                selected_nodes = exps.action[:, 0] + nodes_offset
+                selected_node_embeds = b_graph_embeds[selected_nodes]
+                selected_node_values: torch.Tensor = self.ddp_ac_net.module.critic(selected_node_embeds).squeeze() # type: ignore
+                """get xfer dist by Actor"""
+                # (batch_num_graphs, action_dim)
+                xfer_logits: torch.Tensor = self.ddp_ac_net.module.actor(selected_node_embeds) # type: ignore
+                softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
+                xfer_dists = Categorical(softmax_xfer)
+                # (batch_num_graphs, )
+                xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
+                xfer_entropys = xfer_dists.entropy()
+                """get embeds of next nodes and evaluate them by Critic without grad"""
+                with torch.no_grad():
+                    # (num_next_graphs, )
+                    next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
+                    """get embeds"""
+                    # (batch_next_graphs_nodes, embed_dim)
+                    b_next_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.next_state) # type: ignore
+                    next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
+                    """select embeds"""
+                    # ( sum(num_next_nodes), embed_dim )
+                    next_node_embeds: torch.Tensor = torch.cat([
+                        graph_embed[next_node_ids]
+                        for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
+                    ])
+                    """evaluate"""
+                    # ( sum(num_next_nodes), )
+                    next_node_values: torch.Tensor = self.ddp_ac_net.module.critic(next_node_embeds).squeeze() # type: ignore
+                    num_next_nodes = list(map(len, exps.next_nodes))
+                    next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
+                    """get max next value for each graph"""
+                    max_next_values_list: List[torch.Tensor] = []
+                    for i in range(len(exps)):
+                        max_next_value: torch.Tensor
+                        # next_nodes == [] means invalid xfer
+                        if next_node_values_list[i].shape[0] == 0 or \
+                            is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
+                            max_next_value = torch.zeros(1).to(self.device)
+                        # TODO how to deal with NOP?
+                        else:
+                            max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
+                        max_next_values_list.append(max_next_value)
+                    max_next_values = torch.cat(max_next_values_list)
+                # end with
+                """compute loss for Actor (policy_net, theta)"""
+                # prob ratio = (pi_theta / pi_theta__old)
+                ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
+                advantages = exps.reward + self.cfg.gamma * max_next_values - selected_node_values
+                with torch.no_grad():
+                    # NOTE: is clone().detach() necessary?
+                    surr1 = ratios * advantages
+                    surr2 = torch.clamp(
+                        ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
+                    ) * advantages
+                actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exps)
+                """compute loss for Critic (value_net, phi)"""
+                critic_loss = torch.sum(advantages ** 2) / len(exps)
+                xfer_entropy = torch.sum(xfer_entropys) / len(exps)
+                """compute overall loss""" 
+                loss = actor_loss + 0.5 * critic_loss - float(self.cfg.entropy_coeff) * xfer_entropy
+                """update"""
+                loss.backward()
+                for param in self.ddp_ac_net.parameters():
+                    param.grad.data.clamp_(-1, 1)
+                self.optimizer.step()
+                """logging"""
+                if self.rank == 0:
+                    pbar.update(1)
+                    log_dict = {
+                        'actor_loss': float(actor_loss),
+                        'critic_loss': float(critic_loss),
+                        'xfer_entropy': float(xfer_entropy),
+                        'loss': float(loss),
+                    }
+                    pbar.set_postfix({
+                        **log_dict,
+                        'collect_time': dur_ms(e_time_collect, s_time_collect) / 1e3,
+                        'num_exps': len(exp_list),
+                    })
+                    pbar.refresh()
+                    wandb.log({
+                        'actor_loss': actor_loss,
+                        'critic_loss': critic_loss,
+                        'xfer_entropy': xfer_entropy,
+                        'loss': loss,
+                    })
+            # end for i_step
         # end for k_epochs
         # e_time = get_time_ns()
         # errprint(f'  {self.cfg.k_epochs} epochs finished in {dur_ms(s_time, e_time)} ms.')
@@ -778,9 +797,7 @@ def main(cfg) -> None:
         args=(ddp_processes, obs_processes,),
         nprocs=tot_processes,
         join=True,
-    )
-    # TODO mini-batch
-    
+    )    
     # TODO make sure qasm <-> graph conversion is correct
     # TODO select_action_batch may timeout
     # TODO confirm params in config.yaml

@@ -1,8 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
+from optparse import Option
 import sys
 import random
-from typing import Callable, Iterable, Iterator, Tuple, List, Any
+from typing import Callable, Iterable, Iterator, Optional, Tuple, List, Any, Sequence
 import warnings
 from collections import deque, namedtuple
 from functools import partial
@@ -74,21 +75,74 @@ class SerializableExperience:
         return SerializableExperience(*[None]*len(fields(SerializableExperience))) # type:ignore
 
 @dataclass
-class BSerializableExperience:
-    state: Iterable[str]
-    action: Iterable[Action]
-    reward: Iterable[float]
-    next_state: Iterable[str]
-    game_over: Iterable[bool]
-    next_nodes: Iterable[List[int]]
-    xfer_mask: Iterable[torch.BoolTensor]
-    xfer_logprob: Iterable[float]
-    info: Iterable[Any]
+class ExperienceList:
+    state: List[str | dgl.graph]
+    action: List[Action]
+    reward: List[float]
+    next_state: List[str | dgl.graph]
+    game_over: List[bool]
+    next_nodes: List[List[int]]
+    xfer_mask: List[torch.BoolTensor]
+    xfer_logprob: List[float]
+    info: List[Any]
+    
+    def __len__(self) -> int:
+        return len(self.state)
+    
+    def __add__(self, other) -> ExperienceList:
+        ret = ExperienceList.new_empty()
+        for field in fields(self):
+            setattr(ret, field.name, getattr(self, field.name) + getattr(other, field.name))
+        return ret
+
+    def __iadd__(self, other) -> ExperienceList:
+        for field in fields(self):
+            setattr(self, field.name, getattr(self, field.name).__iadd__(getattr(other, field.name)))
+        return self
     
     @staticmethod
-    def new_empty() -> BSerializableExperience:
-        return BSerializableExperience(*[None]*len(fields(BSerializableExperience))) # type: ignore
+    def new_empty() -> ExperienceList:
+        return ExperienceList(*[None]*len(fields(ExperienceList))) # type: ignore
+
+    def get_batch(
+        self,
+        start_pos: int = 0,
+        batch_size: int = 1,
+        device: torch.device = torch.device('cpu'),
+    ) -> BatchedExperience:
+        exps = BatchedExperience.new_empty()
+        if start_pos < len(self):
+            sc = slice(start_pos, start_pos + batch_size)
+            exps.state = dgl.batch(self.state[sc]).to(device)
+            exps.next_state = dgl.batch(self.next_state[sc]).to(device)
+            exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device) # type: ignore
+            exps.reward = torch.Tensor(self.reward[sc]).to(device)
+            exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device) # type: ignore
+            exps.next_nodes = [ torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc] ] # type: ignore
+            exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device) # type: ignore
+            exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
+        
+        return exps
+
+class ExperienceListIterator:
+
+    def __init__(self, src: ExperienceList, batch_size: int = 1, device: torch.device = torch.device('cpu')):
+        self.src = src
+        self.batch_size = batch_size
+        self.device = device
+        self.start_pos = 0
     
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> BatchedExperience:
+        if self.start_pos < len(self.src):
+            ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
+            self.start_pos += self.batch_size
+            return ret
+        else:
+            raise StopIteration
+
 @dataclass
 class BatchedExperience:
     state: dgl.graph
@@ -102,7 +156,7 @@ class BatchedExperience:
     
     @staticmethod
     def new_empty() -> BatchedExperience:
-        return BatchedExperience(*[None]*len(fields(BatchedExperience))) # type: ignore
+        return BatchedExperience(*[[]]*len(fields(BatchedExperience))) # type: ignore
 
     def __add__(self, other) -> BatchedExperience:
         res = BatchedExperience.new_empty()
@@ -125,7 +179,6 @@ class QuartzInitArgs:
     ecc_file_path: str
     no_increase: bool
     include_nop: bool
-    
 
 def get_agent_name(agent_id: int) -> str:
     return f'agent_{agent_id}'

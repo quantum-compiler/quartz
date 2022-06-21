@@ -30,6 +30,7 @@ import quartz # type: ignore
 import hydra
 import wandb
 
+from ds import *
 from utils import *
 from model import ActorCritic
 from IPython import embed # type: ignore
@@ -126,7 +127,6 @@ class Observer:
                 context=quartz_context, node=graph.get_node_from_id(id=_action.node))
             av_xfer_mask = torch.BoolTensor([0] * quartz_context.num_xfers)
             av_xfer_mask[av_xfers] = True
-            # TODO use softmax temperature?
             # (action_dim, )  only sample from available xfers
             softmax_xfer = masked_softmax(_action.xfer_dist, av_xfer_mask)
             # action_xfer = torch.multinomial(softmax_xfer, num_samples=1)
@@ -146,12 +146,12 @@ class Observer:
             if next_graph is None:
                 reward = self.invalid_reward
                 game_over = True
-                next_graph_str = graph_str # TODO placeholder?
+                next_graph_str = graph_str # CONFIRM placeholder?
             elif is_nop(action.xfer):
                 reward = 0
                 game_over = nop_stop
                 next_graph_str = graph_str # unchanged
-                next_nodes = [action.node] # TODO
+                next_nodes = [action.node] # CONFIRM
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
@@ -231,7 +231,6 @@ class GraphBuffer:
         else:
             sampled_graph = self.buffer[sampled_idx]
         return sampled_graph
-
 
 class PPOAgent:
     
@@ -625,7 +624,7 @@ class PPOMod:
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
-                self.save_ckpt(f'iter_{self.i_iter}.pt') # TODO add loss and best_gc in the name
+                self.save_ckpt(f'iter_{self.i_iter}.pt')
                 
             # e_time = get_time_ns()
             # errprint(f'Iter {self.i_iter} finished in {dur_ms(s_time, e_time)} ms.')
@@ -701,7 +700,7 @@ class PPOMod:
                         if next_node_values_list[i].shape[0] == 0 or \
                             is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
                             max_next_value = torch.zeros(1).to(self.device)
-                        # TODO how to deal with NOP?
+                        # CONFIRM how to deal with NOP?
                         else:
                             max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
                         max_next_values_list.append(max_next_value)

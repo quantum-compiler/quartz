@@ -30,6 +30,7 @@ import quartz # type: ignore
 import hydra
 import wandb
 
+from ds import *
 from utils import *
 from model import ActorCritic
 from IPython import embed # type: ignore
@@ -806,13 +807,6 @@ def main(cfg) -> None:
         nprocs=tot_processes,
         join=True,
     )
-    # TODO make sure qasm <-> graph conversion is correct
-    # TODO select_action_batch may timeout
-    # TODO confirm params in config.yaml
-    # TODO find an optimal config of mp, or it will OOM
-    # TODO profiling; some parts of this code are slow
-    
-    # 4 gpus, 2 obs per agent, len_episode = 80 -> 7994 MiB / GPU
 
 if __name__ == '__main__':
     main()

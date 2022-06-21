@@ -206,6 +206,8 @@ public:
                     std::basic_istream<_CharT, _Traits> &qasm_stream);
   static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
                                                const std::string &filename);
+  static std::shared_ptr<Graph> from_qasm_str(Context *ctx,
+                                              const std::string qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits() const;

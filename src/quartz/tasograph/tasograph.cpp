@@ -1257,6 +1257,12 @@ std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
   return graph;
 }
 
+std::shared_ptr<Graph> Graph::from_qasm_str(Context *ctx,
+                                            const std::string qasm_str) {
+  std::stringstream sstream(qasm_str);
+  return _from_qasm_stream(ctx, sstream);
+}
+
 void Graph::draw_circuit(const std::string &src_file_name,
                          const std::string &save_filename) {
 

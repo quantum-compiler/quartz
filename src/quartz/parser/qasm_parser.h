@@ -2,52 +2,25 @@
 
 #include "../context/context.h"
 #include "../dag/dag.h"
+
 #include <cassert>
 #include <fstream>
 
 namespace quartz {
 void find_and_replace_all(std::string &data, const std::string &tofind,
-                          const std::string &toreplace) {
-  size_t pos = data.find(tofind);
-  while (pos != std::string::npos) {
-    data.replace(pos, tofind.size(), toreplace);
-    pos = data.find(tofind, pos + toreplace.size());
-  }
-}
+                          const std::string &toreplace);
 
-int string_to_number(const std::string &input) {
-  int ret = -1;
-  for (size_t i = 0; i < input.length(); i++) {
-    if (input[i] >= '0' && input[i] <= '9') {
-      if (ret == -1) {
-        ret = 0;
-      }
-      ret = ret * 10 + input[i] - '0';
-    }
-  }
-  return ret;
-}
+int string_to_number(const std::string &input);
 
-bool is_gate_string(const std::string &token, GateType &type) {
-
-#define PER_GATE(x, XGate)                                                     \
-  if (token == std::string(#x)) {                                              \
-    type = GateType::x;                                                        \
-    return true;                                                               \
-  }
-
-#include "../gate/gates.inc.h"
-
-#undef PER_GATE
-  return false;
-}
+bool is_gate_string(const std::string &token, GateType &type);
 
 class QASMParser {
 public:
   QASMParser(Context *ctx) : context(ctx) {}
 
-  template<class _CharT, class _Traits>
-  bool load_qasm_stream(std::basic_istream<_CharT, _Traits>& qasm_stream, DAG*& dag) {
+  template <class _CharT, class _Traits>
+  bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
+                        DAG *&dag) {
     dag = NULL;
     std::string line;
     GateType gate_type;
@@ -78,7 +51,8 @@ public:
       } else if (is_gate_string(command, gate_type)) {
         Gate *gate = context->get_gate(gate_type);
         if (!gate) {
-          std::cerr << "Unsupported gate in current context: " << command << std::endl;
+          std::cerr << "Unsupported gate in current context: " << command
+                    << std::endl;
           return false;
         }
         // Currently don't support parameter gate
@@ -104,7 +78,7 @@ public:
     return true;
   }
 
-  bool load_qasm_str(const std::string& qasm_str, DAG*& dag) {
+  bool load_qasm_str(const std::string &qasm_str, DAG *&dag) {
     std::stringstream sstream(qasm_str);
     return load_qasm_stream(sstream, dag);
   }

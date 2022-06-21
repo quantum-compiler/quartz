@@ -188,6 +188,29 @@ bool Graph::has_edge(const Op &srcOp, const Op &dstOp, int srcIdx,
           inEdges.find(dstOp)->second.end());
 }
 
+Op Graph::add_qubit(int qubit_idx) {
+  Gate *gate = context->get_gate(GateType::input_qubit);
+  auto guid = get_next_special_op_guid();
+  Op op(guid, gate);
+  input_qubit_op_2_qubit_idx[op] = qubit_idx;
+  return op;
+}
+
+Op Graph::add_parameter(const ParamType p) {
+  Gate *gate = context->get_gate(GateType::input_param);
+  auto guid = get_next_special_op_guid();
+  Op op(guid, gate);
+  constant_param_values[op] = p;
+  return op;
+}
+
+Op Graph::new_gate(GateType gt) {
+  Gate *gate = context->get_gate(gt);
+  auto guid = context->next_global_unique_id();
+  Op op(guid, gate);
+  return op;
+}
+
 Edge::Edge(void)
     : srcOp(Op::INVALID_OP), dstOp(Op::INVALID_OP), srcIdx(-1), dstIdx(-1) {}
 
@@ -1115,6 +1138,125 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
   return ostr;
 }
 
+template <class _CharT, class _Traits>
+std::shared_ptr<Graph>
+Graph::_from_qasm_stream(Context *ctx,
+                         std::basic_istream<_CharT, _Traits> &qasm_stream) {
+
+  std::shared_ptr<Graph> graph(new Graph(ctx));
+  std::string line;
+  GateType gate_type;
+  std::vector<Pos> pos_on_qubits;
+  while (std::getline(qasm_stream, line)) {
+    // repleace comma with space
+    find_and_replace_all(line, ",", " ");
+    find_and_replace_all(line, "(", " ");
+    find_and_replace_all(line, ")", " ");
+    // ignore semicolon at the end
+    find_and_replace_all(line, ";", "");
+    std::stringstream ss(line);
+    std::string command;
+    std::getline(ss, command, ' ');
+    if (command == "OPENQASM") {
+      continue; // ignore this line
+    } else if (command == "include") {
+      continue; // ignore this line
+    } else if (command == "creg") {
+      continue; // ignore this line
+    } else if (command == "qreg") {
+      std::string token;
+      getline(ss, token, ' ');
+      size_t num_qubits = string_to_number(token);
+      pos_on_qubits.resize(num_qubits);
+      for (int i = 0; i < num_qubits; ++i) {
+        auto op = graph->add_qubit(i);
+        pos_on_qubits[i] = Pos(op, 0);
+      }
+      assert(!ss.good());
+    } else if (is_gate_string(command, gate_type)) {
+      Gate *gate = graph->context->get_gate(gate_type);
+      if (!gate) {
+        std::cerr << "Unsupported gate in current context: " << command
+                  << std::endl;
+        return nullptr;
+      }
+      if (gate->is_parametrized_gate()) {
+        auto op = graph->new_gate(gate_type);
+        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
+        auto num_params = graph->context->get_gate(gate_type)->num_parameters;
+        for (int i = 0; i < num_params; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          // Currently only support the format of pi*0.123
+          ParamType p;
+          if (token.find("pi") == 0) {
+            auto d = token.substr(3, std::string::npos);
+            p = std::stod(d) * PI;
+          } else {
+            p = std::stod(token);
+          }
+          auto src_op = graph->add_parameter(p);
+          int src_idx = 0;
+          auto dst_op = op;
+          auto dst_idx = num_qubits + i;
+          graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+        }
+        for (int i = 0; i < num_qubits; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          int qubit_idx = string_to_number(token);
+          if (qubit_idx != -1) {
+            auto src_op = pos_on_qubits[qubit_idx].op;
+            auto src_idx = pos_on_qubits[qubit_idx].idx;
+            auto dst_op = op;
+            auto dst_idx = i;
+            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
+          } else
+            return nullptr;
+        }
+      } else if (gate->is_quantum_gate()) {
+        auto op = graph->new_gate(gate_type);
+        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
+        for (int i = 0; i < num_qubits; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          int qubit_idx = string_to_number(token);
+          if (qubit_idx != -1) {
+            auto src_op = pos_on_qubits[qubit_idx].op;
+            auto src_idx = pos_on_qubits[qubit_idx].idx;
+            auto dst_op = op;
+            auto dst_idx = i;
+            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
+          } else
+            return nullptr;
+        }
+      }
+    } else {
+      std::cout << "Unknown gate: " << command << std::endl;
+      assert(false);
+    }
+  }
+  return graph;
+}
+
+std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
+                                             const std::string &filename) {
+  std::ifstream fin;
+  fin.open(filename, std::ifstream::in);
+  if (!fin.is_open()) {
+    std::cerr << "Failed to open " << filename << std::endl;
+    return nullptr;
+  }
+  auto graph = _from_qasm_stream(ctx, fin);
+  fin.close();
+  return graph;
+}
+
 void Graph::draw_circuit(const std::string &src_file_name,
                          const std::string &save_filename) {
 
@@ -1976,22 +2118,25 @@ Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
   return appliable_xfer_v;
 }
 
-  std::vector<size_t>
-  Graph::appliable_xfers_parallel(Op op, const std::vector<GraphXfer*> &xfer_v) const {
-  // cannot use std::vector<bool> here because it's not thread-safe to write different elements of it
+std::vector<size_t>
+Graph::appliable_xfers_parallel(Op op,
+                                const std::vector<GraphXfer *> &xfer_v) const {
+  // cannot use std::vector<bool> here because it's not thread-safe to write
+  // different elements of it
   std::vector<int> xfer_is_appliable(xfer_v.size(), false);
-#pragma omp parallel for schedule(runtime) default(none) shared(xfer_is_appliable, xfer_v, op)
-    for (size_t i = 0; i < xfer_v.size(); i++) {
-      xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);
-    }
-    std::vector<size_t> appliable_xfer_v;
-    for (size_t i = 0; i < xfer_is_appliable.size(); i++) {
-      if (xfer_is_appliable[i]) {
-        appliable_xfer_v.emplace_back(i);
-      }
-    }
-    return appliable_xfer_v;
+#pragma omp parallel for schedule(runtime) default(none)                       \
+    shared(xfer_is_appliable, xfer_v, op)
+  for (size_t i = 0; i < xfer_v.size(); i++) {
+    xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);
   }
+  std::vector<size_t> appliable_xfer_v;
+  for (size_t i = 0; i < xfer_is_appliable.size(); i++) {
+    if (xfer_is_appliable[i]) {
+      appliable_xfer_v.emplace_back(i);
+    }
+  }
+  return appliable_xfer_v;
+}
 
 // bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
 //   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
@@ -2137,7 +2282,5 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
 }
 
 // TODO
-bool Graph::equal(const Graph & other) const{
-    return true;
-}
+bool Graph::equal(const Graph &other) const { return true; }
 }; // namespace quartz

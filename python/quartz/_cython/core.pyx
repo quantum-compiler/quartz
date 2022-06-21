@@ -530,6 +530,16 @@ cdef class PyGraph:
         cdef string s = deref(self.graph).to_qasm(False, False)
         return s.decode('utf-8')
 
+    @staticmethod
+    def from_qasm(*, context : QuartzContext, filename : str):
+        filename_bytes = filename.encode('utf-8')
+        return PyGraph().set_this(Graph.from_qasm_file(context.context, filename_bytes))
+
+    @staticmethod
+    def from_qasm_str(*, context : QuartzContext, qasm_str : str):
+        qasm_str_bytes = qasm_str.encode('utf-8')
+        return PyGraph().set_this(Graph.from_qasm_str(context.context, qasm_str_bytes))
+
     def ccz_flip_greedy_rz(self, *, rotation_merging=False):
         return PyGraph().set_this(deref(self.graph).ccz_flip_greedy_rz())
 

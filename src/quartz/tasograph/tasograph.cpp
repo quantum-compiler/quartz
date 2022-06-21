@@ -1724,7 +1724,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
           it->second.first.ptr->tp == GateType::input_qubit) {
         // Only check inputs on a qubit
         // Excluding input_param gates and arithmetic gates
-        std::cout << gate_type_name(it->second.first.ptr->tp) << std::endl;
         Pos p = Pos(it->second.first, it->second.second);
         auto q = pos_2_logical_qubit.find(p)->second;
         if (qubits.find(q) != qubits.end()) {

@@ -103,10 +103,11 @@ class Observer:
         init_graph = qasm_to_graph(init_state_str)
         exp_list: List[SerializableExperience] = []
         
-        gs_time = get_time_ns()
+        # gs_time = get_time_ns()
         graph = init_graph
         graph_str = init_state_str
         info: Dict[str, Any] = { 'start': True }
+        last_eps_end: int = -1
         for i_step in range(len_episode):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
@@ -117,7 +118,7 @@ class Observer:
                     self.id, graph.to_qasm_str(),
                 )
             else:
-                _action = agent_rref.rpc_sync().select_action(
+                _action = agent_rref.rpc_sync(timeout=0).select_action(
                     self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
             # e_time = get_time_ns()
@@ -129,7 +130,6 @@ class Observer:
             av_xfer_mask[av_xfers] = True
             # (action_dim, )  only sample from available xfers
             softmax_xfer = masked_softmax(_action.xfer_dist, av_xfer_mask)
-            # action_xfer = torch.multinomial(softmax_xfer, num_samples=1)
             xfer_dist = Categorical(softmax_xfer)
             action_xfer = xfer_dist.sample()
             action_xfer_logp: torch.Tensor = xfer_dist.log_prob(action_xfer)
@@ -147,11 +147,13 @@ class Observer:
                 reward = self.invalid_reward
                 game_over = True
                 next_graph_str = graph_str # CONFIRM placeholder?
+                # print(f'    stopped by invalid action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             elif is_nop(action.xfer):
                 reward = 0
                 game_over = nop_stop
                 next_graph_str = graph_str # unchanged
                 next_nodes = [action.node] # CONFIRM
+                # print(f'    stopped by no-op action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
@@ -170,6 +172,7 @@ class Observer:
                     graph = init_graph
                     graph_str = init_state_str
                     info['start'] = True
+                    last_eps_end = i_step
                 else:
                     break
             else:
@@ -274,19 +277,24 @@ class PPOAgent:
         self.pending_states = len(self.obs_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
-        
             
     @torch.no_grad()
-    def select_action(self, obs_id: int, state_str: str) -> Action:
+    def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
         """respond to a single query"""
         pygraph: quartz.PyGraph = qasm_to_graph(state_str)
         dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
+        num_nodes: int = dgl_graph.num_nodes()
+        """compute embeds and use Critic to evaluate each node"""
+        node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
+        node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
+        temperature = 1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+        softmax_node_values = F.softmax(node_values / temperature, dim=0)
+        action_node = int(torch.multinomial(softmax_node_values, 1))
+        """use Actor to evaluate xfers for the sampled node"""
+        action_node_embed = node_embeds[action_node]
+        xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed).cpu()
         
-        # TODO inference on dgl_graph to get action
-        action_node = 0
-        action_xfer = 0
-        
-        return Action(action_node, action_xfer)
+        return ActionTmp(action_node, xfer_logits)
         
     @rpc.functions.async_execution
     @torch.no_grad()
@@ -301,7 +309,7 @@ class PPOAgent:
         if self.states_buf[obs_id] is None:
             self.states_buf[obs_id] = dgl_graph
         else:
-            raise Exception(f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicated assignment occurs!')
+            raise Exception(f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicate assignment occurs!')
         
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
@@ -314,7 +322,6 @@ class PPOAgent:
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
                 """compute embeds and use Critic to evaluate each node"""
                 # (batch_num_nodes, embed_dim)
-                # TODO check whether this ac_net is updated
                 b_node_embeds: torch.Tensor = self.ac_net.graph_embedding(b_state)
                 # (batch_num_nodes, )
                 b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
@@ -328,6 +335,8 @@ class PPOAgent:
                 temperature = 1 / (torch.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
+                # ic(b_softmax_node_values_pad) # delete
+                # ic(b_sampled_nodes)
                 """collect embeddings of sampled nodes"""
                 # (num_graphs, )
                 node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(self.device)
@@ -343,21 +352,28 @@ class PPOAgent:
                     ActionTmp(int(b_sampled_nodes[i]), xfer_logits[i])
                     for i in range(len(self.obs_rrefs))
                 ]
-                self.future_actions.set_result(actions)
+                this_future_actions = self.future_actions # NOTE something magic to avoid duplicate assignment
                 # e_time = get_time_ns()
                 # errprint(f'    Agent {self.id} : Obs {obs_id} requested. Finished inference in {dur_ms(e_time, s_time)} ms.')
                 """re-init"""
                 self.pending_states = len(self.obs_rrefs)
-                self.future_actions = torch.futures.Future()
+                self.future_actions = Future()
                 self.states_buf = [None] * len(self.obs_rrefs)
+                
+                this_future_actions.set_result(actions)
+        # end with
         return future_action # return a future
     
     def other_info_dict(self) -> Dict[str, float]:
         info_dict: Dict[str, float] = {}
         for buffer in self.graph_buffers:
             info_dict[f'{buffer.name}_best_gc'] = float(buffer.best_graph.gate_count)
+            info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
             info_dict[f'{buffer.name}_mean_traj_len'] = \
                 torch.Tensor(buffer.traj_lengths).mean().item() \
+                if len(buffer.traj_lengths) > 0 else 0.
+            info_dict[f'{buffer.name}_max_traj_len'] = \
+                float(max(buffer.traj_lengths)) \
                 if len(buffer.traj_lengths) > 0 else 0.
         return info_dict
     
@@ -395,7 +411,7 @@ class PPOAgent:
         len_episode: int,
         max_gate_count_ratio: float,
         nop_stop: bool
-    ) -> ExperienceList:
+    ) -> ExperienceList:        
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         init_buffer_ids: List[int] = []
@@ -408,7 +424,7 @@ class PPOAgent:
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             """make async RPC to kick off an episode on observers"""
-            future_exp_lists.append(obs_rref.rpc_async().run_episode(
+            future_exp_lists.append(obs_rref.rpc_async(timeout=0).run_episode(
                 rpc.RRef(self),
                 init_graph.to_qasm_str(),
                 len_episode,
@@ -642,12 +658,20 @@ class PPOMod:
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
+            other_info_dict = self.agent.other_info_dict()
+            wandb.log(other_info_dict)
+            collect_info = {
+                **other_info_dict, # type: ignore
+                'num_exps': len(exp_list),
+            }
+            print(f'\n  Data for iter {self.i_iter} collected in {dur_ms(e_time_collect, s_time_collect) / 1e3} s .', flush=True)
+            for k, v in collect_info.items():
+                print(f'    {k} : {v}', flush=True)
             pbar = tqdm(
                 total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
-            wandb.log(self.agent.other_info_dict())
         
         for epoch_k in range(self.cfg.k_epochs):
             # print(f'epoch {epoch_k}', flush=True)
@@ -710,17 +734,21 @@ class PPOMod:
                 # prob ratio = (pi_theta / pi_theta__old)
                 ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
                 advantages = exps.reward + self.cfg.gamma * max_next_values - selected_node_values
+                # print(f'reward = {exps.reward}', flush=True) # delete
+                # print(f'max_next_values = {max_next_values}', flush=True) # delete
+                # print(f'selected_node_values = {selected_node_values}', flush=True) # delete
+                # print(f'advantages = {advantages}', flush=True) # delete
                 with torch.no_grad():
                     # NOTE: is clone().detach() necessary?
-                    surr1 = ratios * advantages
+                    surr1 = ratios * advantages.detach().clone()
                     surr2 = torch.clamp(
                         ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                    ) * advantages
-                actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exps)
+                    ) * advantages.detach().clone()
+                actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exp_list)
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.sum(advantages ** 2) / len(exps)
-                xfer_entropy = torch.sum(xfer_entropys) / len(exps)
-                """compute overall loss""" 
+                critic_loss = torch.sum(advantages ** 2) / len(exp_list)
+                xfer_entropy = torch.sum(xfer_entropys) / len(exp_list)
+                """compute overall loss"""
                 loss = actor_loss + 0.5 * critic_loss - float(self.cfg.entropy_coeff) * xfer_entropy
                 """update"""
                 loss.backward()
@@ -738,8 +766,6 @@ class PPOMod:
                     }
                     pbar.set_postfix({
                         **log_dict,
-                        'collect_time': dur_ms(e_time_collect, s_time_collect) / 1e3,
-                        'num_exps': len(exp_list),
                     })
                     pbar.refresh()
                     wandb.log({
@@ -772,7 +798,7 @@ class PPOMod:
         self.ddp_ac_net.module.load_state_dict(model_state_dict)
         self.ac_net_old.load_state_dict(model_state_dict)
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-        print(f'resumed from "{ckpt}"!')
+        print(f'resumed from "{ckpt_path}"!')
         
 
 @hydra.main(config_path='config', config_name='config')

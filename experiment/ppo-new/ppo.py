@@ -639,6 +639,7 @@ class PPOMod:
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
         """train loop"""
+        self.start_time_sec = time.time()
         while self.i_iter < max_iterations:
             # s_time = get_time_ns()
             self.train_iter()
@@ -670,6 +671,7 @@ class PPOMod:
                 'num_exps': len(exp_list),
             }
             print(f'\n  Data for iter {self.i_iter} collected in {dur_ms(e_time_collect, s_time_collect) / 1e3} s .', flush=True)
+            print(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .', flush=True)
             for k, v in collect_info.items():
                 print(f'    {k} : {v}', flush=True)
             pbar = tqdm(

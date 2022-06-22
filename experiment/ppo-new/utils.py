@@ -9,6 +9,7 @@ from collections import deque, namedtuple
 from functools import partial
 import threading
 import time
+import datetime
 import copy
 import itertools
 
@@ -75,3 +76,6 @@ def get_time_ns() -> int:
 
 def dur_ms(t1: int, t2: int) -> float:
     return abs(t2 - t1) / 1e6
+
+def sec_to_hms(sec: float) -> str:
+    return str(datetime.timedelta(seconds=sec))

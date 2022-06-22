@@ -1934,8 +1934,10 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
 }
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
-Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation = false) {
-    // When eliminate_rotation is true, this function will eliminate all rotation whose parameters are all 0
+Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                                 bool eliminate_rotation = false) {
+  // When eliminate_rotation is true, this function will eliminate all rotation
+  // whose parameters are all 0
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return std::make_pair(std::shared_ptr<Graph>(nullptr), std::vector<int>());
   }
@@ -2078,33 +2080,36 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation
   }
   if (!fail) {
     std::unordered_set<Op, OpHash> op_set;
-    // The destination graph in xfer is an empty graph
-    if (xfer->dstOps.size() == 0) {
-      for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
-        if (inEdges.find((*it)->mapOp) != inEdges.end()) {
-          auto in_es = inEdges.find((*it)->mapOp)->second;
-          for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
-            if(e_it->srcOp.ptr->is_quantum_gate()){
-              op_set.insert(e_it->srcOp);
-            }
+    // The destination graph in xfer is not an empty graph
+    // Add all nodes in the destination graph to op_set
+    if (!xfer->dstOps.empty()) {
+      for (const auto &opx : xfer->dstOps) {
+        if (opx->mapOp.ptr->is_quantum_gate()) {
+          op_set.insert(opx->mapOp);
+        }
+      }
+    }
+    // Add all 1-hop predecessors to op_set
+    for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
+      if (inEdges.find((*it)->mapOp) != inEdges.end()) {
+        auto in_es = inEdges.find((*it)->mapOp)->second;
+        for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
+          if (e_it->srcOp.ptr->is_quantum_gate()) {
+            op_set.insert(e_it->srcOp);
           }
         }
       }
-    } else {
-      for (const auto &opx : xfer->dstOps) {
-        op_set.insert(opx->mapOp);
-      }
     }
     std::vector<Op> all_ops;
-    if(eliminate_rotation)   {
-        new_graph->constant_and_rotation_elimination();
+    if (eliminate_rotation) {
+      new_graph->constant_and_rotation_elimination();
     }
     new_graph->topology_order_ops(all_ops);
     auto ops_num = all_ops.size();
     for (size_t i = 0; i < ops_num; ++i) {
-        if (op_set.find(all_ops[i]) != op_set.end()) {
-            node_trace.push_back(i);
-        }
+      if (op_set.find(all_ops[i]) != op_set.end()) {
+        node_trace.push_back(i);
+      }
     }
   }
   while (!opx_op_dq.empty()) {

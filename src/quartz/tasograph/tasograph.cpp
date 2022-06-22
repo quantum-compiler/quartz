@@ -1934,7 +1934,8 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
 }
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
-Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
+Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation = false) {
+    // When eliminate_rotation is true, this function will eliminate all rotation whose parameters are all 0
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return std::make_pair(std::shared_ptr<Graph>(nullptr), std::vector<int>());
   }
@@ -2076,55 +2077,34 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     }
   }
   if (!fail) {
-    std::vector<Op> all_ops;
-    new_graph->topology_order_ops(all_ops);
-    auto ops_num = all_ops.size();
+    std::unordered_set<Op, OpHash> op_set;
     // The destination graph in xfer is an empty graph
     if (xfer->dstOps.size() == 0) {
-      std::unordered_set<Op, OpHash> op_set;
       for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
         if (inEdges.find((*it)->mapOp) != inEdges.end()) {
           auto in_es = inEdges.find((*it)->mapOp)->second;
           for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
-            if (e_it->srcOp.ptr->tp != GateType::input_param &&
-                e_it->srcOp.ptr->tp != GateType::input_qubit) {
+            if(e_it->srcOp.ptr->is_quantum_gate()){
               op_set.insert(e_it->srcOp);
             }
           }
         }
-        // if(op_set.empty()){
-        //     if (outEdges.find((*it)->mapOp) != outEdges.end()) {
-        //     auto out_es = outEdges.find((*it)->mapOp)->second;
-        //     for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it)
-        //     {
-        //         op_set.insert(e_it->dstOp);
-        //     }
-        //     }
-        // }
-      }
-      for (size_t i = 0; i < ops_num; ++i) {
-        if (op_set.find(all_ops[i]) != op_set.end()) {
-          node_trace.push_back(i);
-        }
       }
     } else {
-      std::unordered_set<Op, OpHash> mapped_op_set;
       for (const auto &opx : xfer->dstOps) {
-        mapped_op_set.insert(opx->mapOp);
+        op_set.insert(opx->mapOp);
       }
-      for (size_t i = 0; i < ops_num; ++i) {
-        if (mapped_op_set.find(all_ops[i]) != mapped_op_set.end()) {
-          node_trace.push_back(i);
+    }
+    std::vector<Op> all_ops;
+    if(eliminate_rotation)   {
+        new_graph->constant_and_rotation_elimination();
+    }
+    new_graph->topology_order_ops(all_ops);
+    auto ops_num = all_ops.size();
+    for (size_t i = 0; i < ops_num; ++i) {
+        if (op_set.find(all_ops[i]) != op_set.end()) {
+            node_trace.push_back(i);
         }
-      }
-
-      //   auto target_op = xfer->dstOps[0]->mapOp;
-      //   for (size_t i = 0; i < ops_num; ++i) {
-      //     if (target_op == all_ops[i]) {
-      //       node_trace.push_back(i);
-      //       break;
-      //     }
-      //   }
     }
   }
   while (!opx_op_dq.empty()) {

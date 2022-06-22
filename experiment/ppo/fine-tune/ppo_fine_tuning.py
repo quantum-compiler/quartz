@@ -1,4 +1,5 @@
 import quartz
+from quartz.core import PyGraph
 import torch
 import os
 from datetime import datetime
@@ -44,7 +45,7 @@ save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
-K_epochs = 30  # update policy for K epochs
+K_epochs = 25  # update policy for K epochs
 eps_clip = 0.2  # clip parameter for PPO
 gamma = 0.95  # discount factor
 lr_graph_embedding = 3e-4  # learning rate for graph embedding network
@@ -60,18 +61,14 @@ invalid_reward = -1
 
 # quartz initialization
 
-context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg', 'x'],
-                               filename='bfs_verified_simplified.json',
+# context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg', 'x'],
+#                                filename='bfs_verified_simplified.json',
+#                                no_increase=False)
+context = quartz.QuartzContext(gate_set=['h', 'cx', 'x', 'rz', 'add'],
+                               filename='../../../Nam_complete_ECC_set.json',
                                no_increase=False)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
-# init_dag = parser.load_qasm(
-#     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
-init_dag = parser.load_qasm(
-    filename=
-    "../../t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_4_after_toffoli_flip.qasm"
-)
-init_circ = quartz.PyGraph(context=context, dag=init_dag)
 xfer_dim = context.num_xfers
 
 global circ_info
@@ -86,20 +83,27 @@ circ_names = ['barenco_tof_3']  #, 'mod5_4']
 # circ_names = ['tof_3']
 # circ_names = ['rc_adder_6']
 # circ_names = ['qcla_com_7']
+# circ_names = ['adder_8']
+# circ_names = ['gf2^10_mult']
 
 circ_dataset = {}
 for circ_name in circ_names:
     circ_dataset[circ_name] = {}
 
     if circ_name == 'barenco_tof_3':
-        init_dag = parser.load_qasm(filename="../../near_56.qasm")
-        init_circ = quartz.PyGraph(context=context, dag=init_dag)
+        init_circ = PyGraph.from_qasm(context=context,
+                                      filename="../../near_56_rz.qasm")
     else:
-        init_dag = parser.load_qasm(
+        # init_dag = parser.load_qasm(
+        #     # filename=
+        #     # f"../../t_tdg_h_cx_toffoli_flip_dataset/{circ_name}_after_toffoli_flip.qasm"
+        #     filename=
+        #     f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
+        # init_circ = quartz.PyGraph(context=context, dag=init_dag)
+        init_circ = PyGraph.from_qasm(
+            context=context,
             filename=
-            f"../../t_tdg_h_cx_toffoli_flip_dataset/{circ_name}_after_toffoli_flip.qasm"
-        )
-        init_circ = quartz.PyGraph(context=context, dag=init_dag)
+            f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
 
     circ_dataset[circ_name]['init_circ'] = init_circ
     circ_dataset[circ_name]['circs'] = {}

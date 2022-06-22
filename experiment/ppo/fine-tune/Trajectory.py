@@ -40,10 +40,12 @@ class Trajectory:
     def apply_action_and_record(self, context: QuartzContext, node: int,
                                 xfer: int, xfer_logprob: torch.Tensor,
                                 mask: torch.Tensor):
+        print("in_apply")
         # start = time.time()
         next_circ, next_nodes = self.current_circ.apply_xfer_with_local_state_tracking(
             xfer=context.get_xfer_from_id(id=xfer),
-            node=self.current_circ.get_node_from_id(id=node))
+            node=self.current_circ.get_node_from_id(id=node),
+            eliminate_rotation=True)
         # t_0 = time.time()
         # print(f'action time: {t_0 - start}')
 
@@ -129,6 +131,7 @@ class Trajectory:
 
         # Update current_circ
         self.current_circ = next_circ
+        print("out apply")
 
 
 def sample_init_circs(

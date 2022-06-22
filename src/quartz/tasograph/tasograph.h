@@ -171,6 +171,7 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
   Op add_qubit(int qubit_idx);
@@ -206,6 +207,8 @@ public:
                     std::basic_istream<_CharT, _Traits> &qasm_stream);
   static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
                                                const std::string &filename);
+  static std::shared_ptr<Graph> from_qasm_str(Context *ctx,
+                                              const std::string qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits() const;
@@ -227,7 +230,7 @@ public:
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
-  apply_xfer_and_track_node(GraphXfer *xfer, Op op);
+  apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

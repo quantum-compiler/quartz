@@ -36,9 +36,6 @@ from model import ActorCritic
 from IPython import embed # type: ignore
 from icecream import ic # type: ignore
 
-DDP_PORT = int(23333)
-RPC_PORT = DDP_PORT + 1
-
 """global vars"""
 quartz_context: quartz.QuartzContext
 quartz_parser: quartz.PyQASMParser
@@ -119,11 +116,11 @@ class Observer:
             s_time = get_time_ns()
             _action: ActionTmp
             if self.batch_inference:
-                _action = agent_rref.rpc_sync(timeout=0).select_action_batch(
+                _action = agent_rref.rpc_sync().select_action_batch(
                     self.id, graph.to_qasm_str(),
                 )
             else:
-                _action = agent_rref.rpc_sync(timeout=0).select_action(
+                _action = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
             # e_time = get_time_ns()
@@ -335,7 +332,7 @@ class PPOAgent:
                 """sample node by softmax with temperature for each graph as a batch"""
                 # (num_graphs, max_num_nodes)
                 b_node_values_pad = nn.utils.rnn.pad_sequence(
-                    node_values_list, batch_first=True, padding_value=-torch.inf)
+                    node_values_list, batch_first=True, padding_value=-math.inf)
                 # (num_graphs, )
                 temperature = 1 / (torch.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
@@ -429,7 +426,7 @@ class PPOAgent:
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             """make async RPC to kick off an episode on observers"""
-            future_exp_lists.append(obs_rref.rpc_async(timeout=0).run_episode(
+            future_exp_lists.append(obs_rref.rpc_async().run_episode(
                 rpc.RRef(self),
                 init_graph.to_qasm_str(),
                 len_episode,
@@ -515,7 +512,7 @@ class PPOMod:
             self.wandb_mode = 'disabled'
         self.print_cfg()
         seed_all(cfg.seed)
-        
+
         """init quartz"""
         self.init_quartz_context_func = partial(
             init_quartz_context,
@@ -552,7 +549,8 @@ class PPOMod:
         self.ddp_processes = ddp_processes
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            init_method=f'tcp://localhost:{RPC_PORT}'
+            init_method=f'tcp://localhost:{int(self.cfg.ddp_port) + 1}',
+            rpc_timeout=0,
         )
         
         if rank < ddp_processes:
@@ -564,7 +562,7 @@ class PPOMod:
             )
             dist.init_process_group(
                 backend='nccl',
-                init_method=f'tcp://localhost:{DDP_PORT}',
+                init_method=f'tcp://localhost:{int(self.cfg.ddp_port)}',
                 rank=rank, world_size=ddp_processes,
             )
             self.train()
@@ -831,7 +829,6 @@ def main(cfg) -> None:
         join=True,
     )    
     # TODO make sure qasm <-> graph conversion is correct
-    # TODO select_action_batch may timeout
     # TODO confirm params in config.yaml
     # TODO find an optimal config of mp, or it will OOM
     # TODO profiling; some parts of this code are slow

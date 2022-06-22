@@ -366,6 +366,10 @@ class PPOAgent:
         # end with
         return future_action # return a future
     
+    def clear_buffer_traj_lens(self) -> None:
+        for buffer in self.graph_buffers:
+            buffer.traj_lengths = []
+
     def other_info_dict(self) -> Dict[str, float]:
         info_dict: Dict[str, float] = {}
         for buffer in self.graph_buffers:
@@ -422,7 +426,6 @@ class PPOAgent:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
             init_graph: quartz.PyGraph = graph_buffer.sample()
-            graph_buffer.traj_lengths = []
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             """make async RPC to kick off an episode on observers"""
@@ -654,6 +657,7 @@ class PPOMod:
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
         s_time_collect = get_time_ns()
+        self.agent.clear_buffer_traj_lens()
         exp_list: ExperienceList = self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _i in range(self.cfg.num_trajs_per_iter // self.cfg.obs_per_agent - 1):

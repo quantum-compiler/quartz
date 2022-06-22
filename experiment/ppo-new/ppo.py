@@ -59,11 +59,16 @@ def init_quartz_context(
     )
     quartz_parser = quartz.PyQASMParser(context=quartz_context)
 
-def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
+def qasm_to_graph_th_dag(qasm_str: str) -> quartz.PyGraph:
     global quartz_context
     global quartz_parser
     dag = quartz_parser.load_qasm_str(qasm_str)
     graph = quartz.PyGraph(context=quartz_context, dag=dag)
+    return graph
+
+def qasm_to_graph(qasm_str: str) -> quartz.PyGraph:
+    global quartz_context
+    graph = quartz.PyGraph.from_qasm_str(context=quartz_context, qasm_str=qasm_str)
     return graph
 
 def is_nop(xfer_id: int) -> bool:

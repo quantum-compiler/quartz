@@ -216,10 +216,14 @@ cdef class PyXfer:
 
     @property
     def src_str(self):
+        if self.is_nop:
+            return 'NOP'
         return self.graphXfer.src_str().decode('utf-8')
 
     @property
     def dst_str(self):
+        if self.is_nop:
+            return 'NOP'
         return self.graphXfer.dst_str().decode('utf-8')
 
 cdef class QuartzContext:

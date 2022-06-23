@@ -44,7 +44,7 @@ nop_stop: True
 len_episode: 300
 invalid_reward: -1.0
 max_gate_count_ratio: 1.2
-batch_inference: False
+batch_inference: True
 agent_collect: False
 
 # training
@@ -54,6 +54,6 @@ mini_batch_size: 3600 # per DDP process; < num_trajs_per_iter * len_episode
 k_epochs: 30 # TODO
 lr_graph_embedding: 3e-4
 lr_actor: 3e-4
-lr_critic: 1e-3
+lr_critic: 5e-4
 update_policy_interval: 1
 save_ckpt_interval: 1

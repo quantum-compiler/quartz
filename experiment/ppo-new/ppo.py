@@ -160,6 +160,14 @@ class Observer:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
                 next_graph_str = next_graph.to_qasm_str()
+                if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
+                    assert len(next_nodes) > 0 # delete
+                    next_nodes_ts = torch.tensor(next_nodes)
+                    next_dgl_graph = next_graph.to_dgl_graph()
+                    src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
+                    edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
+                    next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
+                    next_nodes = next_nodes_ts_2.tolist()
             
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
@@ -350,7 +358,6 @@ class PPOAgent:
                     next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
                     next_nodes = next_nodes_ts_2.tolist()
                     
-            
             exp = Experience(
                 graph, action, reward, next_graph, game_over,
                 next_nodes, av_xfer_mask, action_xfer_logp.item(), copy.deepcopy(info),
@@ -949,12 +956,12 @@ class PPOMod:
                 # print(f'max_next_values = {max_next_values}', flush=True) # delete
                 # print(f'selected_node_values = {selected_node_values}', flush=True) # delete
                 # print(f'advantages = {advantages}', flush=True) # delete
-                with torch.no_grad():
+                # with torch.no_grad():
                     # NOTE: is clone().detach() necessary?
-                    surr1 = ratios * advantages.detach().clone()
-                    surr2 = torch.clamp(
-                        ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                    ) * advantages.detach().clone()
+                surr1 = ratios * advantages.detach().clone()
+                surr2 = torch.clamp(
+                    ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
+                ) * advantages.detach().clone()
                 actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exp_list)
                 """compute loss for Critic (value_net, phi)"""
                 critic_loss = torch.sum(advantages ** 2) / len(exp_list)

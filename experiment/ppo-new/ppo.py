@@ -29,6 +29,7 @@ import quartz # type: ignore
 
 import hydra
 import wandb
+from omegaconf.dictconfig import DictConfig
 
 from ds import *
 from utils import *
@@ -88,7 +89,7 @@ class Observer:
         self,
         agent_rref: rpc.RRef[PPOAgent],
         init_state_str: str,
-        len_episode: int,
+        max_eps_len: int,
         max_gate_count_ratio: float,
         nop_stop: bool,
     ) -> List[SerializableExperience]:
@@ -110,7 +111,7 @@ class Observer:
         graph_str = init_state_str
         info: Dict[str, Any] = { 'start': True }
         last_eps_end: int = -1
-        for i_step in range(len_episode):
+        for i_step in range(max_eps_len):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
             # s_time = get_time_ns()
@@ -219,10 +220,10 @@ class GraphBuffer:
         return len(self.buffer) + 1
 
     def prepare_for_next_iter(self) -> None:
-        self.max_traj_length = max(
-            self.max_traj_length,
-            max(self.traj_lengths),
-        )
+        if len(self.traj_lengths) > 0:
+            self.max_traj_length = max(
+                self.max_traj_length, max(self.traj_lengths),
+            )
         self.traj_lengths.clear()
         
     def push_back(self, graph: quartz.PyGraph) -> None:
@@ -264,17 +265,21 @@ class PPOAgent:
         invalid_reward: float,
         ac_net: ActorCritic,
         input_graphs: List[Dict[str, str]],
-        softmax_hit_rate: float,
-        dynamic_traj_length: bool,
+        softmax_temp: DictConfig,
+        dyn_eps_len: bool,
+        max_eps_len: int,
+        min_eps_len: int,
         output_dir: str,
     ) -> None:
         self.id = agent_id
         self.device = device
         self.output_dir = output_dir
-        self.dynamic_traj_length = dynamic_traj_length
+        self.dyn_eps_len = dyn_eps_len
+        self.max_eps_len = max_eps_len
+        self.min_eps_len = min_eps_len
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
-        self.softmax_hit_rate = softmax_hit_rate
+        self.softmax_temp = softmax_temp
         
         """init Observers on the other processes and hold the refs to them"""
         self.obs_rrefs: List[rpc.RRef] = []
@@ -301,7 +306,7 @@ class PPOAgent:
     def run_episode(
         self,
         init_graph: quartz.PyGraph,
-        len_episode: int,
+        max_eps_len: int,
         max_gate_count_ratio: float,
         nop_stop: bool,
     ) -> List[Experience]:
@@ -311,7 +316,7 @@ class PPOAgent:
         graph = init_graph
         info: Dict[str, Any] = { 'start': True }
         last_eps_end: int = -1
-        for i_step in range(len_episode):
+        for i_step in range(max_eps_len):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
             # s_time = get_time_ns()
@@ -320,7 +325,11 @@ class PPOAgent:
             """compute embeds and use Critic to evaluate each node"""
             node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
             node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
-            temperature = 1 #1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+            temperature: float
+            if not self.softmax_temp.en:
+                temperature = 1.0
+            else:
+                temperature = 1 / (math.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
             softmax_node_values = F.softmax(node_values / temperature, dim=0)
             action_node = int(torch.multinomial(softmax_node_values, 1))
             """use Actor to evaluate xfers for the sampled node"""
@@ -402,7 +411,6 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data_self(
         self,
-        len_episode: int,
         max_gate_count_ratio: float,
         nop_stop: bool
     ) -> ExperienceList:        
@@ -416,16 +424,19 @@ class PPOAgent:
             init_graph: quartz.PyGraph = graph_buffer.sample()
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
-            if self.dynamic_traj_length:
+            if self.dyn_eps_len:
                 max_len = graph_buffer.max_traj_length
                 if max_len < 40:
-                    len_episode = math.ceil(max_len * 1.5)
+                    max_eps_len = math.ceil(max_len * 1.5)
                 else:
-                    len_episode = math.ceil(max_len * 1.2)
+                    max_eps_len = math.ceil(max_len * 1.2)
+                max_eps_len = max(max_eps_len, self.min_eps_len)
+            else:
+                max_eps_len = self.max_eps_len
             """make async RPC to kick off an episode on observers"""
             future_exp_lists.append(self.run_episode(
                 init_graph,
-                len_episode,
+                max_eps_len,
                 max_gate_count_ratio,
                 nop_stop,
             ))
@@ -492,7 +503,7 @@ class PPOAgent:
         """collect experiences together"""
         s_exps: List[Experience] = list(itertools.chain(*future_exp_lists))
         
-        s_exps_zip = ExperienceList(*list(map(list, zip(*s_exps)))) # type: ignore
+        s_exps_zip = ExperienceList(*map(list, zip(*s_exps))) # type: ignore
         s_exps_zip.state = state_dgl_list
         s_exps_zip.next_state = next_state_dgl_list
         # e_time = get_time_ns()
@@ -508,7 +519,11 @@ class PPOAgent:
         """compute embeds and use Critic to evaluate each node"""
         node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
         node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
-        temperature = 1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+        temperature: float
+        if not self.softmax_temp.en:
+            temperature = 1.0
+        else:
+            temperature = 1 / (math.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
         softmax_node_values = F.softmax(node_values / temperature, dim=0)
         action_node = int(torch.multinomial(softmax_node_values, 1))
         """use Actor to evaluate xfers for the sampled node"""
@@ -553,7 +568,11 @@ class PPOAgent:
                 b_node_values_pad = nn.utils.rnn.pad_sequence(
                     node_values_list, batch_first=True, padding_value=-math.inf)
                 # (num_graphs, )
-                temperature = 1 / (torch.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+                temperature: torch.Tensor
+                if not self.softmax_temp.en:
+                    temperature = torch.ones(1).to(self.device)
+                else:
+                    temperature = 1 / (torch.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 # ic(b_softmax_node_values_pad) # delete
@@ -633,7 +652,6 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data(
         self,
-        len_episode: int,
         max_gate_count_ratio: float,
         nop_stop: bool
     ) -> ExperienceList:        
@@ -647,17 +665,20 @@ class PPOAgent:
             init_graph: quartz.PyGraph = graph_buffer.sample()
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
-            if self.dynamic_traj_length:
+            if self.dyn_eps_len:
                 max_len = graph_buffer.max_traj_length
                 if max_len < 40:
-                    len_episode = math.ceil(max_len * 1.5)
+                    max_eps_len = math.ceil(max_len * 1.5)
                 else:
-                    len_episode = math.ceil(max_len * 1.2)
+                    max_eps_len = math.ceil(max_len * 1.2)
+                max_eps_len = max(max_eps_len, self.min_eps_len)
+            else:
+                max_eps_len = self.max_eps_len
             """make async RPC to kick off an episode on observers"""
             future_exp_lists.append(obs_rref.rpc_async().run_episode(
                 rpc.RRef(self),
                 init_graph.to_qasm_str(),
-                len_episode,
+                max_eps_len,
                 max_gate_count_ratio,
                 nop_stop,
             ))
@@ -722,7 +743,7 @@ class PPOAgent:
         """collect experiences together"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
         
-        s_exps_zip = ExperienceList(*list(map(list, zip(*s_exps)))) # type: ignore
+        s_exps_zip = ExperienceList(*map(list, zip(*s_exps))) # type: ignore
         s_exps_zip.state = state_dgl_list
         s_exps_zip.next_state = next_state_dgl_list
         # e_time = get_time_ns()
@@ -841,8 +862,10 @@ class PPOMod:
             invalid_reward=self.cfg.invalid_reward,
             ac_net=self.ac_net_old,
             input_graphs=self.input_graphs,
-            softmax_hit_rate=self.cfg.softmax_hit_rate,
-            dynamic_traj_length=self.cfg.dynamic_traj_length,
+            softmax_temp=self.cfg.softmax_temp,
+            dyn_eps_len=self.cfg.dyn_eps_len,
+            max_eps_len=self.cfg.max_eps_len,
+            min_eps_len=self.cfg.min_eps_len,
             output_dir=self.output_dir,
         )
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
@@ -896,10 +919,10 @@ class PPOMod:
             collect_fn = self.agent.collect_data_self
         else: # use observers to collect data
             collect_fn = self.agent.collect_data
-        exp_list: ExperienceList = collect_fn(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+        exp_list: ExperienceList = collect_fn(self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _i in range(self.cfg.num_trajs_per_iter // self.cfg.obs_per_agent - 1):
-            exp_list += collect_fn(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+            exp_list += collect_fn(self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         e_time_collect = get_time_ns()
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
@@ -1074,7 +1097,7 @@ def main(cfg) -> None:
     # TODO find an optimal config of mp, or it will OOM
     # TODO profiling; some parts of this code are slow
     
-    # 4 gpus, 2 obs per agent, len_episode = 80 -> 7994 MiB / GPU
+    # 4 gpus, 2 obs per agent, max_eps_len = 80 -> 7994 MiB / GPU
 
 if __name__ == '__main__':
     main()

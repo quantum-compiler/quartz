@@ -33,7 +33,9 @@ critic_hidden_size: 128
 gamma: 0.95
 entropy_coeff: 0.02
 eps_clip: 0.2
-softmax_hit_rate: 0.8
+softmax_temp:
+  en: True
+  hit_rate: 0.8
 
 # multiprocessing
 mp_start_method: spawn # fork
@@ -41,20 +43,21 @@ obs_per_agent: 1 # 128
 
 # exp collection
 nop_stop: True
-len_episode: 300
 invalid_reward: -1.0
 max_gate_count_ratio: 1.2
 batch_inference: True
 agent_collect: False
-dynamic_traj_length: True
+dyn_eps_len: True
+max_eps_len: 300
+min_eps_len: 10
 
 # training
 max_iterations: 1e8
 num_trajs_per_iter: 128
-mini_batch_size: 4800 # per DDP process; < num_trajs_per_iter * len_episode
+mini_batch_size: 3600 # per DDP process; < num_trajs_per_iter * len_episode
 k_epochs: 30 # TODO
 lr_graph_embedding: 3e-4
 lr_actor: 3e-4
 lr_critic: 5e-4
 update_policy_interval: 1
-save_ckpt_interval: 1
+save_ckpt_interval: 5

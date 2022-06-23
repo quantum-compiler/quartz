@@ -462,7 +462,7 @@ cdef class PyGraph:
         ]
         return nodes_with_id
 
-    def get_node_from_id(self, *, id) -> PyNode:
+    def get_node_from_id(self, *, id : int) -> PyNode:
         assert(id < self.num_nodes)
         return self.nodes[id]
 

@@ -90,8 +90,8 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       input_qubits_op.push_back(input_qubit_op);
       input_qubit_op_2_qubit_idx[input_qubit_op] = node->index;
     } else if (node->type == DAGNode::input_param) {
-      input_params_op.push_back(
-          Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
+      input_params_op.push_back(Op(context->next_global_unique_id(),
+                                   ctx->get_gate(GateType::input_param)));
     }
   }
 
@@ -164,7 +164,10 @@ Graph::Graph(const Graph &graph) {
 }
 
 size_t Graph::get_next_special_op_guid() {
-  assert(special_op_guid < GUID_PRESERVED);
+  if (special_op_guid >= GUID_PRESERVED) {
+    std::cerr << "Run out of special guid." << std::endl;
+    assert(false);
+  }
   return special_op_guid++;
 }
 
@@ -203,7 +206,7 @@ Op Graph::add_qubit(int qubit_idx) {
 
 Op Graph::add_parameter(const ParamType p) {
   Gate *gate = context->get_gate(GateType::input_param);
-  auto guid = get_next_special_op_guid();
+  auto guid = context->next_global_unique_id();
   Op op(guid, gate);
   constant_param_values[op] = p;
   return op;
@@ -436,14 +439,12 @@ void Graph::remove_node(Op oldOp) {
         outEdges.find(oldOp) != outEdges.end()) {
       auto input_edges = inEdges[oldOp];
       auto output_edges = outEdges[oldOp];
-      int num_qubits = oldOp.ptr->get_num_qubits();
       for (auto in_edge : input_edges) {
         for (auto out_edge : output_edges) {
-          if (in_edge.dstIdx == out_edge.srcIdx) {
-            if (in_edge.dstIdx < num_qubits) {
-              add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
-                       out_edge.dstIdx);
-            }
+          if (in_edge.dstIdx < num_qubits &&
+              in_edge.dstIdx == out_edge.srcIdx) {
+            add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
+                     out_edge.dstIdx);
           }
         }
       }
@@ -541,7 +542,7 @@ void Graph::constant_and_rotation_elimination() {
           auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
           remove_node(op);
 
-          Op merged_op(get_next_special_op_guid(),
+          Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
@@ -559,7 +560,7 @@ void Graph::constant_and_rotation_elimination() {
           auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
           remove_node(op);
 
-          Op merged_op(get_next_special_op_guid(),
+          Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
@@ -740,7 +741,7 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
                       constant_param_values[param_idx_2_op_1[i]];
       remove_node(param_idx_2_op_0[i]);
       remove_node(param_idx_2_op_1[i]);
-      Op new_constant_op(get_next_special_op_guid(),
+      Op new_constant_op(context->next_global_unique_id(),
                          context->get_gate(GateType::input_param));
       add_edge(new_constant_op, op_0, 0, i);
       constant_param_values[new_constant_op] = sum;
@@ -1661,6 +1662,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     std::vector<OpX *> output_opxs(num_output, nullptr);
     if (inEdges.find(op_) != inEdges.end()) {
       for (auto &e : inEdges.find(op_)->second) {
+        if (!((size_t)e.dstIdx < num_input)) {
+          std::cout << 1663 << std::endl;
+        }
         assert((size_t)e.dstIdx < num_input);
         input_ops[e.dstIdx] = e.srcOp;
       }
@@ -1684,6 +1688,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
     if (outEdges.find(op_) != outEdges.end()) {
       for (auto &e : outEdges.find(op_)->second) {
+        if (!((size_t)e.srcIdx < num_output)) {
+          std::cout << 1689 << std::endl;
+        }
         assert((size_t)e.srcIdx < num_output);
         output_ops[e.srcIdx] = e.dstOp;
       }
@@ -1692,6 +1699,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     for (auto &opx : xfer->srcOps) {
       for (auto &input_tensor : opx->inputs) {
         if (input_tensor.op == opx_) {
+          if (!((size_t)input_tensor.idx < num_output)) {
+            std::cout << 1700 << std::endl;
+          }
           assert((size_t)input_tensor.idx < num_output);
           output_opxs[input_tensor.idx] = opx;
         }
@@ -1778,8 +1788,12 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     opx_op_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  if (!fail)
+  if (!fail) {
+    if (!(mapped_opx.size() == xfer->srcOps.size())) {
+      std::cout << 1790 << std::endl;
+    }
     assert(mapped_opx.size() == xfer->srcOps.size());
+  }
   return !fail;
 }
 

@@ -659,7 +659,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
         // unmapped src -> mapped dst
         if (paramValues.find(dstOp->inputs[i].idx) != paramValues.end()) {
           // New constant parameters
-          Op input_constant_param_op(newGraph->get_next_special_op_guid(),
+          Op input_constant_param_op(context->next_global_unique_id(),
                                      context->get_gate(GateType::input_param));
           newGraph->constant_param_values[input_constant_param_op] =
               paramValues.find(dstOp->inputs[i].idx)->second;

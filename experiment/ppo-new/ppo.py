@@ -160,14 +160,14 @@ class Observer:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
                 next_graph_str = next_graph.to_qasm_str()
-                if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
-                    assert len(next_nodes) > 0 # delete
-                    next_nodes_ts = torch.tensor(next_nodes)
-                    next_dgl_graph = next_graph.to_dgl_graph()
-                    src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
-                    edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
-                    next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
-                    next_nodes = next_nodes_ts_2.tolist()
+                # if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
+                #     assert len(next_nodes) > 0 # delete
+                #     next_nodes_ts = torch.tensor(next_nodes)
+                #     next_dgl_graph = next_graph.to_dgl_graph()
+                #     src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
+                #     edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
+                #     next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
+                #     next_nodes = next_nodes_ts_2.tolist()
             
             exp = SerializableExperience(
                 graph_str, action, reward, next_graph_str, game_over,
@@ -213,9 +213,17 @@ class GraphBuffer:
         """other infos"""
         self.best_graph = self.original_graph
         self.traj_lengths: List[int] = []
+        self.max_traj_length: int = 0
     
     def __len__(self) -> int:
         return len(self.buffer) + 1
+
+    def prepare_for_next_iter(self) -> None:
+        self.max_traj_length = max(
+            self.max_traj_length,
+            max(self.traj_lengths),
+        )
+        self.traj_lengths.clear()
         
     def push_back(self, graph: quartz.PyGraph) -> None:
         hash_value = hash(graph)
@@ -257,11 +265,13 @@ class PPOAgent:
         ac_net: ActorCritic,
         input_graphs: List[Dict[str, str]],
         softmax_hit_rate: float,
+        dynamic_traj_length: bool,
         output_dir: str,
     ) -> None:
         self.id = agent_id
         self.device = device
         self.output_dir = output_dir
+        self.dynamic_traj_length = dynamic_traj_length
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
         self.softmax_hit_rate = softmax_hit_rate
@@ -349,14 +359,14 @@ class PPOAgent:
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
-                if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
-                    assert len(next_nodes) > 0
-                    next_nodes_ts = torch.tensor(next_nodes)
-                    next_dgl_graph = next_graph.to_dgl_graph()
-                    src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
-                    edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
-                    next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
-                    next_nodes = next_nodes_ts_2.tolist()
+                # if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
+                #     assert len(next_nodes) > 0
+                #     next_nodes_ts = torch.tensor(next_nodes)
+                #     next_dgl_graph = next_graph.to_dgl_graph()
+                #     src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
+                #     edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
+                #     next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
+                #     next_nodes = next_nodes_ts_2.tolist()
                     
             exp = Experience(
                 graph, action, reward, next_graph, game_over,
@@ -406,6 +416,12 @@ class PPOAgent:
             init_graph: quartz.PyGraph = graph_buffer.sample()
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
+            if self.dynamic_traj_length:
+                max_len = graph_buffer.max_traj_length
+                if max_len < 40:
+                    len_episode = math.ceil(max_len * 1.5)
+                else:
+                    len_episode = math.ceil(max_len * 1.2)
             """make async RPC to kick off an episode on observers"""
             future_exp_lists.append(self.run_episode(
                 init_graph,
@@ -569,9 +585,9 @@ class PPOAgent:
         # end with
         return future_action # return a future
     
-    def clear_buffer_traj_lens(self) -> None:
+    def perpare_buf_for_next_iter(self) -> None:
         for buffer in self.graph_buffers:
-            buffer.traj_lengths = []
+            buffer.prepare_for_next_iter()
 
     def other_info_dict(self) -> Dict[str, float]:
         info_dict: Dict[str, float] = {}
@@ -631,6 +647,12 @@ class PPOAgent:
             init_graph: quartz.PyGraph = graph_buffer.sample()
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
+            if self.dynamic_traj_length:
+                max_len = graph_buffer.max_traj_length
+                if max_len < 40:
+                    len_episode = math.ceil(max_len * 1.5)
+                else:
+                    len_episode = math.ceil(max_len * 1.2)
             """make async RPC to kick off an episode on observers"""
             future_exp_lists.append(obs_rref.rpc_async().run_episode(
                 rpc.RRef(self),
@@ -820,6 +842,7 @@ class PPOMod:
             ac_net=self.ac_net_old,
             input_graphs=self.input_graphs,
             softmax_hit_rate=self.cfg.softmax_hit_rate,
+            dynamic_traj_length=self.cfg.dynamic_traj_length,
             output_dir=self.output_dir,
         )
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
@@ -868,7 +891,7 @@ class PPOMod:
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
         s_time_collect = get_time_ns()
-        self.agent.clear_buffer_traj_lens()
+        self.agent.perpare_buf_for_next_iter()
         if self.cfg.agent_collect is True:
             collect_fn = self.agent.collect_data_self
         else: # use observers to collect data
@@ -944,11 +967,11 @@ class PPOMod:
                     max_next_values_list: List[torch.Tensor] = []
                     for i in range(len(exps)):
                         max_next_value: torch.Tensor
-                        # next_nodes == [] means invalid xfer
+                        # invalid xfer, gate count exceeds limit, NOP
                         if next_node_values_list[i].shape[0] == 0 or \
+                            exps.game_over[i] or \
                             is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
                             max_next_value = torch.zeros(1).to(self.device)
-                        # CONFIRM how to deal with NOP?
                         else:
                             max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
                         max_next_values_list.append(max_next_value)
@@ -962,12 +985,11 @@ class PPOMod:
                 # print(f'max_next_values = {max_next_values}', flush=True) # delete
                 # print(f'selected_node_values = {selected_node_values}', flush=True) # delete
                 # print(f'advantages = {advantages}', flush=True) # delete
-                # with torch.no_grad():
-                    # NOTE: is clone().detach() necessary?
-                surr1 = ratios * advantages.detach().clone()
-                surr2 = torch.clamp(
-                    ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                ) * advantages.detach().clone()
+                with torch.no_grad():
+                    surr1 = ratios * advantages
+                    surr2 = torch.clamp(
+                        ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
+                    ) * advantages
                 actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exp_list)
                 """compute loss for Critic (value_net, phi)"""
                 critic_loss = torch.sum(advantages ** 2) / len(exp_list)

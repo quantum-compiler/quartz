@@ -46,11 +46,12 @@ invalid_reward: -1.0
 max_gate_count_ratio: 1.2
 batch_inference: True
 agent_collect: False
+dynamic_traj_length: True
 
 # training
 max_iterations: 1e8
 num_trajs_per_iter: 128
-mini_batch_size: 3600 # per DDP process; < num_trajs_per_iter * len_episode
+mini_batch_size: 4800 # per DDP process; < num_trajs_per_iter * len_episode
 k_epochs: 30 # TODO
 lr_graph_embedding: 3e-4
 lr_actor: 3e-4

@@ -5,7 +5,7 @@ from typing import Callable, Iterable, Iterator, Optional, Tuple, List, Any, Seq
 
 import torch
 import dgl # type: ignore
-import quartz
+import quartz # type: ignore
 from IPython import embed # type: ignore
 
 @dataclass

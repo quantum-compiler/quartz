@@ -463,6 +463,11 @@ cdef class PyGraph:
         return nodes_with_id
 
     def get_node_from_id(self, *, id : int) -> PyNode:
+        n = self.num_nodes
+        if id >= n:
+            print(id)
+            print(n)
+            self.to_qasm(filename='a.qasm')
         assert(id < self.num_nodes)
         return self.nodes[id]
 

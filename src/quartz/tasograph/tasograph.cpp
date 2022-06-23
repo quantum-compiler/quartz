@@ -483,7 +483,6 @@ void Graph::remove_edge(Op srcOp, Op dstOp) {
 // Merge constant parameters
 // Eliminate rotation with parameter 0
 void Graph::constant_and_rotation_elimination() {
-  std::unordered_map<size_t, size_t> hash_values;
   std::queue<Op> op_queue;
   // Compute the hash value for input ops
   for (auto it = outEdges.cbegin(); it != outEdges.cend(); it++) {
@@ -595,6 +594,12 @@ void Graph::constant_and_rotation_elimination() {
         }
       }
       if (all_parameter_is_0) {
+        // Delete all parameter nodes, they are all 0
+        for (const auto &e : input_edges) {
+          if (e.dstIdx > num_qubits) {
+            remove_node(e.srcOp);
+          }
+        }
         remove_node(op);
       }
     }

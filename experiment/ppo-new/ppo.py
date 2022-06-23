@@ -466,6 +466,9 @@ class PPOAgent:
                 if s_exp.game_over:
                     graph_buffer.traj_lengths.append(i_step)
             # end for s_exp
+            if len(obs_res) > 0 and not obs_res[-1].game_over:
+                graph_buffer.traj_lengths.append(i_step)
+        # end for res of each obs
             
         # end for obs
         # s_time = get_time_ns()
@@ -687,7 +690,10 @@ class PPOAgent:
                 if s_exp.game_over:
                     graph_buffer.traj_lengths.append(i_step)
             # end for s_exp
-            
+            if len(obs_res) > 0 and not obs_res[-1].game_over:
+                graph_buffer.traj_lengths.append(i_step)
+        # end for obs_res
+        
         # end for obs
         # s_time = get_time_ns()
         # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')

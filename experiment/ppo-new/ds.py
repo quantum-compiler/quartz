@@ -42,6 +42,14 @@ class Experience:
     @staticmethod
     def new_empty() -> Experience:
         return Experience(*[None]*len(fields(Experience))) # type:ignore
+    
+    def __str__(self) -> str:
+        s = f'{self.state} (gate_count = {self.state.gate_count}) ' \
+            f'{self.next_state} (gate_count = {self.next_state.gate_count}) \n' \
+            f'{self.action}  reward = {self.reward}  game_over = {self.game_over}  ' \
+            f'next_nodes = {self.next_nodes}  \n' \
+            f'xfer_mask = {self.xfer_mask}  xfer_logprob = {self.xfer_logprob}  info = {self.info}'
+        return s
 
 @dataclass
 class SerializableExperience:

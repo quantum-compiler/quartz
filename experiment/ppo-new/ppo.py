@@ -302,7 +302,7 @@ class PPOAgent:
             """compute embeds and use Critic to evaluate each node"""
             node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
             node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
-            temperature = 1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+            temperature = 1 #1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
             softmax_node_values = F.softmax(node_values / temperature, dim=0)
             action_node = int(torch.multinomial(softmax_node_values, 1))
             """use Actor to evaluate xfers for the sampled node"""
@@ -341,6 +341,15 @@ class PPOAgent:
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
+                if quartz_context.get_xfer_from_id(id=action.xfer).dst_gate_count != 0:
+                    assert len(next_nodes) > 0
+                    next_nodes_ts = torch.tensor(next_nodes)
+                    next_dgl_graph = next_graph.to_dgl_graph()
+                    src_node_ids, _, edge_ids = next_dgl_graph.in_edges(next_nodes_ts, form='all')
+                    edge_mask = next_dgl_graph.edata['reversed'][edge_ids] == 0
+                    next_nodes_ts_2 = torch.cat([next_nodes_ts, src_node_ids[edge_mask]])
+                    next_nodes = next_nodes_ts_2.tolist()
+                    
             
             exp = Experience(
                 graph, action, reward, next_graph, game_over,
@@ -348,6 +357,14 @@ class PPOAgent:
             )
             exp_list.append(exp)
             info['start'] = False
+            # print(
+            #     f'node_values = {node_values}\n'
+            #     f'softmax_node_values = {softmax_node_values}\n'
+            #     f'xfer_logits = {xfer_logits}\n'
+            #     f'softmax_xfer = {softmax_xfer}\n'
+            #     f'exp: {exp}',
+            #     flush=True,
+            # ) # delete
             # s_time = get_time_ns()
             # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
             if game_over:
@@ -362,6 +379,7 @@ class PPOAgent:
         # end for
         # ge_time = get_time_ns()
         # errprint(f'    Obs {self.id} : Trajectory finished in {dur_ms(ge_time, gs_time)} ms.')
+        
         return exp_list
         
     @torch.no_grad()
@@ -388,6 +406,7 @@ class PPOAgent:
                 max_gate_count_ratio,
                 nop_stop,
             ))
+            # print(f'exp_list = {future_exp_lists[-1]}', flush=True) # delete
             
         # e_time = get_time_ns()
         # errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
@@ -946,7 +965,7 @@ class PPOMod:
                 loss.backward()
                 for param in self.ddp_ac_net.parameters():
                     param.grad.data.clamp_(-1, 1)
-                self.optimizer.step()
+                self.optimizer.step() # confirm
                 """logging"""
                 if self.rank == 0:
                     pbar.update(1)

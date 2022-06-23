@@ -5,7 +5,7 @@ from typing import Callable, Iterable, Iterator, Optional, Tuple, List, Any, Seq
 
 import torch
 import dgl # type: ignore
-
+import quartz
 from IPython import embed # type: ignore
 
 @dataclass
@@ -20,6 +20,29 @@ class Action:
 class ActionTmp:
     node: int
     xfer_dist: torch.Tensor
+
+@dataclass
+class Experience:
+    state: quartz.PyGraph
+    action: Action
+    reward: float
+    next_state: quartz.PyGraph
+    game_over: bool
+    next_nodes: List[int]
+    xfer_mask: torch.BoolTensor
+    xfer_logprob: float
+    info: Any
+    
+    def __iter__(self) -> Iterator:
+        return iter([
+            getattr(self, field.name)
+            for field in fields(self)
+        ])
+    
+    @staticmethod
+    def new_empty() -> Experience:
+        return Experience(*[None]*len(fields(Experience))) # type:ignore
+
 @dataclass
 class SerializableExperience:
     state: str

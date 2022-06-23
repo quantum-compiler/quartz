@@ -113,7 +113,7 @@ class Observer:
         for i_step in range(len_episode):
             # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
-            s_time = get_time_ns()
+            # s_time = get_time_ns()
             _action: ActionTmp
             if self.batch_inference:
                 _action = agent_rref.rpc_sync().select_action_batch(
@@ -279,6 +279,180 @@ class PPOAgent:
         self.pending_states = len(self.obs_rrefs)
         self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
+        
+    def run_episode(
+        self,
+        init_graph: quartz.PyGraph,
+        len_episode: int,
+        max_gate_count_ratio: float,
+        nop_stop: bool,
+    ) -> List[Experience]:
+        exp_list: List[Experience] = []
+        
+        # gs_time = get_time_ns()
+        graph = init_graph
+        info: Dict[str, Any] = { 'start': True }
+        last_eps_end: int = -1
+        for i_step in range(len_episode):
+            # print(f'obs {self.id} step {i_step}')
+            """get action (action_node, xfer_dist) from agent"""
+            # s_time = get_time_ns()
+            dgl_graph: dgl.graph = graph.to_dgl_graph().to(self.device)
+            num_nodes: int = dgl_graph.num_nodes()
+            """compute embeds and use Critic to evaluate each node"""
+            node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
+            node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
+            temperature = 1 / (math.log( self.softmax_hit_rate * (num_nodes - 1)/(1 - self.softmax_hit_rate) ))
+            softmax_node_values = F.softmax(node_values / temperature, dim=0)
+            action_node = int(torch.multinomial(softmax_node_values, 1))
+            """use Actor to evaluate xfers for the sampled node"""
+            action_node_embed = node_embeds[action_node]
+            xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed)
+            """sample action_xfer with mask"""
+            av_xfers = graph.available_xfers_parallel(
+                context=quartz_context, node=graph.get_node_from_id(id=action_node))
+            av_xfer_mask = torch.BoolTensor([0] * quartz_context.num_xfers)
+            av_xfer_mask[av_xfers] = True
+            # (action_dim, )  only sample from available xfers
+            softmax_xfer = masked_softmax(xfer_logits, av_xfer_mask)
+            xfer_dist = Categorical(softmax_xfer)
+            action_xfer = xfer_dist.sample()
+            action_xfer_logp: torch.Tensor = xfer_dist.log_prob(action_xfer)
+            
+            """apply action"""
+            action = Action(action_node, action_xfer.item())
+            next_nodes: List[int]
+            next_graph, next_nodes = \
+                graph.apply_xfer_with_local_state_tracking(
+                    xfer=quartz_context.get_xfer_from_id(id=action.xfer),
+                    node=graph.get_node_from_id(id=action.node)
+                )
+            """parse result, compute reward"""
+            if next_graph is None:
+                reward = -1.0
+                game_over = True
+                next_graph = graph
+                # print(f'    stopped by invalid action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
+            elif is_nop(action.xfer):
+                reward = 0
+                game_over = nop_stop
+                next_nodes = [action.node] # CONFIRM
+                # print(f'    stopped by no-op action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
+            else:
+                reward = graph.gate_count - next_graph.gate_count
+                game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
+            
+            exp = Experience(
+                graph, action, reward, next_graph, game_over,
+                next_nodes, av_xfer_mask, action_xfer_logp.item(), copy.deepcopy(info),
+            )
+            exp_list.append(exp)
+            info['start'] = False
+            # s_time = get_time_ns()
+            # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
+            if game_over:
+                if False:
+                    graph = init_graph
+                    info['start'] = True
+                    last_eps_end = i_step
+                else:
+                    break
+            else:
+                graph = next_graph
+        # end for
+        # ge_time = get_time_ns()
+        # errprint(f'    Obs {self.id} : Trajectory finished in {dur_ms(ge_time, gs_time)} ms.')
+        return exp_list
+        
+    @torch.no_grad()
+    def collect_data_self(
+        self,
+        len_episode: int,
+        max_gate_count_ratio: float,
+        nop_stop: bool
+    ) -> ExperienceList:        
+        """collect experiences from observers"""
+        future_exp_lists: List[List[Experience]] = []
+        init_buffer_ids: List[int] = []
+        # s_time = get_time_ns()
+        for obs_rref in self.obs_rrefs:
+            """sample init state"""
+            graph_buffer = self.graph_buffers[self.init_buffer_turn]
+            init_graph: quartz.PyGraph = graph_buffer.sample()
+            init_buffer_ids.append(self.init_buffer_turn)
+            self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
+            """make async RPC to kick off an episode on observers"""
+            future_exp_lists.append(self.run_episode(
+                init_graph,
+                len_episode,
+                max_gate_count_ratio,
+                nop_stop,
+            ))
+            
+        # e_time = get_time_ns()
+        # errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
+        """convert graph and maintain graph_buffer"""
+        state_dgl_list: List[dgl.graph] = []
+        next_state_dgl_list: List[dgl.graph] = []
+        for buffer_id, obs_res in zip(init_buffer_ids, future_exp_lists):
+            """for each observer's results (several trajectories)"""
+            graph_buffer = self.graph_buffers[buffer_id]
+            init_graph = None
+            exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]] = [] # for output optimization path
+            for s_exp in obs_res:
+                """for each experience"""
+                if s_exp.info['start']:
+                    init_graph = obs_res[0].state
+                    exp_seq = []
+                    i_step = 0
+                # qasm_s_time = get_time_ns()
+                graph = s_exp.state
+                next_graph = s_exp.next_state
+                # qasm_e_time = get_time_ns()
+                # errprint(f'         Tow qasm graph convered in {dur_ms(qasm_e_time, qasm_s_time)} ms.')
+                ss_exp = SerializableExperience(*s_exp)
+                ss_exp.state = s_exp.state.to_qasm_str()
+                ss_exp.next_state = s_exp.next_state.to_qasm_str()
+                exp_seq.append((ss_exp, graph, next_graph))
+                if not s_exp.game_over and \
+                    not is_nop(s_exp.action.xfer) and \
+                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
+                    graph_buffer.push_back(next_graph)
+                # dgl_s_time = get_time_ns()
+                state_dgl_list.append(graph.to_dgl_graph())
+                next_state_dgl_list.append(next_graph.to_dgl_graph())
+                # dgl_e_time = get_time_ns()
+                # errprint(f'         Tow graph convered to dgl in {dur_ms(dgl_e_time, dgl_s_time)} ms.')
+                """best graph maintenance"""
+                if next_graph.gate_count < graph_buffer.best_graph.gate_count:
+                    seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
+                    msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
+                    print(f'\n{msg}\n')
+                    if self.id == 0: # TODO multi-processing logging
+                        wandb.alert(
+                            title='Better graph is found!',
+                            text=msg, level=wandb.AlertLevel.INFO,
+                            wait_duration=0,
+                        ) # send alert to slack
+                    
+                    graph_buffer.best_graph = next_graph
+                i_step += 1
+                if s_exp.game_over:
+                    graph_buffer.traj_lengths.append(i_step)
+            # end for s_exp
+            
+        # end for obs
+        # s_time = get_time_ns()
+        # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
+        """collect experiences together"""
+        s_exps: List[Experience] = list(itertools.chain(*future_exp_lists))
+        
+        s_exps_zip = ExperienceList(*list(map(list, zip(*s_exps)))) # type: ignore
+        s_exps_zip.state = state_dgl_list
+        s_exps_zip.next_state = next_state_dgl_list
+        # e_time = get_time_ns()
+        # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
+        return s_exps_zip
             
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
@@ -546,6 +720,11 @@ class PPOMod:
         global quartz_parser
         self.init_quartz_context_func()
         
+        """set num of OMP threads to avoid blasting the machine"""
+        if self.cfg.omp_num_threads != 0:
+            os.environ["OMP_NUM_THREADS"] = str(self.cfg.omp_num_threads)
+        # otherwise we don't limit it
+        
         """RPC and DDP initialization"""
         # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
         self.rank = rank
@@ -658,10 +837,14 @@ class PPOMod:
         """collect batched data in dgl or tensor format"""
         s_time_collect = get_time_ns()
         self.agent.clear_buffer_traj_lens()
-        exp_list: ExperienceList = self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+        if self.cfg.agent_collect is True:
+            collect_fn = self.agent.collect_data_self
+        else: # use observers to collect data
+            collect_fn = self.agent.collect_data
+        exp_list: ExperienceList = collect_fn(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for _i in range(self.cfg.num_trajs_per_iter // self.cfg.obs_per_agent - 1):
-            exp_list += self.agent.collect_data(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
+            exp_list += collect_fn(self.cfg.len_episode, self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         e_time_collect = get_time_ns()
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training

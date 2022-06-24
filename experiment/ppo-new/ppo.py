@@ -198,20 +198,22 @@ class GraphBuffer:
         device: torch.device = torch.device('cpu'),
     ) -> None:
         self.name = name
-        self.max_len = max_len
+        # self.max_len = max_len
         self.device = device
         self.original_graph = qasm_to_graph(original_graph_qasm)
         
-        self.buffer: List[quartz.PyGraph] = []
+        self.gc_to_graph: Dict[int, List[quartz.PyGraph]] = {
+            self.original_graph.gate_count: [ self.original_graph, ],
+        }
         self.hashset: Set[int] = { hash(self.original_graph) }
-        self.gate_counts: torch.Tensor = torch.Tensor([]).to(self.device)
+        
         """other infos"""
         self.best_graph = self.original_graph
         self.traj_lengths: List[int] = []
         self.max_traj_length: int = 0
     
     def __len__(self) -> int:
-        return len(self.buffer) + 1
+        return len(self.hashset)
 
     def prepare_for_next_iter(self) -> None:
         if len(self.traj_lengths) > 0:
@@ -224,28 +226,16 @@ class GraphBuffer:
         hash_value = hash(graph)
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
-            self.buffer.append(graph)
-            self.gate_counts = torch.cat([
-                self.gate_counts,
-                torch.Tensor([graph.gate_count]).to(self.device)
-            ])
-            if len(self) > self.max_len:
-                graph_to_remove = self.buffer.pop(0) # remove and return
-                self.hashset.remove(hash(graph_to_remove))
-                self.gate_counts = self.gate_counts[1:]                
+            gc = int(graph.gate_count)
+            if gc not in self.gc_to_graph:
+                self.gc_to_graph[gc] = []
+            self.gc_to_graph[gc].append(graph)      
         
     def sample(self) -> quartz.PyGraph:
-        gate_counts = torch.cat([
-            self.gate_counts,
-            torch.Tensor([self.original_graph.gate_count]).to(self.device),
-        ]) # always has the probability to start from the original graph
+        gate_counts = torch.Tensor(list(self.gc_to_graph.keys())).to(self.device)
         weights = 1 / gate_counts ** 4
-        sampled_idx = int(torch.multinomial(weights, num_samples=1))
-        sampled_graph: quartz.PyGraph
-        if sampled_idx == len(self.buffer):
-            sampled_graph = self.original_graph
-        else:
-            sampled_graph = self.buffer[sampled_idx]
+        sampled_gc = int(torch.multinomial(weights, num_samples=1))
+        sampled_graph = random.choice(self.gc_to_graph[sampled_gc])
         return sampled_graph
 
 class PPOAgent:

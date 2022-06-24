@@ -64,8 +64,11 @@ def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor
     logits[~mask] -= 1e10
     return F.softmax(logits, dim=-1)
 
-def errprint(s: str, file = sys.stderr):
+def errprint(s: str, file = sys.stderr) -> None:
     print(s, file=file)
+
+def printfl(s: str) -> None:
+    print(s, flush=True)
 
 def get_time_ns() -> int:
     return time.time_ns()

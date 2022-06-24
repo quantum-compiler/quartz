@@ -111,7 +111,6 @@ class PPOMod:
                 name=obs_name, rank=rank, world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
-            # print(f'{obs_name} initialized')
         # block until all rpcs finish
         rpc.shutdown()
     
@@ -169,7 +168,7 @@ class PPOMod:
                 mode=self.wandb_mode,
                 config=self.cfg,
             )
-        print(f'rank {self.rank} on {self.device} initialized', flush=True)
+        printfl(f'rank {self.rank} on {self.device} initialized')
         
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
@@ -178,15 +177,11 @@ class PPOMod:
         """train loop"""
         self.start_time_sec = time.time()
         while self.i_iter < max_iterations:
-            # s_time = get_time_ns()
             self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt')
-                
-            # e_time = get_time_ns()
-            # errprint(f'Iter {self.i_iter} finished in {dur_ms(s_time, e_time)} ms.')
             self.i_iter += 1
 
         
@@ -212,10 +207,10 @@ class PPOMod:
                 **other_info_dict, # type: ignore
                 'num_exps': f'{len(exp_list)}  (num_eps_per_iter = {self.cfg.num_eps_per_iter})',
             }
-            print(f'\n  Data for iter {self.i_iter} collected in {dur_ms(e_time_collect, s_time_collect) / 1e3} s .', flush=True)
-            print(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .', flush=True)
+            printfl(f'\n  Data for iter {self.i_iter} collected in {dur_ms(e_time_collect, s_time_collect) / 1e3} s .')
+            printfl(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .')
             for k, v in collect_info.items():
-                print(f'    {k} : {v}', flush=True)
+                printfl(f'    {k} : {v}')
             pbar = tqdm(
                 total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',
@@ -223,11 +218,9 @@ class PPOMod:
             )
         
         for epoch_k in range(self.cfg.k_epochs):
-            # print(f'epoch {epoch_k}', flush=True)
             for i_step, exps in enumerate(
                 ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
             ):
-                # print(f'  step {i_step} {len(exps)}', flush=True)
                 self.optimizer.zero_grad()
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
@@ -283,10 +276,6 @@ class PPOMod:
                 # prob ratio = (pi_theta / pi_theta__old)
                 ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
                 advantages = exps.reward + self.cfg.gamma * max_next_values - selected_node_values
-                # print(f'reward = {exps.reward}', flush=True) # delete
-                # print(f'max_next_values = {max_next_values}', flush=True) # delete
-                # print(f'selected_node_values = {selected_node_values}', flush=True) # delete
-                # print(f'advantages = {advantages}', flush=True) # delete
                 surr1 = ratios * advantages.detach()
                 surr2 = torch.clamp(
                     ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
@@ -324,8 +313,6 @@ class PPOMod:
             # end for i_step
         # end for k_epochs
         self.agent.sync_best_graph()
-        # e_time = get_time_ns()
-        # errprint(f'  {self.cfg.k_epochs} epochs finished in {dur_ms(s_time, e_time)} ms.')
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO save top-k model
@@ -337,7 +324,7 @@ class PPOMod:
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 # 'loss': LOSS,
             }, ckpt_path)
-            print(f'saved "{ckpt_path}"!')
+            printfl(f'saved "{ckpt_path}"!')
         
     def load_ckpt(self, ckpt_path: str) -> None:
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
@@ -346,7 +333,7 @@ class PPOMod:
         self.ddp_ac_net.module.load_state_dict(model_state_dict)
         self.ac_net_old.load_state_dict(model_state_dict)
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-        print(f'resumed from "{ckpt_path}"!')
+        printfl(f'resumed from "{ckpt_path}"!')
 
 @hydra.main(config_path='config', config_name='config')
 def main(cfg) -> None:

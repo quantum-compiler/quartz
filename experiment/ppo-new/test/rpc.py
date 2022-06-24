@@ -9,10 +9,10 @@ def work_func(x):
 
 def init_process(rank, tot_processes):
     print(f'here is rank {rank}', flush=True)
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = f'{52529}'
+    #os.environ['MASTER_ADDR'] = 'localhost'
+    #os.environ['MASTER_PORT'] = f'{52529}'
     rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-        # init_method=f'tcp://localhost:52524',
+        init_method=f'tcp://localhost:52524',
         num_worker_threads=32,
     )
     rpc.init_rpc(

@@ -61,15 +61,12 @@ class Observer:
         init_graph = qtz.qasm_to_graph(init_state_str)
         exp_list: List[SerializableExperience] = []
         
-        # gs_time = get_time_ns()
         graph = init_graph
         graph_str = init_state_str
         info: Dict[str, Any] = { 'start': True }
         last_eps_end: int = -1
         for i_step in range(max_eps_len):
-            # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
-            # s_time = get_time_ns()
             _action: ActionTmp
             if self.batch_inference:
                 _action = agent_rref.rpc_sync().select_action_batch(
@@ -79,8 +76,6 @@ class Observer:
                 _action = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
                 ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
-            # e_time = get_time_ns()
-            # errprint(f'    Obs {self.id} : Action got in {dur_ms(e_time, s_time)} ms.')
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
                 context=qtz.quartz_context, node=graph.get_node_from_id(id=_action.node))
@@ -105,13 +100,11 @@ class Observer:
                 reward = self.invalid_reward
                 game_over = True
                 next_graph_str = graph_str # CONFIRM placeholder?
-                # print(f'    stopped by invalid action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             elif qtz.is_nop(action.xfer):
                 reward = 0
                 game_over = nop_stop
                 next_graph_str = graph_str # unchanged
                 next_nodes = [action.node] # CONFIRM
-                # print(f'    stopped by no-op action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
@@ -123,8 +116,6 @@ class Observer:
             )
             exp_list.append(exp)
             info['start'] = False
-            # s_time = get_time_ns()
-            # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
             if game_over:
                 if self.batch_inference:
                     graph = init_graph
@@ -139,8 +130,6 @@ class Observer:
         # end for
         if i_step - last_eps_end >= max_eps_len:
             exp_list[-1].game_over = True # eps len exceeds limit
-        # ge_time = get_time_ns()
-        # errprint(f'    Obs {self.id} : episode finished in {dur_ms(ge_time, gs_time)} ms.')
         return exp_list
     
 
@@ -209,9 +198,7 @@ class PPOAgent:
         info: Dict[str, Any] = { 'start': True }
         last_eps_end: int = -1
         for i_step in range(max_eps_len):
-            # print(f'obs {self.id} step {i_step}')
             """get action (action_node, xfer_dist) from agent"""
-            # s_time = get_time_ns()
             dgl_graph: dgl.graph = graph.to_dgl_graph().to(self.device)
             num_nodes: int = dgl_graph.num_nodes()
             """compute embeds and use Critic to evaluate each node"""
@@ -251,12 +238,10 @@ class PPOAgent:
                 reward = -1.0
                 game_over = True
                 next_graph = graph
-                # print(f'    stopped by invalid action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             elif qtz.is_nop(action.xfer):
                 reward = 0
                 game_over = nop_stop
                 next_nodes = [action.node] # CONFIRM
-                # print(f'    stopped by no-op action: {action}  eps_len: {i_step - last_eps_end} softmax_xfer = {softmax_xfer}', flush=True) # delete
             else:
                 reward = graph.gate_count - next_graph.gate_count
                 game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
@@ -267,16 +252,6 @@ class PPOAgent:
             )
             exp_list.append(exp)
             info['start'] = False
-            # print(
-            #     f'node_values = {node_values}\n'
-            #     f'softmax_node_values = {softmax_node_values}\n'
-            #     f'xfer_logits = {xfer_logits}\n'
-            #     f'softmax_xfer = {softmax_xfer}\n'
-            #     f'exp: {exp}',
-            #     flush=True,
-            # ) # delete
-            # s_time = get_time_ns()
-            # errprint(f'    Obs {self.id} : Action applied in {dur_ms(e_time, s_time)} ms.')
             if game_over:
                 if False:
                     graph = init_graph
@@ -286,9 +261,6 @@ class PPOAgent:
                     break
             else:
                 graph = next_graph
-        # end for
-        # ge_time = get_time_ns()
-        # errprint(f'    Obs {self.id} : episode finished in {dur_ms(ge_time, gs_time)} ms.')
         
         return exp_list
         
@@ -301,7 +273,6 @@ class PPOAgent:
         """collect experiences from observers"""
         future_exp_lists: List[List[Experience]] = []
         init_buffer_ids: List[int] = []
-        # s_time = get_time_ns()
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
@@ -325,10 +296,7 @@ class PPOAgent:
                 max_gate_count_ratio,
                 nop_stop,
             ))
-            # print(f'exp_list = {future_exp_lists[-1]}', flush=True) # delete
             
-        # e_time = get_time_ns()
-        # errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
         """convert graph and maintain graph_buffer"""
         state_dgl_list: List[dgl.graph] = []
         next_state_dgl_list: List[dgl.graph] = []
@@ -343,11 +311,8 @@ class PPOAgent:
                     init_graph = obs_res[0].state
                     exp_seq = []
                     i_step = 0
-                # qasm_s_time = get_time_ns()
                 graph = s_exp.state
                 next_graph = s_exp.next_state
-                # qasm_e_time = get_time_ns()
-                # errprint(f'         Tow qasm graph convered in {dur_ms(qasm_e_time, qasm_s_time)} ms.')
                 ss_exp = SerializableExperience(*s_exp)
                 ss_exp.state = s_exp.state.to_qasm_str()
                 ss_exp.next_state = s_exp.next_state.to_qasm_str()
@@ -356,16 +321,13 @@ class PPOAgent:
                     not qtz.is_nop(s_exp.action.xfer) and \
                     next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
-                # dgl_s_time = get_time_ns()
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
-                # dgl_e_time = get_time_ns()
-                # errprint(f'         Tow graph convered to dgl in {dur_ms(dgl_e_time, dgl_s_time)} ms.')
                 """best graph maintenance"""
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
                     msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
-                    print(f'\n{msg}\n', flush=True)
+                    printfl(f'\n{msg}\n')
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',
@@ -382,17 +344,12 @@ class PPOAgent:
                 graph_buffer.eps_lengths.append(i_step)
         # end for res of each obs
             
-        # end for obs
-        # s_time = get_time_ns()
-        # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
         """collect experiences together"""
         s_exps: List[Experience] = list(itertools.chain(*future_exp_lists))
         
         s_exps_zip = ExperienceList(*map(list, zip(*s_exps))) # type: ignore
         s_exps_zip.state = state_dgl_list
         s_exps_zip.next_state = next_state_dgl_list
-        # e_time = get_time_ns()
-        # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
         return s_exps_zip
             
     @torch.no_grad()
@@ -434,10 +391,7 @@ class PPOAgent:
         
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
-            # errprint(f'    Agent {self.id} : Obs {obs_id} requested.')
             if self.pending_states == 0:
-                # errprint(f'    Agent {self.id} : Obs {obs_id} requested. Start inference.')
-                # s_time = get_time_ns()
                 """collected a batch, start batch inference"""
                 b_state: dgl.graph = dgl.batch(self.states_buf)
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
@@ -460,8 +414,6 @@ class PPOAgent:
                     temperature = 1 / (torch.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
-                # ic(b_softmax_node_values_pad) # delete
-                # ic(b_sampled_nodes)
                 """collect embeddings of sampled nodes"""
                 # (num_graphs, )
                 node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(self.device)
@@ -478,8 +430,6 @@ class PPOAgent:
                     for i in range(len(self.obs_rrefs))
                 ]
                 this_future_actions = self.future_actions # NOTE something magic to avoid duplicate assignment
-                # e_time = get_time_ns()
-                # errprint(f'    Agent {self.id} : Obs {obs_id} requested. Finished inference in {dur_ms(e_time, s_time)} ms.')
                 """re-init"""
                 self.pending_states = len(self.obs_rrefs)
                 self.future_actions = Future()
@@ -539,7 +489,6 @@ class PPOAgent:
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         init_buffer_ids: List[int] = []
-        # s_time = get_time_ns()
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
@@ -567,8 +516,6 @@ class PPOAgent:
             
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
-        # e_time = get_time_ns()
-        # errprint(f'    Data collected in {dur_ms(e_time, s_time)} ms.')
         """convert graph and maintain graph_buffer"""
         state_dgl_list: List[dgl.graph] = []
         next_state_dgl_list: List[dgl.graph] = []
@@ -583,26 +530,20 @@ class PPOAgent:
                     init_graph = qtz.qasm_to_graph(obs_res[0].state)
                     exp_seq = []
                     i_step = 0
-                # qasm_s_time = get_time_ns()
                 graph = qtz.qasm_to_graph(s_exp.state)
                 next_graph = qtz.qasm_to_graph(s_exp.next_state)
-                # qasm_e_time = get_time_ns()
-                # errprint(f'         Tow qasm graph convered in {dur_ms(qasm_e_time, qasm_s_time)} ms.')
                 exp_seq.append((s_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
                     next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
-                # dgl_s_time = get_time_ns()
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
-                # dgl_e_time = get_time_ns()
-                # errprint(f'         Tow graph convered to dgl in {dur_ms(dgl_e_time, dgl_s_time)} ms.')
                 """best graph maintenance"""
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
                     msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
-                    print(f'\n{msg}\n', flush=True)
+                    printfl(f'\n{msg}\n')
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',
@@ -621,20 +562,17 @@ class PPOAgent:
         # end for obs_res
         
         # end for obs
-        # s_time = get_time_ns()
-        # errprint(f'    Graph converted in {dur_ms(e_time, s_time)} ms.')
         """collect experiences together"""
         s_exps: List[SerializableExperience] = list(itertools.chain(*s_exp_lists))
         
         s_exps_zip = ExperienceList(*map(list, zip(*s_exps))) # type: ignore
         s_exps_zip.state = state_dgl_list
         s_exps_zip.next_state = next_state_dgl_list
-        # e_time = get_time_ns()
-        # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
         return s_exps_zip
 
     def sync_best_graph(self) -> None:
         """broadcast the best graph of each buffer to other agents"""
+        sync_dir = os.path.join(self.output_dir, 'sync_dir')
         best_info = [
             {
                 'name': buffer.name,
@@ -643,13 +581,13 @@ class PPOAgent:
             }
             for buffer in self.graph_buffers
         ]
-        with open(os.path.join(self.output_dir, f'best_info_{self.id}.json'), 'w') as f:
+        with open(os.path.join(sync_dir, f'best_info_{self.id}.json'), 'w') as f:
             json.dump(best_info, fp=f, indent=2)
         dist.barrier()
         """read in other agents' results"""
         for r in range(self.num_agents):
             if r != self.id:
-                with open(os.path.join(self.output_dir, f'best_info_{r}.json')) as f:
+                with open(os.path.join(sync_dir, f'best_info_{r}.json')) as f:
                     other_best_info = json.load(f)
                 for i in range(len(self.graph_buffers)):
                     buffer = self.graph_buffers[i]
@@ -658,7 +596,7 @@ class PPOAgent:
                     if other_info['gate_count'] < buffer.best_graph.gate_count:
                         new_best_graph = qtz.qasm_to_graph(other_info['qasm'])
                         buffer.best_graph = new_best_graph
-                        print(f'  Agent {self.id} : read in new best graph ({new_best_graph.gate_count}) from agent {r}', flush=True)
+                        printfl(f'  Agent {self.id} : read in new best graph ({new_best_graph.gate_count}) from agent {r}')
                     # end if
                 # end for i
             # end if r

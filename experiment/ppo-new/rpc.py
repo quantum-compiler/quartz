@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.multiprocessing as mp
 import torch.distributed.rpc as rpc
@@ -7,9 +8,10 @@ def work_func(x):
 
 def init_process(rank, tot_processes):
     print(f'here is rank {rank}', flush=True)
-
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = f'{52528}'
     rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-        init_method=f'tcp://localhost:52523',
+        # init_method=f'tcp://localhost:52524',
         num_worker_threads=32,
     )
     rpc.init_rpc(
@@ -30,7 +32,7 @@ def init_process(rank, tot_processes):
 
 def main() -> None:
     mp.set_start_method('spawn')
-    tot_processes = 19
+    tot_processes = 18
     print(f'spawning {tot_processes} processes...')
     mp.spawn(
         fn=init_process,

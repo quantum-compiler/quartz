@@ -1,11 +1,14 @@
+# this file is under mypy's checking
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
-from typing import Callable, Iterable, Iterator, Optional, Tuple, List, Any, Sequence
+from typing import Dict, Iterator, Set, List, Any
 
+import random
 import torch
 import dgl # type: ignore
 import quartz # type: ignore
+import qtz
 from IPython import embed # type: ignore
 
 @dataclass
@@ -171,3 +174,61 @@ class BatchedExperience:
     
     def __len__(self) -> int:
         return len(self.next_nodes)
+
+class GraphBuffer:
+    """store PyGraph of a class of circuits for init state sampling and best info maintenance"""
+    def __init__(
+        self,
+        name: str,
+        original_graph_qasm: str,
+        max_len: int | float,
+        device: torch.device = torch.device('cpu'),
+    ) -> None:
+        self.name = name
+        # self.max_len = max_len
+        self.device = device
+        self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
+        
+        self.gc_to_graph: Dict[int, List[quartz.PyGraph]] = {
+            self.original_graph.gate_count: [ self.original_graph, ],
+        }
+        self.hashset: Set[int] = { hash(self.original_graph) }
+        
+        """other infos"""
+        self.best_graph = self.original_graph
+        self.eps_lengths: List[int] = []
+        self.max_eps_length: int = 0
+    
+    def __len__(self) -> int:
+        return len(self.hashset)
+    
+    def update_max_eps_length(self, x: int) -> int:
+        self.max_eps_length = max(
+            self.max_eps_length, x
+        )
+        return self.max_eps_length
+
+    def prepare_for_next_iter(self) -> None:
+        if len(self.eps_lengths) > 0:
+            self.max_eps_length = max(
+                self.max_eps_length, max(self.eps_lengths),
+            )
+        self.eps_lengths.clear()
+        
+    def push_back(self, graph: quartz.PyGraph) -> None:
+        hash_value = hash(graph)
+        if hash_value not in self.hashset:
+            self.hashset.add(hash_value)
+            gc = int(graph.gate_count)
+            if gc not in self.gc_to_graph:
+                self.gc_to_graph[gc] = []
+            self.gc_to_graph[gc].append(graph)      
+        
+    def sample(self) -> quartz.PyGraph:
+        gc_list = list(self.gc_to_graph.keys())
+        gate_counts = torch.Tensor(gc_list).to(self.device)
+        weights = 1 / gate_counts ** 4
+        sampled_gc_idx = int(torch.multinomial(weights, num_samples=1))
+        sampled_gc = gc_list[sampled_gc_idx]
+        sampled_graph = random.choice(self.gc_to_graph[sampled_gc])
+        return sampled_graph

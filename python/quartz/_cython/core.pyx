@@ -216,10 +216,14 @@ cdef class PyXfer:
 
     @property
     def src_str(self):
+        if self.is_nop:
+            return 'NOP'
         return self.graphXfer.src_str().decode('utf-8')
 
     @property
     def dst_str(self):
+        if self.is_nop:
+            return 'NOP'
         return self.graphXfer.dst_str().decode('utf-8')
 
 cdef class QuartzContext:
@@ -439,7 +443,7 @@ cdef class PyGraph:
             return PyGraph().set_this(ret)
 
     # TODO: use node_id directly instead of using PyNode
-    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node, bool eliminate_rotation = False):
+    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False):
         if xfer.is_nop:
             return self, []
         ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node, eliminate_rotation)
@@ -458,7 +462,12 @@ cdef class PyGraph:
         ]
         return nodes_with_id
 
-    def get_node_from_id(self, *, id) -> PyNode:
+    def get_node_from_id(self, *, id : int) -> PyNode:
+        n = self.num_nodes
+        if id >= n:
+            print(id)
+            print(n)
+            self.to_qasm(filename='a.qasm')
         assert(id < self.num_nodes)
         return self.nodes[id]
 

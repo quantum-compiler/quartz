@@ -43,7 +43,8 @@ class Trajectory:
         # start = time.time()
         next_circ, next_nodes = self.current_circ.apply_xfer_with_local_state_tracking(
             xfer=context.get_xfer_from_id(id=xfer),
-            node=self.current_circ.get_node_from_id(id=node))
+            node=self.current_circ.get_node_from_id(id=node),
+            eliminate_rotation=True)
         # t_0 = time.time()
         # print(f'action time: {t_0 - start}')
 
@@ -72,17 +73,17 @@ class Trajectory:
             self.done = True
 
         # Compute next nodes
-        if self.is_nop or next_nodes == []:
-            next_nodes = []
-        else:
-            next_nodes = torch.tensor(next_nodes, dtype=torch.int64)
-            if context.get_xfer_from_id(id=xfer).dst_gate_count != 0:
-                src_node_ids, _, edge_ids = next_circ.to_dgl_graph().in_edges(
-                    next_nodes, form='all')
-                edge_mask = next_circ.to_dgl_graph(
-                ).edata['reversed'][edge_ids] == 0
-                next_nodes = torch.cat((next_nodes, src_node_ids[edge_mask]))
-            next_nodes = next_nodes.tolist()  # Could be []
+        # if self.is_nop or next_nodes == []:
+        #     next_nodes = []
+        # else:
+        #     next_nodes = torch.tensor(next_nodes, dtype=torch.int64)
+        #     if context.get_xfer_from_id(id=xfer).dst_gate_count != 0:
+        #         src_node_ids, _, edge_ids = next_circ.to_dgl_graph().in_edges(
+        #             next_nodes, form='all')
+        #         edge_mask = next_circ.to_dgl_graph(
+        #         ).edata['reversed'][edge_ids] == 0
+        #         next_nodes = torch.cat((next_nodes, src_node_ids[edge_mask]))
+        #     next_nodes = next_nodes.tolist()  # Could be []
 
         # Reward
         reward: int = 0
@@ -131,19 +132,18 @@ class Trajectory:
         self.current_circ = next_circ
 
 
-def sample_init_circs(
-        circ_info: dict,
-        circ_dataset: dict,
-        circ_names: list[str],
-        num_each_circ: int,
-        keep_origin: bool = True) -> list[tuple[str, PyGraph, int, int]]:
+def sample_init_circs(circ_info: dict,
+                      circ_dataset: dict,
+                      circ_names: list,
+                      num_each_circ: int,
+                      keep_origin: bool = True) -> list:
 
     pass
 
 
 def get_trajectory_batch(ppo_agent: PPO, context: QuartzContext,
-                         sampled_init_circs: list[tuple[str, PyGraph, int]],
-                         max_seq_len: int, invalid_reward: int):
+                         sampled_init_circs: list, max_seq_len: int,
+                         invalid_reward: int):
     trajectory_list: list[Trajectory] = []
     for i, circ_info in enumerate(sampled_init_circs):
         trajectory_list.append(

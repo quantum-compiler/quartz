@@ -360,7 +360,7 @@ class PPOAgent:
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
                     msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
-                    print(f'\n{msg}\n')
+                    print(f'\n{msg}\n', flush=True)
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',
@@ -602,7 +602,7 @@ class PPOAgent:
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
                     msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
-                    print(f'\n{msg}\n')
+                    print(f'\n{msg}\n', flush=True)
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',

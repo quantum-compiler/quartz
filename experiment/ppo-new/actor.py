@@ -6,11 +6,13 @@ import threading
 import copy
 import itertools
 import math
+import json
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+import torch.distributed as dist
 import torch.distributed.rpc as rpc
 from torch.futures import Future
 import dgl # type: ignore
@@ -147,6 +149,7 @@ class PPOAgent:
     def __init__(
         self,
         agent_id: int,
+        num_agents: int,
         num_observers: int,
         device: torch.device,
         batch_inference: bool,
@@ -160,6 +163,7 @@ class PPOAgent:
         output_dir: str,
     ) -> None:
         self.id = agent_id
+        self.num_agents = num_agents
         self.device = device
         self.output_dir = output_dir
         self.dyn_eps_len = dyn_eps_len
@@ -605,8 +609,9 @@ class PPOAgent:
                             text=msg, level=wandb.AlertLevel.INFO,
                             wait_duration=0,
                         ) # send alert to slack
-                    
+                    # end if
                     graph_buffer.best_graph = next_graph
+                # end if
                 i_step += 1
                 if s_exp.game_over:
                     graph_buffer.eps_lengths.append(i_step)
@@ -627,3 +632,35 @@ class PPOAgent:
         # e_time = get_time_ns()
         # errprint(f'    Data batched in {dur_ms(e_time, s_time)} ms.')
         return s_exps_zip
+
+    def sync_best_graph(self) -> None:
+        """broadcast the best graph of each buffer to other agents"""
+        best_info = [
+            {
+                'name': buffer.name,
+                'gate_count': buffer.best_graph.gate_count,
+                'qasm': buffer.best_graph.to_qasm_str(),
+            }
+            for buffer in self.graph_buffers
+        ]
+        with open(os.path.join(self.output_dir, f'best_info_{self.id}.json'), 'w') as f:
+            json.dump(best_info, fp=f, indent=2)
+        dist.barrier()
+        """read in other agents' results"""
+        for r in range(self.num_agents):
+            if r != self.id:
+                with open(os.path.join(self.output_dir, f'best_info_{r}.json')) as f:
+                    other_best_info = json.load(f)
+                for i in range(len(self.graph_buffers)):
+                    buffer = self.graph_buffers[i]
+                    other_info = other_best_info[i]
+                    assert buffer.name == other_info['name']
+                    if other_info['gate_count'] < buffer.best_graph.gate_count:
+                        new_best_graph = qtz.qasm_to_graph(other_info['qasm'])
+                        buffer.best_graph = new_best_graph
+                        print(f'  Agent {self.id} : read in new best graph ({new_best_graph.gate_count}) from agent {r}', flush=True)
+                    # end if
+                # end for i
+            # end if r
+        # end for r
+    

@@ -193,7 +193,7 @@ class GraphBuffer:
             self.original_graph.gate_count: [ self.original_graph, ],
         }
         self.hashset: Set[int] = { hash(self.original_graph) }
-        
+                
         """other infos"""
         self.best_graph = self.original_graph
         self.eps_lengths: List[int] = []
@@ -215,14 +215,18 @@ class GraphBuffer:
             )
         self.eps_lengths.clear()
         
-    def push_back(self, graph: quartz.PyGraph) -> None:
-        hash_value = hash(graph)
+    def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
+        if hash_value is None:
+            hash_value = hash(graph)
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
             gc = int(graph.gate_count)
             if gc not in self.gc_to_graph:
                 self.gc_to_graph[gc] = []
-            self.gc_to_graph[gc].append(graph)      
+            self.gc_to_graph[gc].append(graph)
+            return True
+        else:
+            return False
         
     def sample(self) -> quartz.PyGraph:
         gc_list = list(self.gc_to_graph.keys())
@@ -232,3 +236,16 @@ class GraphBuffer:
         sampled_gc = gc_list[sampled_gc_idx]
         sampled_graph = random.choice(self.gc_to_graph[sampled_gc])
         return sampled_graph
+
+    """Note that it's not concurrency-safe to call these functions."""
+    def push_nonexist_best(self, qasm: str) -> bool:
+        graph = qtz.qasm_to_graph(qasm)
+        if self.push_back(graph): # non-exist
+            """update best graph and return whether the best info is updated"""
+            if graph.gate_count < self.best_graph.gate_count:
+                self.best_graph = graph
+                return True
+        # end if
+        return False
+    
+    

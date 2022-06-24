@@ -12,8 +12,8 @@ from tqdm import tqdm # type: ignore
 import torch
 from torch.distributions import Categorical
 import torch.multiprocessing as mp
-import torch.distributed.rpc as rpc
 import torch.distributed as dist
+import torch.distributed.rpc as rpc
 from torch.nn.parallel import DistributedDataParallel as DDP
 # import quartz # type: ignore
 
@@ -134,6 +134,7 @@ class PPOMod:
         # NOTE should not use self.ac_net later
         self.agent = PPOAgent(
             agent_id=self.rank,
+            num_agents=self.ddp_processes,
             num_observers=self.cfg.obs_per_agent,
             device=self.device,
             batch_inference=self.cfg.batch_inference,
@@ -322,6 +323,7 @@ class PPOMod:
                     })
             # end for i_step
         # end for k_epochs
+        self.agent.sync_best_graph()
         # e_time = get_time_ns()
         # errprint(f'  {self.cfg.k_epochs} epochs finished in {dur_ms(s_time, e_time)} ms.')
         
@@ -367,13 +369,8 @@ def main(cfg) -> None:
         args=(ddp_processes, obs_processes,),
         nprocs=tot_processes,
         join=True,
-    )    
-    # TODO make sure qasm <-> graph conversion is correct
-    # TODO confirm params in config.yaml
-    # TODO find an optimal config of mp, or it will OOM
+    )
     # TODO profiling; some parts of this code are slow
     
-    # 4 gpus, 2 obs per agent, max_eps_len = 80 -> 7994 MiB / GPU
-
 if __name__ == '__main__':
     main()

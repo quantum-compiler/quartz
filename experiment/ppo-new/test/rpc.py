@@ -6,6 +6,7 @@ import torch.distributed.rpc as rpc
 def work_func(x):
     return x * 100
 
+
 def init_process(rank, tot_processes):
     print(f'here is rank {rank}', flush=True)
     os.environ['MASTER_ADDR'] = 'localhost'

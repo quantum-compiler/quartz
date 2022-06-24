@@ -573,6 +573,8 @@ class PPOAgent:
     def sync_best_graph(self) -> None:
         """broadcast the best graph of each buffer to other agents"""
         sync_dir = os.path.join(self.output_dir, 'sync_dir')
+        if not os.path.exists(sync_dir):
+            os.makedirs(sync_dir)
         best_info = [
             {
                 'name': buffer.name,

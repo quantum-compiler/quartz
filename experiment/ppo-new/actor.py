@@ -595,7 +595,7 @@ class PPOAgent:
                     buffer = self.graph_buffers[i]
                     other_info = other_best_info[i]
                     assert buffer.name == other_info['name']
-                    if buffer.push_nonexist_best(other_best_info['qasm']):
+                    if buffer.push_nonexist_best(other_info['qasm']):
                         printfl(f'  Agent {self.id} : read in new best graph ({buffer.best_graph.gate_count}) from agent {r}')
                     # end if
                 # end for i

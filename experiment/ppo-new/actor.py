@@ -311,6 +311,7 @@ class PPOAgent:
                 else:
                     max_eps_len = math.ceil(max_len * 1.2)
                 max_eps_len = max(max_eps_len, self.min_eps_len)
+                max_eps_len = min(max_eps_len, self.max_eps_len)
             else:
                 max_eps_len = self.max_eps_len
             """make async RPC to kick off an episode on observers"""
@@ -554,6 +555,7 @@ class PPOAgent:
                 else:
                     max_eps_len = math.ceil(max_len * 1.2)
                 max_eps_len = max(max_eps_len, self.min_eps_len)
+                max_eps_len = min(max_eps_len, self.max_eps_len)
             else:
                 max_eps_len = self.max_eps_len
             """make async RPC to kick off an episode on observers"""

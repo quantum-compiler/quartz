@@ -9,7 +9,7 @@ def work_func(x):
 def init_process(rank, tot_processes):
     print(f'here is rank {rank}', flush=True)
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = f'{52528}'
+    os.environ['MASTER_PORT'] = f'{52529}'
     rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
         # init_method=f'tcp://localhost:52524',
         num_worker_threads=32,
@@ -31,8 +31,12 @@ def init_process(rank, tot_processes):
 
 
 def main() -> None:
+    import resource
+    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (1000000, rlimit[1]))
+    
     mp.set_start_method('spawn')
-    tot_processes = 18
+    tot_processes = 19
     print(f'spawning {tot_processes} processes...')
     mp.spawn(
         fn=init_process,

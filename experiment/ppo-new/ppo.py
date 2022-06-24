@@ -41,7 +41,6 @@ class PPOMod:
         elif cfg.wandb.en is False:
             self.wandb_mode = 'disabled'
         self.print_cfg()
-        seed_all(cfg.seed)
 
         """init quartz"""
         self.init_quartz_context_func = partial(
@@ -68,6 +67,7 @@ class PPOMod:
         print('=========================================')
     
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
+        seed_all(self.cfg.seed)
         """init Quartz for each process"""
         global quartz_context
         global quartz_parser

@@ -69,6 +69,7 @@ class GraphXfer {
 public:
   GraphXfer(Context *_context);
   GraphXfer(Context *_context, const DAG *src_graph, const DAG *dst_graph);
+  bool src_graph_connected(DAG *src_graph);
   TensorX new_tensor(void);
   bool map_output(const TensorX &src, const TensorX &dst);
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;

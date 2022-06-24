@@ -510,14 +510,8 @@ class PPOAgent:
         best_gc: int,
         exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]]
     ) -> str:
-        for try_i in range(int(1e8)):
-            output_dir = os.path.join(self.output_dir, name, f'{best_gc}_{try_i}')
-            # in case of duplication under multi-processing setting
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-                break
-        else:
-            raise Exception(f'Unexpected: Couldn\'t find an available path for {os.path.join(self.output_dir, name, f"{best_gc}")}')
+        output_dir = os.path.join(self.output_dir, name, f'{best_gc}_{self.id}')
+        os.makedirs(output_dir)
         """make a s_exp to output the starting graph"""
         first_s_exp = SerializableExperience.new_empty()
         first_s_exp.action = Action(0, 0)

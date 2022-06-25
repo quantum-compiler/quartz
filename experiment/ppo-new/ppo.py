@@ -201,7 +201,7 @@ class PPOMod:
             exp_list += collect_fn(self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
-        printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s')
+        printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
         if self.rank == 0:

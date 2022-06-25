@@ -147,7 +147,8 @@ class PPOAgent:
         invalid_reward: float,
         ac_net: ActorCritic,
         input_graphs: List[Dict[str, str]],
-        softmax_temp: DictConfig,
+        softmax_temp_en: bool,
+        hit_rate: float,
         dyn_eps_len: bool,
         max_eps_len: int,
         min_eps_len: int,
@@ -162,7 +163,8 @@ class PPOAgent:
         self.min_eps_len = min_eps_len
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
-        self.softmax_temp = softmax_temp
+        self.softmax_temp_en = softmax_temp_en
+        self.hit_rate = hit_rate
         
         """init Observers on the other processes and hold the refs to them"""
         self.obs_rrefs: List[rpc.RRef] = []
@@ -207,10 +209,10 @@ class PPOAgent:
             node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
             node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
             temperature: float
-            if not self.softmax_temp.en:
+            if not self.softmax_temp_en:
                 temperature = 1.0
             else:
-                temperature = 1 / (math.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
+                temperature = 1 / (math.log( self.hit_rate * (num_nodes - 1)/(1 - self.hit_rate) ))
             softmax_node_values = F.softmax(node_values / temperature, dim=0)
             action_node = int(torch.multinomial(softmax_node_values, 1))
             """use Actor to evaluate xfers for the sampled node"""
@@ -365,10 +367,10 @@ class PPOAgent:
         node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
         node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
         temperature: float
-        if not self.softmax_temp.en:
+        if not self.softmax_temp_en:
             temperature = 1.0
         else:
-            temperature = 1 / (math.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
+            temperature = 1 / (math.log( self.hit_rate * (num_nodes - 1)/(1 - self.hit_rate) ))
         softmax_node_values = F.softmax(node_values / temperature, dim=0)
         action_node = int(torch.multinomial(softmax_node_values, 1))
         """use Actor to evaluate xfers for the sampled node"""
@@ -411,10 +413,10 @@ class PPOAgent:
                     node_values_list, batch_first=True, padding_value=-math.inf)
                 # (num_graphs, )
                 temperature: torch.Tensor
-                if not self.softmax_temp.en:
+                if not self.softmax_temp_en:
                     temperature = torch.ones(1).to(self.device)
                 else:
-                    temperature = 1 / (torch.log( self.softmax_temp.hit_rate * (num_nodes - 1)/(1 - self.softmax_temp.hit_rate) ))
+                    temperature = 1 / (torch.log( self.hit_rate * (num_nodes - 1)/(1 - self.hit_rate) ))
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 """collect embeddings of sampled nodes"""

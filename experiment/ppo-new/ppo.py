@@ -22,19 +22,21 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import hydra
 import wandb
 
+from config.config import *
 from ds import *
 from utils import *
 from model import ActorCritic
 from actor import PPOAgent
+
 from IPython import embed # type: ignore
 from icecream import ic # type: ignore
 
 class PPOMod:
     
     def __init__(
-        self, cfg, output_dir: str
+        self, cfg: BaseConfig, output_dir: str
     ) -> None:
-        self.cfg = cfg
+        self.cfg: BaseConfig = cfg
         self.output_dir = output_dir
         self.wandb_mode = 'online'
         if cfg.wandb.offline:
@@ -55,15 +57,16 @@ class PPOMod:
         for input_graph in cfg.input_graphs:
             with open(input_graph.path) as f:
                 self.input_graphs.append({
-                    'name': input_graph['name'],
+                    'name': input_graph.name,
                     'qasm': f.read(),
                 })
-        self.num_gate_type: int = 29
+        self.num_gate_type: int = cfg.num_gate_type
         
     def print_cfg(self) -> None:
         print('================ Configs ================')
-        for k, v in self.cfg.items():
-            print(f'{k} : {v}')
+        print(OmegaConf.to_yaml(self.cfg))
+        # for k, v in self.cfg.items():
+        #     print(f'{k} : {v}')
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
     
@@ -85,7 +88,7 @@ class PPOMod:
         self.ddp_processes = ddp_processes
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            init_method=f'tcp://localhost:{int(self.cfg.ddp_port) + 1}',
+            init_method=f'tcp://localhost:{self.cfg.ddp_port + 1}',
             rpc_timeout=0,
         )
         
@@ -98,15 +101,15 @@ class PPOMod:
             )
             dist.init_process_group(
                 backend='nccl',
-                init_method=f'tcp://localhost:{int(self.cfg.ddp_port)}',
+                init_method=f'tcp://localhost:{self.cfg.ddp_port}',
                 rank=rank, world_size=ddp_processes,
             )
             self.train()
         else:
             """init observer processes"""
             obs_rank = rank - ddp_processes
-            agent_rref_id = int(obs_rank // self.cfg.obs_per_agent)
-            obs_in_agent_rank = int(obs_rank % self.cfg.obs_per_agent)
+            agent_rref_id = obs_rank // self.cfg.obs_per_agent
+            obs_in_agent_rank = obs_rank % self.cfg.obs_per_agent
             obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
             rpc.init_rpc(
                 name=obs_name, rank=rank, world_size=tot_processes,
@@ -141,7 +144,8 @@ class PPOMod:
             invalid_reward=self.cfg.invalid_reward,
             ac_net=self.ac_net_old,
             input_graphs=self.input_graphs,
-            softmax_temp=self.cfg.softmax_temp,
+            softmax_temp_en=self.cfg.softmax_temp_en,
+            hit_rate=self.cfg.hit_rate,
             dyn_eps_len=self.cfg.dyn_eps_len,
             max_eps_len=self.cfg.max_eps_len,
             min_eps_len=self.cfg.min_eps_len,
@@ -167,7 +171,7 @@ class PPOMod:
                 project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
                 mode=self.wandb_mode,
-                config=self.cfg,
+                config=self.cfg, # type: ignore
             )
         printfl(f'rank {self.rank} on {self.device} initialized')
         
@@ -289,7 +293,7 @@ class PPOMod:
                 critic_loss = torch.sum(advantages ** 2) / len(exp_list)
                 xfer_entropy = torch.sum(xfer_entropys) / len(exp_list)
                 """compute overall loss"""
-                loss = actor_loss + 0.5 * critic_loss - float(self.cfg.entropy_coeff) * xfer_entropy
+                loss = actor_loss + 0.5 * critic_loss - self.cfg.entropy_coeff * xfer_entropy
                 """update"""
                 loss.backward()
                 for param in self.ddp_ac_net.parameters():
@@ -340,10 +344,11 @@ class PPOMod:
         printfl(f'resumed from "{ckpt_path}"!')
 
 @hydra.main(config_path='config', config_name='config')
-def main(cfg) -> None:
+def main(config: Config) -> None:
     output_dir = os.path.abspath(os.curdir) # get hydra output dir
     os.chdir(hydra.utils.get_original_cwd()) # set working dir to the original one
     
+    cfg: BaseConfig = config.c
     warnings.simplefilter('ignore')
     
     ppo_mod = PPOMod(cfg, output_dir)
@@ -352,7 +357,7 @@ def main(cfg) -> None:
     ddp_processes = 1
     if len(cfg.gpus) > 1:
         ddp_processes = len(cfg.gpus)
-    obs_processes = int(ddp_processes * cfg.obs_per_agent)
+    obs_processes = ddp_processes * cfg.obs_per_agent
     tot_processes = ddp_processes + obs_processes
     print(f'spawning {tot_processes} processes...')
     mp.spawn(

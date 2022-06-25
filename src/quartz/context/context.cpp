@@ -185,6 +185,15 @@ namespace quartz {
 		return dis_real(gen);
 	}
 
+    bool Context::has_parameterized_gate() const{
+        for(auto it = gates_.begin(); it != gates_.end(); ++it){
+            if(it->second->is_parametrized_gate())
+                return true;
+        }
+        return false;
+    }
+
+
 	Context union_contexts(Context *ctx_0, Context *ctx_1) {
 		std::vector< GateType > union_vector;
 		std::set< GateType > gate_set_0(ctx_0->get_supported_gates().begin(),
@@ -200,5 +209,6 @@ namespace quartz {
 		}
 		return Context(union_vector);
 	}
+
 
 } // namespace quartz

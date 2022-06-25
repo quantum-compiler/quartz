@@ -320,6 +320,9 @@ cdef class QuartzContext:
         else:
             return False
 
+    def has_parameterized_gate(self) -> bool:
+        return self.context.has_parameterized_gate()
+
     @property
     def num_equivalence_classes(self):
         return self.eqs.num_equivalence_classes()

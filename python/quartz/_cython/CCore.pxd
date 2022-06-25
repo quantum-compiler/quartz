@@ -59,6 +59,7 @@ cdef extern from "context/context.h" namespace "quartz":
     cdef cppclass Context:
         Context(const vector[GateType]) except +
         size_t next_global_unique_id()
+        bool has_parameterized_gate() const
 
 ctypedef Context* Context_ptr
 

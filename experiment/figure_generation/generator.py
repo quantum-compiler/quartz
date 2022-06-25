@@ -20,6 +20,9 @@ class GraphRecord:
     def add_neighbor(self, neighbor_hash):
         self.neighbour_hash_list.append(neighbor_hash)
 
+    def seal(self):
+        self.sealed = True
+
 
 class DataBuffer:
     def __init__(self) -> None:
@@ -39,7 +42,8 @@ class DataBuffer:
         # separate the graphs
         finished_graphs = {}
         unfinished_graphs = {}
-        for graph_hash, graph_record in self.hash2graphs:
+        for graph_hash in self.hash2graphs:
+            graph_record = self.hash2graphs[graph_hash]
             if graph_record.sealed:
                 finished_graphs[graph_hash] = graph_record
             else:
@@ -47,7 +51,7 @@ class DataBuffer:
 
         # save into file
         if not len(finished_graphs) == 0:
-            with open(output_path + f"_{len(finished_graphs)}.dat", 'w') as f:
+            with open(output_path + f"_{len(finished_graphs)}.dat", 'wb') as f:
                 pickle.dump(obj=finished_graphs, file=f, protocol=pickle.HIGHEST_PROTOCOL)
         self.hash2graphs = unfinished_graphs
 
@@ -145,11 +149,12 @@ class Generator:
 
                         # logging
                         if budget % 1000 == 0:
-                            bar.set_postfix({'best_cnt': best_gate_cnt, '|visited|': total_visited_circuits,
+                            bar.set_postfix({'best_cnt': best_gate_cnt, 'visited': total_visited_circuits,
                                              'graphs': self.buffer.total_graphs})
                             bar.refresh()
                         if budget % 1000 == 0:
                             self.save(f'{total_budget-budget}')
+                self.buffer.hash2graphs[initial_graph_hash].seal()
 
 
 if __name__ == '__main__':

@@ -9,6 +9,8 @@ import copy
 import math
 from tqdm import tqdm # type: ignore
 
+import qtz
+
 import torch
 from torch.distributions import Categorical
 import torch.multiprocessing as mp
@@ -20,7 +22,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import hydra
 import wandb
 
-import qtz
 from ds import *
 from utils import *
 from model import ActorCritic
@@ -163,7 +164,7 @@ class PPOMod:
         ])
         if self.rank == 0:
             wandb.init(
-                project='PPO',
+                project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
                 mode=self.wandb_mode,
                 config=self.cfg,

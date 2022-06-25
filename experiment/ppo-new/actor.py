@@ -8,6 +8,8 @@ import itertools
 import math
 import json
 
+import qtz
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +19,6 @@ import torch.distributed.rpc as rpc
 from torch.futures import Future
 import dgl # type: ignore
 # import quartz # type: ignore
-import qtz
 
 import wandb
 from omegaconf.dictconfig import DictConfig
@@ -93,7 +94,8 @@ class Observer:
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                    node=graph.get_node_from_id(id=action.node)
+                    node=graph.get_node_from_id(id=action.node),
+                    eliminate_rotation=qtz.has_parameterized_gate,
                 )
             """parse result, compute reward"""
             if next_graph is None:
@@ -231,7 +233,8 @@ class PPOAgent:
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                    node=graph.get_node_from_id(id=action.node)
+                    node=graph.get_node_from_id(id=action.node),
+                    eliminate_rotation=qtz.has_parameterized_gate,
                 )
             """parse result, compute reward"""
             if next_graph is None:

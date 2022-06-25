@@ -2,11 +2,15 @@
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
-from typing import Dict, Iterator, Set, List, Any
+from typing import Dict, Iterator, Set, List, Tuple, Any
 
+import math
 import random
+import itertools
+
 import torch
 import dgl # type: ignore
+
 import quartz # type: ignore
 import qtz
 from IPython import embed # type: ignore
@@ -176,7 +180,7 @@ class BatchedExperience:
         return len(self.next_nodes)
 
 class GraphBuffer:
-    """store PyGraph of a class of circuits for init state sampling and best info maintenance"""
+    """store PyGraph of a class of circuits for init state sampling and maintain some other infos"""
     def __init__(
         self,
         name: str,
@@ -196,24 +200,54 @@ class GraphBuffer:
                 
         """other infos"""
         self.best_graph = self.original_graph
+        
         self.eps_lengths: List[int] = []
         self.max_eps_length: int = 0
+        
+        self.rewards: List[List[float]] = []
     
     def __len__(self) -> int:
         return len(self.hashset)
     
-    def update_max_eps_length(self, x: int) -> int:
+    def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
+        """Return: (best, old_best)"""
+        old = self.max_eps_length
         self.max_eps_length = max(
             self.max_eps_length, x
         )
-        return self.max_eps_length
+        return self.max_eps_length, old
+    
+    def update_max_eps_length(self) -> Tuple[int, int, int]:
+        """Return: (best, current, old_best)"""
+        old = self.max_eps_length
+        cur = max(self.eps_lengths) if len(self.eps_lengths) > 0 else 0
+        self.max_eps_length = max(
+            self.max_eps_length, cur,
+        )
+        return self.max_eps_length, cur, old
 
     def prepare_for_next_iter(self) -> None:
-        if len(self.eps_lengths) > 0:
-            self.max_eps_length = max(
-                self.max_eps_length, max(self.eps_lengths),
-            )
+        self.update_max_eps_length()
         self.eps_lengths.clear()
+        self.rewards.clear()
+    
+    def rewards_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        best_eps_reward: float = - math.inf
+        mean_eps_reward: float = 0.
+        for eps_rewards in self.rewards:
+            # assert len(eps_rewards) > 0
+            eps_sum = sum(eps_rewards)
+            best_eps_reward = max(best_eps_reward, eps_sum)
+            mean_eps_reward += eps_sum / len(self.rewards)
+        
+        all_rewards = list(itertools.chain(*self.rewards))
+        
+        info['best_eps_reward'] = best_eps_reward
+        info['mean_eps_reward'] = mean_eps_reward
+        info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
+        
+        return info
         
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:

@@ -1,109 +1,36 @@
 import argparse
 import heapq
 import json
-import math
 import os
-from collections import deque
+import time
 
-import multiprocessing as mp
+import multiprocess as mp
 import quartz
-from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector
 from tqdm import tqdm
 
 
-def check(graph):
-    graph.to_qasm(filename='check.qasm')
-    qc_origin = QuantumCircuit.from_qasm_file(
-        'barenco_tof_3_opt_path/subst_history_39.qasm')
-    qc_optimized = QuantumCircuit.from_qasm_file('check.qasm')
-    return Statevector.from_instruction(qc_origin).equiv(
-        Statevector.from_instruction(qc_optimized))
+class GraphRecord:
+    def __init__(self, qasm_str: string, gate_cnt: int, parent_hash):
+        self.qasm_str = qasm_str
+        self.gate_cnt = gate_cnt
+        self.parent_hash = parent_hash
+        self.neighbour_hash_list = []
+
+    def add_neighbor(self, neighbor_hash):
+        self.neighbour_hash_list.append(neighbor_hash)
 
 
 class DataBuffer:
-    def __init__(self, gamma) -> None:
-        self.hash2graphs = {}  # graph qasm and gate count
-        self.reward_map = {}
-        self.path_map = {}  # predecessors
-        self.gamma = gamma
+    def __init__(self) -> None:
+        self.hash2graphs = {}  # hash -> GraphRecord
 
-    def add_graph(self, graph: quartz.PyGraph, graph_hash, graph_cnt):
-        assert (graph_hash not in self.hash2graphs)  # TODO  remove
-        self.hash2graphs[graph_hash] = (graph.to_qasm_str(), graph_cnt)
+    def add_graph(self, graph: quartz.PyGraph, graph_hash, graph_cnt, parent_hash):
+        assert (graph_hash not in self.hash2graphs)
+        self.hash2graphs[graph_hash] = GraphRecord(qasm_str=graph.to_qasm_str(),
+                                                   gate_cnt=graph_cnt, parent_hash=parent_hash)
 
-    def update_path(self, pre_graph_hash, node_id, xfer_id, graph_hash):
-        # may introduce loops; it's the caller's responsibility to handle it
-        if graph_hash not in self.path_map:
-            self.path_map[graph_hash] = {pre_graph_hash: (node_id, xfer_id)}
-        elif pre_graph_hash not in self.path_map[graph_hash]:
-            self.path_map[graph_hash][pre_graph_hash] = (node_id, xfer_id)
-
-    def _add_to_reward_map(self, reward, g_hash, node_id, xfer_id, depth):
-        if g_hash not in self.reward_map:
-            self.reward_map[g_hash] = {}
-            self.reward_map[g_hash][node_id] = {}
-            self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
-        elif node_id not in self.reward_map[g_hash]:
-            self.reward_map[g_hash][node_id] = {}
-            self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
-        elif xfer_id not in self.reward_map[g_hash][node_id]:
-            self.reward_map[g_hash][node_id][
-                xfer_id] = reward * math.pow(self.gamma, depth)
-        else:
-            self.reward_map[g_hash][node_id][xfer_id] = max(
-                reward * math.pow(self.gamma, depth),
-                self.reward_map[g_hash][node_id][xfer_id])
-
-    def update_reward(self, pre_graph_hash, pre_graph_cnt, node_id, xfer_id, graph_hash, graph_cnt):
-        # pre_graph -> graph
-        # TODO  if exists? min?
-        assert pre_graph_hash in self.hash2graphs and graph_hash in self.hash2graphs
-        # old_graph_gate_cnt = self.gate_count_map.get(graph_hash, None)
-        # assert(old_graph_gate_cnt is None or old_graph_gate_cnt == graph_gate_cnt)
-        # self.gate_count_map[graph_hash] = graph_gate_cnt
-
-        # update reward in this connected component by BFS
-        # only when the gate count is reduced by this xfer (greedy?)
-        reward = pre_graph_cnt - graph_cnt
-        if reward == 0:
-            self._add_to_reward_map(reward, pre_graph_hash, node_id, xfer_id, 0)
-
-        if reward > 0:
-            q = deque([])  # (g_hash, node_id, xfer_id, depth)
-            s = set([])
-            q.append((pre_graph_hash, node_id, xfer_id, 0))
-            s.add(pre_graph_hash)
-            while len(q) > 0:
-                g_hash, node_id, xfer_id, depth = q.popleft()
-                self._add_to_reward_map(reward, g_hash, node_id, xfer_id, depth)
-
-                # TODO  considering contiguous reduction
-                # if reward of g_hash is not better, then stop find predecessors!
-                # g_hash, node_id, xfer_id, depth, succ_gc, succ_reward = q.popleft()
-                # reward = max(reward, this_gc - succ_gc + gamma * succ_reward)
-                # assert( gamma * succ_reward == pow(init_reward, depth) )
-
-                pre_dict = self.path_map[g_hash]
-                for pre_hash in pre_dict:
-                    assert self.hash2graphs[pre_hash][1] >= pre_graph_cnt
-                    if pre_hash not in s and self.hash2graphs[pre_hash][1] <= pre_graph_cnt:
-                        # TODO  global or local?
-                        # print(f'!!! in update_reward: {self.gate_count_map[pre_hash]} > {pre_graph_gate_cnt}')
-                        # assert(False)
-                        n_id, x_id = pre_dict[pre_hash]
-                        q.append((pre_hash, n_id, x_id, depth + 1))
-                        s.add(pre_hash)
-
-    def save_path(self, output_path: str):
-        with open(output_path, 'w') as f:
-            json.dump(self.path_map, f, indent=2)
-
-    def save_reward(self, output_path: str):
-        with open(output_path, 'w') as f:
-            json.dump(self.reward_map, f, indent=2)
+    def add_neighbor(self, graph_hash, neighbor_hash):
+        self.hash2graphs[graph_hash].add_neighbor(neighbor_hash=neighbor_hash)
 
     def save_graph(self, output_path: str):
         with open(output_path, 'w') as f:
@@ -119,44 +46,37 @@ all_nodes = None
 
 
 class Generator:
-    def __init__(self,
-                 gate_set: list,
-                 ecc_file: str,
-                 input_circuit_file: str,
-                 gamma: int = 0.9,
-                 no_increase: bool = True,
-                 include_nop: bool = True,
-                 ):
+    def __init__(self, gate_set: list, ecc_file: str, input_circuit_file: str,
+                 no_increase: bool = True, include_nop: bool = True):
+        # output path
         self.output_path = "./outputs"
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
+        # set context
         global quartz_context
+        quartz_context = quartz.QuartzContext(gate_set=gate_set, filename=ecc_file,
+                                              no_increase=no_increase, include_nop=include_nop)
+
+        # set original graph
         global initial_graph
-        quartz_context = quartz.QuartzContext(
-            gate_set=gate_set,
-            filename=ecc_file,
-            no_increase=no_increase,
-            include_nop=include_nop,
-        )
         qasm_parser = quartz.PyQASMParser(context=quartz_context)
         dag = qasm_parser.load_qasm(filename=input_circuit_file)
         initial_graph = quartz.PyGraph(context=quartz_context, dag=dag)
 
-        self.buffer = DataBuffer(gamma)
+        self.buffer = DataBuffer()
 
     def save(self, prefix: str = ''):
-        self.buffer.save_path(os.path.join(self.output_path, f'{prefix}path.json'))
         self.buffer.save_graph(os.path.join(self.output_path, f'{prefix}graph.json'))
-        self.buffer.save_reward(os.path.join(self.output_path, f'{prefix}reward.json'))
 
-    def gen(self):
+    def gen(self, budget):
         global initial_graph
         global quartz_context
         global all_nodes
 
         initial_graph_hash = initial_graph.hash()
         initial_graph_gate_count = initial_graph.gate_count
+        best_gate_cnt = initial_graph_gate_count
 
         # min-heap by default; contains (gate_count, hash)
         # gate_count is used to compare the pair by default
@@ -164,64 +84,54 @@ class Generator:
         visited_hash_set = set()
         heapq.heappush(candidate_hq, (initial_graph_gate_count, initial_graph, initial_graph_hash))
         visited_hash_set.add(initial_graph_hash)
-        self.buffer.add_graph(initial_graph, initial_graph_hash, initial_graph_gate_count)
+        self.buffer.add_graph(graph=initial_graph, graph_hash=initial_graph_hash,
+                              graph_cnt=initial_graph_gate_count, parent_hash=0)
 
-        best_graph = initial_graph
-        best_gate_cnt = initial_graph_gate_count
-        max_gate_cnt = 64
-        budget = 5_000_000
-
-        with tqdm(
-                total=initial_graph.gate_count,
-                desc='num of gates reduced',
-                bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
-        ) as pbar:
+        # start search
+        with tqdm(total=budget, desc='num of circuits gathered',
+                  bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}') as bar:
+            total_visited_circuits = 0
             while len(candidate_hq) > 0 and budget > 0:
-                first_cnt, initial_graph, initial_graph_hash = heapq.heappop(candidate_hq)
+                # get graph of current loop
+                initial_graph_gate_cnt, initial_graph, initial_graph_hash = heapq.heappop(candidate_hq)
                 all_nodes = initial_graph.all_nodes()
 
-                # print(f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}')
+                # get all applicable transfers
+                def available_xfers(idx):
+                    return initial_graph.available_xfers_parallel(context=quartz_context, node=all_nodes[idx])
 
-                def available_xfers(i):
-                    return initial_graph.available_xfers(context=quartz_context, node=all_nodes[i])
-
-                # av_start = time.monotonic_ns()
                 with mp.Pool() as pool:
-                    appliable_xfers_nodes = pool.map(available_xfers, list(range(len(all_nodes))))
-                # av_end = time.monotonic_ns()
-                # print(f'av duration: { (av_end - av_start) / 1e6 } ms')
-                # print(sum([len(xfers) for xfers in appliable_xfers_nodes]))
+                    applicable_xfers_nodes = pool.map(available_xfers, list(range(len(all_nodes))))
+
+                # apply them to get new graphs
+                # enumerate all nodes in the graph
                 for i in range(len(all_nodes)):
                     node = all_nodes[i]
-                    appliable_xfers = appliable_xfers_nodes[i]
-                    for xfer in appliable_xfers:
-                        new_graph = initial_graph.apply_xfer(
-                            xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
+                    applicable_xfers = applicable_xfers_nodes[i]
+                    # enumerate all xfers on selected node
+                    for xfer in applicable_xfers:
+                        new_graph = initial_graph.apply_xfer(xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
                         new_hash = new_graph.hash()
                         new_cnt = new_graph.gate_count
-
+                        # only visit the new graph if not visited
                         if new_hash not in visited_hash_set:
                             visited_hash_set.add(new_hash)
                             heapq.heappush(candidate_hq, (new_cnt, new_graph, new_hash))
-                            self.buffer.add_graph(new_graph, new_hash, new_cnt)
+                            self.buffer.add_graph(graph=new_graph, graph_hash=new_hash, graph_cnt=new_cnt,
+                                                  parent_hash=initial_graph_hash)
+                            self.buffer.add_neighbor(graph_hash=initial_graph_hash, neighbor_hash=new_hash)
                             if new_cnt < best_gate_cnt:
-                                print()
-                                pbar.update(best_gate_cnt - new_cnt)
-                                best_graph = new_graph
+                                print(f"Graph with {new_cnt} gates found!")
                                 best_gate_cnt = new_cnt
+                            bar.update(1)
+                            budget -= 1
+                        total_visited_circuits += 1
 
-                        self.buffer.update_path(initial_graph_hash, i, xfer, new_hash)
-                        self.buffer.update_reward(initial_graph_hash, first_cnt, i, xfer, new_hash, new_cnt)
-
-                        budget -= 1
+                        # logging
                         if budget % 1000 == 0:
-                            pbar.set_postfix({
-                                'best_gate_cnt': best_gate_cnt,
-                                '|reward_map|': len(self.buffer.reward_map),
-                                'budget': budget,
-                                '|graphs|': len(self.buffer.hash2graphs),
-                            })
-                            pbar.refresh()
+                            bar.set_postfix({'best_cnt': best_gate_cnt, '|visited|': total_visited_circuits,
+                                             'graphs': len(self.buffer.hash2graphs)})
+                            bar.refresh()
                         if budget % 100_000 == 0:
                             self.save(f'{budget}_')
                 # end for all_nodes
@@ -233,20 +143,15 @@ class Generator:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate figure for paper.')
-    parser.add_argument('--gamma', type=float, default=0.9, required=True)
     parser.add_argument('--no_increase', type=bool, default=True, required=True)
-    parser.add_argument('--include_nop', type=bool, default=True, required=True)
+    parser.add_argument('--include_nop', type=bool, default=False, required=True)
     args = parser.parse_args()
 
     generator = Generator(
         gate_set=['h', 'cx', 't', 'tdg'],
         ecc_file="bfs_verified_simplified.json",
         input_circuit_file="./barenco_tof_3.qasm",
-        gamma=args.gamma,
         no_increase=args.no_increase,
         include_nop=args.include_nop,
     )
-    try:
-        generator.gen()
-    except KeyboardInterrupt:
-        generator.save()
+    generator.gen(10)

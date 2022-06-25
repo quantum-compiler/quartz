@@ -1,6 +1,6 @@
 import argparse
 import heapq
-import json
+import pickle
 import os
 import time
 
@@ -10,11 +10,12 @@ from tqdm import tqdm
 
 
 class GraphRecord:
-    def __init__(self, qasm_str: string, gate_cnt: int, parent_hash):
+    def __init__(self, qasm_str, gate_cnt, parent_hash):
         self.qasm_str = qasm_str
         self.gate_cnt = gate_cnt
         self.parent_hash = parent_hash
         self.neighbour_hash_list = []
+        self.sealed = False
 
     def add_neighbor(self, neighbor_hash):
         self.neighbour_hash_list.append(neighbor_hash)
@@ -23,18 +24,32 @@ class GraphRecord:
 class DataBuffer:
     def __init__(self) -> None:
         self.hash2graphs = {}  # hash -> GraphRecord
+        self.total_graphs = 0
 
     def add_graph(self, graph: quartz.PyGraph, graph_hash, graph_cnt, parent_hash):
         assert (graph_hash not in self.hash2graphs)
         self.hash2graphs[graph_hash] = GraphRecord(qasm_str=graph.to_qasm_str(),
                                                    gate_cnt=graph_cnt, parent_hash=parent_hash)
+        self.total_graphs += 1
 
     def add_neighbor(self, graph_hash, neighbor_hash):
         self.hash2graphs[graph_hash].add_neighbor(neighbor_hash=neighbor_hash)
 
     def save_graph(self, output_path: str):
-        with open(output_path, 'w') as f:
-            json.dump(self.hash2graphs, f, indent=2)
+        # separate the graphs
+        finished_graphs = {}
+        unfinished_graphs = {}
+        for graph_hash, graph_record in self.hash2graphs:
+            if graph_record.sealed:
+                finished_graphs[graph_hash] = graph_record
+            else:
+                unfinished_graphs[graph_hash] = graph_record
+
+        # save into file
+        if not len(finished_graphs) == 0:
+            with open(output_path + f"_{len(finished_graphs)}.dat", 'w') as f:
+                pickle.dump(obj=finished_graphs, file=f, protocol=pickle.HIGHEST_PROTOCOL)
+        self.hash2graphs = unfinished_graphs
 
 
 # these should be global variables to avoid serialization when multi-processing
@@ -66,8 +81,8 @@ class Generator:
 
         self.buffer = DataBuffer()
 
-    def save(self, prefix: str = ''):
-        self.buffer.save_graph(os.path.join(self.output_path, f'{prefix}graph.json'))
+    def save(self, suffix: str = ''):
+        self.buffer.save_graph(os.path.join(self.output_path, f'graph_{suffix}'))
 
     def gen(self, budget):
         global initial_graph
@@ -91,6 +106,7 @@ class Generator:
         with tqdm(total=budget, desc='num of circuits gathered',
                   bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}') as bar:
             total_visited_circuits = 0
+            total_budget = budget
             while len(candidate_hq) > 0 and budget > 0:
                 # get graph of current loop
                 initial_graph_gate_cnt, initial_graph, initial_graph_hash = heapq.heappop(candidate_hq)
@@ -130,15 +146,10 @@ class Generator:
                         # logging
                         if budget % 1000 == 0:
                             bar.set_postfix({'best_cnt': best_gate_cnt, '|visited|': total_visited_circuits,
-                                             'graphs': len(self.buffer.hash2graphs)})
+                                             'graphs': self.buffer.total_graphs})
                             bar.refresh()
-                        if budget % 100_000 == 0:
-                            self.save(f'{budget}_')
-                # end for all_nodes
-            # end while
-        # end with
-
-        self.save()
+                        if budget % 1000 == 0:
+                            self.save(f'{total_budget-budget}')
 
 
 if __name__ == '__main__':
@@ -154,4 +165,4 @@ if __name__ == '__main__':
         no_increase=args.no_increase,
         include_nop=args.include_nop,
     )
-    generator.gen(10)
+    generator.gen(2000)

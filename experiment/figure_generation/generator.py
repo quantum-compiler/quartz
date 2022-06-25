@@ -1,17 +1,15 @@
-import quartz
-import time
-import os
+import argparse
 import heapq
 import json
-from qiskit.quantum_info import Statevector
-from qiskit import QuantumCircuit
 import math
+import os
 from collections import deque
-from functools import partial
+
 import multiprocess as mp
+import quartz
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
 from tqdm import tqdm
-import argparse
-from IPython import embed
 
 
 def check(graph):
@@ -115,7 +113,7 @@ class DataBuffer:
 # these should be global variables to avoid serialization when multi-processing
 # so we cannot run multiple generators concurrently,
 # unless we create lists of these global variables
-first_graph = None
+initial_graph = None
 quartz_context = None
 all_nodes = None
 
@@ -127,23 +125,23 @@ class Generator:
                  input_circuit_file: str,
                  gamma: int = 0.9,
                  no_increase: bool = True,
-                 output_path: str = 'pretrain_dataset',
+                 include_nop: bool = True,
                  ):
         self.output_path = output_path
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
         global quartz_context
-        global first_graph
+        global initial_graph
         quartz_context = quartz.QuartzContext(
             gate_set=gate_set,
             filename=ecc_file,
             no_increase=no_increase,
-            include_nop=True,  # TODO
+            include_nop=include_nop,
         )
-        parser = quartz.PyQASMParser(context=quartz_context)
-        dag = parser.load_qasm(filename=input_circuit_file)
-        first_graph = quartz.PyGraph(context=quartz_context, dag=dag)
+        qasm_parser = quartz.PyQASMParser(context=quartz_context)
+        dag = qasm_parser.load_qasm(filename=input_circuit_file)
+        initial_graph = quartz.PyGraph(context=quartz_context, dag=dag)
 
         self.buffer = DataBuffer(gamma)
 
@@ -153,39 +151,39 @@ class Generator:
         self.buffer.save_reward(os.path.join(self.output_path, f'{prefix}reward.json'))
 
     def gen(self):
-        global first_graph
+        global initial_graph
         global quartz_context
         global all_nodes
 
-        first_graph_hash = first_graph.hash()
-        first_graph_gate_count = first_graph.gate_count
+        initial_graph_hash = initial_graph.hash()
+        initial_graph_gate_count = initial_graph.gate_count
 
         # min-heap by default; contains (gate_count, hash)
         # gate_count is used to compare the pair by default
         candidate_hq = []  # (graph.gate_count, graph, graph_hash)
         visited_hash_set = set()
-        heapq.heappush(candidate_hq, (first_graph_gate_count, first_graph, first_graph_hash))
-        visited_hash_set.add(first_graph_hash)
-        self.buffer.add_graph(first_graph, first_graph_hash, first_graph_gate_count)
+        heapq.heappush(candidate_hq, (initial_graph_gate_count, initial_graph, initial_graph_hash))
+        visited_hash_set.add(initial_graph_hash)
+        self.buffer.add_graph(initial_graph, initial_graph_hash, initial_graph_gate_count)
 
-        best_graph = first_graph
-        best_gate_cnt = first_graph_gate_count
+        best_graph = initial_graph
+        best_gate_cnt = initial_graph_gate_count
         max_gate_cnt = 64
         budget = 5_000_000
 
         with tqdm(
-                total=first_graph.gate_count,
+                total=initial_graph.gate_count,
                 desc='num of gates reduced',
                 bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
         ) as pbar:
             while len(candidate_hq) > 0 and budget > 0:
-                first_cnt, first_graph, first_graph_hash = heapq.heappop(candidate_hq)
-                all_nodes = first_graph.all_nodes()
+                first_cnt, initial_graph, initial_graph_hash = heapq.heappop(candidate_hq)
+                all_nodes = initial_graph.all_nodes()
 
                 # print(f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}')
 
                 def available_xfers(i):
-                    return first_graph.available_xfers(context=quartz_context, node=all_nodes[i])
+                    return initial_graph.available_xfers(context=quartz_context, node=all_nodes[i])
 
                 # av_start = time.monotonic_ns()
                 with mp.Pool() as pool:
@@ -197,7 +195,7 @@ class Generator:
                     node = all_nodes[i]
                     appliable_xfers = appliable_xfers_nodes[i]
                     for xfer in appliable_xfers:
-                        new_graph = first_graph.apply_xfer(
+                        new_graph = initial_graph.apply_xfer(
                             xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
                         new_hash = new_graph.hash()
                         new_cnt = new_graph.gate_count
@@ -212,8 +210,8 @@ class Generator:
                                 best_graph = new_graph
                                 best_gate_cnt = new_cnt
 
-                        self.buffer.update_path(first_graph_hash, i, xfer, new_hash)
-                        self.buffer.update_reward(first_graph_hash, first_cnt, i, xfer, new_hash, new_cnt)
+                        self.buffer.update_path(initial_graph_hash, i, xfer, new_hash)
+                        self.buffer.update_reward(initial_graph_hash, first_cnt, i, xfer, new_hash, new_cnt)
 
                         budget -= 1
                         if budget % 1000 == 0:
@@ -235,20 +233,20 @@ class Generator:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate figure for paper.')
-    parser.add_argument('--output-path', type=str, required=True)
     parser.add_argument('--gamma', type=float, default=0.9, required=True)
+    parser.add_argument('--no_increase', type=bool, default=True, required=True)
+    parser.add_argument('--include_nop', type=bool, default=True, required=True)
     args = parser.parse_args()
 
     generator = Generator(
         gate_set=['h', 'cx', 't', 'tdg'],
-        ecc_file='bfs_verified_simplified.json',
-        input_circuit_file="../barenco_tof_3_opt_path/subst_history_39.qasm",
+        ecc_file="bfs_verified_simplified.json",
+        input_circuit_file="./barenco_tof_3.qasm",
         gamma=args.gamma,
-        no_increase=True,
-        output_path=args.output_path,
+        no_increase=args.no_increase,
+        include_nop=args.include_nop,
     )
     try:
         generator.gen()
     except KeyboardInterrupt:
         generator.save()
-        embed()

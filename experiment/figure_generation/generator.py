@@ -152,7 +152,7 @@ class Generator:
                             bar.set_postfix({'best_cnt': best_gate_cnt, 'visited': total_visited_circuits,
                                              'graphs': self.buffer.total_graphs})
                             bar.refresh()
-                        if budget % 1000 == 0:
+                        if budget % 100_000 == 0:
                             self.save(f'{total_budget-budget}')
                 self.buffer.hash2graphs[initial_graph_hash].seal()
 
@@ -170,4 +170,4 @@ if __name__ == '__main__':
         no_increase=args.no_increase,
         include_nop=args.include_nop,
     )
-    generator.gen(2000)
+    generator.gen(5_000_000)

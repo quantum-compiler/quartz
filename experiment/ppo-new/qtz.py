@@ -6,6 +6,8 @@ import quartz # type: ignore
 quartz_context: quartz.QuartzContext
 quartz_parser: quartz.PyQASMParser
 
+has_parameterized_gate: bool
+
 def init_quartz_context(
     gate_set: List[str],
     ecc_file_path: str,
@@ -14,6 +16,7 @@ def init_quartz_context(
 ) -> None:
     global quartz_context
     global quartz_parser
+    global has_parameterized_gate
     quartz_context = quartz.QuartzContext(
         gate_set=gate_set,
         filename=ecc_file_path,
@@ -21,6 +24,7 @@ def init_quartz_context(
         include_nop=include_nop,
     )
     quartz_parser = quartz.PyQASMParser(context=quartz_context)
+    has_parameterized_gate = quartz_context.has_parameterized_gate()
 
 def qasm_to_graph_th_dag(qasm_str: str) -> quartz.PyGraph:
     global quartz_context

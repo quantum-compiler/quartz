@@ -8,6 +8,8 @@ import itertools
 import math
 import json
 
+import qtz
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +19,6 @@ import torch.distributed.rpc as rpc
 from torch.futures import Future
 import dgl # type: ignore
 # import quartz # type: ignore
-import qtz
 
 import wandb
 from omegaconf.dictconfig import DictConfig
@@ -75,7 +76,7 @@ class Observer:
             else:
                 _action = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
-                ) # NOTE not sure if it's OK because `select_action` doesn't return a `Future`
+                )
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
                 context=qtz.quartz_context, node=graph.get_node_from_id(id=_action.node))
@@ -93,7 +94,8 @@ class Observer:
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                    node=graph.get_node_from_id(id=action.node)
+                    node=graph.get_node_from_id(id=action.node),
+                    eliminate_rotation=qtz.has_parameterized_gate,
                 )
             """parse result, compute reward"""
             if next_graph is None:
@@ -231,7 +233,8 @@ class PPOAgent:
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                    node=graph.get_node_from_id(id=action.node)
+                    node=graph.get_node_from_id(id=action.node),
+                    eliminate_rotation=qtz.has_parameterized_gate,
                 )
             """parse result, compute reward"""
             if next_graph is None:
@@ -448,14 +451,19 @@ class PPOAgent:
         for buffer in self.graph_buffers:
             info_dict[f'{buffer.name}_best_gc'] = buffer.best_graph.gate_count
             info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
+            
             info_dict[f'{buffer.name}_mean_eps_len'] = \
                 torch.Tensor(buffer.eps_lengths).mean().item() \
                 if len(buffer.eps_lengths) > 0 else 0.
-            max_eps_len_this_iter = \
-                int(max(buffer.eps_lengths)) \
-                if len(buffer.eps_lengths) > 0 else 0
-            info_dict[f'{buffer.name}_max_eps_len_this_iter'] = max_eps_len_this_iter
-            info_dict[f'{buffer.name}_max_eps_len'] = buffer.update_max_eps_length(max_eps_len_this_iter)
+            
+            max_eps_len, this_max_eps_len, _ = buffer.update_max_eps_length()
+            info_dict[f'{buffer.name}_max_eps_len'] = this_max_eps_len
+            info_dict[f'{buffer.name}_max_eps_len_global'] = max_eps_len
+            
+            rewards_info = buffer.rewards_info()
+            for k, v in rewards_info.items():
+                info_dict[f'{buffer.name}_{k}'] = v
+            
         return info_dict
     
     def output_opt_path(
@@ -530,15 +538,17 @@ class PPOAgent:
                     init_graph = qtz.qasm_to_graph(obs_res[0].state)
                     exp_seq = []
                     i_step = 0
+                    graph_buffer.rewards.append([])
                 graph = qtz.qasm_to_graph(s_exp.state)
                 next_graph = qtz.qasm_to_graph(s_exp.next_state)
+                state_dgl_list.append(graph.to_dgl_graph())
+                next_state_dgl_list.append(next_graph.to_dgl_graph())
                 exp_seq.append((s_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
-                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
+                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less or equal gate count
                     graph_buffer.push_back(next_graph)
-                state_dgl_list.append(graph.to_dgl_graph())
-                next_state_dgl_list.append(next_graph.to_dgl_graph())
+                graph_buffer.rewards[-1].append(s_exp.reward)
                 """best graph maintenance"""
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)

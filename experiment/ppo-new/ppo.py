@@ -9,6 +9,8 @@ import copy
 import math
 from tqdm import tqdm # type: ignore
 
+import qtz
+
 import torch
 from torch.distributions import Categorical
 import torch.multiprocessing as mp
@@ -20,7 +22,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import hydra
 import wandb
 
-import qtz
 from ds import *
 from utils import *
 from model import ActorCritic
@@ -163,7 +164,7 @@ class PPOMod:
         ])
         if self.rank == 0:
             wandb.init(
-                project='PPO',
+                project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
                 mode=self.wandb_mode,
                 config=self.cfg,
@@ -202,15 +203,15 @@ class PPOMod:
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
             other_info_dict = self.agent.other_info_dict()
-            wandb.log(other_info_dict)
             collect_info = {
                 **other_info_dict, # type: ignore
-                'num_exps': f'{len(exp_list)}  (num_eps_per_iter = {self.cfg.num_eps_per_iter})',
+                'num_exps': len(exp_list),
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_ms(e_time_collect, s_time_collect) / 1e3} s .')
             printfl(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .')
             for k, v in collect_info.items():
                 printfl(f'    {k} : {v}')
+            wandb.log(other_info_dict)
             pbar = tqdm(
                 total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',

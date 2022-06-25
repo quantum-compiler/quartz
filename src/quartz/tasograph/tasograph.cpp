@@ -105,8 +105,6 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     }
   }
 
-  //   std::cout << edge_2_op.size() << std::endl;
-
   for (auto &node : dag->nodes) {
     size_t srcIdx = -1; // Assumption: a node can have at most 1 input
     Op srcOp;
@@ -342,7 +340,6 @@ size_t Graph::hash(void) {
       }
     }
   }
-  //   std::cout << total << std::endl;
   return total;
 }
 
@@ -1667,9 +1664,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     std::vector<OpX *> output_opxs(num_output, nullptr);
     if (inEdges.find(op_) != inEdges.end()) {
       for (auto &e : inEdges.find(op_)->second) {
-        if (!((size_t)e.dstIdx < num_input)) {
-          std::cout << 1663 << std::endl;
-        }
         assert((size_t)e.dstIdx < num_input);
         input_ops[e.dstIdx] = e.srcOp;
       }
@@ -1693,9 +1687,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
     if (outEdges.find(op_) != outEdges.end()) {
       for (auto &e : outEdges.find(op_)->second) {
-        if (!((size_t)e.srcIdx < num_output)) {
-          std::cout << 1689 << std::endl;
-        }
         assert((size_t)e.srcIdx < num_output);
         output_ops[e.srcIdx] = e.dstOp;
       }
@@ -1704,9 +1695,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     for (auto &opx : xfer->srcOps) {
       for (auto &input_tensor : opx->inputs) {
         if (input_tensor.op == opx_) {
-          if (!((size_t)input_tensor.idx < num_output)) {
-            std::cout << 1700 << std::endl;
-          }
           assert((size_t)input_tensor.idx < num_output);
           output_opxs[input_tensor.idx] = opx;
         }
@@ -1784,7 +1772,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   if (!fail) {
     auto new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      //   std::cout << "Loop!" << std::endl;
       fail = true;
     }
   }
@@ -1794,9 +1781,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
   if (!fail) {
-    if (!(mapped_opx.size() == xfer->srcOps.size())) {
-      std::cout << 1790 << std::endl;
-    }
     assert(mapped_opx.size() == xfer->srcOps.size());
   }
   return !fail;

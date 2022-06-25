@@ -10,27 +10,31 @@ bool graph_cmp(std::shared_ptr<Graph> a, std::shared_ptr<Graph> b) {
 }
 
 int main() {
+//   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
+//                GateType::cx, GateType::x, GateType::rz, GateType::add});
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::t, GateType::tdg});
+               GateType::cx, GateType::x, GateType::rz, GateType::add});
 
   // Construct circuit graph from qasm file
-  QASMParser qasm_parser(&ctx);
-  DAG *dag = nullptr;
-  if (!qasm_parser.load_qasm(
-          "../experiment/barenco_tof_3_opt_path/subst_history_39.qasm", dag)) {
-    std::cout << "Parser failed" << std::endl;
-    return 0;
-  }
+//   QASMParser qasm_parser(&ctx);
+//   DAG *dag = nullptr;
+//   if (!qasm_parser.load_qasm(
+//           "../experiment/t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_3.qasm.toffoli_flip", dag)) {
+//     std::cout << "Parser failed" << std::endl;
+    
+    // return 0;
+//   }
+    auto graph = Graph::from_qasm_file(&ctx, "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
 
-  ctx.get_and_gen_input_dis(dag->get_num_qubits());
-  ctx.get_and_gen_hashing_dis(dag->get_num_qubits());
-  ctx.get_and_gen_parameters(dag->get_num_input_parameters());
+//   ctx.get_and_gen_input_dis(dag->get_num_qubits());
+//   ctx.get_and_gen_hashing_dis(dag->get_num_qubits());
+//   ctx.get_and_gen_parameters(dag->get_num_input_parameters());
 
-  std::shared_ptr<Graph> graph(new Graph(&ctx, dag));
+//   std::shared_ptr<Graph> graph(new Graph(&ctx, dag));
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json")) {
+  if (!eqs.load_json(&ctx, "../Nam_complete_ECC_set.json")) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }
@@ -39,32 +43,18 @@ int main() {
   auto ecc = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
   for (auto eqcs : ecc) {
-    bool first = true;
-    // std::cout << eqcs.size() << std::endl;
-    for (auto circ : eqcs) {
-      if (first)
-        first = false;
-      else {
-        auto xfer_0 = GraphXfer::create_GraphXfer(&ctx, eqcs[0], circ, true);
-        auto xfer_1 = GraphXfer::create_GraphXfer(&ctx, circ, eqcs[0], true);
-        if (xfer_0 != nullptr)
-          xfers.push_back(xfer_0);
-        if (xfer_1 != nullptr)
-          xfers.push_back(xfer_1);
-      }
+    for (auto circ_0 : eqcs) {
+        for(auto circ_1 : eqcs){
+            if(circ_0 != circ_1){
+                auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_0, circ_1, false);
+                if (xfer != nullptr){
+                    xfers.push_back(xfer);
+                }
+            }
+        }
     }
   }
   std::cout << "number of xfers: " << xfers.size() << std::endl;
-
-  size_t cnt = 0;
-  for (size_t i = 0; i < xfers.size(); ++i) {
-    if (xfers[i]->srcOps.size() > xfers[i]->dstOps.size()) {
-      std::cout << ++cnt << ": " << i << std::endl;
-      if (i == 926) {
-        std::cout << i;
-      }
-    }
-  }
 
   //   back tracking search
   auto start = std::chrono::steady_clock::now();

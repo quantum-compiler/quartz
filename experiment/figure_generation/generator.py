@@ -5,7 +5,7 @@ import math
 import os
 from collections import deque
 
-import multiprocess as mp
+import multiprocessing as mp
 import quartz
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector
@@ -127,9 +127,9 @@ class Generator:
                  no_increase: bool = True,
                  include_nop: bool = True,
                  ):
-        self.output_path = output_path
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+        self.output_path = "./outputs"
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
         global quartz_context
         global initial_graph

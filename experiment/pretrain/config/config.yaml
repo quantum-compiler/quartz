@@ -1,0 +1,34 @@
+# train, test
+mode: train
+resume: False
+
+ckpt_path: ''
+
+gpus: [1]
+seed: 98765
+
+wandb:
+  en: True
+  offline: False
+  entity: quartz
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: '../../bfs_verified_simplified.json'
+no_increase: True
+include_nop: True
+
+dataset_dir: dataset
+graph_file: graph.json
+reward_file: reward.json
+
+check_val_every_n_epoch: 8
+scheduler: None
+num_workers: 4
+batch_size: 512
+gamma: 0.9
+acc_interval: 32
+acc_topk: 4
+
+qgnn_h_feats: 64
+qgnn_inter_dim: 64
+use_mask: True

@@ -59,6 +59,7 @@ cdef extern from "context/context.h" namespace "quartz":
     cdef cppclass Context:
         Context(const vector[GateType]) except +
         size_t next_global_unique_id()
+        bool has_parameterized_gate() const
 
 ctypedef Context* Context_ptr
 
@@ -80,6 +81,8 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
         GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr, bool no_increase)
         int num_src_op()
         int num_dst_op()
+        string src_str()
+        string dst_str()
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Op:
@@ -100,8 +103,9 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
         shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
-        pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op) except +
+        pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op, bool) except +
         vector[size_t] appliable_xfers(Op, const vector[GraphXfer *] &)
+        vector[size_t] appliable_xfers_parallel(Op, const vector[GraphXfer *] &)
         void all_ops(vector[Op]&) const
         int gate_count() const
         size_t hash()
@@ -109,7 +113,13 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         void topology_order_ops(vector[Op] &) const
         shared_ptr[Graph] ccz_flip_t(Context *)
         void to_qasm(const string &, bool, bool) const
+        @staticmethod
+        shared_ptr[Graph] from_qasm_file(Context *, const string &)
+        @staticmethod
+        shared_ptr[Graph] from_qasm_str(Context *, const string &)
+        string to_qasm(bool, bool) const
         shared_ptr[Graph] ccz_flip_greedy_rz()
+        bool equal(const Graph &) const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":
@@ -123,3 +133,4 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:
         QASMParser(Context *)
         bool load_qasm(const string &, DAG *&) except +
+        bool load_qasm_str(const string &, DAG *&) except +

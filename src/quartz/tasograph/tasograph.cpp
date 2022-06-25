@@ -27,6 +27,50 @@ Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
 
+void Graph::_construct_pos_2_logical_qubit() {
+  pos_2_logical_qubit.clear();
+  // Construct pos_2_logical_qubit
+  std::unordered_map<Op, int, OpHash> op_in_degree;
+  std::queue<Op> op_q;
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
+    if (it->first.ptr->tp == GateType::input_qubit ||
+        it->first.ptr->tp == GateType::input_param) {
+      op_q.push(it->first);
+    }
+  }
+
+  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
+    op_in_degree[it->first] = it->second.size();
+  }
+
+  while (!op_q.empty()) {
+    auto op = op_q.front();
+    op_q.pop();
+
+    // An input qubit
+    if (input_qubit_op_2_qubit_idx.find(op) !=
+        input_qubit_op_2_qubit_idx.end()) {
+      pos_2_logical_qubit[Pos(op, 0)] = input_qubit_op_2_qubit_idx[op];
+    }
+    if (outEdges.find(op) != outEdges.end()) {
+      auto op_out_edges = outEdges.find(op)->second;
+      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
+           ++e_it) {
+        if (pos_2_logical_qubit.find(Pos(e_it->srcOp, e_it->srcIdx)) !=
+            pos_2_logical_qubit.end()) {
+          pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
+              pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
+        }
+        assert(op_in_degree[e_it->dstOp] > 0);
+        op_in_degree[e_it->dstOp]--;
+        if (op_in_degree[e_it->dstOp] == 0) {
+          op_q.push(e_it->dstOp);
+        }
+      }
+    }
+  }
+}
+
 Graph::Graph(Context *ctx) : context(ctx), special_op_guid(0) {}
 
 Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
@@ -46,8 +90,8 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       input_qubits_op.push_back(input_qubit_op);
       input_qubit_op_2_qubit_idx[input_qubit_op] = node->index;
     } else if (node->type == DAGNode::input_param) {
-      input_params_op.push_back(
-          Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_param)));
+      input_params_op.push_back(Op(context->next_global_unique_id(),
+                                   ctx->get_gate(GateType::input_param)));
     }
   }
 
@@ -60,8 +104,6 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
       edge_2_op[e] = op;
     }
   }
-
-  //   std::cout << edge_2_op.size() << std::endl;
 
   for (auto &node : dag->nodes) {
     size_t srcIdx = -1; // Assumption: a node can have at most 1 input
@@ -107,46 +149,7 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     }
   }
 
-  // Construct pos_2_logical_qubit
-  std::unordered_map<Op, int, OpHash> op_in_degree;
-  std::queue<Op> op_q;
-  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
-    if (it->first.ptr->tp == GateType::input_qubit ||
-        it->first.ptr->tp == GateType::input_param) {
-      op_q.push(it->first);
-    }
-  }
-
-  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
-    op_in_degree[it->first] = it->second.size();
-  }
-
-  while (!op_q.empty()) {
-    auto op = op_q.front();
-    op_q.pop();
-
-    // An input qubit
-    if (input_qubit_op_2_qubit_idx.find(op) !=
-        input_qubit_op_2_qubit_idx.end()) {
-      pos_2_logical_qubit[Pos(op, 0)] = input_qubit_op_2_qubit_idx[op];
-    }
-    if (outEdges.find(op) != outEdges.end()) {
-      auto op_out_edges = outEdges.find(op)->second;
-      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
-           ++e_it) {
-        if (pos_2_logical_qubit.find(Pos(e_it->srcOp, e_it->srcIdx)) !=
-            pos_2_logical_qubit.end()) {
-          pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
-              pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
-        }
-        assert(op_in_degree[e_it->dstOp] > 0);
-        op_in_degree[e_it->dstOp]--;
-        if (op_in_degree[e_it->dstOp] == 0) {
-          op_q.push(e_it->dstOp);
-        }
-      }
-    }
-  }
+  _construct_pos_2_logical_qubit();
 }
 
 Graph::Graph(const Graph &graph) {
@@ -159,7 +162,10 @@ Graph::Graph(const Graph &graph) {
 }
 
 size_t Graph::get_next_special_op_guid() {
-  assert(special_op_guid < GUID_PRESERVED);
+  if (special_op_guid >= GUID_PRESERVED) {
+    std::cerr << "Run out of special guid." << std::endl;
+    assert(false);
+  }
   return special_op_guid++;
 }
 
@@ -186,6 +192,29 @@ bool Graph::has_edge(const Op &srcOp, const Op &dstOp, int srcIdx,
   Edge e(srcOp, dstOp, srcIdx, dstIdx);
   return (inEdges.find(dstOp)->second.find(e) !=
           inEdges.find(dstOp)->second.end());
+}
+
+Op Graph::add_qubit(int qubit_idx) {
+  Gate *gate = context->get_gate(GateType::input_qubit);
+  auto guid = get_next_special_op_guid();
+  Op op(guid, gate);
+  input_qubit_op_2_qubit_idx[op] = qubit_idx;
+  return op;
+}
+
+Op Graph::add_parameter(const ParamType p) {
+  Gate *gate = context->get_gate(GateType::input_param);
+  auto guid = context->next_global_unique_id();
+  Op op(guid, gate);
+  constant_param_values[op] = p;
+  return op;
+}
+
+Op Graph::new_gate(GateType gt) {
+  Gate *gate = context->get_gate(gt);
+  auto guid = context->next_global_unique_id();
+  Op op(guid, gate);
+  return op;
 }
 
 Edge::Edge(void)
@@ -311,7 +340,6 @@ size_t Graph::hash(void) {
       }
     }
   }
-  //   std::cout << total << std::endl;
   return total;
 }
 
@@ -408,14 +436,12 @@ void Graph::remove_node(Op oldOp) {
         outEdges.find(oldOp) != outEdges.end()) {
       auto input_edges = inEdges[oldOp];
       auto output_edges = outEdges[oldOp];
-      int num_qubits = oldOp.ptr->get_num_qubits();
       for (auto in_edge : input_edges) {
         for (auto out_edge : output_edges) {
-          if (in_edge.dstIdx == out_edge.srcIdx) {
-            if (in_edge.dstIdx < num_qubits) {
-              add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
-                       out_edge.dstIdx);
-            }
+          if (in_edge.dstIdx < num_qubits &&
+              in_edge.dstIdx == out_edge.srcIdx) {
+            add_edge(in_edge.srcOp, out_edge.dstOp, in_edge.srcIdx,
+                     out_edge.dstIdx);
           }
         }
       }
@@ -454,7 +480,6 @@ void Graph::remove_edge(Op srcOp, Op dstOp) {
 // Merge constant parameters
 // Eliminate rotation with parameter 0
 void Graph::constant_and_rotation_elimination() {
-  std::unordered_map<size_t, size_t> hash_values;
   std::queue<Op> op_queue;
   // Compute the hash value for input ops
   for (auto it = outEdges.cbegin(); it != outEdges.cend(); it++) {
@@ -513,7 +538,7 @@ void Graph::constant_and_rotation_elimination() {
           auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
           remove_node(op);
 
-          Op merged_op(get_next_special_op_guid(),
+          Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
@@ -531,7 +556,7 @@ void Graph::constant_and_rotation_elimination() {
           auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
           remove_node(op);
 
-          Op merged_op(get_next_special_op_guid(),
+          Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
@@ -566,6 +591,12 @@ void Graph::constant_and_rotation_elimination() {
         }
       }
       if (all_parameter_is_0) {
+        // Delete all parameter nodes, they are all 0
+        for (const auto &e : input_edges) {
+          if (e.dstIdx > num_qubits) {
+            remove_node(e.srcOp);
+          }
+        }
         remove_node(op);
       }
     }
@@ -712,7 +743,7 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
                       constant_param_values[param_idx_2_op_1[i]];
       remove_node(param_idx_2_op_0[i]);
       remove_node(param_idx_2_op_1[i]);
-      Op new_constant_op(get_next_special_op_guid(),
+      Op new_constant_op(context->next_global_unique_id(),
                          context->get_gate(GateType::input_param));
       add_edge(new_constant_op, op_0, 0, i);
       constant_param_values[new_constant_op] = sum;
@@ -1115,6 +1146,135 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
   return ostr;
 }
 
+template <class _CharT, class _Traits>
+std::shared_ptr<Graph>
+Graph::_from_qasm_stream(Context *ctx,
+                         std::basic_istream<_CharT, _Traits> &qasm_stream) {
+
+  std::shared_ptr<Graph> graph(new Graph(ctx));
+  std::string line;
+  GateType gate_type;
+  std::vector<Pos> pos_on_qubits;
+  while (std::getline(qasm_stream, line)) {
+    // repleace comma with space
+    find_and_replace_all(line, ",", " ");
+    find_and_replace_all(line, "(", " ");
+    find_and_replace_all(line, ")", " ");
+    // ignore semicolon at the end
+    find_and_replace_all(line, ";", "");
+    std::stringstream ss(line);
+    std::string command;
+    std::getline(ss, command, ' ');
+    if (command == "OPENQASM") {
+      continue; // ignore this line
+    } else if (command == "include") {
+      continue; // ignore this line
+    } else if (command == "creg") {
+      continue; // ignore this line
+    } else if (command == "qreg") {
+      std::string token;
+      getline(ss, token, ' ');
+      size_t num_qubits = string_to_number(token);
+      pos_on_qubits.resize(num_qubits);
+      for (int i = 0; i < num_qubits; ++i) {
+        auto op = graph->add_qubit(i);
+        pos_on_qubits[i] = Pos(op, 0);
+        // Construct input_qubit_op_2_qubit_idx
+        graph->input_qubit_op_2_qubit_idx[op] = i;
+      }
+      assert(!ss.good());
+    } else if (is_gate_string(command, gate_type)) {
+      Gate *gate = graph->context->get_gate(gate_type);
+      if (!gate) {
+        std::cerr << "Unsupported gate in current context: " << command
+                  << std::endl;
+        return nullptr;
+      }
+      if (gate->is_parametrized_gate()) {
+        auto op = graph->new_gate(gate_type);
+        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
+        auto num_params = graph->context->get_gate(gate_type)->num_parameters;
+        for (int i = 0; i < num_params; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          // Currently only support the format of pi*0.123
+          ParamType p;
+          if (token.find("pi") == 0) {
+            auto d = token.substr(3, std::string::npos);
+            p = std::stod(d) * PI;
+          } else {
+            p = std::stod(token);
+          }
+          auto src_op = graph->add_parameter(p);
+          int src_idx = 0;
+          auto dst_op = op;
+          auto dst_idx = num_qubits + i;
+          graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+        }
+        for (int i = 0; i < num_qubits; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          int qubit_idx = string_to_number(token);
+          if (qubit_idx != -1) {
+            auto src_op = pos_on_qubits[qubit_idx].op;
+            auto src_idx = pos_on_qubits[qubit_idx].idx;
+            auto dst_op = op;
+            auto dst_idx = i;
+            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
+          } else
+            return nullptr;
+        }
+      } else if (gate->is_quantum_gate()) {
+        auto op = graph->new_gate(gate_type);
+        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
+        for (int i = 0; i < num_qubits; ++i) {
+          assert(ss.good());
+          std::string token;
+          ss >> token;
+          int qubit_idx = string_to_number(token);
+          if (qubit_idx != -1) {
+            auto src_op = pos_on_qubits[qubit_idx].op;
+            auto src_idx = pos_on_qubits[qubit_idx].idx;
+            auto dst_op = op;
+            auto dst_idx = i;
+            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
+          } else
+            return nullptr;
+        }
+      }
+    } else {
+      std::cout << "Unknown gate: " << command << std::endl;
+      assert(false);
+    }
+  }
+
+  graph->_construct_pos_2_logical_qubit();
+  return graph;
+}
+
+std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
+                                             const std::string &filename) {
+  std::ifstream fin;
+  fin.open(filename, std::ifstream::in);
+  if (!fin.is_open()) {
+    std::cerr << "Failed to open " << filename << std::endl;
+    return nullptr;
+  }
+  auto graph = _from_qasm_stream(ctx, fin);
+  fin.close();
+  return graph;
+}
+
+std::shared_ptr<Graph> Graph::from_qasm_str(Context *ctx,
+                                            const std::string qasm_str) {
+  std::stringstream sstream(qasm_str);
+  return _from_qasm_stream(ctx, sstream);
+}
+
 void Graph::draw_circuit(const std::string &src_file_name,
                          const std::string &save_filename) {
 
@@ -1508,21 +1668,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1539,6 +1684,21 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];
@@ -1563,13 +1723,18 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
-      Pos p = Pos(it->second.first, it->second.second);
-      auto q = pos_2_logical_qubit.find(p)->second;
-      if (qubits.find(q) != qubits.end()) {
-        fail = true;
-        break;
-      } else {
-        qubits.insert(q);
+      if (it->second.first.ptr->is_quantum_gate() ||
+          it->second.first.ptr->tp == GateType::input_qubit) {
+        // Only check inputs on a qubit
+        // Excluding input_param gates and arithmetic gates
+        Pos p = Pos(it->second.first, it->second.second);
+        auto q = pos_2_logical_qubit.find(p)->second;
+        if (qubits.find(q) != qubits.end()) {
+          fail = true;
+          break;
+        } else {
+          qubits.insert(q);
+        }
       }
     }
   }
@@ -1607,7 +1772,6 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   if (!fail) {
     auto new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      //   std::cout << "Loop!" << std::endl;
       fail = true;
     }
   }
@@ -1616,8 +1780,9 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     opx_op_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  if (!fail)
+  if (!fail) {
     assert(mapped_opx.size() == xfer->srcOps.size());
+  }
   return !fail;
 }
 
@@ -1652,21 +1817,6 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1683,6 +1833,21 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];
@@ -1707,13 +1872,18 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
-      Pos p = Pos(it->second.first, it->second.second);
-      auto q = pos_2_logical_qubit.find(p)->second;
-      if (qubits.find(q) != qubits.end()) {
-        fail = true;
-        break;
-      } else {
-        qubits.insert(q);
+      if (it->second.first.ptr->is_quantum_gate() ||
+          it->second.first.ptr->tp == GateType::input_qubit) {
+        // Only check inputs on a qubit
+        // Excluding input_param gates and arithmetic gates
+        Pos p = Pos(it->second.first, it->second.second);
+        auto q = pos_2_logical_qubit.find(p)->second;
+        if (qubits.find(q) != qubits.end()) {
+          fail = true;
+          break;
+        } else {
+          qubits.insert(q);
+        }
       }
     }
   }
@@ -1767,7 +1937,10 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
 }
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
-Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
+Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                                 bool eliminate_rotation = false) {
+  // When eliminate_rotation is true, this function will eliminate all rotation
+  // whose parameters are all 0
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return std::make_pair(std::shared_ptr<Graph>(nullptr), std::vector<int>());
   }
@@ -1798,21 +1971,6 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
         input_ops[e.dstIdx] = e.srcOp;
       }
     }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output edges in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
     for (size_t i = 0; i < num_input; ++i) {
       auto input_opx = opx_->inputs[i].op;
       if (input_opx != nullptr &&
@@ -1829,6 +1987,21 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     }
     if (fail) {
       break;
+    }
+    if (outEdges.find(op_) != outEdges.end()) {
+      for (auto &e : outEdges.find(op_)->second) {
+        assert((size_t)e.srcIdx < num_output);
+        output_ops[e.srcIdx] = e.dstOp;
+      }
+    }
+    // Get all output OpX because we don't have output edges in GraphXfer
+    for (auto &opx : xfer->srcOps) {
+      for (auto &input_tensor : opx->inputs) {
+        if (input_tensor.op == opx_) {
+          assert((size_t)input_tensor.idx < num_output);
+          output_opxs[input_tensor.idx] = opx;
+        }
+      }
     }
     for (size_t i = 0; i < num_output; ++i) {
       auto output_opx = output_opxs[i];
@@ -1853,13 +2026,18 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
-      Pos p = Pos(it->second.first, it->second.second);
-      auto q = pos_2_logical_qubit.find(p)->second;
-      if (qubits.find(q) != qubits.end()) {
-        fail = true;
-        break;
-      } else {
-        qubits.insert(q);
+      if (it->second.first.ptr->is_quantum_gate() ||
+          it->second.first.ptr->tp == GateType::input_qubit) {
+        // Only check inputs on a qubit
+        // Excluding input_param gates and arithmetic gates
+        Pos p = Pos(it->second.first, it->second.second);
+        auto q = pos_2_logical_qubit.find(p)->second;
+        if (qubits.find(q) != qubits.end()) {
+          fail = true;
+          break;
+        } else {
+          qubits.insert(q);
+        }
       }
     }
   }
@@ -1904,52 +2082,37 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op) {
     }
   }
   if (!fail) {
+    std::unordered_set<Op, OpHash> op_set;
+    // The destination graph in xfer is not an empty graph
+    // Add all nodes in the destination graph to op_set
+    if (!xfer->dstOps.empty()) {
+      for (const auto &opx : xfer->dstOps) {
+        if (opx->mapOp.ptr->is_quantum_gate()) {
+          op_set.insert(opx->mapOp);
+        }
+      }
+    }
+    // Add all 1-hop predecessors to op_set
+    for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
+      if (inEdges.find((*it)->mapOp) != inEdges.end()) {
+        auto in_es = inEdges.find((*it)->mapOp)->second;
+        for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
+          if (e_it->srcOp.ptr->is_quantum_gate()) {
+            op_set.insert(e_it->srcOp);
+          }
+        }
+      }
+    }
     std::vector<Op> all_ops;
+    if (eliminate_rotation) {
+      new_graph->constant_and_rotation_elimination();
+    }
     new_graph->topology_order_ops(all_ops);
     auto ops_num = all_ops.size();
-    // The destination graph in xfer is an empty graph
-    if (xfer->dstOps.size() == 0) {
-      std::set<Op> op_set;
-      for (auto it = xfer->srcOps.cbegin(); it != xfer->srcOps.cend(); ++it) {
-        if (inEdges.find((*it)->mapOp) != inEdges.end()) {
-          auto in_es = inEdges.find((*it)->mapOp)->second;
-          for (auto e_it = in_es.cbegin(); e_it != in_es.cend(); ++e_it) {
-            if (e_it->srcOp.ptr->tp != GateType::input_param &&
-                e_it->srcOp.ptr->tp != GateType::input_qubit) {
-              op_set.insert(e_it->srcOp);
-            }
-          }
-        }
-        if (outEdges.find((*it)->mapOp) != outEdges.end()) {
-          auto out_es = outEdges.find((*it)->mapOp)->second;
-          for (auto e_it = out_es.cbegin(); e_it != out_es.cend(); ++e_it) {
-            op_set.insert(e_it->dstOp);
-          }
-        }
+    for (size_t i = 0; i < ops_num; ++i) {
+      if (op_set.find(all_ops[i]) != op_set.end()) {
+        node_trace.push_back(i);
       }
-      for (size_t i = 0; i < ops_num; ++i) {
-        if (op_set.find(all_ops[i]) != op_set.end()) {
-          node_trace.push_back(i);
-        }
-      }
-    } else {
-      std::set<Op> mapped_op_set;
-      for (const auto &opx : xfer->dstOps) {
-        mapped_op_set.insert(opx->mapOp);
-      }
-      for (size_t i = 0; i < ops_num; ++i) {
-        if (mapped_op_set.find(all_ops[i]) != mapped_op_set.end()) {
-          node_trace.push_back(i);
-        }
-      }
-
-      //   auto target_op = xfer->dstOps[0]->mapOp;
-      //   for (size_t i = 0; i < ops_num; ++i) {
-      //     if (target_op == all_ops[i]) {
-      //       node_trace.push_back(i);
-      //       break;
-      //     }
-      //   }
     }
   }
   while (!opx_op_dq.empty()) {
@@ -1973,22 +2136,25 @@ Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
   return appliable_xfer_v;
 }
 
-  std::vector<size_t>
-  Graph::appliable_xfers_parallel(Op op, const std::vector<GraphXfer*> &xfer_v) const {
-  // cannot use std::vector<bool> here because it's not thread-safe to write different elements of it
+std::vector<size_t>
+Graph::appliable_xfers_parallel(Op op,
+                                const std::vector<GraphXfer *> &xfer_v) const {
+  // cannot use std::vector<bool> here because it's not thread-safe to write
+  // different elements of it
   std::vector<int> xfer_is_appliable(xfer_v.size(), false);
-#pragma omp parallel for schedule(runtime) default(none) shared(xfer_is_appliable, xfer_v, op)
-    for (size_t i = 0; i < xfer_v.size(); i++) {
-      xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);
-    }
-    std::vector<size_t> appliable_xfer_v;
-    for (size_t i = 0; i < xfer_is_appliable.size(); i++) {
-      if (xfer_is_appliable[i]) {
-        appliable_xfer_v.emplace_back(i);
-      }
-    }
-    return appliable_xfer_v;
+#pragma omp parallel for schedule(runtime) default(none)                       \
+    shared(xfer_is_appliable, xfer_v, op)
+  for (size_t i = 0; i < xfer_v.size(); i++) {
+    xfer_is_appliable[i] = xfer_appliable(xfer_v[i], op);
   }
+  std::vector<size_t> appliable_xfer_v;
+  for (size_t i = 0; i < xfer_is_appliable.size(); i++) {
+    if (xfer_is_appliable[i]) {
+      appliable_xfer_v.emplace_back(i);
+    }
+  }
+  return appliable_xfer_v;
+}
 
 // bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
 //   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
@@ -2132,4 +2298,7 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
     }
   }
 }
+
+// TODO
+bool Graph::equal(const Graph &other) const { return true; }
 }; // namespace quartz

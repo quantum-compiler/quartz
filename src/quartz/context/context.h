@@ -35,6 +35,8 @@ namespace quartz {
 		std::vector< ParamType > get_all_generated_parameters() const;
 		size_t next_global_unique_id();
 
+        bool has_parameterized_gate() const;
+
 		// A hacky function: set a generated parameter.
 		void set_generated_parameter(int id, ParamType param);
 

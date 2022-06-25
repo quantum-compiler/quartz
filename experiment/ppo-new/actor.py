@@ -595,7 +595,9 @@ class PPOAgent:
         ]
         with open(os.path.join(sync_dir, f'best_info_{self.id}.json'), 'w') as f:
             json.dump(best_info, fp=f, indent=2)
+        printfl(f'Agent {self.id} : waiting for others to sync')
         dist.barrier()
+        printfl(f'Agent {self.id} : finish waiting')
         """read in other agents' results"""
         for r in range(self.num_agents):
             if r != self.id:

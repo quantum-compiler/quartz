@@ -69,6 +69,9 @@ def errprint(s: str, file = sys.stderr) -> None:
 
 def printfl(s: str) -> None:
     print(s, flush=True)
+    
+def logprintfl(s: str) -> None:
+    print(f'[{datetime.datetime.now()}] {s}', flush=True)
 
 def get_time_ns() -> int:
     return time.time_ns()

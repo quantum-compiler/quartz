@@ -19,7 +19,7 @@ def analyze_circuit(qasm_str, max_depth):
     # prepare quartz context
     quartz_context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
                                           filename="../bfs_verified_simplified.json",
-                                          no_increase=False, include_nop=False)
+                                          no_increase=True, include_nop=False)
     qasm_parser = quartz.PyQASMParser(context=quartz_context)
     dag = qasm_parser.load_qasm_str(qasm_str=qasm_str)
     initial_graph = quartz.PyGraph(context=quartz_context, dag=dag)
@@ -29,6 +29,7 @@ def analyze_circuit(qasm_str, max_depth):
     # start BFS search for circuits with fewer gates
     candidate_queue = [[initial_graph, initial_graph_hash]]
     visited_hash_set = {initial_graph_hash: 0}
+    searched_count = 0
     while len(candidate_queue) > 0:
         # get graph for current loop
         graph_packet = candidate_queue.pop(0)
@@ -42,7 +43,7 @@ def analyze_circuit(qasm_str, max_depth):
             applicable_xfers = cur_graph.available_xfers_parallel(context=quartz_context,
                                                                   node=node)
             for xfer in applicable_xfers:
-                new_graph = initial_graph.apply_xfer(xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
+                new_graph = cur_graph.apply_xfer(xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
                 new_hash = new_graph.hash()
                 new_cnt = new_graph.gate_count
                 # if new circuit has fewer gates, then we are done
@@ -56,11 +57,16 @@ def analyze_circuit(qasm_str, max_depth):
                 # and stop when we reach max depth
                 if visited_hash_set[new_hash] > max_depth:
                     return -1
+                # this is for logging
+                searched_count += 1
+                if searched_count % 1000 == 0:
+                    print(f"Searched {searched_count} circuits, now at depth {visited_hash_set[new_hash]}.")
     assert False
 
 
 def main():
     # input parameters
+    random.seed(12345)
     circuit_dict_path = "../data/900000_graph.json"
     total_circuit_count = 10
     num_workers = 1
@@ -75,7 +81,7 @@ def main():
 
     # compute min #xfers for these circuits
     # TODO: change this to multi-processing
-    result = analyze_circuits(selected_circuit_list[0][0], 1)
+    result = analyze_circuit(selected_circuit_list[0][0], 5)
     print(result)
 
 

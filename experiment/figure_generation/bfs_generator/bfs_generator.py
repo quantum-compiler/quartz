@@ -163,7 +163,7 @@ class Generator:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate figure for paper.')
-    parser.add_argument('--no_increase', type=bool, default=False, required=False)
+    parser.add_argument('--no_increase', type=bool, default=True, required=False)
     parser.add_argument('--include_nop', type=bool, default=False, required=False)
     args = parser.parse_args()
 

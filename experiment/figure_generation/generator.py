@@ -147,6 +147,8 @@ class Generator:
                                 best_gate_cnt = new_cnt
                             bar.update(1)
                             budget -= 1
+                        else:
+                            self.buffer.add_neighbor(graph_hash=initial_graph_hash, neighbor_hash=new_hash)
                         total_visited_circuits += 1
 
                         # logging

@@ -91,4 +91,5 @@ experiment/ppo/fine-tune/PPO_circs
 experiment/a2c/*txt
 
 experiment/ppo-new/outputs
-experiment/ppo-new/log*
+experiment/**/log*
+experiment/**/*.log

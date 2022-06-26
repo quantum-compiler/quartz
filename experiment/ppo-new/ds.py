@@ -203,52 +203,20 @@ class GraphBuffer:
         
         self.eps_lengths: List[int] = []
         self.max_eps_length: int = 0
-        
         self.rewards: List[List[float]] = []
+        self.init_graph_gcs: List[int] = []
+        self.graph_gcs: List[int] = []
     
     def __len__(self) -> int:
         return len(self.hashset)
     
-    def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
-        """Return: (best, old_best)"""
-        old = self.max_eps_length
-        self.max_eps_length = max(
-            self.max_eps_length, x
-        )
-        return self.max_eps_length, old
-    
-    def update_max_eps_length(self) -> Tuple[int, int, int]:
-        """Return: (best, current, old_best)"""
-        old = self.max_eps_length
-        cur = max(self.eps_lengths) if len(self.eps_lengths) > 0 else 0
-        self.max_eps_length = max(
-            self.max_eps_length, cur,
-        )
-        return self.max_eps_length, cur, old
-
     def prepare_for_next_iter(self) -> None:
         self.update_max_eps_length()
         self.eps_lengths.clear()
         self.rewards.clear()
+        self.init_graph_gcs.clear()
+        self.graph_gcs.clear()
     
-    def rewards_info(self) -> Dict[str, float]:
-        info: Dict[str, float] = {}
-        best_eps_reward: float = - math.inf
-        mean_eps_reward: float = 0.
-        for eps_rewards in self.rewards:
-            # assert len(eps_rewards) > 0
-            eps_sum = sum(eps_rewards)
-            best_eps_reward = max(best_eps_reward, eps_sum)
-            mean_eps_reward += eps_sum / len(self.rewards)
-        
-        all_rewards = list(itertools.chain(*self.rewards))
-        
-        info['best_eps_reward'] = best_eps_reward
-        info['mean_eps_reward'] = mean_eps_reward
-        info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
-        
-        return info
-        
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
             hash_value = hash(graph)
@@ -282,4 +250,51 @@ class GraphBuffer:
         # end if
         return False
     
+    def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
+        """Return: (best, old_best)"""
+        old = self.max_eps_length
+        self.max_eps_length = max(
+            self.max_eps_length, x
+        )
+        return self.max_eps_length, old
+    
+    def update_max_eps_length(self) -> Tuple[int, int, int]:
+        """Return: (best, current, old_best)"""
+        old = self.max_eps_length
+        cur = max(self.eps_lengths) if len(self.eps_lengths) > 0 else 0
+        self.max_eps_length = max(
+            self.max_eps_length, cur,
+        )
+        return self.max_eps_length, cur, old
+    
+    def rewards_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        best_eps_reward: float = - math.inf
+        mean_eps_reward: float = 0.
+        for eps_rewards in self.rewards:
+            # assert len(eps_rewards) > 0
+            eps_sum = sum(eps_rewards)
+            best_eps_reward = max(best_eps_reward, eps_sum)
+            mean_eps_reward += eps_sum / len(self.rewards)
+        
+        all_rewards = list(itertools.chain(*self.rewards))
+        
+        info['best_eps_reward'] = best_eps_reward
+        info['mean_eps_reward'] = mean_eps_reward
+        info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
+        
+        return info
+    
+    def gate_count_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        
+        info['min_init_gc'] = min(self.init_graph_gcs)
+        info['max_init_gc'] = min(self.init_graph_gcs)
+        info['mean_init_gc'] = sum(self.init_graph_gcs) / len(self.init_graph_gcs)
+        
+        info['best_gc_iter'] = min(self.graph_gcs)
+        info['max_gc_iter'] = max(self.graph_gcs)
+        info['mean_gc_iter'] = sum(self.graph_gcs) / len(self.graph_gcs)
+        
+        return info
     

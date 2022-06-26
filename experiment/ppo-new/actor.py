@@ -468,6 +468,10 @@ class PPOAgent:
             for k, v in rewards_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
             
+            gate_count_info = buffer.gate_count_info()
+            for k, v in gate_count_info.items():
+                info_dict[f'{buffer.name}_{k}'] = v
+            
         return info_dict
     
     def output_opt_path(
@@ -534,7 +538,7 @@ class PPOAgent:
 
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
-        """convert graph and maintain graph_buffer"""
+        """convert graph and maintain infos in graph_buffer"""
         state_dgl_list: List[dgl.graph] = []
         next_state_dgl_list: List[dgl.graph] = []
         for buffer_id, obs_res in zip(init_buffer_ids, s_exp_lists):
@@ -544,21 +548,26 @@ class PPOAgent:
             exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]] = [] # for output optimization path
             for s_exp in obs_res:
                 """for each experience"""
-                if s_exp.info['start']:
-                    init_graph = qtz.qasm_to_graph(obs_res[0].state)
-                    exp_seq = []
-                    i_step = 0
-                    graph_buffer.rewards.append([])
                 graph = qtz.qasm_to_graph(s_exp.state)
                 next_graph = qtz.qasm_to_graph(s_exp.next_state)
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
                 exp_seq.append((s_exp, graph, next_graph))
+                """add graphs into buffer"""
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
                     next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less or equal gate count
                     graph_buffer.push_back(next_graph)
+                if s_exp.info['start']:
+                    init_graph = qtz.qasm_to_graph(obs_res[0].state)
+                    exp_seq = []
+                    i_step = 0
+                    graph_buffer.rewards.append([])
+                    graph_buffer.init_graph_gcs.append(graph.gate_count)
+                    graph_buffer.graph_gcs.append(graph.gate_count)
+                
                 graph_buffer.rewards[-1].append(s_exp.reward)
+                graph_buffer.graph_gcs.append(next_graph.gate_count)
                 """best graph maintenance"""
                 if next_graph.gate_count < graph_buffer.best_graph.gate_count:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
@@ -572,7 +581,7 @@ class PPOAgent:
                         ) # send alert to slack
                     # end if
                     graph_buffer.best_graph = next_graph
-                # end if
+                # end if better
                 i_step += 1
                 if s_exp.game_over:
                     graph_buffer.eps_lengths.append(i_step)

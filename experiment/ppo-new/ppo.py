@@ -324,7 +324,9 @@ class PPOMod:
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO save top-k model
-        ckpt_path = os.path.join(self.output_dir, ckpt_name)
+        ckpt_dir = os.path.join(self.output_dir, 'ckpts')
+        os.makedirs(ckpt_dir, exist_ok=True)
+        ckpt_path = os.path.join(ckpt_dir, ckpt_name)
         if not only_rank_zero or self.rank == 0:
             torch.save({
                 'i_iter': self.i_iter,

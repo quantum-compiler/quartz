@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
@@ -9,6 +10,12 @@ class WandbConfig:
     offline: bool = False
     entity: str = 'quartz'
     project: str = 'PPO'
+    
+    @staticmethod
+    def new_project(proj: str) -> WandbConfig:
+        config = WandbConfig()
+        config.project = proj
+        return config
 
 @dataclass
 class InputGraph:
@@ -20,7 +27,7 @@ class BaseConfig:
     
     mode: str = 'train'
     resume: bool = False
-    ckpt_path: str = 'outputs/2022-06-21/17-33-40/iter_174.pt'
+    ckpt_path: str = 'outputs/2022-06-21/17-33-40/ckpts/iter_174.pt'
 
     gpus: List[int] = field(default_factory=lambda: [
         0, 1, 2, 3, 
@@ -35,7 +42,7 @@ class BaseConfig:
     gate_set: List[str] = field(default_factory=lambda: [
         'h', 'cx', 't', 'tdg',
     ])
-    ecc_file: str = 'bfs_verified_simplified.json'
+    ecc_file: str = '../ecc_set/t_tdg.json.ecc'
     no_increase: bool = False
     include_nop: bool = True
     num_gate_type: int = 29
@@ -43,7 +50,7 @@ class BaseConfig:
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',
-            '../barenco_tof_3_opt_path/subst_history_39.qasm',
+            '../t_tdg_circs/barenco_tof_3.qasm',
         ),
     ])
     

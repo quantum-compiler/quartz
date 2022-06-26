@@ -6,20 +6,21 @@ class NamConfig(BaseConfig):
     gate_set: List[str] = field(default_factory=lambda: [
         'h', 'cx', 'x', 'rz', 'add',
     ])
-    ecc_file: str = 'Nam_complete_ECC_set.json'
+    ecc_file: str = '../nam.json.ecc'
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',
-            '../t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_3.qasm.toffoli_flip',
+            '../nam_circs/barenco_tof_3.qasm',
         ),
     ])
 
 @dataclass
 class NamPretrainConfig(NamConfig):
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Pretrain')
     # quartz
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',
-            '../t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_3.qasm.toffoli_flip',
+            '../nam_circs/barenco_tof_3.qasm',
         ),
     ])

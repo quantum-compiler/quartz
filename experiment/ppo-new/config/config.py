@@ -30,3 +30,4 @@ cs.store(group="c", name="base", node=BaseConfig)
 # other config groups
 cs.store(group="c", name="nam", node=NamConfig)
 cs.store(group="c", name="nam_pret", node=NamPretrainConfig)
+cs.store(group="c", name="nam_multipret", node=NamMultiPretrainConfig)

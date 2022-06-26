@@ -92,3 +92,6 @@ experiment/a2c/*txt
 
 experiment/ppo-new/outputs
 experiment/ppo-new/log*
+
+experiment/figure_generation/outputs
+experiment/figure_generation/data

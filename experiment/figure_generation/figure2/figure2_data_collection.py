@@ -93,7 +93,7 @@ def main():
     random.seed(12345)
     circuit_dict_path = "../data/900000_graph.json"
     total_circuit_count = 4
-    max_search_depth = 10
+    max_search_depth = 5
     num_workers = 2
 
     # read json files and randomly sample a subset of circuits
@@ -122,7 +122,7 @@ def main():
         worker.join()
     final_results = {}
     for idx in range(num_workers):
-        with open(f"./tmp/{rank}.tmp", 'rb') as handle:
+        with open(f"./tmp/{idx}.tmp", 'rb') as handle:
             result_list = pickle.load(file=handle)
             for result in result_list:
                 if result not in final_results:

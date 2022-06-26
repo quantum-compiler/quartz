@@ -92,9 +92,9 @@ def main():
     # input parameters
     random.seed(12345)
     circuit_dict_path = "../data/900000_graph.json"
-    total_circuit_count = 4
-    max_search_depth = 5
-    num_workers = 2
+    total_circuit_count = 10000
+    max_search_depth = 8
+    num_workers = 80
 
     # read json files and randomly sample a subset of circuits
     with open(circuit_dict_path, 'r') as handle:

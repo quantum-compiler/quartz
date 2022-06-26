@@ -29,6 +29,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
     initial_graph = quartz.PyGraph(context=quartz_context, dag=dag)
     initial_graph_hash = initial_graph.hash()
     initial_graph_gate_count = initial_graph.gate_count
+    print(f"[Rank {rank}] New circuit {initial_graph_hash} with {initial_graph_gate_count} gates.")
 
     # start BFS search for circuits with fewer gates
     candidate_queue = [[initial_graph, initial_graph_hash]]
@@ -72,10 +73,12 @@ def analyze_circuit(rank, qasm_str, max_depth):
 def worker_proc(rank, circuit_batch, max_depth):
     result_list = []
     finished_count = 0
+    total_circuits = len(circuit_batch)
     for circuit_packet in circuit_batch:
         qasm_str = circuit_packet[0]
         gate_count = circuit_packet[1]
-        print(f"[Rank {rank}] Start analyzing circuit {finished_count} with {gate_count}.")
+        print(f"[Rank {rank}] ({finished_count + 1}/{total_circuits})"
+              f" Start analyzing new circuit with {gate_count} gates.")
         result = analyze_circuit(rank=rank, qasm_str=qasm_str, max_depth=max_depth)
         result_list.append(result)
         finished_count += 1
@@ -102,7 +105,7 @@ def main():
         selected_circuit_list.append(circuit_dict[selected_hash])
 
     # compute min #xfers for these circuits
-    circuit_per_worker = total_circuit_count / num_workers
+    circuit_per_worker = int(total_circuit_count / num_workers)
     ctx = mp.get_context('spawn')
     process_group = []
     for idx in range(num_workers):

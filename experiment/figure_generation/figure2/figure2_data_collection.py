@@ -1,5 +1,9 @@
 import json
+import multiprocessing as mp
+import pickle
 import random
+import time
+
 import quartz
 
 
@@ -10,7 +14,7 @@ class Query:
         self.graph = None
 
 
-def analyze_circuit(qasm_str, max_depth):
+def analyze_circuit(rank, qasm_str, max_depth):
     """
     Find the minimal number of steps needed to achieve a gate reduction from given circuit.
     Implemented by BFS.
@@ -60,16 +64,34 @@ def analyze_circuit(qasm_str, max_depth):
                 # this is for logging
                 searched_count += 1
                 if searched_count % 1000 == 0:
-                    print(f"Searched {searched_count} circuits, now at depth {visited_hash_set[new_hash]}.")
+                    print(f"[Rank {rank}] Searched {searched_count} circuits,"
+                          f" now at depth {visited_hash_set[new_hash]}.")
     assert False
+
+
+def worker_proc(rank, circuit_batch, max_depth):
+    result_list = []
+    finished_count = 0
+    for circuit_packet in circuit_batch:
+        qasm_str = circuit_packet[0]
+        gate_count = circuit_packet[1]
+        print(f"[Rank {rank}] Start analyzing circuit {finished_count} with {gate_count}.")
+        result = analyze_circuit(rank=rank, qasm_str=qasm_str, max_depth=max_depth)
+        result_list.append(result)
+        finished_count += 1
+
+    # save to file
+    with open(f"./tmp/{rank}.tmp", 'wb') as handle:
+        pickle.dump(obj=result_list, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def main():
     # input parameters
     random.seed(12345)
     circuit_dict_path = "../data/900000_graph.json"
-    total_circuit_count = 10
-    num_workers = 1
+    total_circuit_count = 4
+    max_search_depth = 10
+    num_workers = 2
 
     # read json files and randomly sample a subset of circuits
     with open(circuit_dict_path, 'r') as handle:
@@ -80,9 +102,35 @@ def main():
         selected_circuit_list.append(circuit_dict[selected_hash])
 
     # compute min #xfers for these circuits
-    # TODO: change this to multi-processing
-    result = analyze_circuit(selected_circuit_list[0][0], 5)
-    print(result)
+    circuit_per_worker = total_circuit_count / num_workers
+    ctx = mp.get_context('spawn')
+    process_group = []
+    for idx in range(num_workers):
+        begin = idx * circuit_per_worker
+        end = begin + circuit_per_worker
+        new_worker = ctx.Process(target=worker_proc,
+                                 args=(idx, selected_circuit_list[begin:end], max_search_depth))
+        new_worker.start()
+        process_group.append(new_worker)
+        time.sleep(0.2)
+
+    # wait until all workers finish and gather information
+    for worker in process_group:
+        worker.join()
+    final_results = {}
+    for idx in range(num_workers):
+        with open(f"./tmp/{rank}.tmp", 'rb') as handle:
+            result_list = pickle.load(file=handle)
+            for result in result_list:
+                if result not in final_results:
+                    final_results[result] = 1
+                else:
+                    final_results[result] += 1
+    print("/*************************************************/")
+    print(f"Final results: {final_results}")
+    print("/*************************************************/")
+    with open(f"./final_results.pickle", 'wb') as handle:
+        pickle.dump(obj=final_results, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == '__main__':

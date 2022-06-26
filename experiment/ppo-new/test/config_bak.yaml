@@ -11,17 +11,19 @@ wandb:
   en: True
   offline: False
   entity: quartz
-  project: PPO
+  project: PPO-Pretrain
 
 # quartz
 input_graphs:
   - name: 'barenco_tof_3'
-    path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+    path: '../t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_3.qasm.toffoli_flip' # '../barenco_tof_3_opt_path/subst_history_39.qasm'
   # - name: 'barenco_tof_3'
   #   path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+  # mod5_4
+  # 
 
-gate_set: ['h', 'cx', 't', 'tdg']
-ecc_file: 'bfs_verified_simplified.json'
+gate_set: ['h', 'cx', 'x', 'rz', 'add'] # ['h', 'cx', 't', 'tdg']
+ecc_file: 'Nam_complete_ECC_set.json' # 'bfs_verified_simplified.json'
 no_increase: False
 include_nop: True
 
@@ -36,7 +38,7 @@ entropy_coeff: 0.02
 eps_clip: 0.2
 softmax_temp:
   en: True
-  hit_rate: 0.8
+  hit_rate: 0.9
 
 # multiprocessing
 mp_start_method: spawn # fork

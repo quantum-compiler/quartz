@@ -201,7 +201,7 @@ class PPOMod:
         printfl(f'Agent {self.rank} : start collecting data for iter {self.i_iter}')
         exp_list: ExperienceList = collect_fn(self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-        for _i in range(self.cfg.num_eps_per_iter // self.cfg.obs_per_agent - 1):
+        for i in range(self.cfg.num_eps_per_iter // self.cfg.obs_per_agent - 1):
             exp_list += collect_fn(self.cfg.max_gate_count_ratio, self.cfg.nop_stop)
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3

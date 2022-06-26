@@ -34,10 +34,12 @@ class Observer:
     def __init__(
         self,
         obs_id: int,
+        agent_id: int,
         batch_inference: bool,
         invalid_reward: float,
     ) -> None:
         self.id = obs_id
+        self.agent_id = agent_id
         self.batch_inference = batch_inference
         self.invalid_reward = invalid_reward
     
@@ -171,7 +173,7 @@ class PPOAgent:
         for obs_rank in range(0, num_observers):
             ob_info = rpc.get_worker_info(get_obs_name(self.id, obs_rank))
             self.obs_rrefs.append(
-                rpc.remote(ob_info, Observer, args=(obs_rank, batch_inference, invalid_reward,))
+                rpc.remote(ob_info, Observer, args=(obs_rank, self.id, batch_inference, invalid_reward,))
             )
         
         self.graph_buffers: List[GraphBuffer] = [
@@ -273,7 +275,7 @@ class PPOAgent:
     def collect_data_self(
         self,
         max_gate_count_ratio: float,
-        nop_stop: bool
+        nop_stop: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
         future_exp_lists: List[List[Experience]] = []
@@ -393,7 +395,7 @@ class PPOAgent:
             self.states_buf[obs_id] = dgl_graph
         else:
             raise Exception(f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicate assignment occurs!')
-        
+
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
             if self.pending_states == 0:
@@ -494,11 +496,13 @@ class PPOAgent:
     def collect_data(
         self,
         max_gate_count_ratio: float,
-        nop_stop: bool
+        nop_stop: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
         init_buffer_ids: List[int] = []
+        init_graph_qasm_list: List[str] = []
+        max_eps_len_for_all: int = 0
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
@@ -515,15 +519,19 @@ class PPOAgent:
                 max_eps_len = min(max_eps_len, self.max_eps_len)
             else:
                 max_eps_len = self.max_eps_len
-            """make async RPC to kick off an episode on observers"""
+            init_graph_qasm_list.append(init_graph.to_qasm_str())
+            max_eps_len_for_all = max(max_eps_len_for_all, max_eps_len)
+        # end for
+        """make async RPC to kick off an episode on observers"""
+        for obs_rref, init_qasm in zip(self.obs_rrefs, init_graph_qasm_list):
             future_exp_lists.append(obs_rref.rpc_async().run_episode(
                 rpc.RRef(self),
-                init_graph.to_qasm_str(),
-                max_eps_len,
+                init_qasm,
+                max_eps_len_for_all, # make sure all observers have the same max_eps_len
                 max_gate_count_ratio,
                 nop_stop,
             ))
-            
+
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
         """convert graph and maintain graph_buffer"""

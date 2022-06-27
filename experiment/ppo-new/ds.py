@@ -197,7 +197,7 @@ class GraphBuffer:
             self.original_graph.gate_count: [ self.original_graph, ],
         }
         self.hashset: Set[int] = { hash(self.original_graph) }
-                
+        
         """other infos"""
         self.best_graph = self.original_graph
         

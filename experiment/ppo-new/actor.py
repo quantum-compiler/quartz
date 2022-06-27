@@ -619,16 +619,20 @@ class PPOAgent:
         """read in other agents' results"""
         for r in range(self.num_agents):
             if r != self.id:
-                with open(os.path.join(sync_dir, f'best_info_{r}.json')) as f:
-                    other_best_info = json.load(f)
-                for i in range(len(self.graph_buffers)):
-                    buffer = self.graph_buffers[i]
-                    other_info = other_best_info[i]
-                    assert buffer.name == other_info['name']
-                    if buffer.push_nonexist_best(other_info['qasm']):
-                        printfl(f'  Agent {self.id} : read in new best graph ({buffer.best_graph.gate_count}) from agent {r}')
-                    # end if
-                # end for i
+                self.load_best_info(os.path.join(sync_dir, f'best_info_{r}.json'))
             # end if r
         # end for r
+    
+    def load_best_info(self, best_info_path: str) -> None:
+        best_info: List[Dict[str, Any]]
+        with open(best_info_path) as f:
+            best_info = json.load(f)
+        for i in range(len(self.graph_buffers)):
+            buffer = self.graph_buffers[i]
+            info = best_info[i]
+            assert buffer.name == info['name']
+            if buffer.push_nonexist_best(info['qasm']):
+                printfl(f'  Agent {self.id} : read in new best graph ({buffer.best_graph.gate_count}) from {best_info_path}')
+            # end if
+        # end for i
     

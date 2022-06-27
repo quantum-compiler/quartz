@@ -339,6 +339,7 @@ class PPOMod:
             printfl(f'saved "{ckpt_path}"!')
         
     def load_ckpt(self, ckpt_path: str) -> None:
+        """load model and optimizer"""
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
         self.i_iter = ckpt['i_iter']
         model_state_dict = ckpt['model_state_dict']
@@ -346,6 +347,13 @@ class PPOMod:
         self.ac_net_old.load_state_dict(model_state_dict)
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         printfl(f'resumed from "{ckpt_path}"!')
+        """load best graph info"""
+        if self.cfg.load_best_info:
+            info_files = os.listdir(self.cfg.best_info_dir)
+            for info_file in info_files:
+                self.agent.load_best_info(
+                    os.path.join(self.cfg.best_info_dir, info_file)
+                )
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:

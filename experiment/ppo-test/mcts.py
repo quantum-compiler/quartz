@@ -16,6 +16,16 @@ include_nop = True
 
 ckpt_path = "pretrained_model.pt"
 
+circ_qasm_path = '../nam_circs/barenco_tof_3.qasm'
+
+MCTS_C = 0.5
+MCTS_K = 5
+MCTS_budget = 1000
+MCTS_max_step_len = 512
+MCTS_gamma = 0.95
+
+device = torch.device('cuda:0')
+
 
 class Node:
     def __init__(self, circ: quartz.PyGraph, node_id: int, parent_id: int):
@@ -81,17 +91,15 @@ class Nodes:
 
 
 class MCTS:
-    def __init__(self, init_circ: quartz.PyGraph, C: float, k: int,
-                 budget: int, max_step_length: int, gamma: float, device):
-        self.context = quartz.QuartzContext(gate_set=gate_set,
-                                            filename=ECC_fn,
-                                            no_increase=no_increase,
-                                            include_nop=include_nop)
+    def __init__(self, context: quartz.QuartzContext,
+                 init_circ: quartz.PyGraph, C: float, k: int, budget: int,
+                 max_step_length: int, gamma: float, device):
         self.model = ActorCritic(total_num_gates, graph_embed_dim,
                                  actor_hidden_dim, critic_hidden_dim,
                                  self.context.num_xfers, hit_rate,
                                  device).to(device)
         self.model.load_ckpt(ckpt_path)
+        self.context = context
         self.Nodes: Nodes = Nodes()
         self.root: Node = self.Nodes.create_node(init_circ, 0)
         self.k: int = k
@@ -156,8 +164,19 @@ class MCTS:
         return first_child
 
     def simulation(self, node: Node) -> float:
-        # TODO: run 1 trajectory from the node's circuit
-        pass
+        # run 1 trajectory from the node's circuit
+        assert (node.get_circ() is not None)
+        is_nop: bool = False
+        step: int = 0
+        circ = node.get_circ()
+        while not is_nop and step < self.max_step_length:
+            n_id, x_id = self.model.get_node_and_xfer(self.context, circ)
+            new_circ, _ = circ.apply_xfer_and_node_state_tracking(
+                node=circ.get_node_from_id(id=n_id),
+                xfer=self.context.get_xfer_from_id(id=x_id),
+                eliminate_ratation=self.context.has_parameterized_gate())
+            circ = new_circ
+        return node.get_circ().gate_count - circ.gate_count
 
     def backpropagation(self, reward: float, node_id_trace: list[int]) -> None:
         for node_id in reversed(node_id_trace):
@@ -183,3 +202,13 @@ class MCTS:
                 reward: float = self.simulation(child_node)
                 node_id_trace.append(child_node.get_id())
                 self.backpropagationk(reward, node_id_trace)
+
+
+if __name__ == '__main__':
+    context = quartz.QuartzContext(gate_set=gate_set,
+                                   filename=ECC_fn,
+                                   no_increase=no_increase,
+                                   include_nop=include_nop)
+    init_circ = quartz.PyGraph.from_qasm(circ_qasm_path)
+    mcts_agent = MCTS(context, init_circ, MCTS_C, MCTS_K, MCTS_budget,
+                      MCTS_max_step_len, MCTS_gamma, device)

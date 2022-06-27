@@ -75,6 +75,7 @@ class Generator:
         candidate_hq = [[initial_graph_gate_count, initial_graph, initial_graph_hash]]
         visited_hash_set = set()
         visited_hash_set.add(initial_graph_hash)
+        assert initial_graph_gate_count == self.gate_count
         self.buffer.add_graph(graph=initial_graph, graph_hash=initial_graph_hash,
                               graph_cnt=initial_graph_gate_count)
 
@@ -119,6 +120,7 @@ class Generator:
                         if new_hash not in visited_hash_set and new_cnt == self.gate_count:
                             visited_hash_set.add(new_hash)
                             candidate_hq.append([new_cnt, new_graph, new_hash])
+                            assert new_cnt == self.gate_count
                             self.buffer.add_graph(graph=new_graph, graph_hash=new_hash, graph_cnt=new_cnt)
                             bar.update(1)
                             budget -= 1

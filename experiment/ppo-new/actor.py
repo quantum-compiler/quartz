@@ -553,11 +553,7 @@ class PPOAgent:
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
                 exp_seq.append((s_exp, graph, next_graph))
-                """add graphs into buffer"""
-                if not s_exp.game_over and \
-                    not qtz.is_nop(s_exp.action.xfer) and \
-                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less or equal gate count
-                    graph_buffer.push_back(next_graph)
+                """collect info"""
                 if s_exp.info['start']:
                     init_graph = qtz.qasm_to_graph(obs_res[0].state)
                     exp_seq = []
@@ -565,6 +561,11 @@ class PPOAgent:
                     graph_buffer.rewards.append([])
                     graph_buffer.init_graph_gcs.append(graph.gate_count)
                     graph_buffer.graph_gcs.append(graph.gate_count)
+                """add graphs into buffer"""
+                if not s_exp.game_over and \
+                    not qtz.is_nop(s_exp.action.xfer) and \
+                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less or equal gate count
+                    graph_buffer.push_back(next_graph)
                 
                 graph_buffer.rewards[-1].append(s_exp.reward)
                 graph_buffer.graph_gcs.append(next_graph.gate_count)

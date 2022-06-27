@@ -95,3 +95,4 @@ experiment/ppo-new/log*
 
 experiment/figure_generation/prio_bfs_generator/outputs
 experiment/figure_generation/data
+experiment/figure_generation/figure2/final_results.pickle

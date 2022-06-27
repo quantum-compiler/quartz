@@ -70,7 +70,7 @@ class Generator:
     def __init__(self, gate_set: list, ecc_file: str, input_circuit_file: str,
                  no_increase: bool = True, include_nop: bool = True):
         # output path
-        self.output_path = "./outputs"
+        self.output_path = "outputs"
         if not os.path.exists(self.output_path):
             os.makedirs(self.output_path)
 
@@ -169,8 +169,8 @@ if __name__ == '__main__':
 
     generator = Generator(
         gate_set=['h', 'cx', 't', 'tdg'],
-        ecc_file="bfs_verified_simplified.json",
-        input_circuit_file="./barenco_tof_3.qasm",
+        ecc_file="../bfs_verified_simplified.json",
+        input_circuit_file="../barenco_tof_3.qasm",
         no_increase=args.no_increase,
         include_nop=args.include_nop,
     )

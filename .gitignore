@@ -93,5 +93,5 @@ experiment/a2c/*txt
 experiment/ppo-new/outputs
 experiment/ppo-new/log*
 
-experiment/figure_generation/outputs
+experiment/figure_generation/prio_bfs_generator/outputs
 experiment/figure_generation/data

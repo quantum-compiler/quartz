@@ -17,7 +17,7 @@ class GraphRecord:
 
 
 def main():
-    with open('./outputs/graph_10000_637_finished.dat', 'rb') as handle:
+    with open('outputs/graph_10000_637_finished.dat', 'rb') as handle:
         recovered_obj = pickle.load(handle)
         print(len(recovered_obj))
 

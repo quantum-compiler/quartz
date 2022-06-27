@@ -43,6 +43,8 @@ class PPOMod:
             self.wandb_mode = 'offline'
         elif cfg.wandb.en is False:
             self.wandb_mode = 'disabled'
+        wandb.require("service")
+        wandb.setup()
         self.print_cfg()
 
         """init quartz"""

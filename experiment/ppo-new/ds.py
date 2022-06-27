@@ -3,7 +3,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 from typing import Dict, Iterator, Set, List, Tuple, Any
-
 import math
 import random
 import itertools
@@ -11,6 +10,7 @@ import itertools
 import torch
 import dgl # type: ignore
 
+from utils import *
 import quartz # type: ignore
 import qtz
 from IPython import embed # type: ignore
@@ -185,6 +185,7 @@ class GraphBuffer:
         self,
         name: str,
         original_graph_qasm: str,
+        cost_type: CostType,
         max_len: int | float,
         device: torch.device = torch.device('cpu'),
     ) -> None:
@@ -192,9 +193,10 @@ class GraphBuffer:
         # self.max_len = max_len
         self.device = device
         self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
+        self.cost_type = cost_type
         
-        self.gc_to_graph: Dict[int, List[quartz.PyGraph]] = {
-            self.original_graph.gate_count: [ self.original_graph, ],
+        self.cost_to_graph: Dict[int, List[quartz.PyGraph]] = {
+            get_cost(self.original_graph, cost_type): [ self.original_graph, ],
         }
         self.hashset: Set[int] = { hash(self.original_graph) }
         
@@ -204,8 +206,13 @@ class GraphBuffer:
         self.eps_lengths: List[int] = []
         self.max_eps_length: int = 0
         self.rewards: List[List[float]] = []
+        
         self.init_graph_gcs: List[int] = []
         self.graph_gcs: List[int] = []
+        self.init_graph_ccs: List[int] = []
+        self.graph_ccs: List[int] = []
+        self.init_graph_costs: List[int] = []
+        self.graph_costs: List[int] = []
     
     def __len__(self) -> int:
         return len(self.hashset)
@@ -222,21 +229,21 @@ class GraphBuffer:
             hash_value = hash(graph)
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
-            gc = int(graph.gate_count)
-            if gc not in self.gc_to_graph:
-                self.gc_to_graph[gc] = []
-            self.gc_to_graph[gc].append(graph)
+            gcost = get_cost(graph, self.cost_type)
+            if gcost not in self.cost_to_graph:
+                self.cost_to_graph[gcost] = []
+            self.cost_to_graph[gcost].append(graph)
             return True
         else:
             return False
         
     def sample(self) -> quartz.PyGraph:
-        gc_list = list(self.gc_to_graph.keys())
-        gate_counts = torch.Tensor(gc_list).to(self.device)
-        weights = 1 / gate_counts ** 4
-        sampled_gc_idx = int(torch.multinomial(weights, num_samples=1))
-        sampled_gc = gc_list[sampled_gc_idx]
-        sampled_graph = random.choice(self.gc_to_graph[sampled_gc])
+        gcost_list = list(self.cost_to_graph.keys())
+        gcost = torch.Tensor(gcost_list).to(self.device)
+        weights = 1 / gcost ** 4
+        sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
+        sampled_gcost = gcost_list[sampled_gcost_idx]
+        sampled_graph = random.choice(self.cost_to_graph[sampled_gcost])
         return sampled_graph
 
     """Note that it's not concurrency-safe to call these functions."""
@@ -244,11 +251,21 @@ class GraphBuffer:
         graph = qtz.qasm_to_graph(qasm)
         if self.push_back(graph): # non-exist
             """update best graph and return whether the best info is updated"""
-            if graph.gate_count < self.best_graph.gate_count:
+            if get_cost(graph, self.cost_type) < get_cost(self.best_graph, self.cost_type):
                 self.best_graph = graph
                 return True
         # end if
         return False
+    
+    def append_costs_from_graph(self, graph: quartz.PyGraph):
+        self.graph_gcs.append(graph.gate_count)
+        self.graph_ccs.append(graph.cx_count)
+        self.graph_costs.append(get_cost(graph, self.cost_type))
+    
+    def append_init_costs_from_graph(self, graph: quartz.PyGraph):
+        self.init_graph_gcs.append(graph.gate_count)
+        self.init_graph_ccs.append(graph.cx_count)
+        self.init_graph_costs.append(get_cost(graph, self.cost_type))
     
     def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
         """Return: (best, old_best)"""
@@ -285,16 +302,21 @@ class GraphBuffer:
         
         return info
     
-    def gate_count_info(self) -> Dict[str, float]:
+    def cost_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {}
         
-        info['min_init_gc'] = min(self.init_graph_gcs)
-        info['max_init_gc'] = min(self.init_graph_gcs)
-        info['mean_init_gc'] = sum(self.init_graph_gcs) / len(self.init_graph_gcs)
-        
-        info['best_gc_iter'] = min(self.graph_gcs)
-        info['max_gc_iter'] = max(self.graph_gcs)
-        info['mean_gc_iter'] = sum(self.graph_gcs) / len(self.graph_gcs)
+        for name, values, init_values in [
+            ('gate_count', self.graph_gcs, self.init_graph_gcs),
+            ('cx_count', self.graph_ccs, self.init_graph_ccs),
+            ('cost', self.graph_costs, self.init_graph_costs),
+        ]:
+            info[f'min_init_{name}'] = min(init_values)
+            info[f'max_init_{name}'] = max(init_values)
+            info[f'mean_init_{name}'] = sum(init_values) / len(init_values)
+            
+            info[f'best_{name}_iter'] = min(values)
+            info[f'max_{name}_iter'] = max(values)
+            info[f'mean_{name}_iter'] = sum(values) / len(values)
         
         return info
     

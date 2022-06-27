@@ -37,18 +37,20 @@ class Observer:
         agent_id: int,
         batch_inference: bool,
         invalid_reward: float,
+        cost_type: CostType,
     ) -> None:
         self.id = obs_id
         self.agent_id = agent_id
         self.batch_inference = batch_inference
         self.invalid_reward = invalid_reward
+        self.cost_type = cost_type
     
     def run_episode(
         self,
         agent_rref: rpc.RRef[PPOAgent],
         init_state_str: str,
         max_eps_len: int,
-        max_gate_count_ratio: float,
+        max_cost_ratio: float,
         nop_stop: bool,
     ) -> List[SerializableExperience]:
         """Interact with env for many steps to collect data.
@@ -110,8 +112,10 @@ class Observer:
                 next_graph_str = graph_str # unchanged
                 next_nodes = [action.node] # CONFIRM
             else:
-                reward = graph.gate_count - next_graph.gate_count
-                game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
+                graph_cost =  get_cost(graph, self.cost_type)
+                next_graph_cost =  get_cost(next_graph, self.cost_type)
+                reward = graph_cost - next_graph_cost
+                game_over = (graph_cost > next_graph_cost * max_cost_ratio)
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
@@ -147,6 +151,7 @@ class PPOAgent:
         device: torch.device,
         batch_inference: bool,
         invalid_reward: float,
+        cost_type: CostType,
         ac_net: ActorCritic,
         input_graphs: List[Dict[str, str]],
         softmax_temp_en: bool,
@@ -163,6 +168,7 @@ class PPOAgent:
         self.dyn_eps_len = dyn_eps_len
         self.max_eps_len = max_eps_len
         self.min_eps_len = min_eps_len
+        self.cost_type = cost_type
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
         self.softmax_temp_en = softmax_temp_en
@@ -173,13 +179,13 @@ class PPOAgent:
         for obs_rank in range(0, num_observers):
             ob_info = rpc.get_worker_info(get_obs_name(self.id, obs_rank))
             self.obs_rrefs.append(
-                rpc.remote(ob_info, Observer, args=(obs_rank, self.id, batch_inference, invalid_reward,))
+                rpc.remote(ob_info, Observer, args=(obs_rank, self.id, batch_inference, invalid_reward, self.cost_type))
             )
         
         self.graph_buffers: List[GraphBuffer] = [
             GraphBuffer(
                 input_graph['name'], input_graph['qasm'],
-                math.inf, self.device
+                self.cost_type, math.inf, self.device
             ) for input_graph in input_graphs
         ]
         self.init_buffer_turn: int = 0
@@ -194,7 +200,7 @@ class PPOAgent:
         self,
         init_graph: quartz.PyGraph,
         max_eps_len: int,
-        max_gate_count_ratio: float,
+        max_cost_ratio: float,
         nop_stop: bool,
     ) -> List[Experience]:
         exp_list: List[Experience] = []
@@ -250,8 +256,10 @@ class PPOAgent:
                 game_over = nop_stop
                 next_nodes = [action.node] # CONFIRM
             else:
-                reward = graph.gate_count - next_graph.gate_count
-                game_over = (next_graph.gate_count > init_graph.gate_count * max_gate_count_ratio)
+                graph_cost =  get_cost(graph, self.cost_type)
+                next_graph_cost =  get_cost(next_graph, self.cost_type)
+                reward = graph_cost - next_graph_cost
+                game_over = (graph_cost > next_graph_cost * max_cost_ratio)
                     
             exp = Experience(
                 graph, action, reward, next_graph, game_over,
@@ -274,7 +282,7 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data_self(
         self,
-        max_gate_count_ratio: float,
+        max_cost_ratio: float,
         nop_stop: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
@@ -300,7 +308,7 @@ class PPOAgent:
             future_exp_lists.append(self.run_episode(
                 init_graph,
                 max_eps_len,
-                max_gate_count_ratio,
+                max_cost_ratio,
                 nop_stop,
             ))
             
@@ -311,29 +319,35 @@ class PPOAgent:
             """for each observer's results (several episodes)"""
             graph_buffer = self.graph_buffers[buffer_id]
             init_graph = None
+            init_graph_cost: int
             exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]] = [] # for output optimization path
             for s_exp in obs_res:
                 """for each experience"""
-                if s_exp.info['start']:
-                    init_graph = obs_res[0].state
-                    exp_seq = []
-                    i_step = 0
                 graph = s_exp.state
                 next_graph = s_exp.next_state
                 ss_exp = SerializableExperience(*s_exp)
                 ss_exp.state = s_exp.state.to_qasm_str()
                 ss_exp.next_state = s_exp.next_state.to_qasm_str()
+                graph_cost =  get_cost(graph, self.cost_type)
+                next_graph_cost =  get_cost(next_graph, self.cost_type)
+                if s_exp.info['start']:
+                    init_graph = graph
+                    init_graph_cost = get_cost(init_graph, self.cost_type)
+                    exp_seq = []
+                    i_step = 0
+
                 exp_seq.append((ss_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
-                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less gate count
+                    next_graph_cost <= init_graph_cost: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
                 """best graph maintenance"""
-                if next_graph.gate_count < graph_buffer.best_graph.gate_count:
-                    seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
-                    msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
+                cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
+                if next_graph_cost < cur_best_cost:
+                    seq_path = self.output_opt_path(graph_buffer.name, next_graph_cost, exp_seq)
+                    msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                     printfl(f'\n{msg}\n')
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
@@ -343,6 +357,7 @@ class PPOAgent:
                         ) # send alert to slack
                     
                     graph_buffer.best_graph = next_graph
+                    cur_best_cost = next_graph_cost
                 i_step += 1
                 if s_exp.game_over:
                     graph_buffer.eps_lengths.append(i_step)
@@ -453,7 +468,7 @@ class PPOAgent:
     def other_info_dict(self) -> Dict[str, float | int]:
         info_dict: Dict[str, float | int] = {}
         for buffer in self.graph_buffers:
-            info_dict[f'{buffer.name}_best_gc'] = buffer.best_graph.gate_count
+            info_dict[f'{buffer.name}_best_cost'] = get_cost(buffer.best_graph, self.cost_type)
             info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
             
             info_dict[f'{buffer.name}_mean_eps_len'] = \
@@ -468,8 +483,8 @@ class PPOAgent:
             for k, v in rewards_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
             
-            gate_count_info = buffer.gate_count_info()
-            for k, v in gate_count_info.items():
+            cost_info = buffer.cost_info()
+            for k, v in cost_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
             
         return info_dict
@@ -490,7 +505,7 @@ class PPOAgent:
         exp_seq = [(first_s_exp, None, exp_seq[0][1])] + exp_seq
         """output the seq"""
         for i_step, (s_exp, graph, next_graph) in enumerate(exp_seq):
-            fname = f'{i_step}_{next_graph.gate_count}_{int(s_exp.reward)}_' \
+            fname = f'{i_step}_{get_cost(next_graph, self.cost_type)}_{int(s_exp.reward)}_' \
                     f'{s_exp.action.node}_{s_exp.action.xfer}.qasm'
             with open(os.path.join(output_dir, fname), 'w') as f:
                 f.write(s_exp.next_state)
@@ -499,7 +514,7 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data(
         self,
-        max_gate_count_ratio: float,
+        max_cost_ratio: float,
         nop_stop: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
@@ -538,7 +553,7 @@ class PPOAgent:
                 rpc.RRef(self),
                 init_qasm,
                 max_eps_len_for_all, # make sure all observers have the same max_eps_len
-                max_gate_count_ratio,
+                max_cost_ratio,
                 nop_stop,
             ))
 
@@ -551,6 +566,7 @@ class PPOAgent:
             """for each observer's results (several episodes)"""
             graph_buffer = self.graph_buffers[buffer_id]
             init_graph = None
+            init_graph_cost: int
             exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]] = [] # for output optimization path
             for s_exp in obs_res:
                 """for each experience"""
@@ -559,26 +575,30 @@ class PPOAgent:
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
                 exp_seq.append((s_exp, graph, next_graph))
+                graph_cost =  get_cost(graph, self.cost_type)
+                next_graph_cost =  get_cost(next_graph, self.cost_type)
                 """collect info"""
                 if s_exp.info['start']:
-                    init_graph = qtz.qasm_to_graph(obs_res[0].state)
+                    init_graph = graph
+                    init_graph_cost = graph_cost
                     exp_seq = []
                     i_step = 0
                     graph_buffer.rewards.append([])
-                    graph_buffer.init_graph_gcs.append(graph.gate_count)
-                    graph_buffer.graph_gcs.append(graph.gate_count)
+                    graph_buffer.append_init_costs_from_graph(init_graph)
+                    graph_buffer.append_costs_from_graph(init_graph)
                 """add graphs into buffer"""
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
-                    next_graph.gate_count <= init_graph.gate_count: # NOTE: only add graphs with less or equal gate count
+                    next_graph_cost <= init_graph_cost: # NOTE: only add graphs with less or equal gate count
                     graph_buffer.push_back(next_graph)
                 
                 graph_buffer.rewards[-1].append(s_exp.reward)
-                graph_buffer.graph_gcs.append(next_graph.gate_count)
+                graph_buffer.append_costs_from_graph(next_graph)
                 """best graph maintenance"""
-                if next_graph.gate_count < graph_buffer.best_graph.gate_count:
-                    seq_path = self.output_opt_path(graph_buffer.name, next_graph.gate_count, exp_seq)
-                    msg = f'Agent {self.id} : {graph_buffer.name}: {graph_buffer.best_graph.gate_count} -> {next_graph.gate_count} ! Seq saved to {seq_path} .'
+                cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
+                if next_graph_cost < cur_best_cost:
+                    seq_path = self.output_opt_path(graph_buffer.name, next_graph_cost, exp_seq)
+                    msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                     printfl(f'\n{msg}\n')
                     if self.id == 0: # TODO multi-processing logging
                         wandb.alert(
@@ -613,16 +633,16 @@ class PPOAgent:
         best_info = [
             {
                 'name': buffer.name,
-                'gate_count': buffer.best_graph.gate_count,
+                'best_cost': get_cost(buffer.best_graph, self.cost_type),
                 'qasm': buffer.best_graph.to_qasm_str(),
             }
             for buffer in self.graph_buffers
         ]
         with open(os.path.join(sync_dir, f'best_info_{self.id}.json'), 'w') as f:
             json.dump(best_info, fp=f, indent=2)
-        printfl(f'Agent {self.id} : waiting for others to sync')
+        # printfl(f'Agent {self.id} : waiting for others to sync')
         dist.barrier()
-        printfl(f'Agent {self.id} : finish waiting')
+        # printfl(f'Agent {self.id} : finish waiting')
         """read in other agents' results"""
         for r in range(self.num_agents):
             if r != self.id:
@@ -639,7 +659,7 @@ class PPOAgent:
             info = best_info[i]
             assert buffer.name == info['name']
             if buffer.push_nonexist_best(info['qasm']):
-                printfl(f'  Agent {self.id} : read in new best graph ({buffer.best_graph.gate_count}) from {best_info_path}')
+                printfl(f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}')
             # end if
         # end for i
     

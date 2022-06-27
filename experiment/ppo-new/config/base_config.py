@@ -74,9 +74,10 @@ class BaseConfig:
     obs_per_agent: int = 3
 
     # exp collection
+    cost_type: str = 'gate_count'
     nop_stop: bool = True
     invalid_reward: float = -1.0
-    max_gate_count_ratio: float = 1.2
+    max_cost_ratio: float = 1.2
     batch_inference: bool = True
     agent_collect: bool = False
     dyn_eps_len: bool = True

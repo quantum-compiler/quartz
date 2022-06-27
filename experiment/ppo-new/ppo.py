@@ -73,7 +73,7 @@ class PPOMod:
         print('=========================================')
     
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
-        seed_all(self.cfg.seed)
+        seed_all(self.cfg.seed + rank)
         """init Quartz for each process"""
         global quartz_context
         global quartz_parser

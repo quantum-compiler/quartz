@@ -212,7 +212,7 @@ class PPOMod:
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
-            other_info_dict = self.agent.other_info_dict()
+            other_info_dict = self.agent.othe2r_info_dict()
             collect_info = {
                 **other_info_dict, # type: ignore
                 'num_exps': len(exp_list),

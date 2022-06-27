@@ -28,6 +28,7 @@ class BaseConfig:
     mode: str = 'train'
     resume: bool = False
     ckpt_path: str = 'outputs/2022-06-21/17-33-40/ckpts/iter_174.pt'
+    load_non_ddp_ckpt: bool = False
     load_best_info: bool = False
     best_info_dir: str = 'outputs/2022-06-26/08-45-11/sync_dir'
 

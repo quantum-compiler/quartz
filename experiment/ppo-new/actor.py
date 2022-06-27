@@ -526,6 +526,12 @@ class PPOAgent:
             init_graph_qasm_list.append(init_graph.to_qasm_str())
             max_eps_len_for_all = max(max_eps_len_for_all, max_eps_len)
         # end for
+        """communicate with others to get max of max_eps_len_for_all"""
+        max_eps_len_all_ranks = torch.zeros(self.num_agents).to(self.device)
+        max_eps_len_all_ranks[self.id] = max_eps_len_for_all
+        for r in range(self.num_agents):
+            dist.broadcast(max_eps_len_all_ranks[r], r)
+        max_eps_len_for_all = int(max_eps_len_all_ranks.max())
         """make async RPC to kick off an episode on observers"""
         for obs_rref, init_qasm in zip(self.obs_rrefs, init_graph_qasm_list):
             future_exp_lists.append(obs_rref.rpc_async().run_episode(

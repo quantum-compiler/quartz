@@ -235,15 +235,15 @@ class PPOMod:
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
                 # (batch_num_nodes, embed_dim)
-                b_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.state) # type: ignore
+                b_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.state, ActorCritic.graph_embedding_name())
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset
                 selected_node_embeds = b_graph_embeds[selected_nodes]
-                selected_node_values: torch.Tensor = self.ddp_ac_net.module.critic(selected_node_embeds).squeeze() # type: ignore
+                selected_node_values: torch.Tensor = self.ddp_ac_net(selected_node_embeds, ActorCritic.critic_name()).squeeze()
                 """get xfer dist by Actor"""
                 # (batch_num_graphs, action_dim)
-                xfer_logits: torch.Tensor = self.ddp_ac_net.module.actor(selected_node_embeds) # type: ignore
+                xfer_logits: torch.Tensor = self.ddp_ac_net(selected_node_embeds, ActorCritic.actor_name())
                 softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer)
                 # (batch_num_graphs, )
@@ -255,7 +255,7 @@ class PPOMod:
                     next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
                     """get embeds"""
                     # (batch_next_graphs_nodes, embed_dim)
-                    b_next_graph_embeds: torch.Tensor = self.ddp_ac_net.module.graph_embedding(exps.next_state) # type: ignore
+                    b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.graph_embedding_name())
                     next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
                     """select embeds"""
                     # ( sum(num_next_nodes), embed_dim )
@@ -265,7 +265,7 @@ class PPOMod:
                     ])
                     """evaluate"""
                     # ( sum(num_next_nodes), )
-                    next_node_values: torch.Tensor = self.ddp_ac_net.module.critic(next_node_embeds).squeeze() # type: ignore
+                    next_node_values: torch.Tensor = self.ddp_ac_net(next_node_embeds, ActorCritic.critic_name()).squeeze()
                     num_next_nodes = list(map(len, exps.next_nodes))
                     next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
                     """get max next value for each graph"""
@@ -332,7 +332,7 @@ class PPOMod:
         if not only_rank_zero or self.rank == 0:
             torch.save({
                 'i_iter': self.i_iter,
-                'model_state_dict': self.ddp_ac_net.module.state_dict(),
+                'model_state_dict': self.ddp_ac_net.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 # 'loss': LOSS,
             }, ckpt_path)
@@ -343,8 +343,12 @@ class PPOMod:
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
         self.i_iter = ckpt['i_iter']
         model_state_dict = ckpt['model_state_dict']
-        self.ddp_ac_net.module.load_state_dict(model_state_dict)
-        self.ac_net_old.load_state_dict(model_state_dict)
+        if self.cfg.load_non_ddp_ckpt:
+            self.ddp_ac_net.module.load_state_dict(model_state_dict)
+            self.ac_net_old.load_state_dict(model_state_dict)
+        else:
+            self.ddp_ac_net.load_state_dict(model_state_dict)
+            self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         printfl(f'resumed from "{ckpt_path}"!')
         """load best graph info"""

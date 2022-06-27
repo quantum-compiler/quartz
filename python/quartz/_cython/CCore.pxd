@@ -109,6 +109,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         void all_ops(vector[Op]&) const
         int gate_count() const
         int cx_count() const
+        int specific_gate_count(GateType) const
         size_t hash()
         void all_edges(vector[Edge]&) const
         void topology_order_ops(vector[Op] &) const

@@ -394,14 +394,15 @@ int Graph::gate_count() const {
   return cnt;
 }
 
-int Graph::cx_count() const{
+  int Graph::specific_gate_count(GateType gate_type) const{
   int cnt = 0;
   for (const auto &it : inEdges) {
-    if (it.first.ptr->tp == GateType::cx)
+    if (it.first.ptr->tp == gate_type)
       cnt++;
   }
   return cnt;
-}
+
+  }
 
 void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);

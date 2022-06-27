@@ -574,7 +574,6 @@ class PPOAgent:
                 next_graph = qtz.qasm_to_graph(s_exp.next_state)
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
-                exp_seq.append((s_exp, graph, next_graph))
                 graph_cost =  get_cost(graph, self.cost_type)
                 next_graph_cost =  get_cost(next_graph, self.cost_type)
                 """collect info"""
@@ -586,6 +585,8 @@ class PPOAgent:
                     graph_buffer.rewards.append([])
                     graph_buffer.append_init_costs_from_graph(init_graph)
                     graph_buffer.append_costs_from_graph(init_graph)
+                exp_seq.append((s_exp, graph, next_graph))
+                
                 """add graphs into buffer"""
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \

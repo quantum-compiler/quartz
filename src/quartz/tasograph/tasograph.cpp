@@ -394,15 +394,14 @@ int Graph::gate_count() const {
   return cnt;
 }
 
-  int Graph::specific_gate_count(GateType gate_type) const{
+int Graph::specific_gate_count(GateType gate_type) const {
   int cnt = 0;
   for (const auto &it : inEdges) {
     if (it.first.ptr->tp == gate_type)
       cnt++;
   }
   return cnt;
-
-  }
+}
 
 void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);
@@ -1796,7 +1795,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return !fail;
 }
 
-std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
+std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
+                                         bool eliminate_rotation) {
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return nullptr;
   }
@@ -1936,6 +1936,11 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
       fail = true;
     }
   }
+  if (!fail) {
+    if (eliminate_rotation) {
+      new_graph->constant_and_rotation_elimination();
+    }
+  }
   while (!opx_op_dq.empty()) {
     auto opx_op_pair = opx_op_dq.back();
     opx_op_dq.pop_back();
@@ -1948,7 +1953,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
 Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
-                                 bool eliminate_rotation = false) {
+                                 bool eliminate_rotation) {
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {

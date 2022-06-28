@@ -107,36 +107,47 @@ class Tester:
                     topk_xfer_logits, topk_xfers = torch.topk(xfer_logits, k=topk)
                     for action_xfer_logit, action_xfer in zip(topk_xfer_logits, topk_xfers):
                         action = Action(action_node, action_xfer)
+                        # printfl(f'trying {action}')
                         next_graph, next_nodes = \
                             cur_graph.apply_xfer_with_local_state_tracking(
                                 xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
                                 node=cur_graph.get_node_from_id(id=action.node),
                                 eliminate_rotation=qtz.has_parameterized_gate,
                             )
-                        next_hash = hash(next_graph)
-                        if next_hash not in hash_prevexp and popped_exp.depth + 1 < max_eps_len:
-                            next_cost = get_cost(next_graph, self.cost_type)
-                            action_node_value = float(action_node_value)
-                            action_xfer_logit = float(action_xfer_logit)
-                            prev_exp = PrevExp(
-                                next_graph, next_hash, popped_exp.cur_hash, next_cost,
-                                action, action_node_value, action_xfer_logit, popped_exp.depth + 1
-                            )
-                            hash_prevexp[next_hash] = prev_exp
-                            heapq.heappush(q, prev_exp)
-                            
-                            if next_cost < best_cost:
-                                pbar.update(best_cost - next_cost)
-                                best_graph, best_cost, best_hash = next_graph, next_cost, next_hash
-                                print(
-                                    f'Better graph with cost {best_cost} is found!'
-                                    f' node_value: {action_node_value}'
-                                    f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
+                        if next_graph is not None:
+                            # printfl(f'Not None!!!!!!!!!!!!!')
+                            next_hash = hash(next_graph)
+                            if next_hash not in hash_prevexp and popped_exp.depth + 1 < max_eps_len:
+                                next_cost = get_cost(next_graph, self.cost_type)
+                                action_node_value = float(action_node_value)
+                                action_xfer_logit = float(action_xfer_logit)
+                                prev_exp = PrevExp(
+                                    next_graph, next_hash, popped_exp.cur_hash, next_cost,
+                                    action, action_node_value, action_xfer_logit, popped_exp.depth + 1
                                 )
+                                hash_prevexp[next_hash] = prev_exp
+                                heapq.heappush(q, prev_exp)
+                                
+                                if next_cost < best_cost:
+                                    pbar.update(best_cost - next_cost)
+                                    best_graph, best_cost, best_hash = next_graph, next_cost, next_hash
+                                    print(
+                                        f'Better graph with cost {best_cost} is found!'
+                                        f' node_value: {action_node_value}'
+                                        f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
+                                    )
+                                # end if
                             # end if
                         # end if
                     # end for xfer
                 # end for node
+                pbar.set_postfix({
+                    'cur_cost': popped_exp.cur_cost,
+                    'best_cost': best_cost,
+                    '|q|': len(q),
+                    '|hash_prevexp|': len(hash_prevexp),
+                })
+                pbar.refresh()
             # end while
         # end with
         """output seq"""

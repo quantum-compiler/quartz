@@ -365,8 +365,8 @@ class PPOMod:
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
             self.device = torch.device('cpu')
         else:
-            self.device = torch.device(f'cuda:{self.cfg.gpus[0]}')
-        torch.cuda.set_device(self.device)
+            self.device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
+        # torch.cuda.set_device(self.device)
         dist.init_process_group(
             backend='nccl',
             init_method=f'tcp://localhost:{self.cfg.ddp_port}',
@@ -375,7 +375,6 @@ class PPOMod:
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
-        
         self.ac_net = ActorCritic(
             num_gate_type=self.num_gate_type,
             graph_embed_size=self.cfg.graph_embed_size,
@@ -385,6 +384,7 @@ class PPOMod:
             device=self.device,
         ).to(self.device)
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
+        
         if rank == 0:
             """load ckpt"""
             if self.cfg.resume:
@@ -393,10 +393,8 @@ class PPOMod:
                 model_state_dict = ckpt['model_state_dict']
                 if self.cfg.load_non_ddp_ckpt:
                     self.ddp_ac_net.module.load_state_dict(model_state_dict)
-                    self.ac_net_old.load_state_dict(model_state_dict)
                 else:
                     self.ddp_ac_net.load_state_dict(model_state_dict)
-                    self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
                 printfl(f'resumed from "{ckpt_path}"!')
             
             graph_name = self.cfg.input_graphs[0].name
@@ -425,8 +423,8 @@ def main(config: Config) -> None:
     
     ppo_mod = PPOMod(cfg, output_dir)
     
+    mp.set_start_method(cfg.mp_start_method)
     if cfg.mode == 'train':
-        mp.set_start_method(cfg.mp_start_method)
         ddp_processes = 1
         if len(cfg.gpus) > 1:
             ddp_processes = len(cfg.gpus)

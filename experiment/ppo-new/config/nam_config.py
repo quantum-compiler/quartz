@@ -53,5 +53,15 @@ class NamMultiPretrainConfig(NamConfig):
     ])
 
 @dataclass
-class NamTestConfig(TestConfig, NamConfig):
-    pass
+class NamTestConfig(TestConfig):
+    # quartz
+    gate_set: List[str] = field(default_factory=lambda: [
+        'h', 'cx', 'x', 'rz', 'add',
+    ])
+    ecc_file: str = '../ecc_set/nam.json.ecc'
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[
+        InputGraph(
+            'barenco_tof_3',
+            '../nam_circs/barenco_tof_3.qasm',
+        ),
+    ])

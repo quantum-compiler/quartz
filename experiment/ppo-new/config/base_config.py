@@ -95,7 +95,7 @@ class BaseConfig:
     update_policy_interval: int = 1
     save_ckpt_interval: int = 5
 
-@dataclassgit
+@dataclass
 class TestConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)
     topk: int = 6

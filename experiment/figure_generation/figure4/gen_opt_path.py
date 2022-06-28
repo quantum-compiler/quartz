@@ -62,13 +62,14 @@ def gen_path(rank, qasm_str, max_depth):
                         par_hash = path_set[save_hash][1]
                         save_node_idx = path_set[save_hash][2]
                         save_xfer_idx = path_set[save_hash][3]
-                        if par_hash is None and save_node_idx is None and save_xfer_idx is None:
-                            break
                         # save circuit
-                        save_path_name = f"./path{max_depth}/step{circuit_idx}_{save_node_idx}_{save_xfer_idx}.qasm"
+                        save_path_name = f"./path_{max_depth}/step{circuit_idx}_{save_node_idx}_{save_xfer_idx}.qasm"
+                        print(save_path_name)
                         with open(save_path_name, 'w') as handle:
                             handle.write(save_graph.to_qasm_str())
                         # change param
+                        if par_hash is None and save_node_idx is None and save_xfer_idx is None:
+                            break
                         circuit_idx -= 1
                         save_hash = par_hash
                     # return final depth

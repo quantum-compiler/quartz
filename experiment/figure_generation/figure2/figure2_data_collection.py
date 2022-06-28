@@ -3,6 +3,7 @@ import multiprocessing as mp
 import pickle
 import random
 import time
+import os
 
 import quartz
 
@@ -70,7 +71,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
     assert False
 
 
-def worker_proc(rank, circuit_batch, max_depth):
+def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
     result_list = []
     finished_count = 0
     total_circuits = len(circuit_batch)
@@ -84,25 +85,30 @@ def worker_proc(rank, circuit_batch, max_depth):
         finished_count += 1
 
     # save to file
-    with open(f"./tmp/{rank}.tmp", 'wb') as handle:
+    with open(f"./tmp{gate_count_to_plot}/{rank}.tmp", 'wb') as handle:
         pickle.dump(obj=result_list, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def main():
     # input parameters
     random.seed(12345)
-    circuit_dict_path = "../data/900000_graph.json"
+    gate_count_to_plot = 58
     total_circuit_count = 10000
     max_search_depth = 8
-    num_workers = 80
+    num_workers = 100
 
     # read json files and randomly sample a subset of circuits
+    circuit_dict_path = f"./dataset/{gate_count_to_plot}.json"
     with open(circuit_dict_path, 'r') as handle:
         circuit_dict = json.load(handle)
     selected_hash_list = random.sample(list(circuit_dict), total_circuit_count)
     selected_circuit_list = []
     for selected_hash in selected_hash_list:
         selected_circuit_list.append(circuit_dict[selected_hash])
+
+    # make output dir
+    if not os.path.exists(f"./tmp{gate_count_to_plot}"):
+        os.makedirs(f"./tmp{gate_count_to_plot}")
 
     # compute min #xfers for these circuits
     circuit_per_worker = int(total_circuit_count / num_workers)
@@ -112,7 +118,8 @@ def main():
         begin = idx * circuit_per_worker
         end = begin + circuit_per_worker
         new_worker = ctx.Process(target=worker_proc,
-                                 args=(idx, selected_circuit_list[begin:end], max_search_depth))
+                                 args=(idx, selected_circuit_list[begin:end],
+                                       max_search_depth, gate_count_to_plot))
         new_worker.start()
         process_group.append(new_worker)
         time.sleep(0.2)
@@ -122,7 +129,7 @@ def main():
         worker.join()
     final_results = {}
     for idx in range(num_workers):
-        with open(f"./tmp/{idx}.tmp", 'rb') as handle:
+        with open(f"./tmp{gate_count_to_plot}/{idx}.tmp", 'rb') as handle:
             result_list = pickle.load(file=handle)
             for result in result_list:
                 if result not in final_results:

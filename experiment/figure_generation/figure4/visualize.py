@@ -5,7 +5,7 @@ from qiskit import QuantumCircuit, transpile
 
 def main():
     # argument
-    path_length = 7
+    path_length = 6
 
     # draw
     input_path = f"./path_{path_length}"

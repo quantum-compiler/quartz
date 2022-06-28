@@ -229,7 +229,7 @@ class GraphBuffer:
             hash_value = hash(graph)
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
-            gcost = get_cost(graph, self.cost_type)
+            gcost = round(get_cost(graph, self.cost_type), 1)
             if gcost not in self.cost_to_graph:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)

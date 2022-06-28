@@ -110,6 +110,13 @@ class ExperienceList:
     def new_empty() -> ExperienceList:
         return ExperienceList(*[None]*len(fields(ExperienceList))) # type: ignore
 
+    def shuffle(self) -> None:
+        self.state, self.action, self.reward, self.next_state, self.game_over, \
+        self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info = shuffle_lists(
+            self.state, self.action, self.reward, self.next_state, self.game_over,
+            self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info
+        )
+    
     def get_batch(
         self,
         start_pos: int = 0,

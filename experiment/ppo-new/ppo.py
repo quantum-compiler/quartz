@@ -228,6 +228,7 @@ class PPOMod:
             )
         
         for epoch_k in range(self.cfg.k_epochs):
+            exp_list.shuffle()
             for i_step, exps in enumerate(
                 ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
             ):
@@ -410,7 +411,7 @@ class PPOMod:
             )
             
             graph = qtz.qasm_to_graph(qasm_str)
-            best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len)
+            best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len) # type: ignore
         
 
 @hydra.main(config_path='config', config_name='config')

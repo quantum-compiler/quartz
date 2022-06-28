@@ -145,7 +145,7 @@ def main():
     print("/*************************************************/")
     print(f"Final results: {final_results}")
     print("/*************************************************/")
-    with open(f"./final_results.pickle", 'wb') as handle:
+    with open(f"./final_results_{gate_count_to_plot}.pickle", 'wb') as handle:
         pickle.dump(obj=final_results, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 

@@ -104,15 +104,15 @@ class ActorCritic(nn.Module):
             k: int) -> tuple[list[int], list[int]]:
         dgl_g = circ.to_dgl_graph().to(self.device)
         graph_embeds = self.graph_embedding(dgl_g)
-        node_values: torch.Tensor = self.critic(graph_embeds).squeeze(0)
-        _, node_idxs: torch.Tensor = node_values.topk(k)
+        node_values: torch.Tensor = self.critic(graph_embeds).squeeze()
+        _, node_idxs = node_values.topk(k)
 
         masks = torch.zeros((k, self.action_dim),
                             dtype=torch.bool).to(self.device)
-        for idx in node_idxs:
+        for i, node_idx in enumerate(node_idxs):
             available_xfers = circ.available_xfers_parallel(
-                context=context, node=circ.get_node_from_id(id=idx))
-            masks[idx][available_xfers] = True
+                context=context, node=circ.get_node_from_id(id=node_idx))
+            masks[i][available_xfers] = True
 
         xfer_logits = self.actor(graph_embeds[node_idxs])
         xfer_probs = masked_softmax(xfer_logits, masks)
@@ -126,7 +126,7 @@ class ActorCritic(nn.Module):
         node_num = circ.gate_count
         dgl_g = circ.to_dgl_graph().to(self.device)
         graph_embeds = self.graph_embedding(dgl_g)
-        node_values: torch.Tensor = self.critic(graph_embeds).squeeze(0)
+        node_values: torch.Tensor = self.critic(graph_embeds).squeeze()
 
         temperature = 1 / math.log(
             (node_num - 1) / (1 - self.hit_rate) * self.hit_rate)

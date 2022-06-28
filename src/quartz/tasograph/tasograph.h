@@ -183,7 +183,7 @@ public:
   bool check_correctness();
   float total_cost() const;
   int gate_count() const;
-  int cx_count() const;
+  int specific_gate_count(GateType gate_type) const;
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
@@ -229,9 +229,11 @@ public:
   std::vector<size_t>
   appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
+                                    bool eliminate_rotation = false);
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
-  apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation);
+  apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                            bool eliminate_rotation = false);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

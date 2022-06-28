@@ -436,10 +436,10 @@ cdef class PyGraph:
         return result
                     
     # TODO: use node_id directly instead of using PyNode
-    def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
+    def apply_xfer(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False) -> PyGraph:
         if xfer.is_nop:
             return self
-        ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node)
+        ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node, eliminate_rotation)
         if ret.get() == NULL:
             return None
         else:
@@ -567,7 +567,11 @@ cdef class PyGraph:
 
     @property
     def cx_count(self):
-        return deref(self.graph).cx_count()
+        return deref(self.graph).specific_gate_count(GateType.cx)
+
+    @property
+    def t_count(self):
+        return deref(self.graph).specific_gate_count(GateType.t)
 
     @property
     def num_nodes(self):

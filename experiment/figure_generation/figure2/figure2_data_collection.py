@@ -90,9 +90,14 @@ def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
 
 
 def main():
-    # input parameters
+    # get input parameter from console
+    parser = argparse.ArgumentParser(description='Generate figure for paper.')
+    parser.add_argument('--gate_count', type=int, required=True)
+    args = parser.parse_args()
+
+    # more parameters
     random.seed(12345)
-    gate_count_to_plot = 58
+    gate_count_to_plot = args.gate_count
     total_circuit_count = 10000
     max_search_depth = 8
     num_workers = 100

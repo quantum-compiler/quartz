@@ -51,3 +51,7 @@ class NamMultiPretrainConfig(NamConfig):
             '../nam_circs/tof_5.qasm',
         ),
     ])
+
+@dataclass
+class NamTestConfig(TestConfig, NamConfig):
+    pass

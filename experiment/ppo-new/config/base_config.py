@@ -95,5 +95,9 @@ class BaseConfig:
     update_policy_interval: int = 1
     save_ckpt_interval: int = 5
 
-
-
+@dataclass
+class TestConfig(BaseConfig):
+    wandb: WandbConfig = WandbConfig(False)
+    topk: int = 6
+    mode: str = 'test'
+    resume: bool = True

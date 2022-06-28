@@ -27,7 +27,11 @@ cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
 cs.store(group="c", name="base", node=BaseConfig)
 
-# other config groups
+# other config groups for training
 cs.store(group="c", name="nam", node=NamConfig)
 cs.store(group="c", name="nam_pret", node=NamPretrainConfig)
 cs.store(group="c", name="nam_multipret", node=NamMultiPretrainConfig)
+cs.store(group="c", name="nam_test", node=NamTestConfig)
+
+# cfg groups for test
+# cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

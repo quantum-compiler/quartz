@@ -27,6 +27,7 @@ from ds import *
 from utils import *
 from model import ActorCritic
 from actor import PPOAgent
+from tester import Tester
 
 from IPython import embed # type: ignore
 from icecream import ic # type: ignore
@@ -75,13 +76,11 @@ class PPOMod:
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
         seed_all(self.cfg.seed + rank)
         """init Quartz for each process"""
-        global quartz_context
-        global quartz_parser
         self.init_quartz_context_func()
         
         """set num of OMP threads to avoid blasting the machine"""
         if self.cfg.omp_num_threads != 0:
-            os.environ["OMP_NUM_THREADS"] = str(self.cfg.omp_num_threads)
+            os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
         # otherwise we don't limit it
         
         """RPC and DDP initialization"""
@@ -359,6 +358,62 @@ class PPOMod:
                 self.agent.load_best_info(
                     os.path.join(self.cfg.best_info_dir, info_file)
                 )
+    
+    def test(self, rank: int) -> None:
+        seed_all(self.cfg.seed)
+        """init Quartz and other things"""
+        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+            self.device = torch.device('cpu')
+        else:
+            self.device = torch.device(f'cuda:{self.cfg.gpus[0]}')
+        torch.cuda.set_device(self.device)
+        dist.init_process_group(
+            backend='nccl',
+            init_method=f'tcp://localhost:{self.cfg.ddp_port}',
+            rank=rank, world_size=2,
+        )
+        self.init_quartz_context_func()
+        if self.cfg.omp_num_threads != 0:
+            os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
+        
+        self.ac_net = ActorCritic(
+            num_gate_type=self.num_gate_type,
+            graph_embed_size=self.cfg.graph_embed_size,
+            actor_hidden_size=self.cfg.actor_hidden_size,
+            critic_hidden_size=self.cfg.critic_hidden_size,
+            action_dim=qtz.quartz_context.num_xfers,
+            device=self.device,
+        ).to(self.device)
+        self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
+        if rank == 0:
+            """load ckpt"""
+            if self.cfg.resume:
+                ckpt_path = self.cfg.ckpt_path
+                ckpt = torch.load(ckpt_path, map_location=self.device)
+                model_state_dict = ckpt['model_state_dict']
+                if self.cfg.load_non_ddp_ckpt:
+                    self.ddp_ac_net.module.load_state_dict(model_state_dict)
+                    self.ac_net_old.load_state_dict(model_state_dict)
+                else:
+                    self.ddp_ac_net.load_state_dict(model_state_dict)
+                    self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
+                printfl(f'resumed from "{ckpt_path}"!')
+            
+            graph_name = self.cfg.input_graphs[0].name
+            qasm_path = self.cfg.input_graphs[0].path
+            with open(qasm_path) as f:
+                qasm_str = f.read()
+            
+            tester = Tester(
+                cost_type=CostType.from_str(self.cfg.cost_type),
+                ac_net=self.ddp_ac_net.module, # type: ignore
+                device=self.device,
+                output_dir=self.output_dir,
+            )
+            
+            graph = qtz.qasm_to_graph(qasm_str)
+            best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len)
+        
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
@@ -370,20 +425,30 @@ def main(config: Config) -> None:
     
     ppo_mod = PPOMod(cfg, output_dir)
     
-    mp.set_start_method(cfg.mp_start_method)
-    ddp_processes = 1
-    if len(cfg.gpus) > 1:
-        ddp_processes = len(cfg.gpus)
-    obs_processes = ddp_processes * cfg.obs_per_agent
-    tot_processes = ddp_processes + obs_processes
-    print(f'spawning {tot_processes} processes...')
-    mp.spawn(
-        fn=ppo_mod.init_process,
-        args=(ddp_processes, obs_processes,),
-        nprocs=tot_processes,
-        join=True,
-    )
+    if cfg.mode == 'train':
+        mp.set_start_method(cfg.mp_start_method)
+        ddp_processes = 1
+        if len(cfg.gpus) > 1:
+            ddp_processes = len(cfg.gpus)
+        obs_processes = ddp_processes * cfg.obs_per_agent
+        tot_processes = ddp_processes + obs_processes
+        print(f'spawning {tot_processes} processes...')
+        mp.spawn(
+            fn=ppo_mod.init_process,
+            args=(ddp_processes, obs_processes,),
+            nprocs=tot_processes,
+            join=True,
+        )
     # TODO profiling; some parts of this code are slow
+    elif cfg.mode == 'test':
+        mp.spawn(
+            fn=ppo_mod.test,
+            args=(),
+            nprocs=2,
+            join=True,
+        )
+    else:
+        raise NotImplementedError(f'Unexpected mode {cfg.mode}')
     
 if __name__ == '__main__':
     main()

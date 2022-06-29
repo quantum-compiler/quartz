@@ -65,3 +65,11 @@ class NamTestConfig(TestConfig):
             '../nam_circs/barenco_tof_3.qasm',
         ),
     ])
+
+@dataclass
+class NamConvertConfig(ConvertConfig):
+    # quartz
+    gate_set: List[str] = field(default_factory=lambda: [
+        'h', 'cx', 'x', 'rz', 'add',
+    ])
+    ecc_file: str = '../ecc_set/nam.json.ecc'

@@ -101,3 +101,11 @@ class TestConfig(BaseConfig):
     topk: int = 6
     mode: str = 'test'
     resume: bool = True
+
+@dataclass
+class ConvertConfig(BaseConfig):
+    wandb: WandbConfig = WandbConfig(False)
+    mode: str = 'convert'
+    resume: bool = True
+    ckpt_output_dir: str = '.'
+    ckpt_output_path: str = ''

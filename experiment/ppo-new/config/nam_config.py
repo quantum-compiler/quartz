@@ -67,6 +67,12 @@ class NamTestConfig(TestConfig):
     ])
 
 @dataclass
+class NamAllTestConfig(NamTestConfig):
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[])
+    input_graph_dir: str = '../nam_circs'
+    budget: int = 10000
+
+@dataclass
 class NamConvertConfig(ConvertConfig):
     # quartz
     gate_set: List[str] = field(default_factory=lambda: [

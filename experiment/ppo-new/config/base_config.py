@@ -101,6 +101,7 @@ class TestConfig(BaseConfig):
     topk: int = 6
     mode: str = 'test'
     resume: bool = True
+    budget: int = int(1e8)
 
 @dataclass
 class ConvertConfig(BaseConfig):

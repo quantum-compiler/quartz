@@ -401,20 +401,31 @@ class PPOMod:
                     self.ddp_ac_net.load_state_dict(model_state_dict)
                 printfl(f'resumed from "{ckpt_path}"!')
             
-            graph_name = self.cfg.input_graphs[0].name
-            qasm_path = self.cfg.input_graphs[0].path
-            with open(qasm_path) as f:
-                qasm_str = f.read()
-            
             tester = Tester(
                 cost_type=CostType.from_str(self.cfg.cost_type),
                 ac_net=self.ddp_ac_net.module, # type: ignore
                 device=self.device,
                 output_dir=self.output_dir,
             )
-            
-            graph = qtz.qasm_to_graph(qasm_str)
-            best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len) # type: ignore
+
+            input_graphs: List[InputGraph]
+            if len(self.cfg.input_graphs) > 0:
+                input_graphs = self.cfg.input_graphs
+            else:
+                assert hasattr(self.cfg, 'input_graph_dir')
+                files = os.listdir(self.input_graph_dir)
+                for file in files:
+                    qasm_path = os.path.join(self.input_graph_dir, file)
+                    name = file.split('.')[0]
+                    input_graphs.append(InputGraph(name, qasm_path))
+
+            for input_graph in input_graphs:
+                graph_name = input_graph.name
+                qasm_path = input_graph.path
+                with open(qasm_path) as f:
+                    qasm_str = f.read()
+                graph = qtz.qasm_to_graph(qasm_str)
+                best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, self.cfg.budget) # type: ignore
     
     def convert(self, rank: int) -> None:
         self.init_two_ddp_processes(rank)

@@ -199,7 +199,8 @@ public:
            int timeout = 86400 /*1 day*/);
   std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
                                   int gate_count_upper_bound,
-                                  std::string circuit_name, int timeout);
+                                  std::string circuit_name, bool print_message,
+                                  int timeout = 86400 /*1 day*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result, bool print_id) const;

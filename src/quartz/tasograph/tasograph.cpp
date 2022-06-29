@@ -157,6 +157,7 @@ Graph::Graph(const Graph &graph) {
   constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
   input_qubit_op_2_qubit_idx = graph.input_qubit_op_2_qubit_idx;
+  pos_2_logical_qubit = graph.pos_2_logical_qubit;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
 }
@@ -1549,7 +1550,7 @@ std::shared_ptr<Graph> Graph::optimize(
 std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
                                        int gate_count_upper_bound,
                                        std::string circuit_name,
-                                       int timeout = 86400 /*1 day*/) {
+                                       bool print_message, int timeout) {
   auto start = std::chrono::steady_clock::now();
   std::priority_queue<std::shared_ptr<Graph>,
                       std::vector<std::shared_ptr<Graph>>, GraphCompare>
@@ -1561,13 +1562,16 @@ std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
   candidates.push(best_graph);
   hashmap.insert(hash());
 
+  int invoke_cnt = 0;
+
   while (!candidates.empty()) {
     auto graph = candidates.top();
     candidates.pop();
     std::vector<Op> all_nodes;
     graph->topology_order_ops(all_nodes);
-    for (auto const &node : all_nodes) {
-      for (auto xfer : xfers) {
+    for (auto xfer : xfers) {
+      for (auto const &node : all_nodes) {
+        invoke_cnt++;
         auto new_graph =
             graph->apply_xfer(xfer, node, context->has_parameterized_gate());
         auto end = std::chrono::steady_clock::now();
@@ -1597,14 +1601,16 @@ std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
       }
     }
     auto end = std::chrono::steady_clock::now();
-    std::cout << "[" << circuit_name << "] "
-              << "Best gate count: " << best_gate_cnt
-              << "\tcandidate number: " << candidates.size() << "\tafter "
-              << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
-                     end - start)
-                         .count() /
-                     1000.0
-              << " seconds." << std::endl;
+    if (print_message) {
+      std::cout << "[" << circuit_name << "] "
+                << "Best gate count: " << best_gate_cnt
+                << "\tcandidate number: " << candidates.size() << "\tafter "
+                << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                       end - start)
+                           .count() /
+                       1000.0
+                << " seconds." << std::endl;
+    }
   }
   return best_graph;
 }
@@ -1687,7 +1693,9 @@ Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                                    std::vector<int> instruction) {
   std::shared_ptr<Graph> graph(new Graph(*this));
   std::shared_ptr<Graph> new_graph(nullptr);
+  int a = 0;
   for (const auto direction : instruction) {
+    std::cout << a << std::endl;
     if (direction == 0) {
       new_graph = xfer->run_1_time(0, graph.get());
     } else {

@@ -99,7 +99,7 @@ class BaseConfig:
 @dataclass
 class TestConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)
-    topk: int = 6
+    topk: int = 3
     mode: str = 'test'
     resume: bool = True
     budget: int = int(1e8)

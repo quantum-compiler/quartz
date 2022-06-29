@@ -93,3 +93,4 @@ experiment/a2c/*txt
 experiment/ppo-new/outputs
 experiment/**/log*
 experiment/**/*.log
+experiment/**/*.pt

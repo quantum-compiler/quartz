@@ -72,7 +72,7 @@ class Tester:
         topk: int,
         max_eps_len: int,
         budget: int = int(1e6)
-    ) -> quartz.PyGraph:
+    ) -> int:
             
         cur_graph: quartz.PyGraph = input_graph
         cur_cost = get_cost(cur_graph, self.cost_type)
@@ -133,7 +133,7 @@ class Tester:
                                 if next_cost < best_cost:
                                     pbar.update(best_cost - next_cost)
                                     best_graph, best_cost, best_hash = next_graph, next_cost, next_hash
-                                    print(
+                                    printfl(
                                         f'Better graph with cost {best_cost} is found!'
                                         f' node_value: {action_node_value}'
                                         f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
@@ -171,7 +171,7 @@ class Tester:
             with open(os.path.join(out_dir, file_name), 'w') as f:
                 f.write(prev_exp.cur_graph.to_qasm_str())
         
-        return best_graph
+        return best_cost
         
     
     

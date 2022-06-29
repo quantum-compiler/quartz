@@ -8,6 +8,7 @@ import time
 import copy
 import math
 from tqdm import tqdm # type: ignore
+from natsort import natsorted
 
 import qtz
 
@@ -408,24 +409,33 @@ class PPOMod:
                 output_dir=self.output_dir,
             )
 
-            input_graphs: List[InputGraph]
+            input_graphs: List[InputGraph] = []
             if len(self.cfg.input_graphs) > 0:
                 input_graphs = self.cfg.input_graphs
             else:
                 assert hasattr(self.cfg, 'input_graph_dir')
-                files = os.listdir(self.input_graph_dir)
+                files = natsorted(os.listdir(self.cfg.input_graph_dir))
                 for file in files:
-                    qasm_path = os.path.join(self.input_graph_dir, file)
+                    qasm_path = os.path.join(self.cfg.input_graph_dir, file)
                     name = file.split('.')[0]
                     input_graphs.append(InputGraph(name, qasm_path))
 
+            res_list: List[Tuple[str, int]] = []
             for input_graph in input_graphs:
                 graph_name = input_graph.name
                 qasm_path = input_graph.path
                 with open(qasm_path) as f:
                     qasm_str = f.read()
                 graph = qtz.qasm_to_graph(qasm_str)
-                best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, self.cfg.budget) # type: ignore
+                printfl(f'Testing {graph_name}...')
+                best_cost = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, self.cfg.budget) # type: ignore
+                res = (graph_name, best_cost)
+                printfl(f'Test Result: {graph_name} : {best_cost}')
+                res_list.append(res)
+            printfl(f'\n\nAll Test Results:\n')
+            for name, cost in res_list:
+                printfl(f'{graph_name} : {best_cost}')
+
     
     def convert(self, rank: int) -> None:
         self.init_two_ddp_processes(rank)

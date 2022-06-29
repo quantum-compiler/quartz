@@ -231,7 +231,7 @@ class GraphBuffer:
         
         self.init_graph_gcs.clear()
         self.graph_gcs.clear()
-        self.init_graph_ccs.claer()
+        self.init_graph_ccs.clear()
         self.graph_ccs.clear()
         self.init_graph_costs.clear()
         self.graph_costs.clear()

@@ -1,12 +1,13 @@
 # this file is under mypy's checking
 from __future__ import annotations
 import os
-from typing import List, Dict
+from typing import List, Dict, cast
 import warnings
 from functools import partial
 import time
 import copy
 import math
+from numpy import str0
 from tqdm import tqdm # type: ignore
 from natsort import natsorted
 
@@ -176,13 +177,16 @@ class PPOMod:
                 mode=self.wandb_mode,
                 config=self.cfg, # type: ignore
             )
-        printfl(f'rank {self.rank} / {len(self.ddp_processes)} on {self.device} initialized')
+        printfl(f'rank {self.rank} / {self.ddp_processes} on {self.device} initialized')
         
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
         """train loop"""
+        limited_time_budget: bool = len(self.cfg.time_budget) > 0
+        if limited_time_budget:
+            sec_budget: float = hms_to_sec(self.cfg.time_budget)
         self.start_time_sec = time.time()
         while self.i_iter < max_iterations:
             self.train_iter()
@@ -191,7 +195,10 @@ class PPOMod:
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt')
             self.i_iter += 1
-
+            used_sec = time.time() - self.start_time_sec
+            if limited_time_budget and used_sec > sec_budget:
+                printfl(f'rank {self.rank}: Run out of time budget {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...')
+                break
         
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
@@ -390,6 +397,7 @@ class PPOMod:
 
     @torch.no_grad()
     def test(self, rank: int, world_size: int) -> None:
+        assert isinstance(self.cfg, TestConfig)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""
         if self.cfg.resume:
@@ -413,8 +421,7 @@ class PPOMod:
         if len(self.cfg.input_graphs) > 0:
             input_graphs = self.cfg.input_graphs
         else:
-            assert hasattr(self.cfg, 'input_graph_dir')
-            files = natsorted(os.listdir(self.cfg.input_graph_dir))
+            files: List[str] = cast(List[str], natsorted(os.listdir(self.cfg.input_graph_dir)))
             n_file_each_rank = math.ceil(len(files) / world_size)
             files = files[n_file_each_rank * rank : n_file_each_rank * (rank + 1)]
             for file in files:
@@ -424,14 +431,12 @@ class PPOMod:
 
         info_list: List[str] = []
         for input_graph in input_graphs:
-            graph_name = input_graph.name
-            qasm_path = input_graph.path
-            with open(qasm_path) as f:
+            with open(input_graph.path) as f:
                 qasm_str = f.read()
             graph = qtz.qasm_to_graph(qasm_str)
-            printfl(f'rank {rank} Testing {graph_name}...')
-            best_cost, best_time = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, graph_name, self.cfg.budget) # type: ignore
-            info = f'{graph_name} : {best_cost}  {best_time} seconds ({sec_to_hms(best_time)})'
+            printfl(f'rank {rank} Testing {input_graph.name}...')
+            best_cost, best_time = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, input_graph.name, self.cfg.budget)
+            info = f'{input_graph.name} : {best_cost}  {best_time} seconds ({sec_to_hms(best_time)})'
             printfl(f'rank {rank} Test Result: {info}')
             info_list.append(info)
         printfl(f'\n\n rank {rank} All Test Results:\n')
@@ -439,6 +444,7 @@ class PPOMod:
             printfl(info)
 
     def convert(self, rank: int) -> None:
+        assert isinstance(self.cfg, ConvertConfig)
         self.init_ddp_processes(rank, 2)
         if rank == 0:
             """load ckpt"""
@@ -449,14 +455,12 @@ class PPOMod:
             printfl(f'"{ckpt_path}" is loaded!')
 
             out_path: str
-            ckpt_output_path: str = self.cfg.ckpt_output_path # type: ignore
-            ckpt_output_dir: str = self.cfg.ckpt_output_dir # type: ignore
-            if ckpt_output_path == '':
+            if self.cfg.ckpt_output_path == '':
                 ckpt_fname = os.path.basename(ckpt_path)
-                os.makedirs(ckpt_output_dir, exist_ok=True)
-                out_path = os.path.join(ckpt_output_dir, f'converted_{ckpt_fname}')
+                os.makedirs(self.cfg.ckpt_output_dir, exist_ok=True)
+                out_path = os.path.join(self.cfg.ckpt_output_dir, f'converted_{ckpt_fname}')
             else:
-                out_path = ckpt_output_path
+                out_path = self.cfg.ckpt_output_path
             if os.path.exists(out_path):
                 for i in range(int(1e8)):
                     posb_path = f'{out_path}.{i}'

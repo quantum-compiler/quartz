@@ -111,6 +111,9 @@ def dur_ms(t1: int, t2: int) -> float:
 def sec_to_hms(sec: float) -> str:
     return str(datetime.timedelta(seconds=sec))
 
+def hms_to_sec(hms: str) -> float:
+    return sum(x * float(t) for x, t in zip([3600, 60, 1], hms.split(':')))
+
 def shuffle_lists(*ls):
     zip_ls = list(zip(*ls))
     random.shuffle(zip_ls)

@@ -59,12 +59,14 @@ class Tester:
             cost_type: CostType,
             ac_net: ActorCritic,
             device: torch.device,
-            output_dir: str
+            output_dir: str,
+            rank: int,
         ) -> None:
         self.cost_type = cost_type
         self.ac_net = ac_net
         self.device = device
         self.output_dir = output_dir
+        self.rank = rank
         
     def beam_search(
         self,
@@ -88,7 +90,7 @@ class Tester:
         
         with tqdm(
             total=cur_cost,
-            desc='cost reduced',
+            desc=f'rank {self.rank} cost reduced',
             bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
         ) as pbar:
             start_time = time.time()
@@ -136,7 +138,7 @@ class Tester:
                                     best_graph, best_cost, best_hash, best_time = next_graph, next_cost, next_hash, time.time()
                                     time_delta_sec = best_time - start_time
                                     printfl(
-                                        f'Better graph with cost {best_cost} is found in {time_delta_sec} s ({sec_to_hms(time_delta_sec)})!'
+                                        f'rank {self.rank} Better graph with cost {best_cost} is found in {time_delta_sec} s ({sec_to_hms(time_delta_sec)})!'
                                         f' node_value: {action_node_value}'
                                         f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
                                     )
@@ -159,7 +161,7 @@ class Tester:
         """output seq"""
         out_dir = os.path.join(self.output_dir, 'out_graphs', name)
         os.makedirs(out_dir, exist_ok=True)
-        print(f'saving the path to {out_dir} ...')
+        printfl(f'rank {self.rank} saving the path to {out_dir} ...')
         prevexp_list: List[PrevExp] = []
         
         cur_hash = best_hash

@@ -94,7 +94,8 @@ class BaseConfig:
     lr_critic: float = 5e-4
     update_policy_interval: int = 1
     save_ckpt_interval: int = 5
-
+    time_budget: str = ''
+    
 @dataclass
 class TestConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)
@@ -102,7 +103,9 @@ class TestConfig(BaseConfig):
     mode: str = 'test'
     resume: bool = True
     budget: int = int(1e8)
-
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[])
+    input_graph_dir: str = '../nam_circs'
+    
 @dataclass
 class ConvertConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)

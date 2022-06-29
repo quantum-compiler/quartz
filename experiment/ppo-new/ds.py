@@ -247,7 +247,7 @@ class GraphBuffer:
     def sample(self) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())
         gcost = torch.Tensor(gcost_list).to(self.device)
-        weights = 1 / gcost ** 4
+        weights = 1 / gcost + 0.5
         sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
         sampled_gcost = gcost_list[sampled_gcost_idx]
         sampled_graph = random.choice(self.cost_to_graph[sampled_gcost])

@@ -228,8 +228,13 @@ class GraphBuffer:
         self.update_max_eps_length()
         self.eps_lengths.clear()
         self.rewards.clear()
+        
         self.init_graph_gcs.clear()
         self.graph_gcs.clear()
+        self.init_graph_ccs.claer()
+        self.graph_ccs.clear()
+        self.init_graph_costs.clear()
+        self.graph_costs.clear()
     
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:

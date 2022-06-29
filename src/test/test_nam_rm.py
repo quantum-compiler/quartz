@@ -1,4 +1,5 @@
 from fileinput import filename
+from pyparsing import original_text_for
 import quartz
 import time
 import heapq
@@ -9,12 +10,14 @@ import os
 def optimize(context: quartz.QuartzContext,
              init_circ: quartz.PyGraph,
              circ_name: str,
+             upper_limit: float = 1.05,
              print_message: bool = True,
              timeout: int = 86400) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.gate_count, init_circ.to_qasm_str())]
     hash_set = set([init_circ.hash()])
     best_circ: quartz.PyGraph = init_circ
     best_gate_cnt: int = init_circ.gate_count
+    original_cnt = init_circ.gate_count
 
     start = time.time()
     invoke_cnt: int = 0
@@ -45,6 +48,8 @@ def optimize(context: quartz.QuartzContext,
 
                 new_hash = new_circ.hash()
                 new_cnt = new_circ.gate_count
+                if new_cnt > original_cnt * upper_limit:
+                    continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
                     heapq.heappush(candidate,

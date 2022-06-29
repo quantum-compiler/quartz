@@ -360,7 +360,7 @@ class PPOMod:
                     os.path.join(self.cfg.best_info_dir, info_file)
                 )
     
-    def test(self, rank: int) -> None:
+    def init_two_ddp_processes(self, rank: int) -> None:
         seed_all(self.cfg.seed)
         """init Quartz and other things"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
@@ -385,7 +385,10 @@ class PPOMod:
             device=self.device,
         ).to(self.device)
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
-        
+
+    @torch.no_grad()
+    def test(self, rank: int) -> None:
+        self.init_two_ddp_processes(rank)
         if rank == 0:
             """load ckpt"""
             if self.cfg.resume:
@@ -412,7 +415,35 @@ class PPOMod:
             
             graph = qtz.qasm_to_graph(qasm_str)
             best_graph = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len) # type: ignore
-        
+    
+    def convert(self, rank: int) -> None:
+        self.init_two_ddp_processes(rank)
+        if rank == 0:
+            """load ckpt"""
+            ckpt_path = self.cfg.ckpt_path
+            ckpt = torch.load(ckpt_path, map_location=self.device)
+            model_state_dict = ckpt['model_state_dict']
+            self.ddp_ac_net.load_state_dict(model_state_dict)
+            printfl(f'"{ckpt_path}" is loaded!')
+
+            out_path: str
+            ckpt_output_path: str = self.cfg.ckpt_output_path # type: ignore
+            ckpt_output_dir: str = self.cfg.ckpt_output_dir # type: ignore
+            if ckpt_output_path == '':
+                ckpt_fname = os.path.basename(ckpt_path)
+                os.makedirs(ckpt_output_dir, exist_ok=True)
+                out_path = os.path.join(ckpt_output_dir, f'converted_{ckpt_fname}')
+            else:
+                out_path = ckpt_output_path
+            if os.path.exists(out_path):
+                for i in range(int(1e8)):
+                    posb_path = f'{out_path}.{i}'
+                    if not os.path.exists(posb_path):
+                        out_path = posb_path
+                        break
+            torch.save(self.ddp_ac_net.module.state_dict(), out_path)
+            printfl(f'saved "{out_path}"!')
+
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
@@ -442,6 +473,13 @@ def main(config: Config) -> None:
     elif cfg.mode == 'test':
         mp.spawn(
             fn=ppo_mod.test,
+            args=(),
+            nprocs=2,
+            join=True,
+        )
+    elif cfg.mode == 'convert':
+        mp.spawn(
+            fn=ppo_mod.convert,
             args=(),
             nprocs=2,
             join=True,

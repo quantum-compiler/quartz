@@ -71,6 +71,7 @@ class Tester:
         input_graph: quartz.PyGraph,
         topk: int,
         max_eps_len: int,
+        budget: int = int(1e6)
     ) -> quartz.PyGraph:
             
         cur_graph: quartz.PyGraph = input_graph
@@ -90,8 +91,9 @@ class Tester:
             bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
         ) as pbar:
             
-            while len(q) > 0:
+            while len(q) > 0 and budget > 0:
                 popped_exp = heapq.heappop(q)
+                budget -= 1
                 cur_graph = popped_exp.cur_graph
                 
                 dgl_graph = cur_graph.to_dgl_graph().to(self.device)
@@ -103,11 +105,12 @@ class Tester:
                     xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed)
                     av_xfers = cur_graph.available_xfers_parallel(
                         context=qtz.quartz_context, node=cur_graph.get_node_from_id(id=action_node))
-                    xfer_logits[av_xfers] -= 1e10
+                    av_mask = torch.BoolTensor([0] * qtz.quartz_context.num_xfers).to(self.device)
+                    av_mask[av_xfers] = True
+                    xfer_logits[~av_mask] -= 1e10
                     topk_xfer_logits, topk_xfers = torch.topk(xfer_logits, k=topk)
                     for action_xfer_logit, action_xfer in zip(topk_xfer_logits, topk_xfers):
-                        action = Action(action_node, action_xfer)
-                        # printfl(f'trying {action}')
+                        action = Action(int(action_node), int(action_xfer))
                         next_graph, next_nodes = \
                             cur_graph.apply_xfer_with_local_state_tracking(
                                 xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
@@ -115,7 +118,6 @@ class Tester:
                                 eliminate_rotation=qtz.has_parameterized_gate,
                             )
                         if next_graph is not None:
-                            # printfl(f'Not None!!!!!!!!!!!!!')
                             next_hash = hash(next_graph)
                             if next_hash not in hash_prevexp and popped_exp.depth + 1 < max_eps_len:
                                 next_cost = get_cost(next_graph, self.cost_type)
@@ -146,8 +148,10 @@ class Tester:
                     'best_cost': best_cost,
                     '|q|': len(q),
                     '|hash_prevexp|': len(hash_prevexp),
+                    'budget': budget,
                 })
-                pbar.refresh()
+                if budget % 1000 == 0:
+                    pbar.refresh()
             # end while
         # end with
         """output seq"""

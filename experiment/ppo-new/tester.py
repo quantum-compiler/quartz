@@ -71,8 +71,9 @@ class Tester:
         input_graph: quartz.PyGraph,
         topk: int,
         max_eps_len: int,
-        budget: int = int(1e6)
-    ) -> int:
+        name: str,
+        budget: int = int(1e6),
+    ) -> Tuple[int, float]:
             
         cur_graph: quartz.PyGraph = input_graph
         cur_cost = get_cost(cur_graph, self.cost_type)
@@ -83,14 +84,14 @@ class Tester:
             cur_hash: prev_exp
         }
         q: List[PrevExp] = [prev_exp]
-        best_graph, best_cost, best_hash = cur_graph, cur_cost, cur_hash
+        best_graph, best_cost, best_hash, best_time = cur_graph, cur_cost, cur_hash, time.time()
         
         with tqdm(
             total=cur_cost,
             desc='cost reduced',
             bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
         ) as pbar:
-            
+            start_time = time.time()
             while len(q) > 0 and budget > 0:
                 popped_exp = heapq.heappop(q)
                 budget -= 1
@@ -132,9 +133,10 @@ class Tester:
                                 
                                 if next_cost < best_cost:
                                     pbar.update(best_cost - next_cost)
-                                    best_graph, best_cost, best_hash = next_graph, next_cost, next_hash
+                                    best_graph, best_cost, best_hash, best_time = next_graph, next_cost, next_hash, time.time()
+                                    time_delta_sec = best_time - start_time
                                     printfl(
-                                        f'Better graph with cost {best_cost} is found!'
+                                        f'Better graph with cost {best_cost} is found in {time_delta_sec} s ({sec_to_hms(time_delta_sec)})!'
                                         f' node_value: {action_node_value}'
                                         f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
                                     )
@@ -155,7 +157,7 @@ class Tester:
             # end while
         # end with
         """output seq"""
-        out_dir = os.path.join(self.output_dir, 'out_graphs')
+        out_dir = os.path.join(self.output_dir, 'out_graphs', name)
         os.makedirs(out_dir, exist_ok=True)
         print(f'saving the path to {out_dir} ...')
         prevexp_list: List[PrevExp] = []
@@ -171,7 +173,7 @@ class Tester:
             with open(os.path.join(out_dir, file_name), 'w') as f:
                 f.write(prev_exp.cur_graph.to_qasm_str())
         
-        return best_cost
+        return best_cost, best_time - start_time
         
     
     

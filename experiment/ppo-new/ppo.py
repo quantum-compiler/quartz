@@ -176,7 +176,7 @@ class PPOMod:
                 mode=self.wandb_mode,
                 config=self.cfg, # type: ignore
             )
-        printfl(f'rank {self.rank} on {self.device} initialized')
+        printfl(f'rank {self.rank} / {len(self.ddp_processes)} on {self.device} initialized')
         
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
@@ -361,18 +361,19 @@ class PPOMod:
                     os.path.join(self.cfg.best_info_dir, info_file)
                 )
     
-    def init_two_ddp_processes(self, rank: int) -> None:
+    def init_ddp_processes(self, rank: int, world_size: int) -> None:
         seed_all(self.cfg.seed)
         """init Quartz and other things"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
             self.device = torch.device('cpu')
         else:
             self.device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
-        # torch.cuda.set_device(self.device)
+        torch.cuda.set_device(self.device)
+        printfl(f'rank {rank} / {world_size} use {self.device}')
         dist.init_process_group(
             backend='nccl',
             init_method=f'tcp://localhost:{self.cfg.ddp_port}',
-            rank=rank, world_size=2,
+            rank=rank, world_size=world_size,
         )
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
@@ -388,57 +389,57 @@ class PPOMod:
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
 
     @torch.no_grad()
-    def test(self, rank: int) -> None:
-        self.init_two_ddp_processes(rank)
-        if rank == 0:
-            """load ckpt"""
-            if self.cfg.resume:
-                ckpt_path = self.cfg.ckpt_path
-                ckpt = torch.load(ckpt_path, map_location=self.device)
-                model_state_dict = ckpt['model_state_dict']
-                if self.cfg.load_non_ddp_ckpt:
-                    self.ddp_ac_net.module.load_state_dict(model_state_dict)
-                else:
-                    self.ddp_ac_net.load_state_dict(model_state_dict)
-                printfl(f'resumed from "{ckpt_path}"!')
-            
-            tester = Tester(
-                cost_type=CostType.from_str(self.cfg.cost_type),
-                ac_net=self.ddp_ac_net.module, # type: ignore
-                device=self.device,
-                output_dir=self.output_dir,
-            )
-
-            input_graphs: List[InputGraph] = []
-            if len(self.cfg.input_graphs) > 0:
-                input_graphs = self.cfg.input_graphs
+    def test(self, rank: int, world_size: int) -> None:
+        self.init_ddp_processes(rank, world_size)
+        """load ckpt"""
+        if self.cfg.resume:
+            ckpt_path = self.cfg.ckpt_path
+            ckpt = torch.load(ckpt_path, map_location=self.device)
+            model_state_dict = ckpt['model_state_dict']
+            if self.cfg.load_non_ddp_ckpt:
+                self.ddp_ac_net.module.load_state_dict(model_state_dict)
             else:
-                assert hasattr(self.cfg, 'input_graph_dir')
-                files = natsorted(os.listdir(self.cfg.input_graph_dir))
-                for file in files:
-                    qasm_path = os.path.join(self.cfg.input_graph_dir, file)
-                    name = file.split('.')[0]
-                    input_graphs.append(InputGraph(name, qasm_path))
+                self.ddp_ac_net.load_state_dict(model_state_dict)
+            printfl(f'rank {rank} resumed from "{ckpt_path}"!')
+        
+        tester = Tester(
+            cost_type=CostType.from_str(self.cfg.cost_type),
+            ac_net=self.ddp_ac_net.module, # type: ignore
+            device=self.device,
+            output_dir=self.output_dir,
+        )
 
-            res_list: List[Tuple[str, int]] = []
-            for input_graph in input_graphs:
-                graph_name = input_graph.name
-                qasm_path = input_graph.path
-                with open(qasm_path) as f:
-                    qasm_str = f.read()
-                graph = qtz.qasm_to_graph(qasm_str)
-                printfl(f'Testing {graph_name}...')
-                best_cost = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, self.cfg.budget) # type: ignore
-                res = (graph_name, best_cost)
-                printfl(f'Test Result: {graph_name} : {best_cost}')
-                res_list.append(res)
-            printfl(f'\n\nAll Test Results:\n')
-            for name, cost in res_list:
-                printfl(f'{graph_name} : {best_cost}')
+        input_graphs: List[InputGraph] = []
+        if len(self.cfg.input_graphs) > 0:
+            input_graphs = self.cfg.input_graphs
+        else:
+            assert hasattr(self.cfg, 'input_graph_dir')
+            files = natsorted(os.listdir(self.cfg.input_graph_dir))
+            n_file_each_rank = math.ceil(len(files) / world_size)
+            files = files[n_file_each_rank * rank : n_file_each_rank * (rank + 1)]
+            for file in files:
+                qasm_path = os.path.join(self.cfg.input_graph_dir, file)
+                name = file.split('.')[0]
+                input_graphs.append(InputGraph(name, qasm_path))
 
-    
+        info_list: List[str] = []
+        for input_graph in input_graphs:
+            graph_name = input_graph.name
+            qasm_path = input_graph.path
+            with open(qasm_path) as f:
+                qasm_str = f.read()
+            graph = qtz.qasm_to_graph(qasm_str)
+            printfl(f'rank {rank} Testing {graph_name}...')
+            best_cost, best_time = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, graph_name, self.cfg.budget) # type: ignore
+            info = f'{graph_name} : {best_cost}  {best_time} seconds ({sec_to_hms(best_time)})'
+            printfl(f'rank {rank} Test Result: {info}')
+            info_list.append(info)
+        printfl(f'\n\n rank {rank} All Test Results:\n')
+        for info in info_list:
+            printfl(info)
+
     def convert(self, rank: int) -> None:
-        self.init_two_ddp_processes(rank)
+        self.init_ddp_processes(rank, 2)
         if rank == 0:
             """load ckpt"""
             ckpt_path = self.cfg.ckpt_path
@@ -476,11 +477,11 @@ def main(config: Config) -> None:
     
     ppo_mod = PPOMod(cfg, output_dir)
     
+    ddp_processes = 1
+    if len(cfg.gpus) > 1:
+        ddp_processes = len(cfg.gpus)
     mp.set_start_method(cfg.mp_start_method)
     if cfg.mode == 'train':
-        ddp_processes = 1
-        if len(cfg.gpus) > 1:
-            ddp_processes = len(cfg.gpus)
         obs_processes = ddp_processes * cfg.obs_per_agent
         tot_processes = ddp_processes + obs_processes
         print(f'spawning {tot_processes} processes...')
@@ -494,8 +495,8 @@ def main(config: Config) -> None:
     elif cfg.mode == 'test':
         mp.spawn(
             fn=ppo_mod.test,
-            args=(),
-            nprocs=2,
+            args=(ddp_processes, ),
+            nprocs=ddp_processes,
             join=True,
         )
     elif cfg.mode == 'convert':

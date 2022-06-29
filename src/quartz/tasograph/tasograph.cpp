@@ -1546,6 +1546,69 @@ std::shared_ptr<Graph> Graph::optimize(
   return bestGraph;
 } // namespace quartz
 
+std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
+                                       int gate_count_upper_bound,
+                                       std::string circuit_name,
+                                       int timeout = 86400 /*1 day*/) {
+  auto start = std::chrono::steady_clock::now();
+  std::priority_queue<std::shared_ptr<Graph>,
+                      std::vector<std::shared_ptr<Graph>>, GraphCompare>
+      candidates;
+  std::set<size_t> hashmap;
+  std::shared_ptr<Graph> best_graph(new Graph(*this));
+  auto best_gate_cnt = gate_count();
+
+  candidates.push(best_graph);
+  hashmap.insert(hash());
+
+  while (!candidates.empty()) {
+    auto graph = candidates.top();
+    candidates.pop();
+    std::vector<Op> all_nodes;
+    graph->topology_order_ops(all_nodes);
+    for (auto const &node : all_nodes) {
+      for (auto xfer : xfers) {
+        auto new_graph =
+            graph->apply_xfer(xfer, node, context->has_parameterized_gate());
+        auto end = std::chrono::steady_clock::now();
+        if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                       start)
+                    .count() /
+                1000.0 >
+            timeout) {
+          std::cout << "Timeout. Program terminated. Best gate count is "
+                    << best_gate_cnt << std::endl;
+          return best_graph;
+        }
+        if (new_graph == nullptr)
+          continue;
+
+        auto new_hash = new_graph->hash();
+        auto new_cnt = new_graph->gate_count();
+        if (hashmap.find(new_hash) == hashmap.end()) {
+          hashmap.insert(new_hash);
+          candidates.push(new_graph);
+          if (new_cnt < best_gate_cnt) {
+            best_gate_cnt = new_cnt;
+            best_graph = new_graph;
+          }
+        } else
+          continue;
+      }
+    }
+    auto end = std::chrono::steady_clock::now();
+    std::cout << "[" << circuit_name << "] "
+              << "Best gate count: " << best_gate_cnt
+              << "\tcandidate number: " << candidates.size() << "\tafter "
+              << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                     end - start)
+                         .count() /
+                     1000.0
+              << " seconds." << std::endl;
+  }
+  return best_graph;
+}
+
 std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   // Transform ccz to t, an naive solution
   // Simply 1 normal 1 inverse

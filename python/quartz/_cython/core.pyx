@@ -571,7 +571,7 @@ cdef class PyGraph:
 
     @property
     def t_count(self):
-        return deref(self.graph).specific_gate_count(GateType.t)
+        return deref(self.graph).specific_gate_count(GateType.t) + deref(self.graph).specific_gate_count(GateType.tdg)
 
     @property
     def num_nodes(self):

@@ -99,6 +99,12 @@ class ExperienceList:
     def __len__(self) -> int:
         return len(self.state)
     
+    def __iter__(self) -> Iterator:
+        return iter([
+            getattr(self, field.name)
+            for field in fields(self)
+        ])
+
     def __add__(self, other) -> ExperienceList:
         ret = ExperienceList.new_empty()
         for field in fields(self):

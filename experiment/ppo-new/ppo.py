@@ -310,7 +310,7 @@ class PPOMod:
                 surr1 = ratios * exps.advantages
                 surr2 = torch.clamp(
                     ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                ) * exps.advantages
+                ) * exps.advantages # NOTE: use fixed advantages
                 actor_loss = - torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
                 critic_loss = torch.mean((exps.target_values - selected_node_values) ** 2)

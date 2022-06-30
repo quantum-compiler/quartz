@@ -20,7 +20,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
     """
     Find the minimal number of steps needed to achieve a gate reduction from given circuit.
     Implemented by BFS.
-    return: -1 if not found under max_depth, min #xfer o.w.
+    return: (-1, 0) if not found under max_depth, (min #xfer, reduced gate count) o.w.
     """
     # prepare quartz context
     quartz_context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
@@ -56,14 +56,14 @@ def analyze_circuit(rank, qasm_str, max_depth):
                 # if new circuit has fewer gates, then we are done
                 if new_cnt < initial_graph_gate_count:
                     final_depth = visited_hash_set[cur_graph_hash] + 1
-                    return final_depth
+                    return final_depth, initial_graph_gate_count - new_cnt
                 # otherwise we will continue search
                 if new_hash not in visited_hash_set:
                     visited_hash_set[new_hash] = visited_hash_set[cur_graph_hash] + 1
                     candidate_queue.append([new_graph, new_hash])
                 # and stop when we reach max depth
                 if visited_hash_set[new_hash] > max_depth:
-                    return -1
+                    return -1, 0
                 # this is for logging
                 searched_count += 1
                 if searched_count % 1000 == 0:
@@ -74,6 +74,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
 
 def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
     result_list = []
+    reduced_cnt_list = []
     finished_count = 0
     total_circuits = len(circuit_batch)
     for circuit_packet in circuit_batch:
@@ -81,13 +82,16 @@ def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
         gate_count = circuit_packet[1]
         print(f"[Rank {rank}] ({finished_count + 1}/{total_circuits})"
               f" Start analyzing new circuit with {gate_count} gates.")
-        result = analyze_circuit(rank=rank, qasm_str=qasm_str, max_depth=max_depth)
-        result_list.append(result)
+        depth, reduced_cnt = analyze_circuit(rank=rank, qasm_str=qasm_str, max_depth=max_depth)
+        result_list.append(depth)
+        reduced_cnt_list.append(reduced_cnt)
         finished_count += 1
 
     # save to file
     with open(f"./tmp{gate_count_to_plot}/{rank}.tmp", 'wb') as handle:
         pickle.dump(obj=result_list, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(f"./tmp{gate_count_to_plot}/{rank}_reduced_cnt.tmp", 'wb') as handle:
+        pickle.dump(obj=reduced_cnt_list, file=handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def main():

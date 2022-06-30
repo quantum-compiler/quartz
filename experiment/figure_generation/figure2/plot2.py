@@ -6,13 +6,15 @@ import matplotlib.pyplot as plt
 # This file plots distribution
 def main():
     # input param
-    gate_count = 46
+    gate_count = 58
 
-    with open(f"./final_results_{gate_count}.pickle", 'rb') as handle:
+    with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
     for i in range(8):
         if i + 1 not in result_dict:
             result_dict[i + 1] = 0
+    if -1 not in result_dict:
+        result_dict[-1] = 0
 
     # prepare y_list
     y_list = []

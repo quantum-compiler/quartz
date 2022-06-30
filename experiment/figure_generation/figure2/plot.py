@@ -5,8 +5,14 @@ import matplotlib.pyplot as plt
 
 # This file plot cdf.
 def main():
-    with open(f"./final_results.pickle", 'rb') as handle:
+    # input param
+    gate_count = 46
+
+    with open(f"./final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
+    for i in range(8):
+        if i + 1 not in result_dict:
+            result_dict[i + 1] = 0
 
     # prepare y_list
     y_list = [0]
@@ -27,6 +33,7 @@ def main():
     plt.xlabel("min #xfers")
     plt.ylabel("percentage")
     plt.plot(x_list, y_list)
+    plt.savefig(f"{gate_count}_cdf.jpg")
     plt.show()
 
 

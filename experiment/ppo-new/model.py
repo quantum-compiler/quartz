@@ -111,7 +111,7 @@ class ActorCritic(nn.Module):
     
     @staticmethod
     def actor_embedding_name() -> str:
-        return 'critic_embedding'
+        return 'actor_embedding'
     
     @staticmethod
     def actor_name() -> str:

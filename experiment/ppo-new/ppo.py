@@ -235,10 +235,55 @@ class PPOMod:
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
         
-        for epoch_k in range(self.cfg.k_epochs):
-            exp_list.shuffle()
+        """compute values of next nodes using un-updated network to get advantages"""
+        all_target_values: List[float] = []
+        all_advs: List[float] = []
+        with torch.no_grad():
             for i_step, exps in enumerate(
-                ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
+                    ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
+                ):
+                # (num_next_graphs, )
+                next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
+                """get embeds"""
+                # (batch_next_graphs_nodes, embed_dim)
+                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.graph_embedding_name())
+                next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
+                """select embeds"""
+                # ( sum(num_next_nodes), embed_dim )
+                next_node_embeds: torch.Tensor = torch.cat([
+                    graph_embed[next_node_ids]
+                    for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
+                ])
+                """evaluate"""
+                # ( sum(num_next_nodes), )
+                next_node_values: torch.Tensor = self.ddp_ac_net(next_node_embeds, ActorCritic.critic_name()).squeeze()
+                num_next_nodes = list(map(len, exps.next_nodes))
+                next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
+                """get max next value for each graph"""
+                max_next_values_list: List[torch.Tensor] = []
+                for i in range(len(exps)):
+                    max_next_value: torch.Tensor
+                    # invalid xfer, gate count exceeds limit, NOP
+                    if next_node_values_list[i].shape[0] == 0 or \
+                        exps.game_over[i] or \
+                        qtz.is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
+                        max_next_value = torch.zeros(1).to(self.device)
+                    else:
+                        max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
+                    max_next_values_list.append(max_next_value)
+                max_next_values = torch.cat(max_next_values_list)
+                target_values = exps.reward + self.cfg.gamma * max_next_values
+                advs = target_values - exps.node_value
+                all_target_values += target_values.tolist()
+                all_advs += advs.tolist()
+            # end for
+            train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)
+        # end with
+        """update the network for K epochs"""
+        for k_epoch in range(self.cfg.k_epochs):
+            train_exp_list.shuffle()
+            for i_step, exps in enumerate(
+                ExperienceListIterator(train_exp_list, self.cfg.mini_batch_size, self.device)
             ):
                 self.optimizer.zero_grad()
                 """get embeds of seleted nodes and evaluate them by Critic"""
@@ -249,6 +294,7 @@ class PPOMod:
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset
                 selected_node_embeds = b_graph_embeds[selected_nodes]
+                # NOTE: this is the "new value" updated with the network's updates
                 selected_node_values: torch.Tensor = self.ddp_ac_net(selected_node_embeds, ActorCritic.critic_name()).squeeze()
                 """get xfer dist by Actor"""
                 # (batch_num_graphs, action_dim)
@@ -258,51 +304,17 @@ class PPOMod:
                 # (batch_num_graphs, )
                 xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
                 xfer_entropys = xfer_dists.entropy()
-                """get embeds of next nodes and evaluate them by Critic without grad"""
-                with torch.no_grad():
-                    # (num_next_graphs, )
-                    next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
-                    """get embeds"""
-                    # (batch_next_graphs_nodes, embed_dim)
-                    b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.graph_embedding_name())
-                    next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
-                    """select embeds"""
-                    # ( sum(num_next_nodes), embed_dim )
-                    next_node_embeds: torch.Tensor = torch.cat([
-                        graph_embed[next_node_ids]
-                        for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
-                    ])
-                    """evaluate"""
-                    # ( sum(num_next_nodes), )
-                    next_node_values: torch.Tensor = self.ddp_ac_net(next_node_embeds, ActorCritic.critic_name()).squeeze()
-                    num_next_nodes = list(map(len, exps.next_nodes))
-                    next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
-                    """get max next value for each graph"""
-                    max_next_values_list: List[torch.Tensor] = []
-                    for i in range(len(exps)):
-                        max_next_value: torch.Tensor
-                        # invalid xfer, gate count exceeds limit, NOP
-                        if next_node_values_list[i].shape[0] == 0 or \
-                            exps.game_over[i] or \
-                            qtz.is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
-                            max_next_value = torch.zeros(1).to(self.device)
-                        else:
-                            max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
-                        max_next_values_list.append(max_next_value)
-                    max_next_values = torch.cat(max_next_values_list)
-                # end with
                 """compute loss for Actor (policy_net, theta)"""
                 # prob ratio = (pi_theta / pi_theta__old)
                 ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
-                advantages = exps.reward + self.cfg.gamma * max_next_values - selected_node_values
-                surr1 = ratios * advantages.detach()
+                surr1 = ratios * exps.advantages
                 surr2 = torch.clamp(
                     ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                ) * advantages.detach()
-                actor_loss = - torch.sum(torch.min(surr1, surr2)) / len(exp_list)
+                ) * exps.advantages
+                actor_loss = - torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.sum(advantages ** 2) / len(exp_list)
-                xfer_entropy = torch.sum(xfer_entropys) / len(exp_list)
+                critic_loss = torch.mean((exps.target_values - selected_node_values) ** 2)
+                xfer_entropy = torch.mean(xfer_entropys)
                 """compute overall loss"""
                 loss = actor_loss + 0.5 * critic_loss - self.cfg.entropy_coeff * xfer_entropy
                 """update"""
@@ -330,6 +342,8 @@ class PPOMod:
                         'loss': loss,
                     })
             # end for i_step
+            exps = None
+            torch.cuda.empty_cache()
         # end for k_epochs
         self.agent.sync_best_graph()
         

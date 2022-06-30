@@ -72,28 +72,28 @@ class Observer:
         last_eps_end: int = -1
         for i_step in range(max_eps_len):
             """get action (action_node, xfer_dist) from agent"""
-            _action: ActionTmp
+            actmp: ActionTmp
             if self.batch_inference:
-                _action = agent_rref.rpc_sync().select_action_batch(
+                actmp = agent_rref.rpc_sync().select_action_batch(
                     self.id, graph.to_qasm_str(),
                 )
             else:
-                _action = agent_rref.rpc_sync().select_action(
+                actmp = agent_rref.rpc_sync().select_action(
                     self.id, graph.to_qasm_str(),
                 )
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
-                context=qtz.quartz_context, node=graph.get_node_from_id(id=_action.node))
+                context=qtz.quartz_context, node=graph.get_node_from_id(id=actmp.node))
             av_xfer_mask = torch.BoolTensor([0] * qtz.quartz_context.num_xfers)
             av_xfer_mask[av_xfers] = True
             # (action_dim, )  only sample from available xfers
-            softmax_xfer = masked_softmax(_action.xfer_dist, av_xfer_mask)
+            softmax_xfer = masked_softmax(actmp.xfer_dist, av_xfer_mask)
             xfer_dist = Categorical(softmax_xfer)
             action_xfer = xfer_dist.sample()
             action_xfer_logp: torch.Tensor = xfer_dist.log_prob(action_xfer)
             
             """apply action"""
-            action = Action(_action.node, action_xfer.item())
+            action = Action(actmp.node, action_xfer.item())
             next_nodes: List[int]
             next_graph, next_nodes = \
                 graph.apply_xfer_with_local_state_tracking(
@@ -119,7 +119,7 @@ class Observer:
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
-                graph_str, action, reward, next_graph_str, game_over,
+                graph_str, action, reward, next_graph_str, game_over, actmp.node_value,
                 next_nodes, av_xfer_mask, action_xfer_logp.item(), copy.deepcopy(info),
             )
             exp_list.append(exp)
@@ -394,7 +394,7 @@ class PPOAgent:
         action_node_embed = node_embeds[action_node]
         xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed).cpu()
         
-        return ActionTmp(action_node, xfer_logits)
+        return ActionTmp(action_node, float(node_values[action_node]), xfer_logits)
         
     @rpc.functions.async_execution
     @torch.no_grad()
@@ -448,8 +448,11 @@ class PPOAgent:
                 xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds).cpu()
                 # return the xfer dist. to observers who are responsible for sample xfer with masks
                 actions = [
-                    ActionTmp(int(b_sampled_nodes[i]), xfer_logits[i])
-                    for i in range(len(self.obs_rrefs))
+                    ActionTmp(
+                        node=int(b_sampled_nodes[i]),
+                        node_value=float(node_values_list[i][ b_sampled_nodes[i] ]),
+                        xfer_dist=xfer_logits[i]
+                    ) for i in range(len(self.obs_rrefs))
                 ]
                 this_future_actions = self.future_actions # NOTE something magic to avoid duplicate assignment
                 """re-init"""

@@ -2,7 +2,7 @@
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
-from typing import Dict, Iterator, Set, List, Tuple, Any
+from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar
 import math
 import random
 import itertools
@@ -26,6 +26,7 @@ class Action:
 @dataclass
 class ActionTmp:
     node: int
+    node_value: float
     xfer_dist: torch.Tensor
 
 @dataclass
@@ -35,6 +36,7 @@ class Experience:
     reward: float
     next_state: quartz.PyGraph
     game_over: bool
+    node_value: float
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
@@ -65,6 +67,7 @@ class SerializableExperience:
     reward: float
     next_state: str
     game_over: bool
+    node_value: float
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
@@ -87,6 +90,7 @@ class ExperienceList:
     reward: List[float]
     next_state: List[str | dgl.graph]
     game_over: List[bool]
+    node_value: List[float]
     next_nodes: List[List[int]]
     xfer_mask: List[torch.BoolTensor]
     xfer_logprob: List[float]
@@ -111,9 +115,9 @@ class ExperienceList:
         return ExperienceList(*[None]*len(fields(ExperienceList))) # type: ignore
 
     def shuffle(self) -> None:
-        self.state, self.action, self.reward, self.next_state, self.game_over, \
+        self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \
         self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info = shuffle_lists(
-            self.state, self.action, self.reward, self.next_state, self.game_over,
+            self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value,
             self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info
         )
     
@@ -131,30 +135,50 @@ class ExperienceList:
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device) # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
             exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device) # type: ignore
+            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
             exps.next_nodes = [ torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc] ] # type: ignore
             exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device) # type: ignore
             exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
         
         return exps
 
-class ExperienceListIterator:
+@dataclass
+class TrainExpList(ExperienceList):
+    target_values: List[float]
+    advantages: List[float]
 
-    def __init__(self, src: ExperienceList, batch_size: int = 1, device: torch.device = torch.device('cpu')):
-        self.src = src
-        self.batch_size = batch_size
-        self.device = device
-        self.start_pos = 0
+    @staticmethod
+    def new_empty() -> TrainExpList:
+        return TrainExpList(*[None]*len(fields(TrainExpList))) # type: ignore
+
+    def shuffle(self) -> None:
+        self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \
+        self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info, self.target_values, self.advantages = shuffle_lists(
+            self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value,
+            self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info, self.target_values, self.advantages
+        )
     
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> BatchedExperience:
-        if self.start_pos < len(self.src):
-            ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
-            self.start_pos += self.batch_size
-            return ret
-        else:
-            raise StopIteration
+    def get_batch(
+        self,
+        start_pos: int = 0,
+        batch_size: int = 1,
+        device: torch.device = torch.device('cpu'),
+    ) -> TrainBatchExp:
+        exps = TrainBatchExp.new_empty()
+        if start_pos < len(self):
+            sc = slice(start_pos, start_pos + batch_size)
+            exps.state = dgl.batch(self.state[sc]).to(device)
+            exps.next_state = dgl.batch(self.next_state[sc]).to(device)
+            exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device) # type: ignore
+            exps.reward = torch.Tensor(self.reward[sc]).to(device)
+            exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device) # type: ignore
+            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
+            exps.next_nodes = [ torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc] ] # type: ignore
+            exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device) # type: ignore
+            exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
+            exps.target_values = torch.Tensor(self.target_values[sc]).to(device)
+            exps.advantages = torch.Tensor(self.advantages[sc]).to(device)
+        return exps
 
 @dataclass
 class BatchedExperience:
@@ -163,6 +187,7 @@ class BatchedExperience:
     reward: torch.Tensor # (B,)
     next_state: dgl.graph
     game_over: torch.BoolTensor # (B,)
+    node_value: torch.Tensor # (B,)
     next_nodes: List[torch.LongTensor]
     xfer_mask: torch.BoolTensor # (B,)
     xfer_logprob: torch.Tensor # (B,)
@@ -171,13 +196,14 @@ class BatchedExperience:
     def new_empty() -> BatchedExperience:
         return BatchedExperience(*[[]]*len(fields(BatchedExperience))) # type: ignore
 
-    def __add__(self, other) -> BatchedExperience:
+    def __add__(self, other: BatchedExperience) -> BatchedExperience:
         res = BatchedExperience.new_empty()
         res.state = dgl.batch([self.state, other.state])
         res.next_state = dgl.batch([self.next_state, other.next_state])
         res.action = torch.cat([self.action, other.action]) # type: ignore
         res.reward = torch.cat([self.reward, other.reward])
         res.game_over = torch.cat([self.game_over, other.game_over]) # type: ignore
+        res.node_value = torch.cat([self.node_value, other.node_value])
         res.next_nodes = self.next_nodes + other.next_nodes
         res.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask]) # type: ignore
         res.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
@@ -185,6 +211,35 @@ class BatchedExperience:
     
     def __len__(self) -> int:
         return len(self.next_nodes)
+
+class TrainBatchExp(BatchedExperience):
+    target_values: torch.Tensor
+    advantages: torch.Tensor
+    
+    @staticmethod
+    def new_empty() -> TrainBatchExp:
+        return TrainBatchExp(*[[]]*len(fields(TrainBatchExp))) # type: ignore
+
+ExpListType = TypeVar('ExpListType', bound=ExperienceList)
+BatchExpType = TypeVar('BatchExpType', bound=BatchedExperience)
+class ExperienceListIterator:
+
+    def __init__(self, src: ExpListType, batch_size: int = 1, device: torch.device = torch.device('cpu')) -> None:
+        self.src = src
+        self.batch_size = batch_size
+        self.device = device
+        self.start_pos = 0
+    
+    def __iter__(self) -> ExperienceListIterator:
+        return self
+
+    def __next__(self) -> BatchExpType:
+        if self.start_pos < len(self.src):
+            ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
+            self.start_pos += self.batch_size
+            return ret
+        else:
+            raise StopIteration
 
 class GraphBuffer:
     """store PyGraph of a class of circuits for init state sampling and maintain some other infos"""

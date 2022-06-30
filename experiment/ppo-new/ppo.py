@@ -298,12 +298,13 @@ class PPOMod:
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 b_action_nodes = exps.action[:, 0] + nodes_offset
-                action_node_embeds = b_actor_node_embeds[b_action_nodes]
+                action_node_actor_embeds = b_actor_node_embeds[b_action_nodes]
+                action_node_critic_embeds = b_critic_node_embeds[b_action_nodes]
                 # NOTE: this is the "new value" updated with the network's updates
-                selected_node_values: torch.Tensor = self.ddp_ac_net(b_critic_node_embeds, ActorCritic.critic_name()).squeeze()
+                node_values: torch.Tensor = self.ddp_ac_net(action_node_critic_embeds, ActorCritic.critic_name()).squeeze()
                 """get xfer dist by Actor"""
                 # (batch_num_graphs, action_dim)
-                xfer_logits: torch.Tensor = self.ddp_ac_net(action_node_embeds, ActorCritic.actor_name())
+                xfer_logits: torch.Tensor = self.ddp_ac_net(action_node_actor_embeds, ActorCritic.actor_name())
                 softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer)
                 # (batch_num_graphs, )
@@ -318,7 +319,7 @@ class PPOMod:
                 ) * exps.advantages # NOTE: use fixed advantages
                 actor_loss = - torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.mean((exps.target_values - selected_node_values) ** 2)
+                critic_loss = torch.mean((exps.target_values - node_values) ** 2)
                 xfer_entropy = torch.mean(xfer_entropys)
                 """compute overall loss"""
                 loss = actor_loss + 0.5 * critic_loss - self.cfg.entropy_coeff * xfer_entropy

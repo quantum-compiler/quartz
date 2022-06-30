@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # This file plot cdf.
 def main():
     # input param
-    gate_count = 46
+    gate_count = "pretrain"
 
     with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
@@ -32,8 +32,11 @@ def main():
     print(x_list)
 
     # plot
+    plt.figure(num=1, figsize=(8, 6), dpi=300)
     plt.xlabel("min #xfers")
-    plt.ylabel("percentage")
+    plt.ylabel("percentage (%)")
+    plt.yticks(ticks=[1, 0.8, 0.6, 0.4, 0.2, 0],
+               labels=["100%", "80%", "60%", "40%", "20%", "0%"])
     plt.plot(x_list, y_list, marker='o')
     plt.savefig(f"{gate_count}_cdf.jpg")
     plt.show()

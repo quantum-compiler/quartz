@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # This file plots distribution
 def main():
     # input param
-    gate_count = 46
+    gate_count = "pretrain"
 
     with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
@@ -33,8 +33,11 @@ def main():
     print(x_list)
 
     # plot
+    plt.figure(num=1, figsize=(8, 6), dpi=300)
     plt.xlabel("min #xfers")
-    plt.ylabel("percentage")
+    plt.ylabel("percentage (%)")
+    plt.yticks(ticks=[1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0],
+               labels=["100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%", "20%", "10%", "0%"])
     plt.bar(x_list, y_list)
     plt.savefig(f"{gate_count}_dist.jpg")
     plt.show()

@@ -158,7 +158,11 @@ class PPOMod:
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
         self.optimizer = torch.optim.Adam([
             {
-                'params': self.ddp_ac_net.module.graph_embedding.parameters(), # type: ignore
+                'params': self.ddp_ac_net.module.critic_embedding.parameters(), # type: ignore
+                'lr': self.cfg.lr_graph_embedding,
+            },
+            {
+                'params': self.ddp_ac_net.module.actor_embedding.parameters(), # type: ignore
                 'lr': self.cfg.lr_graph_embedding,
             },
             {

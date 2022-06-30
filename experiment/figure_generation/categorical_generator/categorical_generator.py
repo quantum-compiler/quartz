@@ -147,4 +147,4 @@ if __name__ == '__main__':
         input_data_file="../data/900000_graph.json",
         gate_count=args.gate_count
     )
-    generator.gen(12_000)
+    generator.gen(150_000)

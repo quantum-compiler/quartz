@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 # This file plot cdf.
 def main():
     # input param
-    gate_count = 58
+    gate_count = 46
 
     with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)

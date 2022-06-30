@@ -80,7 +80,8 @@ class ActorCritic(nn.Module):
         device: torch.device,
     ) -> None:
         super().__init__()
-        self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
+        self.critic_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
+        self.actor_embedding = QGNN(6, num_gate_type, graph_embed_size, graph_embed_size)
         self.actor = nn.Sequential(
             nn.Linear(graph_embed_size, actor_hidden_size),
             nn.ReLU(),
@@ -93,8 +94,10 @@ class ActorCritic(nn.Module):
         )
     
     def forward(self, x: torch.Tensor, callee: str) -> torch.Tensor:
-        if callee == self.graph_embedding_name():
-            return self.graph_embedding(x)
+        if callee == self.critic_embedding_name():
+            return self.critic_embedding(x)
+        elif callee == self.actor_embedding_name():
+            return self.actor_embedding(x)
         elif callee == self.actor_name():
             return self.actor(x)
         elif callee == self.critic_name():
@@ -103,8 +106,12 @@ class ActorCritic(nn.Module):
             raise NotImplementedError(f'Unexpected callee name: {callee}')
     
     @staticmethod
-    def graph_embedding_name() -> str:
-        return 'graph_embedding'
+    def critic_embedding_name() -> str:
+        return 'critic_embedding'
+    
+    @staticmethod
+    def actor_embedding_name() -> str:
+        return 'critic_embedding'
     
     @staticmethod
     def actor_name() -> str:

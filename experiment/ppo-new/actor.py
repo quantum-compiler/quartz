@@ -214,8 +214,8 @@ class PPOAgent:
             dgl_graph: dgl.graph = graph.to_dgl_graph().to(self.device)
             num_nodes: int = dgl_graph.num_nodes()
             """compute embeds and use Critic to evaluate each node"""
-            node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
-            node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
+            critic_node_embeds: torch.Tensor = self.ac_net.critic_embedding(dgl_graph)
+            node_values: torch.Tensor = self.ac_net.critic(critic_node_embeds).squeeze()
             temperature: float
             if not self.softmax_temp_en:
                 temperature = 1.0
@@ -224,7 +224,8 @@ class PPOAgent:
             softmax_node_values = F.softmax(node_values / temperature, dim=0)
             action_node = int(torch.multinomial(softmax_node_values, 1))
             """use Actor to evaluate xfers for the sampled node"""
-            action_node_embed = node_embeds[action_node]
+            actor_node_embeds: torch.Tensor = self.ac_net.actor_embedding(dgl_graph)
+            action_node_embed = actor_node_embeds[action_node]
             xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed)
             """sample action_xfer with mask"""
             av_xfers = graph.available_xfers_parallel(
@@ -381,8 +382,8 @@ class PPOAgent:
         dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
         num_nodes: int = dgl_graph.num_nodes()
         """compute embeds and use Critic to evaluate each node"""
-        node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
-        node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
+        critic_node_embeds: torch.Tensor = self.ac_net.critic_embedding(dgl_graph)
+        node_values: torch.Tensor = self.ac_net.critic(critic_node_embeds).squeeze()
         temperature: float
         if not self.softmax_temp_en:
             temperature = 1.0
@@ -391,7 +392,8 @@ class PPOAgent:
         softmax_node_values = F.softmax(node_values / temperature, dim=0)
         action_node = int(torch.multinomial(softmax_node_values, 1))
         """use Actor to evaluate xfers for the sampled node"""
-        action_node_embed = node_embeds[action_node]
+        actor_node_embeds: torch.Tensor = self.ac_net.actor_embeddding(dgl_graph)
+        action_node_embed = actor_node_embeds[action_node]
         xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed).cpu()
         
         return ActionTmp(action_node, float(node_values[action_node]), xfer_logits)
@@ -419,9 +421,10 @@ class PPOAgent:
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
                 """compute embeds and use Critic to evaluate each node"""
                 # (batch_num_nodes, embed_dim)
-                b_node_embeds: torch.Tensor = self.ac_net.graph_embedding(b_state)
+                b_critic_node_embeds: torch.Tensor = self.ac_net.critic_embedding(b_state)
+                b_actor_node_embeds: torch.Tensor = self.ac_net.actor_embedding(b_state)
                 # (batch_num_nodes, )
-                b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
+                b_node_values: torch.Tensor = self.ac_net.critic(b_critic_node_embeds).squeeze()
                 # list with length num_graphs; each member is a tensor of node values in a graph
                 node_values_list: List[torch.Tensor] = torch.split(b_node_values, num_nodes.tolist())
                 """sample node by softmax with temperature for each graph as a batch"""
@@ -442,7 +445,7 @@ class PPOAgent:
                 node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 sampled_node_ids = b_sampled_nodes + node_offsets
                 # (num_graphs, embed_dim)
-                sampled_node_embeds = b_node_embeds[sampled_node_ids]
+                sampled_node_embeds = b_actor_node_embeds[sampled_node_ids]
                 """use Actor to evaluate xfers for sampled nodes"""
                 # (num_graphs, action_dim)
                 xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds).cpu()

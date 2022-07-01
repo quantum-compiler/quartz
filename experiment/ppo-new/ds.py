@@ -258,10 +258,11 @@ class GraphBuffer:
         device: torch.device = torch.device('cpu'),
     ) -> None:
         self.name = name
-        # self.max_len = max_len
+        self.max_len = max_len
         self.device = device
-        self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
         self.cost_type = cost_type
+        self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
+        self.original_cost = get_cost(self.original_graph, self.cost_type)
         
         self.cost_to_graph: Dict[int, List[quartz.PyGraph]] = {
             get_cost(self.original_graph, cost_type): [ self.original_graph, ],
@@ -297,20 +298,25 @@ class GraphBuffer:
         self.init_graph_costs.clear()
         self.graph_costs.clear()
         
-        vmem_perct = vmem_used_perct()
-        if vmem_perct > 80.0:
-            self.shrink()
-            printfl(f'Buffer {self.name} shrinked. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
+        # vmem_perct = vmem_used_perct()
+        # if vmem_perct > 80.0:
+        #     self.shrink()
+        #     printfl(f'Buffer {self.name} shrinked. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
     
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
             hash_value = hash(graph)
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
-            gcost = round(get_cost(graph, self.cost_type), 1)
+            gcost = get_cost(graph, self.cost_type)
             if gcost not in self.cost_to_graph:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)
+            if len(self) > self.max_len:
+                if gcost == self.original_cost:
+                    self.cost_to_graph[gcost].pop(1)
+                else:
+                    self.cost_to_graph[gcost].pop(0)
             return True
         else:
             return False

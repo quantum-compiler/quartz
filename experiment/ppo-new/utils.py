@@ -46,7 +46,7 @@ class QuartzInitArgs:
     gate_set: List[str]
     ecc_file_path: str
     no_increase: bool
-    include_nop: bool
+    include_nop: bool 
 
 class CostType(Enum):
     gate_count = 0

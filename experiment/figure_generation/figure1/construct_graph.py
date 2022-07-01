@@ -40,7 +40,10 @@ def main():
         hash2graph_map[cur_graph_hash] = [graph_idx, cur_graph, cur_graph_gate_count]
         edge_map[graph_idx] = []
         graph_idx += 1
+        if graph_idx % 100 == 0:
+            print(f"Finished preprocessing of {graph_idx} circuits.")
     assert not original_graph_idx == -1
+    print(f"Preprocessing has finished")
 
     # check connectivity
     finished = 0
@@ -51,7 +54,7 @@ def main():
         cur_graph = graph_packet[1]
         all_nodes = cur_graph.all_nodes()
         finished += 1
-        if finished % 100 == 0:
+        if finished % 10 == 0:
             print(f"Finished {finished} circuits.")
 
         # apply xfers to get to new graphs

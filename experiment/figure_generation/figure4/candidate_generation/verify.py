@@ -99,7 +99,7 @@ def main():
     # read in the circuit
     with open(f"./step4_4_1273.qasm", 'r') as handle:
         qasm_str = handle.read()
-        final_depth = gen_path(rank=0, qasm_str=qasm_str, max_depth=5)
+        final_depth = gen_path(rank=0, qasm_str=qasm_str, max_depth=8)
         print(f"Final depth is {final_depth}.")
 
 

@@ -1,0 +1,782 @@
+{
+  "18291054100500590395": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13879065377263050664": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3277395268929766620": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11551139914712756310": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9395731241095778260": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1866645523854504894": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14581523285275134107": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5854036349507662514": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "8600132710064194408": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "104314178004694165": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5539907330483899141": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3335246762013369510": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11219451044502145099": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "793750273061785141": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12297370363715940907": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13412817171474311254": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13304534831983446693": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "7732305165745596407": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "14276840178252265571": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "17697401784750216838": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[3];\ncx q[2],q[4];\nh q[3];\nt q[2];\nt q[4];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11762890438812067652": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\ncx q[2],q[4];\nh q[3];\nt q[2];\nt q[4];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17789108052312046150": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9805193352107932453": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9125213153043392712": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1442047626270122783": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5642150581407335421": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4517041986908872411": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3078530172846490726": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14649598950135275001": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12016628632505973236": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14828505623533797026": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12751174877950154657": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7622256783924904880": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5574242231417295270": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "12444043729360480510": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "705127393125119842": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "7993042843619748682": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12431419323506641784": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\nt q[3];\ncx q[3],q[2];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10089688523827381570": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7828502915275200892": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9287121591646390355": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3765387154453626369": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16832392312095806609": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9124155852364508872": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2299660745239562719": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13635253316502139392": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4226835515200512982": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14307435653247562969": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11006060362832340587": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11712477607297946922": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "2503957280032773206": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "9627604971081339196": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "12229301459970332445": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16313751775794874123": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13410805113095193046": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12909261843779404597": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2680586507914442512": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9014145049396723702": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17560866237429380045": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10083899922938854555": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14106705770631952127": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7754103739358529412": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1207162170920493443": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10949093317734019078": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12500580160983502672": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9131318838689930476": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "8769319140560712112": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11876972441049269356": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "1447420061219075912": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "2799852070471728676": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "10888570025599343944": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3261300489528328052": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15405457563812401995": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3899108629268656153": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16998647862224038653": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3342935388269621670": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "18187912176037842085": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16716557198926816924": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10345171487366524622": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15882484300623064268": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17060771849516174364": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "6482187478010735962": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "2940615944919638182": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "6882178342351375726": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "7325936452586332769": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7876371846571128629": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10622468207127660523": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2126649675068160280": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16122040566672272020": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3002279895473515573": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15987532747611424507": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\nh q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16261282944458568538": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2816085770125251256": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "941038653806052517": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2555517533703578515": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12010145051589089528": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "12539218088141453850": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "16139682337091167146": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "1379199797809490253": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[1],q[0];\ntdg q[0];\ncx q[1],q[0];\nt q[1];\ncx q[0],q[3];\nt q[0];\nt q[3];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "6468375414497781590": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[1];\ncx q[0],q[3];\nt q[0];\nt q[3];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15892925455364738868": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13848995952135588932": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17398859774999962276": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5117490091702855875": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15530963531545880469": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "8706969025360529395": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "18060646943332785767": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4102221408190731079": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "3719741955660409434": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "16330703437158489445": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "17342020721447117645": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[1],q[0];\ncx q[3],q[4];\ntdg q[0];\ntdg q[4];\ncx q[1],q[0];\ncx q[2],q[4];\nt q[1];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13803661065659638737": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\nt q[1];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12307500047615459613": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "18383775729559874781": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17229177367218768834": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "6803476595778408876": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "18307096686432564642": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "975799420481383373": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9152373209421111322": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "13722478273200078475": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "3300766592801089688": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\nt q[1];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "3623181025108136923": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "6976845893508159431": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\nt q[0];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11990849958846092045": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "752603935928919890": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[1],q[0];\nt q[0];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "10023697045139315006": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ncx q[1],q[0];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4046032214542313160": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\nt q[0];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11236034759667360879": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1528529654065749112": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9549572956334940770": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "2606448973279544920": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3721895781037915267": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7682926762893064298": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "7979972409323304090": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "8237050744112934193": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[3],q[4];\ncx q[0],q[1];\ntdg q[4];\nt q[0];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "8449843750628032629": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\ntdg q[1];\ntdg q[4];\ncx q[0],q[1];\ncx q[2],q[4];\nt q[1];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "3108623174976381888": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11479455195715800485": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1053754424275440527": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12557374514929596293": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13672821322687966640": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "6029886675991111307": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "12217025270072602089": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "15294527184422391884": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "16353841146512910067": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "9518505617752684644": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4374636035930523104": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14769688340205362674": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5864321411775992285": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "1313913236488917858": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14726602857650062889": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "10543507767464906936": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "5862905201523766439": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "15815624006666583902": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nh q[3];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "13391314039983924805": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[1],q[0];\nt q[0];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7952710290087523333": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "15285984707161300353": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7630968874252058003": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5029976437068951934": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16169140027958921308": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "11374180778775094730": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "6961094816345875667": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "16537249073175895109": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "17107359743096974479": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\nt q[2];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17240962729554883622": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[3];\ncx q[2],q[4];\nh q[3];\nt q[2];\nt q[4];\ncx q[1],q[3];\nh q[4];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "16291522483255448527": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\ncx q[2],q[4];\nh q[3];\nt q[2];\nt q[4];\ncx q[1],q[3];\nh q[4];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7912355099840577559": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\nt q[4];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17322634122341578233": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "17162578440983907855": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "1140605871552161128": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\nt q[2];\nt q[3];\nh q[4];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "9175955319176499778": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\nh q[4];\ncx q[3],q[2];\ntdg q[2];\ncx q[3],q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "4396930124039554686": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\nt q[3];\ncx q[3],q[2];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "5602698307918261915": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "9264456381846425705": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "4008333561069472376": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "3652595993336962371": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "7434280633435270371": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "14716974103085008836": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[2];\nh q[4];\ntdg q[2];\ncx q[3],q[2];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "12417558810444172876": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\nt q[2];\ncx q[2],q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "17405264518006767649": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "2947068358701416831": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "11881957475721134050": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\nt q[3];\ncx q[2],q[4];\nt q[4];\ncx q[2],q[3];\nh q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "8226515072905753447": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\nt q[2];\nh q[4];\ncx q[2],q[3];\ntdg q[3];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\nt q[0];\nt q[1];\n",
+    58
+  ],
+  "18065992737231724364": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "15080542383907269034": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "6092627037459013965": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nt q[2];\nh q[4];\ncx q[2],q[3];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "12465622111870789328": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\nt q[0];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\nt q[0];\nt q[1];\nh q[3];\n",
+    58
+  ],
+  "3531092132418597539": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[1],q[0];\ntdg q[0];\ncx q[1],q[0];\nt q[1];\ncx q[0],q[3];\nt q[0];\nt q[3];\nh q[3];\n",
+    58
+  ],
+  "3531092132389908806": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[1];\ncx q[0],q[3];\nt q[0];\nt q[3];\nh q[3];\n",
+    58
+  ],
+  "15501006750300129118": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ],
+  "14432736021409301706": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\ncx q[0],q[1];\nt q[0];\n",
+    58
+  ],
+  "13367360552382246121": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\nt q[0];\n",
+    58
+  ],
+  "7732305165745596438": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[0];\nh q[3];\ntdg q[0];\ncx q[1],q[0];\nt q[0];\n",
+    58
+  ],
+  "17796534539809325157": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\nt q[1];\ncx q[0],q[3];\nt q[3];\ncx q[0],q[1];\nh q[3];\ntdg q[1];\nt q[0];\ncx q[0],q[1];\n",
+    58
+  ],
+  "17511239613781686082": [
+    "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\ncx q[0],q[1];\nt q[3];\ntdg q[1];\nh q[3];\ncx q[0],q[1];\ncx q[3],q[4];\nt q[0];\nt q[1];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\ncx q[2],q[3];\nt q[4];\ntdg q[3];\nh q[4];\ncx q[2],q[3];\nt q[2];\nt q[3];\nh q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\ncx q[1],q[3];\ntdg q[3];\ncx q[0],q[3];\nt q[3];\nt q[0];\nh q[3];\ncx q[0],q[1];\ntdg q[1];\ncx q[0],q[1];\nt q[1];\n",
+    58
+  ]
+}

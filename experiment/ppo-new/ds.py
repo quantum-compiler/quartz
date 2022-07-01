@@ -313,10 +313,12 @@ class GraphBuffer:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)
             if len(self) > self.max_len:
+                popped_graph: quartz.PyGraph
                 if gcost == self.original_cost:
-                    self.cost_to_graph[gcost].pop(1)
+                    popped_graph = self.cost_to_graph[gcost].pop(1)
                 else:
-                    self.cost_to_graph[gcost].pop(0)
+                    popped_graph = self.cost_to_graph[gcost].pop(0)
+                self.hashset.remove(hash(popped_graph))
             return True
         else:
             return False

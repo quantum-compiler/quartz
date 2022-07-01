@@ -5,7 +5,8 @@ import os
 def main():
     # input arguments
     input_path = "./input"
-    use_x_percentage = True
+    use_x_percentage = False
+    figure_type = "pdf"  # "pdf" or "jpg"
 
     # read optimization history of each circuit
     circuit_name_list = os.listdir(input_path)
@@ -28,7 +29,10 @@ def main():
     if use_x_percentage:
         plt.xticks(ticks=[1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0],
                    labels=["100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%", "20%", "10%", "0%"])
-    plt.xlabel("optimization process (%)")
+    if use_x_percentage:
+        plt.xlabel("optimization process (%)")
+    else:
+        plt.xlabel("optimization steps")
     plt.ylabel("remaining gates (%)")
     for circuit_name in circuit_name_list:
         # normalize gate count
@@ -46,7 +50,11 @@ def main():
         # plot
         plt.plot(step_list, gate_cnt_list, label=circuit_name, linewidth=2)
     plt.legend()
-    plt.savefig("./figure3_final_figures/figure3.jpg")
+    if use_x_percentage:
+        file_suffix = "relative"
+    else:
+        file_suffix = "absolute"
+    plt.savefig(f"./figure3_final_figures/figure3_{file_suffix}.{figure_type}")
     plt.show()
 
 

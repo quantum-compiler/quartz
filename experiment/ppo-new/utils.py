@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 import sys
+import psutil
 import random
 from typing import Tuple, List, Any
 import warnings
@@ -119,3 +120,6 @@ def shuffle_lists(*ls):
     random.shuffle(zip_ls)
     shuf_lists = map(list, zip(*zip_ls))
     return shuf_lists
+
+def vmem_used_perct() -> float:
+    return psutil.virtual_memory().percent

@@ -296,6 +296,11 @@ class GraphBuffer:
         self.graph_ccs.clear()
         self.init_graph_costs.clear()
         self.graph_costs.clear()
+        
+        vmem_perct = vmem_used_perct()
+        if vmem_perct > 80.0:
+            self.shrink()
+            printfl(f'Buffer {self.name} shrinked. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
     
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
@@ -393,3 +398,12 @@ class GraphBuffer:
         
         return info
     
+    def shrink(self) -> None:
+        for cost_key in self.cost_to_graph:
+            cur = self.cost_to_graph[cost_key]
+            new = cur[len(cur) // 2 : ]
+            if cost_key == get_cost(self.original_graph, self.cost_type):
+                new.append(self.original_graph)
+            self.cost_to_graph[cost_key] = new
+    
+        

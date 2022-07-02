@@ -325,6 +325,8 @@ class GraphBuffer:
                 max_key, max_graphs = cost_key, len(graphs)
         idx_to_pop = 0 if max_key != self.original_cost else 1
         popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+        if len(self.cost_to_graph[max_key]) == 0:
+            self.cost_to_graph.pop(max_key, None)
         self.hashset.remove(hash(popped_graph))
     
     def sample(self) -> quartz.PyGraph:

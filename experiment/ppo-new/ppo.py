@@ -411,7 +411,7 @@ class PPOMod:
 
     @torch.no_grad()
     def test(self, rank: int, world_size: int) -> None:
-        assert isinstance(self.cfg, TestConfig)
+        self.cfg = cast(TestConfig, self.cfg)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""
         if self.cfg.resume:
@@ -429,19 +429,20 @@ class PPOMod:
             ac_net=self.ddp_ac_net.module, # type: ignore
             device=self.device,
             output_dir=self.output_dir,
+            rank=rank,
         )
-
+        """get input graphs"""
         input_graphs: List[InputGraph] = []
         if len(self.cfg.input_graphs) > 0:
             input_graphs = self.cfg.input_graphs
         else:
             files: List[str] = cast(List[str], natsorted(os.listdir(self.cfg.input_graph_dir)))
-            n_file_each_rank = math.ceil(len(files) / world_size)
-            files = files[n_file_each_rank * rank : n_file_each_rank * (rank + 1)]
             for file in files:
                 qasm_path = os.path.join(self.cfg.input_graph_dir, file)
                 name = file.split('.')[0]
                 input_graphs.append(InputGraph(name, qasm_path))
+        n_graph_each_rank = math.ceil(len(input_graphs) / world_size)
+        input_graphs = input_graphs[n_graph_each_rank * rank : n_graph_each_rank * (rank + 1)]
 
         info_list: List[str] = []
         for input_graph in input_graphs:
@@ -458,7 +459,7 @@ class PPOMod:
             printfl(info)
 
     def convert(self, rank: int) -> None:
-        assert isinstance(self.cfg, ConvertConfig)
+        self.cfg = cast(ConvertConfig, self.cfg)
         self.init_ddp_processes(rank, 2)
         if rank == 0:
             """load ckpt"""

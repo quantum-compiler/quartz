@@ -542,6 +542,10 @@ cdef class PyGraph:
         cdef string s = deref(self.graph).to_qasm(False, False)
         return s.decode('utf-8')
 
+    def rotation_merging(self, gate_type:str):
+        deref(self.graph).rotation_merging(get_gate_type_from_str(gate_type))
+
+
     @staticmethod
     def from_qasm(*, context : QuartzContext, filename : str):
         filename_bytes = filename.encode('utf-8')

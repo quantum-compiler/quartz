@@ -83,6 +83,7 @@ class BaseConfig:
     dyn_eps_len: bool = True
     max_eps_len: int = 300
     min_eps_len: int = 20
+    greedy_sample: bool = False
 
     # training
     max_iterations: int = int(1e8)

@@ -248,7 +248,7 @@ class PPOAgent:
                 )
             """parse result, compute reward"""
             if next_graph is None:
-                reward = -1.0
+                reward = self.invalid_reward
                 game_over = True
                 next_graph = graph
             elif qtz.is_nop(action.xfer):
@@ -262,13 +262,13 @@ class PPOAgent:
                 game_over = (graph_cost > next_graph_cost * max_cost_ratio)
                     
             exp = Experience(
-                graph, action, reward, next_graph, game_over,
+                graph, action, reward, next_graph, game_over, float(node_values[action.node]),
                 next_nodes, av_xfer_mask, action_xfer_logp.item(), copy.deepcopy(info),
             )
             exp_list.append(exp)
             info['start'] = False
             if game_over:
-                if False:
+                if self.batch_inference:
                     graph = init_graph
                     info['start'] = True
                     last_eps_end = i_step
@@ -276,7 +276,9 @@ class PPOAgent:
                     break
             else:
                 graph = next_graph
-        
+        # end for
+        if i_step - last_eps_end >= max_eps_len:
+            exp_list[-1].game_over = True # eps len exceeds limit
         return exp_list
         
     @torch.no_grad()
@@ -284,6 +286,7 @@ class PPOAgent:
         self,
         max_cost_ratio: float,
         nop_stop: bool,
+        greedy_sample: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
         future_exp_lists: List[List[Experience]] = []
@@ -291,7 +294,7 @@ class PPOAgent:
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
-            init_graph: quartz.PyGraph = graph_buffer.sample()
+            init_graph: quartz.PyGraph = graph_buffer.sample(greedy_sample)
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             if self.dyn_eps_len:
@@ -325,24 +328,25 @@ class PPOAgent:
                 """for each experience"""
                 graph = s_exp.state
                 next_graph = s_exp.next_state
-                ss_exp = SerializableExperience(*s_exp)
-                ss_exp.state = s_exp.state.to_qasm_str()
-                ss_exp.next_state = s_exp.next_state.to_qasm_str()
-                graph_cost =  get_cost(graph, self.cost_type)
-                next_graph_cost =  get_cost(next_graph, self.cost_type)
+                state_dgl_list.append(graph.to_dgl_graph())
+                next_state_dgl_list.append(next_graph.to_dgl_graph())
+                graph_cost = get_cost(graph, self.cost_type)
+                next_graph_cost = get_cost(next_graph, self.cost_type)
                 if s_exp.info['start']:
                     init_graph = graph
-                    init_graph_cost = get_cost(init_graph, self.cost_type)
+                    init_graph_cost = graph_cost
                     exp_seq = []
                     i_step = 0
-
-                exp_seq.append((ss_exp, graph, next_graph))
+                    graph_buffer.rewards.append([])
+                    graph_buffer.append_init_costs_from_graph(init_graph)
+                    graph_buffer.append_costs_from_graph(init_graph)
+                exp_seq.append((s_exp, graph, next_graph))
                 if not s_exp.game_over and \
                     not qtz.is_nop(s_exp.action.xfer) and \
                     next_graph_cost <= init_graph_cost: # NOTE: only add graphs with less gate count
                     graph_buffer.push_back(next_graph)
-                state_dgl_list.append(graph.to_dgl_graph())
-                next_state_dgl_list.append(next_graph.to_dgl_graph())
+                graph_buffer.rewards[-1].append(s_exp.reward)
+                graph_buffer.append_costs_from_graph(next_graph)
                 """best graph maintenance"""
                 cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
                 if next_graph_cost < cur_best_cost:
@@ -357,7 +361,6 @@ class PPOAgent:
                         ) # send alert to slack
                     
                     graph_buffer.best_graph = next_graph
-                    cur_best_cost = next_graph_cost
                 i_step += 1
                 if s_exp.game_over:
                     graph_buffer.eps_lengths.append(i_step)
@@ -511,6 +514,8 @@ class PPOAgent:
             fname = f'{i_step}_{get_cost(next_graph, self.cost_type)}_{int(s_exp.reward)}_' \
                     f'{s_exp.action.node}_{s_exp.action.xfer}.qasm'
             with open(os.path.join(output_dir, fname), 'w') as f:
+                if not isinstance(s_exp.next_state, str):
+                    s_exp.next_state = s_exp.next_state.to_qasm_str()
                 f.write(s_exp.next_state)
         return output_dir
     
@@ -519,6 +524,7 @@ class PPOAgent:
         self,
         max_cost_ratio: float,
         nop_stop: bool,
+        greedy_sample: bool,
     ) -> ExperienceList:        
         """collect experiences from observers"""
         future_exp_lists: List[Future[List[SerializableExperience]]] = []
@@ -528,7 +534,7 @@ class PPOAgent:
         for obs_rref in self.obs_rrefs:
             """sample init state"""
             graph_buffer = self.graph_buffers[self.init_buffer_turn]
-            init_graph: quartz.PyGraph = graph_buffer.sample()
+            init_graph: quartz.PyGraph = graph_buffer.sample(greedy_sample)
             init_buffer_ids.append(self.init_buffer_turn)
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(self.graph_buffers)
             if self.dyn_eps_len:
@@ -577,8 +583,8 @@ class PPOAgent:
                 next_graph = qtz.qasm_to_graph(s_exp.next_state)
                 state_dgl_list.append(graph.to_dgl_graph())
                 next_state_dgl_list.append(next_graph.to_dgl_graph())
-                graph_cost =  get_cost(graph, self.cost_type)
-                next_graph_cost =  get_cost(next_graph, self.cost_type)
+                graph_cost = get_cost(graph, self.cost_type)
+                next_graph_cost = get_cost(next_graph, self.cost_type)
                 """collect info"""
                 if s_exp.info['start']:
                     init_graph = graph

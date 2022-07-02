@@ -17,6 +17,7 @@ class NamConfig(BaseConfig):
 @dataclass
 class NamFTConfig(NamConfig):
     wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
+    greedy_sample: bool = True
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'adder_8',

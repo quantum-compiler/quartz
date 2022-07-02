@@ -329,10 +329,13 @@ class GraphBuffer:
             self.cost_to_graph.pop(max_key, None)
         self.hashset.remove(hash(popped_graph))
     
-    def sample(self) -> quartz.PyGraph:
+    def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())
         gcost = torch.Tensor(gcost_list).to(self.device)
-        weights = 1 / gcost + 0.5
+        if greedy:
+            weights = 1 / (gcost - gcost.min() + 0.2)
+        else:
+            weights = 1 / gcost**4
         sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
         sampled_gcost = gcost_list[sampled_gcost_idx]
         sampled_graph = random.choice(self.cost_to_graph[sampled_gcost])

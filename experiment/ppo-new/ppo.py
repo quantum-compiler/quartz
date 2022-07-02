@@ -209,10 +209,10 @@ class PPOMod:
         else: # use observers to collect data
             collect_fn = self.agent.collect_data
         # printfl(f'Agent {self.rank} : start collecting data for iter {self.i_iter}')
-        exp_list: ExperienceList = collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop)
+        exp_list: ExperienceList = collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
         # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
         for i in range(self.cfg.num_eps_per_iter // self.cfg.obs_per_agent - 1):
-            exp_list += collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop)
+            exp_list += collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
         # printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')

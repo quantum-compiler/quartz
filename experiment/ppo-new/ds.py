@@ -287,7 +287,6 @@ class GraphBuffer:
         return len(self.hashset)
     
     def prepare_for_next_iter(self) -> None:
-        self.update_max_eps_length()
         self.eps_lengths.clear()
         self.rewards.clear()
         
@@ -362,22 +361,17 @@ class GraphBuffer:
         self.init_graph_ccs.append(graph.cx_count)
         self.init_graph_costs.append(get_cost(graph, self.cost_type))
     
-    def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
-        """Return: (best, old_best)"""
-        old = self.max_eps_length
-        self.max_eps_length = max(
-            self.max_eps_length, x
-        )
-        return self.max_eps_length, old
-    
-    def update_max_eps_length(self) -> Tuple[int, int, int]:
-        """Return: (best, current, old_best)"""
-        old = self.max_eps_length
-        cur = max(self.eps_lengths) if len(self.eps_lengths) > 0 else 0
-        self.max_eps_length = max(
-            self.max_eps_length, cur,
-        )
-        return self.max_eps_length, cur, old
+    def eps_len_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        max_eps_len = max(self.eps_lengths)
+        info[f'min_epslen'] = min(self.eps_lengths)
+        info[f'max_epslen'] = max_eps_len
+        info[f'mean_epslen'] = sum(self.eps_lengths) / len(self.eps_lengths)
+        
+        self.max_eps_length = max(self.max_eps_length, max_eps_len)
+        info[f'max_epslen_global'] = self.max_eps_length
+        
+        return info
     
     def rewards_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {}
@@ -415,12 +409,12 @@ class GraphBuffer:
         
         return info
     
-    def shrink(self) -> None:
-        for cost_key in self.cost_to_graph:
-            cur = self.cost_to_graph[cost_key]
-            new = cur[len(cur) // 2 : ]
-            if cost_key == get_cost(self.original_graph, self.cost_type):
-                new.append(self.original_graph)
-            self.cost_to_graph[cost_key] = new
+    # def shrink(self) -> None:
+    #     for cost_key in self.cost_to_graph:
+    #         cur = self.cost_to_graph[cost_key]
+    #         new = cur[len(cur) // 2 : ]
+    #         if cost_key == get_cost(self.original_graph, self.cost_type):
+    #             new.append(self.original_graph)
+    #         self.cost_to_graph[cost_key] = new
     
         

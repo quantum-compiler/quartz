@@ -477,13 +477,9 @@ class PPOAgent:
             info_dict[f'{buffer.name}_best_cost'] = get_cost(buffer.best_graph, self.cost_type)
             info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
             
-            info_dict[f'{buffer.name}_mean_eps_len'] = \
-                torch.Tensor(buffer.eps_lengths).mean().item() \
-                if len(buffer.eps_lengths) > 0 else 0.
-            
-            max_eps_len, this_max_eps_len, _ = buffer.update_max_eps_length()
-            info_dict[f'{buffer.name}_max_eps_len'] = this_max_eps_len
-            info_dict[f'{buffer.name}_max_eps_len_global'] = max_eps_len
+            eps_len_info = buffer.eps_len_info()
+            for k, v in eps_len_info.items():
+                info_dict[f'{buffer.name}_{k}'] = v
             
             rewards_info = buffer.rewards_info()
             for k, v in rewards_info.items():

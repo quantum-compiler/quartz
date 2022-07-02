@@ -313,16 +313,20 @@ class GraphBuffer:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)
             if len(self) > self.max_len:
-                popped_graph: quartz.PyGraph
-                if gcost == self.original_cost:
-                    popped_graph = self.cost_to_graph[gcost].pop(1)
-                else:
-                    popped_graph = self.cost_to_graph[gcost].pop(0)
-                self.hashset.remove(hash(popped_graph))
+                self.pop_one()
             return True
         else:
             return False
         
+    def pop_one(self) -> None:
+        max_key, max_graphs = None, None
+        for cost_key, graphs in self.cost_to_graph.items():
+            if max_key is None or len(graphs) > max_graphs:
+                max_key, max_graphs = cost_key, len(graphs)
+        idx_to_pop = 0 if max_key != self.original_cost else 1
+        popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+        self.hashset.remove(hash(popped_graph))
+    
     def sample(self) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())
         gcost = torch.Tensor(gcost_list).to(self.device)

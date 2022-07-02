@@ -30,6 +30,7 @@ cs.store(group="c", name="convert", node=ConvertConfig)
 
 # other config groups for training
 cs.store(group="c", name="nam", node=NamConfig)
+cs.store(group="c", name="nam_ft", node=NamFTConfig)
 cs.store(group="c", name="nam_pret", node=NamPretrainConfig)
 cs.store(group="c", name="nam_mp", node=NamMPConfig)
 cs.store(group="c", name="nam_rm_mp", node=NamRMMPConfig)

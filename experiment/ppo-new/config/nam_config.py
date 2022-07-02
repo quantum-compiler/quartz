@@ -13,6 +13,16 @@ class NamConfig(BaseConfig):
             '../nam_circs/barenco_tof_3.qasm',
         ),
     ])
+    
+@dataclass
+class NamFTConfig(NamConfig):
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[
+        InputGraph(
+            'adder_8',
+            '../nam_circs/adder_8.qasm',
+        ),
+    ])
 
 @dataclass
 class NamPretrainConfig(NamConfig):

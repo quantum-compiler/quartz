@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 import sys
+import psutil # type: ignore
 import random
 from typing import Tuple, List, Any
 import warnings
@@ -45,7 +46,7 @@ class QuartzInitArgs:
     gate_set: List[str]
     ecc_file_path: str
     no_increase: bool
-    include_nop: bool
+    include_nop: bool 
 
 class CostType(Enum):
     gate_count = 0
@@ -119,3 +120,6 @@ def shuffle_lists(*ls):
     random.shuffle(zip_ls)
     shuf_lists = map(list, zip(*zip_ls))
     return shuf_lists
+
+def vmem_used_perct() -> float:
+    return psutil.virtual_memory().percent

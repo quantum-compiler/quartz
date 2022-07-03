@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(Quartz)
 
-SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_BUILD_TYPE "Release")
 
 if (EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
     include (${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
@@ -59,9 +59,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif ()
 else ()
     if (MSVC)
-        set(CMAKE_CXX_FLAGS "/O2 /Wall ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "/O3 /Wall ${CMAKE_CXX_FLAGS}")
     else ()
-        set(CMAKE_CXX_FLAGS "-O2 -Wall ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "-O3 -Wall ${CMAKE_CXX_FLAGS}")
     endif ()
 endif ()
 

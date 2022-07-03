@@ -9,6 +9,7 @@ from hydra.core.config_store import ConfigStore
 
 from config.base_config import BaseConfig
 from config.nam_config import *
+from config.tdg_config import *
 
 defaults = [
     # config group name c will load config named base
@@ -30,11 +31,18 @@ cs.store(group="c", name="convert", node=ConvertConfig)
 
 # other config groups for training
 cs.store(group="c", name="nam", node=NamConfig)
+cs.store(group="c", name="nam_ft", node=NamFTConfig)
 cs.store(group="c", name="nam_pret", node=NamPretrainConfig)
-cs.store(group="c", name="nam_multipret", node=NamMultiPretrainConfig)
+cs.store(group="c", name="nam_mp", node=NamMPConfig)
+cs.store(group="c", name="nam_rm_mp", node=NamRMMPConfig)
 cs.store(group="c", name="nam_test", node=NamTestConfig)
 cs.store(group="c", name="nam_alltest", node=NamAllTestConfig)
 cs.store(group="c", name="nam_convert", node=NamConvertConfig)
+
+cs.store(group="c", name="tdg", node=TdgConfig)
+cs.store(group="c", name="tdg_ft", node=TdgFTConfig)
+cs.store(group="c", name="tdg_mp", node=TdgMPConfig)
+cs.store(group="c", name="tdg_rmmp", node=TdgRMMPConfig)
 
 # cfg groups for test
 # cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

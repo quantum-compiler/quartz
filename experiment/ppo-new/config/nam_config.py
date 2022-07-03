@@ -13,6 +13,18 @@ class NamConfig(BaseConfig):
             '../nam_circs/barenco_tof_3.qasm',
         ),
     ])
+    
+@dataclass
+class NamFTConfig(NamConfig):
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
+    k_epochs: int = 10
+    greedy_sample: bool = True
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[
+        InputGraph(
+            'qcla_mod_7',
+            '../nam_circs/qcla_mod_7.qasm',
+        ),
+    ])
 
 @dataclass
 class NamPretrainConfig(NamConfig):
@@ -26,7 +38,7 @@ class NamPretrainConfig(NamConfig):
     ])
 
 @dataclass
-class NamMultiPretrainConfig(NamConfig):
+class NamMPConfig(NamConfig):
     wandb: WandbConfig = WandbConfig.new_project('PPO-Pretrain-Multi')
     # quartz
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
@@ -49,6 +61,41 @@ class NamMultiPretrainConfig(NamConfig):
         InputGraph(
             'tof_5',
             '../nam_circs/tof_5.qasm',
+        ),
+        InputGraph(
+            'gf2^4_mult',
+            '../nam_circs/gf2^4_mult.qasm',
+        ),
+    ])
+
+@dataclass
+class NamRMMPConfig(NamConfig):
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Pretrain-Multi')
+    # quartz
+    input_graphs: List[InputGraph] = field(default_factory=lambda:[
+        InputGraph(
+            'barenco_tof_3',
+            '../nam_rm_circs/barenco_tof_3.qasm',
+        ),
+        InputGraph(
+            'vbe_adder_3',
+            '../nam_rm_circs/vbe_adder_3.qasm',
+        ),
+        InputGraph(
+            'mod5_4',
+            '../nam_rm_circs/mod5_4.qasm',
+        ),
+        InputGraph(
+            'mod_mult_55',
+            '../nam_rm_circs/mod_mult_55.qasm',
+        ),
+        InputGraph(
+            'tof_5',
+            '../nam_rm_circs/tof_5.qasm',
+        ),
+        InputGraph(
+            'gf2^4_mult',
+            '../nam_rm_circs/gf2^4_mult.qasm',
         ),
     ])
 

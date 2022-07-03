@@ -302,7 +302,7 @@ class GraphBuffer:
         vmem_perct = vmem_used_perct()
         old_len = len(self)
         if vmem_perct > 80.0:
-            for i in range(1000):
+            for i in range(len(self) // 5):
                 self.pop_one()
             gc.collect()
             printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')

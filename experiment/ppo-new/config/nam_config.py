@@ -17,11 +17,12 @@ class NamConfig(BaseConfig):
 @dataclass
 class NamFTConfig(NamConfig):
     wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
+    k_epochs: int = 10
     greedy_sample: bool = True
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
-            'adder_8',
-            '../nam_circs/adder_8.qasm',
+            'qcla_mod_7',
+            '../nam_circs/qcla_mod_7.qasm',
         ),
     ])
 

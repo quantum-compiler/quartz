@@ -36,7 +36,7 @@ class BaseConfig:
         0, 1, 2, 3, 
     ])
     ddp_port: int = 23333
-    omp_num_threads: int = 1
+    omp_num_threads: int = 4
 
     seed: int = 98765
     wandb: WandbConfig = WandbConfig()

@@ -82,7 +82,7 @@ class Observer:
                     self.id, graph.to_qasm_str(),
                 )
             """sample action_xfer with mask"""
-            av_xfers = graph.available_xfers(
+            av_xfers = graph.available_xfers_parallel(
                 context=qtz.quartz_context, node=graph.get_node_from_id(id=actmp.node))
             av_xfer_mask = torch.BoolTensor([0] * qtz.quartz_context.num_xfers)
             av_xfer_mask[av_xfers] = True
@@ -532,7 +532,7 @@ class PPOAgent:
         av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
         for i_eps in range(num_eps):
             graph = cur_graphs[i_eps]
-            av_xfers = graph.available_xfers(
+            av_xfers = graph.available_xfers_parallel(
                 context=qtz.quartz_context,
                 node=graph.get_node_from_id(id=action_nodes[i_eps])
             )

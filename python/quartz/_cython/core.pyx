@@ -545,6 +545,7 @@ cdef class PyGraph:
     def rotation_merging(self, gate_type:str):
         deref(self.graph).rotation_merging(get_gate_type_from_str(gate_type))
         self.get_nodes()
+        return self
 
     @staticmethod
     def from_qasm(*, context : QuartzContext, filename : str):

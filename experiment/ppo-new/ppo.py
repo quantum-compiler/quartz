@@ -204,15 +204,19 @@ class PPOMod:
         """collect batched data in dgl or tensor format"""
         s_time_collect = get_time_ns()
         self.agent.perpare_buf_for_next_iter()
-        if self.cfg.agent_collect is True:
-            collect_fn = self.agent.collect_data_self
-        else: # use observers to collect data
-            collect_fn = self.agent.collect_data
+        exp_list: ExperienceList
         # printfl(f'Agent {self.rank} : start collecting data for iter {self.i_iter}')
-        exp_list: ExperienceList = collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
-        # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-        for i in range(self.cfg.num_eps_per_iter // self.cfg.obs_per_agent - 1):
-            exp_list += collect_fn(self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
+        if self.cfg.agent_collect is True:
+            exp_list = self.agent.collect_data_by_self(
+                self.cfg.num_eps_per_iter // self.ddp_processes, self.cfg.agent_batch_size,
+                self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample
+            )
+        else: # use observers to collect data
+            collect_fn = partial(self.agent.collect_data, self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
+            exp_list = collect_fn()
+            # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
+            for i in range(self.cfg.num_eps_per_iter // (self.ddp_processes * self.cfg.obs_per_agent) - 1):
+                exp_list += collect_fn()
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
         # printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')
@@ -277,7 +281,7 @@ class PPOMod:
                 all_target_values += target_values.tolist()
                 all_advs += advs.tolist()
             # end for
-            train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)
+            train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs) # type: ignore
         # end with
         """update the network for K epochs"""
         for k_epoch in range(self.cfg.k_epochs):
@@ -285,6 +289,7 @@ class PPOMod:
             for i_step, exps in enumerate(
                 ExperienceListIterator(train_exp_list, self.cfg.mini_batch_size, self.device)
             ):
+                assert isinstance(exps, TrainBatchExp)
                 self.optimizer.zero_grad()
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
@@ -342,8 +347,8 @@ class PPOMod:
                         'loss': loss,
                     })
             # end for i_step
-            exps = None
-            torch.cuda.empty_cache()
+            # exps = None
+            # torch.cuda.empty_cache()
         # end for k_epochs
         self.agent.sync_best_graph()
         

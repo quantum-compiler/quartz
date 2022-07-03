@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 import sys
-import psutil
+import psutil # type: ignore
 import random
 from typing import Tuple, List, Any
 import warnings

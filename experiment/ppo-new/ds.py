@@ -2,10 +2,11 @@
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
-from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar
+from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar, cast
 import math
 import random
 import itertools
+import gc
 
 import torch
 import dgl # type: ignore
@@ -118,7 +119,7 @@ class ExperienceList:
     
     @staticmethod
     def new_empty() -> ExperienceList:
-        return ExperienceList(*[None]*len(fields(ExperienceList))) # type: ignore
+        return ExperienceList(*[[] for _ in range(len(fields(ExperienceList)))]) # type: ignore
 
     def shuffle(self) -> None:
         self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \
@@ -200,7 +201,7 @@ class BatchedExperience:
     
     @staticmethod
     def new_empty() -> BatchedExperience:
-        return BatchedExperience(*[[]]*len(fields(BatchedExperience))) # type: ignore
+        return BatchedExperience(*[None for _ in range(len(fields(BatchedExperience)))]) # type: ignore
 
     def __add__(self, other: BatchedExperience) -> BatchedExperience:
         res = BatchedExperience.new_empty()
@@ -224,7 +225,7 @@ class TrainBatchExp(BatchedExperience):
     
     @staticmethod
     def new_empty() -> TrainBatchExp:
-        return TrainBatchExp(*[[]]*len(fields(TrainBatchExp))) # type: ignore
+        return TrainBatchExp(*[None for _ in range(len(fields(TrainBatchExp)))]) # type: ignore
 
 ExpListType = TypeVar('ExpListType', bound=ExperienceList)
 BatchExpType = TypeVar('BatchExpType', bound=BatchedExperience)
@@ -242,6 +243,7 @@ class ExperienceListIterator:
     def __next__(self) -> BatchExpType:
         if self.start_pos < len(self.src):
             ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
+            ret = cast(BatchExpType, ret)
             self.start_pos += self.batch_size
             return ret
         else:
@@ -297,10 +299,13 @@ class GraphBuffer:
         self.init_graph_costs.clear()
         self.graph_costs.clear()
         
-        # vmem_perct = vmem_used_perct()
-        # if vmem_perct > 80.0:
-        #     self.shrink()
-        #     printfl(f'Buffer {self.name} shrinked. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
+        vmem_perct = vmem_used_perct()
+        old_len = len(self)
+        if vmem_perct > 80.0:
+            for i in range(1000):
+                self.pop_one()
+            gc.collect()
+            printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
     
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
@@ -318,15 +323,17 @@ class GraphBuffer:
             return False
         
     def pop_one(self) -> None:
-        max_key, max_graphs = None, None
-        for cost_key, graphs in self.cost_to_graph.items():
-            if max_key is None or len(graphs) > max_graphs:
-                max_key, max_graphs = cost_key, len(graphs)
-        idx_to_pop = 0 if max_key != self.original_cost else 1
-        popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
-        if len(self.cost_to_graph[max_key]) == 0:
-            self.cost_to_graph.pop(max_key, None)
-        self.hashset.remove(hash(popped_graph))
+        if len(self) > 0:
+            max_key: int = -1
+            max_num_graphs: int = -1
+            for cost_key, graphs in self.cost_to_graph.items():
+                if max_key == -1 or len(graphs) > max_num_graphs:
+                    max_key, max_num_graphs = cost_key, len(graphs)
+            idx_to_pop = 0 if max_key != self.original_cost else 1
+            popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+            if len(self.cost_to_graph[max_key]) == 0:
+                self.cost_to_graph.pop(max_key, None)
+            self.hashset.remove(hash(popped_graph))
     
     def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())

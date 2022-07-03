@@ -79,16 +79,17 @@ class BaseConfig:
     invalid_reward: float = -1.0
     max_cost_ratio: float = 1.2
     batch_inference: bool = True
-    agent_collect: bool = False
     dyn_eps_len: bool = True
     max_eps_len: int = 300
     min_eps_len: int = 20
     greedy_sample: bool = False
+    agent_collect: bool = True
+    agent_batch_size: int = 128
 
     # training
     max_iterations: int = int(1e8)
-    num_eps_per_iter: int = 30
-    mini_batch_size: int = 3600 # per DDP process; < num_eps_per_iter * len_episode
+    num_eps_per_iter: int = 128 # 30
+    mini_batch_size: int = 3840 # per DDP process; < num_eps_per_iter * len_episode
     k_epochs: int = 25
     lr_graph_embedding: float = 3e-4
     lr_actor: float = 3e-4

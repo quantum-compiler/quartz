@@ -108,9 +108,10 @@ def main():
     num_workers = 100
 
     # read json files and randomly sample a subset of circuits
-    circuit_dict_path = f"./dataset/{gate_count_to_plot}.json"
+    circuit_dict_path = f"./dataset_100k/graph{gate_count_to_plot}.json"
     with open(circuit_dict_path, 'r') as handle:
         circuit_dict = json.load(handle)
+    print(f"There are {len(circuit_dict)} circuits with {gate_count_to_plot} gates.")
     selected_hash_list = random.sample(list(circuit_dict), total_circuit_count)
     selected_circuit_list = []
     for selected_hash in selected_hash_list:

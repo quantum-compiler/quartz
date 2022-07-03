@@ -953,6 +953,7 @@ void Graph::rotation_merging(GateType target_rotation) {
       }
     }
   }
+  constant_and_rotation_elimination();
 }
 
 size_t Graph::get_num_qubits() const {
@@ -1107,7 +1108,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
             }
           }
           if (!found) {
-            iss << f;
+            iss << "pi*" << f / PI;
           }
         }
         iss << ')';
@@ -1208,12 +1209,18 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          // Currently only support the format of pi*0.123
+          // Currently only support the format of pi*0.123, 0.123*pi or 0.123
           ParamType p;
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
             p = std::stod(d) * PI;
-          } else {
+          } 
+          else if(token.find("pi") != std::string::npos){
+            // 0.123*pi
+            auto d = token.substr(0, token.find("*"));
+            p = std::stod(d) * PI;
+          }
+          else {
             p = std::stod(token);
           }
           auto src_op = graph->add_parameter(p);

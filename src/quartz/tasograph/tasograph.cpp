@@ -953,6 +953,7 @@ void Graph::rotation_merging(GateType target_rotation) {
       }
     }
   }
+  constant_and_rotation_elimination();
 }
 
 size_t Graph::get_num_qubits() const {

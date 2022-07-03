@@ -1,4 +1,5 @@
 import pickle
+import argparse
 
 import matplotlib.pyplot as plt
 
@@ -6,7 +7,10 @@ import matplotlib.pyplot as plt
 # This file plot cdf.
 def main():
     # input param
-    gate_count = "pretrain"
+    parser = argparse.ArgumentParser(description='Generate figure for paper.')
+    parser.add_argument('--gate_count', type=int, required=True)
+    args = parser.parse_args()
+    gate_count = f"{args.gate_count}"
 
     with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
@@ -28,7 +32,7 @@ def main():
 
     # prepare x_list
     x_list = list(range(max(result_dict) + 2))
-    x_list[-1] = f">{x_list[-2]}"
+    x_list[-1] = f"N/A"
     print(x_list)
 
     # plot
@@ -38,8 +42,8 @@ def main():
     plt.yticks(ticks=[1, 0.8, 0.6, 0.4, 0.2, 0],
                labels=["100%", "80%", "60%", "40%", "20%", "0%"])
     plt.plot(x_list, y_list, marker='o')
-    plt.savefig(f"{gate_count}_cdf.jpg")
-    plt.show()
+    plt.savefig(f"./figure2_final_figures/{gate_count}_cdf.pdf")
+    # plt.show()
 
 
 if __name__ == '__main__':

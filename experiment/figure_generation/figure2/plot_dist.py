@@ -1,4 +1,5 @@
 import pickle
+import argparse
 
 import matplotlib.pyplot as plt
 
@@ -6,7 +7,10 @@ import matplotlib.pyplot as plt
 # This file plots distribution
 def main():
     # input param
-    gate_count = "pretrain"
+    parser = argparse.ArgumentParser(description='Generate figure for paper.')
+    parser.add_argument('--gate_count', type=int, required=True)
+    args = parser.parse_args()
+    gate_count = f"{args.gate_count}"
 
     with open(f"./raw_results/final_results_{gate_count}.pickle", 'rb') as handle:
         result_dict = pickle.load(file=handle)
@@ -29,7 +33,7 @@ def main():
     x_list = list(range(1, max(result_dict) + 2))
     for idx in range(len(x_list)):
         x_list[idx] = f"{x_list[idx]}"
-    x_list[-1] = f">{x_list[-2]}"
+    x_list[-1] = f"N/A"
     print(x_list)
 
     # plot
@@ -39,8 +43,8 @@ def main():
     plt.yticks(ticks=[1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0],
                labels=["100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%", "20%", "10%", "0%"])
     plt.bar(x_list, y_list)
-    plt.savefig(f"{gate_count}_dist.jpg")
-    plt.show()
+    plt.savefig(f"./figure2_final_figures/{gate_count}_dist.pdf")
+    # plt.show()
 
 
 if __name__ == '__main__':

@@ -187,6 +187,7 @@ class PPOMod:
         limited_time_budget: bool = len(self.cfg.time_budget) > 0
         if limited_time_budget:
             sec_budget: float = hms_to_sec(self.cfg.time_budget)
+            printfl(f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.')
         self.start_time_sec = time.time()
         while self.i_iter < max_iterations:
             self.train_iter()
@@ -197,7 +198,7 @@ class PPOMod:
             self.i_iter += 1
             used_sec = time.time() - self.start_time_sec
             if limited_time_budget and used_sec > sec_budget:
-                printfl(f'rank {self.rank}: Run out of time budget {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...')
+                printfl(f'rank {self.rank}: Run out of time budget {used_sec} sec / {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...')
                 break
         
     def train_iter(self) -> None:

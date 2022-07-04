@@ -294,7 +294,9 @@ class PPOAgent:
     def other_info_dict(self) -> Dict[str, float | int]:
         info_dict: Dict[str, float | int] = {}
         for buffer in self.graph_buffers:
-            info_dict[f'{buffer.name}_best_cost'] = get_cost(buffer.best_graph, self.cost_type)
+            best_cost_global = get_cost(buffer.best_graph, self.cost_type)
+            info_dict[f'{buffer.name}_best_cost'] = best_cost_global
+            info_dict[f'{buffer.name}_best_cost_global'] = best_cost_global
             info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
             
             eps_len_info = buffer.eps_len_info()

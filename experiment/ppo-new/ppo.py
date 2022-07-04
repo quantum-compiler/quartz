@@ -181,6 +181,7 @@ class PPOMod:
         
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter = 0
+        self.tot_exps_collected: int = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
         """train loop"""
@@ -220,6 +221,7 @@ class PPOMod:
                 exp_list += collect_fn()
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
+        self.tot_exps_collected += len(exp_list)
         # printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')
         """evaluate, compute loss, and update (DDP)"""
         # Each agent has different data, so it is DDP training
@@ -228,6 +230,7 @@ class PPOMod:
             collect_info = {
                 **other_info_dict, # type: ignore
                 'num_exps': len(exp_list),
+                'tot_exps_collected_all_rank': self.tot_exps_collected * self.ddp_processes,
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .')

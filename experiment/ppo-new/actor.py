@@ -186,7 +186,7 @@ class PPOAgent:
         self.graph_buffers: List[GraphBuffer] = [
             GraphBuffer(
                 input_graph['name'], input_graph['qasm'],
-                self.cost_type, int(2e5 / len(input_graphs)), self.device
+                self.cost_type, int(1e6 / len(input_graphs)), self.device
             ) for input_graph in input_graphs
         ]
         self.init_buffer_turn: int = 0

@@ -301,7 +301,7 @@ class GraphBuffer:
         
         vmem_perct = vmem_used_perct()
         old_len = len(self)
-        if vmem_perct > 80.0:
+        if vmem_perct > 85.0:
             while len(self) >= 0.75 * old_len:
                 self.pop_some(1000)
             gc.collect()
@@ -316,7 +316,10 @@ class GraphBuffer:
             if gcost not in self.cost_to_graph:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)
-            if len(self) > self.max_len:
+            idx_to_pop = 0 if gcost != self.original_cost else 1
+            while len(self.cost_to_graph[gcost]) > int(5e2):
+                self.cost_to_graph[gcost].pop(idx_to_pop)
+            while len(self) > self.max_len:
                 self.pop_one()
             return True
         else:

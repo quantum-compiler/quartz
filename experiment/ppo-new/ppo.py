@@ -180,7 +180,7 @@ class PPOMod:
         printfl(f'rank {self.rank} / {self.ddp_processes} on {self.device} initialized')
         
         max_iterations = int(self.cfg.max_iterations)
-        self.i_iter = 0
+        self.i_iter: int = 0
         self.tot_exps_collected: int = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
@@ -375,7 +375,7 @@ class PPOMod:
     def load_ckpt(self, ckpt_path: str) -> None:
         """load model and optimizer"""
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
-        self.i_iter = ckpt['i_iter']
+        self.i_iter = int(ckpt['i_iter']) + 1
         model_state_dict = ckpt['model_state_dict']
         if self.cfg.load_non_ddp_ckpt:
             self.ddp_ac_net.module.load_state_dict(model_state_dict)

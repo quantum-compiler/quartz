@@ -302,8 +302,8 @@ class GraphBuffer:
         vmem_perct = vmem_used_perct()
         old_len = len(self)
         if vmem_perct > 80.0:
-            for i in range(len(self) // 5):
-                self.pop_one()
+            while len(self) >= 0.75 * old_len:
+                self.pop_some(1000)
             gc.collect()
             printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
     
@@ -334,6 +334,21 @@ class GraphBuffer:
             if len(self.cost_to_graph[max_key]) == 0:
                 self.cost_to_graph.pop(max_key, None)
             self.hashset.remove(hash(popped_graph))
+    
+    def pop_some(self, num: int) -> None:
+        if len(self) > 0:
+            max_key: int = -1
+            max_num_graphs: int = -1
+            for cost_key, graphs in self.cost_to_graph.items():
+                if max_key == -1 or len(graphs) > max_num_graphs:
+                    max_key, max_num_graphs = cost_key, len(graphs)
+            idx_to_pop = 0 if max_key != self.original_cost else 1
+            for i in range(int(num)):
+                popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+                if len(self.cost_to_graph[max_key]) == 0:
+                    self.cost_to_graph.pop(max_key, None)
+                    break
+                self.hashset.remove(hash(popped_graph))
     
     def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())

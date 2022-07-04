@@ -64,27 +64,27 @@ class TdgRMMPConfig(TdgConfig):
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',
-            '../t_tdg_circs/barenco_tof_3.qasm',
+            '../t_tdg_rm_circs/barenco_tof_3.qasm',
         ),
         InputGraph(
             'vbe_adder_3',
-            '../t_tdg_circs/vbe_adder_3.qasm',
+            '../t_tdg_rm_circs/vbe_adder_3.qasm',
         ),
         InputGraph(
             'mod5_4',
-            '../t_tdg_circs/mod5_4.qasm',
+            '../t_tdg_rm_circs/mod5_4.qasm',
         ),
         InputGraph(
             'mod_mult_55',
-            '../t_tdg_circs/mod_mult_55.qasm',
+            '../t_tdg_rm_circs/mod_mult_55.qasm',
         ),
         InputGraph(
             'tof_5',
-            '../t_tdg_circs/tof_5.qasm',
+            '../t_tdg_rm_circs/tof_5.qasm',
         ),
         InputGraph(
             'gf2^4_mult',
-            '../t_tdg_circs/gf2^4_mult.qasm',
+            '../t_tdg_rm_circs/gf2^4_mult.qasm',
         ),
     ])
 

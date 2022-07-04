@@ -42,7 +42,7 @@ cs.store(group="c", name="nam_convert", node=NamConvertConfig)
 cs.store(group="c", name="tdg", node=TdgConfig)
 cs.store(group="c", name="tdg_ft", node=TdgFTConfig)
 cs.store(group="c", name="tdg_mp", node=TdgMPConfig)
-cs.store(group="c", name="tdg_rmmp", node=TdgRMMPConfig)
+cs.store(group="c", name="tdg_rm_mp", node=TdgRMMPConfig)
 
 # cfg groups for test
 # cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

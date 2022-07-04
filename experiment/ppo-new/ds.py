@@ -347,6 +347,8 @@ class GraphBuffer:
                     max_key, max_num_graphs = cost_key, len(graphs)
             idx_to_pop = 0 if max_key != self.original_cost else 1
             for i in range(int(num)):
+                if len(self.cost_to_graph[max_key]) < idx_to_pop + 1:
+                    break
                 popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
                 if len(self.cost_to_graph[max_key]) == 0:
                     self.cost_to_graph.pop(max_key, None)

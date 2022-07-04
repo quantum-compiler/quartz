@@ -223,12 +223,13 @@ class PPOMod:
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
         self.tot_exps_collected += len(exp_list)
         # printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')
-        """evaluate, compute loss, and update (DDP)"""
+        """log info about data collection"""
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
             other_info_dict = self.agent.other_info_dict()
             collect_info = {
                 **other_info_dict, # type: ignore
+                'iter': self.i_iter,
                 'num_exps': len(exp_list),
                 'tot_exps_collected_all_rank': self.tot_exps_collected * self.ddp_processes,
             }
@@ -236,13 +237,14 @@ class PPOMod:
             logprintfl(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .')
             for k, v in collect_info.items():
                 printfl(f'    {k} : {v}')
-            wandb.log(other_info_dict)
+            wandb.log(collect_info)
             pbar = tqdm(
                 total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
-        
+            
+        """evaluate, compute loss, and update (DDP)"""
         """compute values of next nodes using un-updated network to get advantages"""
         all_target_values: List[float] = []
         all_advs: List[float] = []

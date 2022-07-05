@@ -45,6 +45,7 @@ check_cxx_compiler_flag("-std=c++17" SUPPORT_CXX17)
 if(MSVC)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
     set(BUILD_SHARED_LIBS TRUE)
+    set(CMAKE_CXX_FLAGS "/std:c++17 ${CMAKE_CXX_FLAGS}")
 else()
     set(CMAKE_CXX_FLAGS "-fPIC ${CMAKE_CXX_FLAGS}")
 endif()
@@ -109,3 +110,4 @@ install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
         FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory(src/test)
+add_subdirectory(src/benchmark)

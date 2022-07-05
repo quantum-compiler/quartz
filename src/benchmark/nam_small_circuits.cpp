@@ -42,7 +42,7 @@ void benchmark_nam(const std::string &circuit_name) {
   auto end = std::chrono::steady_clock::now();
 
   num_benchmark++;
-  geomean_gate_count *= graph.gate_count();
+  geomean_gate_count *= graph_before_search->gate_count();
 
   std::cout << circuit_name << " after toffoli flip in "
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -96,7 +96,8 @@ int main() {
   benchmark_nam("gf2^4_mult");  // 225 gates
   if (num_benchmark > 0) {
     std::cout << num_benchmark << " circuits, gate count optimized by "
-              << std::pow(geomean_gate_count, 1.0 / num_benchmark) << " times."
+              << std::pow(geomean_gate_count, 1.0 / num_benchmark)
+              << " times on average."
               << std::endl;
   }
   return 0;

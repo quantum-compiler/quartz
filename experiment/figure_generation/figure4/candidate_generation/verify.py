@@ -97,7 +97,7 @@ def main():
         os.makedirs(output_path)
 
     # read in the circuit
-    with open(f"./final_5steps.qasm", 'r') as handle:
+    with open(f"../../barenco_tof_3.qasm", 'r') as handle:
         qasm_str = handle.read()
         final_depth = gen_path(rank=0, qasm_str=qasm_str, max_depth=8)
         print(f"Final depth is {final_depth}.")

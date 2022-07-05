@@ -81,7 +81,7 @@ def main():
     # read in the circuit
     with open(f"../barenco_tof_3.qasm", 'r') as handle:
         qasm_str = handle.read()
-        final_circuit_count_list = gen_path(rank=0, qasm_str=qasm_str, max_depth=8)
+        final_circuit_count_list = gen_path(rank=0, qasm_str=qasm_str, max_depth=10)
         print(f"Final circuit count list is {final_circuit_count_list}.")
 
 

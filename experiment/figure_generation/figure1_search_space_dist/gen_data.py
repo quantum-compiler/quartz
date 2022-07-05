@@ -54,6 +54,8 @@ def gen_path(rank, qasm_str, max_depth):
                 new_graph = cur_graph.apply_xfer(xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
                 new_hash = new_graph.hash()
                 new_cnt = new_graph.gate_count
+                if new_cnt < best_gate_count:
+                    best_gate_count = new_cnt
                 # otherwise we will continue search
                 if new_hash not in visited_hash_set and new_cnt <= 58:
                     visited_hash_set[new_hash] = visited_hash_set[cur_graph_hash] + 1
@@ -68,8 +70,6 @@ def gen_path(rank, qasm_str, max_depth):
                 if searched_count % 1000 == 0:
                     print(f"[Rank {rank}] Searched {searched_count} circuits,"
                           f" now distribution is {distribution_list}. Best = {best_gate_count}")
-                    if new_cnt < best_gate_count:
-                        best_gate_count = new_cnt
                 if searched_count % 1000000 == 0:
                     print(f"Save result {searched_count}.")
                     with open(f"./dataset/{searched_count}.json", 'w') as f:

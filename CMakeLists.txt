@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(Quartz)
 
-SET(CMAKE_BUILD_TYPE "Debug")
+set(CMAKE_BUILD_TYPE Release)
 
 if (EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
     include (${CMAKE_CURRENT_BINARY_DIR}/config.cmake)

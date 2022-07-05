@@ -1,9 +1,9 @@
 #!/bin/bash
 
-set -x	# print commands and their arguments as they are executed
+set -x	# print commands and their arguments as they are executed.
 set -e	# exit immediately if anything you're running returns a non-zero return code
 
-cd ~/quartz
+cd /workspace/paper
 pwd
 
 cd build

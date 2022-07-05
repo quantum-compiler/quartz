@@ -33,9 +33,6 @@ void benchmark_nam(const std::string &circuit_name) {
 
   Graph graph(&src_ctx, dag);
 
-  num_benchmark++;
-  geomean_gate_count *= graph.gate_count();
-
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
   auto graph_before_search = graph.toffoli_flip_greedy(
@@ -43,6 +40,9 @@ void benchmark_nam(const std::string &circuit_name) {
   //   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   auto end = std::chrono::steady_clock::now();
+
+  num_benchmark++;
+  geomean_gate_count *= graph.gate_count();
 
   std::cout << circuit_name << " after toffoli flip in "
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(

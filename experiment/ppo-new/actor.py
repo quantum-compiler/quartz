@@ -64,6 +64,7 @@ class Observer:
             List[SerializableExperience]: a list of experiences collected in this function
         """
         init_graph = qtz.qasm_to_graph(init_state_str)
+        init_cost = get_cost(init_graph, self.cost_type)
         exp_list: List[SerializableExperience] = []
         
         graph = init_graph
@@ -115,8 +116,8 @@ class Observer:
                 graph_cost =  get_cost(graph, self.cost_type)
                 next_graph_cost =  get_cost(next_graph, self.cost_type)
                 reward = graph_cost - next_graph_cost
-                game_over = (graph_cost > next_graph_cost * max_cost_ratio) or \
-                    (graph.gate_count > next_graph.gate_count * max_cost_ratio)
+                game_over = (graph_cost > init_cost * max_cost_ratio) or \
+                    (graph.gate_count > init_graph.gate_count * max_cost_ratio)
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
@@ -606,6 +607,7 @@ class PPOAgent:
         max_eps_len_for_all = int(max_eps_len_all_ranks.max())
         
         """run episodes"""
+        init_costs: List[int] = [get_cost(init_g, self.cost_type) for init_g in init_graph_list]
         cur_graphs: List[quartz.PyGraph] = init_graph_list.copy() # shallow copy
         graph_seqs: List[List[quartz.PyGraph]] = [ [] for _ in range(num_eps) ]
         last_eps_ends: List[int] = [-1 for _ in range(num_eps)]
@@ -659,8 +661,8 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    game_over = (graph_cost > next_graph_cost * max_cost_ratio) or \
-                        (graph.gate_count > next_graph.gate_count * max_cost_ratio)
+                    game_over = (graph_cost > init_costs[i_eps] * max_cost_ratio) or \
+                        (graph.gate_count > init_graph_list[i_eps].gate_count * max_cost_ratio)
                 if i_step - last_eps_end >= max_eps_len_for_all:
                     game_over = True
                 

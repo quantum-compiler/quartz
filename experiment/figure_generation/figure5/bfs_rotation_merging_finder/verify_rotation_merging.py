@@ -19,7 +19,7 @@ def gen_path(rank, qasm_str, max_depth):
     """
     # prepare quartz context
     quartz_context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
-                                          filename="../bfs_verified_simplified.json",
+                                          filename="../../bfs_verified_simplified.json",
                                           no_increase=True, include_nop=False)
     qasm_parser = quartz.PyQASMParser(context=quartz_context)
     dag = qasm_parser.load_qasm_str(qasm_str=qasm_str)
@@ -97,12 +97,10 @@ def main():
         os.makedirs(output_path)
 
     # read in the circuit
-    for filename in os.listdir("./dataset"):
-        with open(f"./dataset/{filename}", 'r') as handle:
-            print(f"Analyzing {filename}")
-            qasm_str = handle.read()
-            final_depth = gen_path(rank=0, qasm_str=qasm_str, max_depth=8)
-            print(f"Final depth is {final_depth}.")
+    with open(f"../candidate.qasm", 'r') as handle:
+        qasm_str = handle.read()
+        final_depth = gen_path(rank=0, qasm_str=qasm_str, max_depth=8)
+        print(f"Final depth is {final_depth}.")
 
 
 if __name__ == '__main__':

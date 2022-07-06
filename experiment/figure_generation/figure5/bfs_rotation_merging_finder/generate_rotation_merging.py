@@ -23,7 +23,7 @@ class Game:
         new_game = copy.deepcopy(self)
         new_game.state[target] = self.state[target].symmetric_difference(self.state[control])
         new_game.state_history.append(new_game.state.copy())
-        new_game.action_history.append({"control": control, "target": target})
+        new_game.action_history.append((control, target))
         return new_game
 
     def check_equivalence(self, min_cx_count):
@@ -34,12 +34,16 @@ class Game:
         for j in range(self.num_qubits):
             if not i == j:
                 for n in range(len(self.state_history)):
-                    if self.state_history[m][i] == self.state_history[n][j]:
+                    if self.state_history[m][i] == self.state_history[n][j] and n >= min_cx_count:
                         is_equivalent = True
                         t_pos, tdg_pos = (m, i), (n, j)
+                        print(f"depth{n}, qubit{j}")
+
+        # variety condition
+        variety = len(set(self.action_history))
 
         # print history
-        if is_equivalent and len(self.state_history) >= min_cx_count:
+        if is_equivalent and len(self.state_history) >= min_cx_count and variety > self.num_qubits:
             for state in self.state_history:
                 print(state)
             while True:
@@ -69,17 +73,19 @@ class Game:
                 if step_count == n:
                     print(f"tdg q[{j}];", file=handle, flush=True)
                 step_count += 1
-                control = action_pair["control"]
-                target = action_pair["target"]
+                control = action_pair[0]
+                target = action_pair[1]
                 if not step_count == m and not step_count == n:
-                    print(f"tdg q[{target}];", file=handle, flush=True)
+                    print(f"t q[{target}];", file=handle, flush=True)
                 print(f"cx q[{control}], q[{target}];", file=handle, flush=True)
+            if step_count == n:
+                print(f"tdg q[{j}];", file=handle, flush=True)
 
 
 def main():
     # input parameter
     num_qubits = 4
-    min_cx_count = 7
+    min_cx_count = 6
 
     # start search
     initial_game = Game(num_qubits=num_qubits)

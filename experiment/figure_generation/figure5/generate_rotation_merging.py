@@ -1,5 +1,5 @@
 import copy
-import pickle
+import random
 
 
 class Game:
@@ -26,45 +26,60 @@ class Game:
         new_game.action_history.append({"control": control, "target": target})
         return new_game
 
-    def check_equivalence(self, force_print):
+    def check_equivalence(self, min_cx_count):
         # check equivalence
         is_equivalent = False
-        t_pos, tdg_pos = -1, -1
-        for i in range(self.num_qubits):
-            for j in range(self.num_qubits):
-                if not i == j and self.state[i] == self.state[j]:
-                    is_equivalent = True
-                    t_pos, tdg_pos = i, j
+        t_pos, tdg_pos = (-1, -1), (-1, -1)
+        m, i = 0, 0
+        for j in range(self.num_qubits):
+            if not i == j:
+                for n in range(len(self.state_history)):
+                    if self.state_history[m][i] == self.state_history[n][j]:
+                        is_equivalent = True
+                        t_pos, tdg_pos = (m, i), (n, j)
 
         # print history
-        if is_equivalent or force_print:
+        if is_equivalent and len(self.state_history) >= min_cx_count:
             for state in self.state_history:
                 print(state)
             while True:
                 should_save = input("Save or not (y/n):")
                 if should_save == "y":
-                    self.save_to_file(t_idx=t_pos, tdg_idx=tdg_pos)
+                    filename = f"{random.randint(0, 10000000)}"
+                    self.save_to_file(filename=filename,
+                                      t_idx=t_pos, tdg_idx=tdg_pos)
+                    break
                 elif should_save == "n":
                     break
                 else:
                     continue
 
-    def save_to_file(self, t_idx, tdg_idx):
-        with open("./input.qasm", 'w') as handle:
+    def save_to_file(self, filename, t_idx, tdg_idx):
+        # decode for t and tdg
+        m, i = t_idx[0], t_idx[1]
+        n, j = tdg_idx[0], tdg_idx[1]
+        step_count = 0
+        with open(f"./dataset/{filename}.qasm", 'w') as handle:
             print("OPENQASM 2.0;", file=handle, flush=True)
             print("include \"qelib1.inc\";", file=handle, flush=True)
             print(f"qreg q[{self.num_qubits}];", file=handle, flush=True)
             for action_pair in self.action_history:
+                if step_count == m:
+                    print(f"t q[{i}];", file=handle, flush=True)
+                if step_count == n:
+                    print(f"tdg q[{j}];", file=handle, flush=True)
+                step_count += 1
                 control = action_pair["control"]
                 target = action_pair["target"]
+                if not step_count == m and not step_count == n:
+                    print(f"tdg q[{target}];", file=handle, flush=True)
                 print(f"cx q[{control}], q[{target}];", file=handle, flush=True)
-            print(f"t q[{t_idx}];", file=handle, flush=True)
-            print(f"tdg q[{tdg_idx}];", file=handle, flush=True)
 
 
 def main():
     # input parameter
-    num_qubits = 5
+    num_qubits = 4
+    min_cx_count = 7
 
     # start search
     initial_game = Game(num_qubits=num_qubits)
@@ -75,10 +90,7 @@ def main():
         for action_pair in cur_game.action_space:
             control, target = action_pair[0], action_pair[1]
             new_game = cur_game.apply_action(control=control, target=target)
-            if searched_count % 100000 == 0:
-                new_game.check_equivalence(force_print=False)
-            else:
-                new_game.check_equivalence(force_print=False)
+            new_game.check_equivalence(min_cx_count=min_cx_count)
             candidate_queue.append(new_game)
             # logging
             searched_count += 1

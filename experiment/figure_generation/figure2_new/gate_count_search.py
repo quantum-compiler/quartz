@@ -68,7 +68,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
                     return -1, 0
                 # this is for logging
                 searched_count += 1
-                if searched_count % 1000 == 0:
+                if searched_count % 100000 == 0:
                     print(f"[Rank {rank}] Searched {searched_count} circuits,"
                           f" now at depth {depth}.")
     assert False
@@ -99,7 +99,7 @@ def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
 def main():
     # more parameters
     random.seed(12345)
-    sample_circuit_count = 10000
+    sample_circuit_count = 1000
     max_search_depth = 8
     num_workers = 100
 

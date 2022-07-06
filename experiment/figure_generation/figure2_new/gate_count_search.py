@@ -37,6 +37,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
     candidate_queue = [[initial_graph, initial_graph_hash]]
     visited_hash_set = {initial_graph_hash: 0}
     searched_count = 0
+    depth = 0
     while len(candidate_queue) > 0:
         # get graph for current loop
         graph_packet = candidate_queue.pop(0)
@@ -60,6 +61,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
                 # otherwise we will continue search
                 if new_hash not in visited_hash_set and new_cnt <= 58:
                     visited_hash_set[new_hash] = visited_hash_set[cur_graph_hash] + 1
+                    depth = max(depth, visited_hash_set[new_hash])
                     candidate_queue.append([new_graph, new_hash])
                 # and stop when we reach max depth
                 if new_cnt <= 58 and visited_hash_set[new_hash] > max_depth:
@@ -68,7 +70,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
                 searched_count += 1
                 if searched_count % 1000 == 0:
                     print(f"[Rank {rank}] Searched {searched_count} circuits,"
-                          f" now at depth {visited_hash_set[new_hash]}.")
+                          f" now at depth {depth}.")
     assert False
 
 

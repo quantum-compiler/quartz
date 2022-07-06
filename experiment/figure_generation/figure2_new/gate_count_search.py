@@ -62,7 +62,7 @@ def analyze_circuit(rank, qasm_str, max_depth):
                     visited_hash_set[new_hash] = visited_hash_set[cur_graph_hash] + 1
                     candidate_queue.append([new_graph, new_hash])
                 # and stop when we reach max depth
-                if visited_hash_set[new_hash] > max_depth:
+                if new_cnt <= 58 and visited_hash_set[new_hash] > max_depth:
                     return -1, 0
                 # this is for logging
                 searched_count += 1

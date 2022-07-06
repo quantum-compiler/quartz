@@ -115,7 +115,8 @@ class Observer:
                 graph_cost =  get_cost(graph, self.cost_type)
                 next_graph_cost =  get_cost(next_graph, self.cost_type)
                 reward = graph_cost - next_graph_cost
-                game_over = (graph_cost > next_graph_cost * max_cost_ratio)
+                game_over = (graph_cost > next_graph_cost * max_cost_ratio) or \
+                    (graph.gate_count > next_graph.gate_count * max_cost_ratio)
                 next_graph_str = next_graph.to_qasm_str()
             
             exp = SerializableExperience(
@@ -658,7 +659,8 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    game_over = (graph_cost > next_graph_cost * max_cost_ratio)
+                    game_over = (graph_cost > next_graph_cost * max_cost_ratio) or \
+                        (graph.gate_count > next_graph.gate_count * max_cost_ratio)
                 if i_step - last_eps_end >= max_eps_len_for_all:
                     game_over = True
                 

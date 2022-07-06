@@ -26,18 +26,18 @@ class Game:
         new_game.action_history.append({"control": control, "target": target})
         return new_game
 
-    def check_equivalence(self):
+    def check_equivalence(self, force_print):
         # check equivalence
         is_equivalent = False
         t_pos, tdg_pos = -1, -1
-        for i in range(num_qubits):
-            for j in range(num_qubits):
+        for i in range(self.num_qubits):
+            for j in range(self.num_qubits):
                 if not i == j and self.state[i] == self.state[j]:
                     is_equivalent = True
                     t_pos, tdg_pos = i, j
 
         # print history
-        if is_equivalent:
+        if is_equivalent or force_print:
             for state in self.state_history:
                 print(state)
             while True:
@@ -69,13 +69,21 @@ def main():
     # start search
     initial_game = Game(num_qubits=num_qubits)
     candidate_queue = [initial_game]
+    searched_count = 0
     while True:
         cur_game = candidate_queue.pop(0)
         for action_pair in cur_game.action_space:
             control, target = action_pair[0], action_pair[1]
             new_game = cur_game.apply_action(control=control, target=target)
-            new_game.check_equivalence()
+            if searched_count % 100000 == 0:
+                new_game.check_equivalence(force_print=False)
+            else:
+                new_game.check_equivalence(force_print=False)
             candidate_queue.append(new_game)
+            # logging
+            searched_count += 1
+            if searched_count % 1000 == 0:
+                print(f"Searched {searched_count} circuits.")
 
 
 if __name__ == '__main__':

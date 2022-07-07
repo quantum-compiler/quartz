@@ -55,9 +55,9 @@ def main():
     plt.xlim((-0.1, 7.1))
     plt.yticks(ticks=[1, 0.8, 0.6, 0.4, 0.2, 0],
                labels=["100%", "80%", "60%", "40%", "20%", "0%"])
-    plt.plot(gate_count_x_list, gate_count_y_list, marker='o', label="gate count", linewidth=2)
+    plt.plot(gate_count_x_list, gate_count_y_list, marker='o', label="gate count", linewidth=3)
     plt.legend()
-    # plt.savefig(f"./figure2_new_final_figures/cdf.pdf")
+    plt.savefig(f"./figure2_new_final_figures/cdf.pdf")
     plt.show()
 
 

@@ -1,10 +1,11 @@
-from fileinput import filename
-from pyparsing import original_text_for
 import quartz
 import time
 import heapq
 import sys
 import os
+import wandb
+
+wandb.init(project='nam_rm')
 
 
 def optimize(context: quartz.QuartzContext,
@@ -12,6 +13,7 @@ def optimize(context: quartz.QuartzContext,
              circ_name: str,
              upper_limit: float = 1.05,
              print_message: bool = True,
+             max_candidate_len: int = 1_000_000,
              timeout: int = 86400) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.gate_count, init_circ.to_qasm_str())]
     hash_set = set([init_circ.hash()])
@@ -23,6 +25,12 @@ def optimize(context: quartz.QuartzContext,
     invoke_cnt: int = 0
 
     while candidate != []:
+        if len(candidate) > max_candidate_len:
+            print(
+                f"[{circ_name} (rotation merging)] candidate queue shrink from {len(candidate)} to {len(candidate) // 2}"
+            )
+            candidate = candidate[:len(candidate) // 2]
+
         _, circ_qasm_str = heapq.heappop(candidate)
         circ = quartz.PyGraph.from_qasm_str(context=context,
                                             qasm_str=circ_qasm_str)
@@ -35,6 +43,10 @@ def optimize(context: quartz.QuartzContext,
 
                 invoke_cnt += 1
                 if print_message and invoke_cnt % 100_000_000 == 0:
+                    wandb.log({
+                        'invoke_cnt': invoke_cnt,
+                        'best_gate_cnt': best_gate_cnt
+                    })
                     print(
                         f"[{circ_name} (rotation merging)] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
                     )
@@ -58,6 +70,13 @@ def optimize(context: quartz.QuartzContext,
                     if new_cnt < best_gate_cnt:
                         best_gate_cnt = new_cnt
                         best_circ = new_circ
+                        wandb.log({
+                            'invoke_cnt': invoke_cnt,
+                            'best_gate_cnt': best_gate_cnt
+                        })
+                        print(
+                            f"[{circ_name} (rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
+                        )
 
     return best_gate_cnt, best_circ
 
@@ -83,4 +102,4 @@ if __name__ == '__main__':
     best_circ.to_qasm(filename=f'{output_dir}/{circ_name}_optimized.qasm')
 
     with open(f'{output_dir}/results.txt', 'a') as f:
-        f.write(f"{best_gate_cnt}/t/t{circ_name}\n")
+        f.write(f"{best_gate_cnt}\t\t{circ_name}\n")

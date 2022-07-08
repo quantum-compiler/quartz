@@ -66,7 +66,7 @@ void benchmark_nam(const std::string &circuit_name) {
       false,
       GateType::rz,
       circuit_name, /*timeout=*/
-      10);
+      10 /*enable new algorithm here*/);
   end = std::chrono::steady_clock::now();
 
   std::cout << circuit_name << " optimization result in "

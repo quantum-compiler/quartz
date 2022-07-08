@@ -1286,7 +1286,7 @@ std::shared_ptr<Graph> Graph::optimize(
     float alpha, int budget, bool print_subst, Context *ctx,
     const std::string &equiv_file_name, bool use_simulated_annealing,
     bool enable_early_stop, bool use_rotation_merging_in_searching,
-    GateType target_rotation, std::string circuit_name, int timeout) {
+    GateType target_rotation, std::string circuit_name, int timeout, bool use_reuse) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();

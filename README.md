@@ -89,7 +89,7 @@ Graph graph(&src_ctx, dag);
 
 If the input gate set is different from your target gate set, you should consider using the `context_shift` APIs to shift the context constructed with the gate sets to a context constructed with the target gate set.
 
-To shift the context, you should create three `Contxt` objects, one for input, one for target, and one for their union as below:
+To shift the context, you should create three `Context` objects, one for input, one for target, and one for their union as below:
 
 ``` cpp
 Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,

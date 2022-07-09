@@ -51,14 +51,14 @@ namespace quartz {
                     auto successive_op = out_edge.dstOp;
                     auto successive_port = out_edge.dstIdx;
                     // change out edge of previous op
-                    for (auto &prev_out_edge : graph.outEdges[previous_op]) {
+                    for (auto &prev_out_edge: graph.outEdges[previous_op]) {
                         if (prev_out_edge.srcIdx == in_edge.srcIdx) {
                             prev_out_edge.dstOp = successive_op;
                             prev_out_edge.dstIdx = successive_port;
                         }
                     }
                     // change in edge of successive op
-                    for (auto &suc_in_edge : graph.inEdges[successive_op]) {
+                    for (auto &suc_in_edge: graph.inEdges[successive_op]) {
                         if (suc_in_edge.dstIdx == out_edge.dstIdx) {
                             suc_in_edge.srcOp = previous_op;
                             suc_in_edge.srcIdx = previous_port;
@@ -87,6 +87,67 @@ namespace quartz {
         // delete gate from circuit
         graph.inEdges.erase(op);
         graph.outEdges.erase(op);
+    }
+
+    std::set<Op, OpCompare> find_executable_front_gates(Graph &graph,
+                                                        const std::shared_ptr<DeviceTopologyGraph> &device) {
+        // get gates with at least one input input_qubit
+        std::set<Op, OpCompare> tmp_front_gate_set;
+        for (const auto &initial_qubit_mapping: graph.qubit_mapping_table) {
+            auto initial_qubit = initial_qubit_mapping.first;
+            assert(graph.outEdges.find(initial_qubit) != graph.outEdges.end()
+                   && !graph.outEdges[initial_qubit].empty());
+            for (auto edge: graph.outEdges[initial_qubit]) {
+                tmp_front_gate_set.insert(edge.dstOp);
+            }
+        }
+
+        // only retain those real front gates
+        std::set<Op, OpCompare> front_gate_set;
+        for (const auto &tmp_front_gate: tmp_front_gate_set) {
+            // check all inputs
+            bool is_front_gate = true;
+            for (const auto &in_edge: graph.inEdges[tmp_front_gate]) {
+                if (in_edge.srcOp.ptr->tp != GateType::input_qubit) {
+                    is_front_gate = false;
+                }
+            }
+            // append
+            if (is_front_gate) front_gate_set.insert(tmp_front_gate);
+        }
+
+        // check whether they are executable on device
+        std::set<Op, OpCompare> executable_gate_set;
+        for (auto &front_op: front_gate_set) {
+            if (graph.inEdges[front_op].size() == 1) {
+                // single qubit gate is always executable
+                executable_gate_set.insert(front_op);
+            } else if (graph.inEdges[front_op].size() == 2) {
+                // check two qubit gates
+                // get input physical idx
+                Edge in_edge_0 = *(graph.inEdges[front_op].begin());
+                Edge in_edge_1 = *(std::next(graph.inEdges[front_op].begin()));
+                int physical_idx_0 = graph.qubit_mapping_table[in_edge_0.srcOp].second;
+                int physical_idx_1 = graph.qubit_mapping_table[in_edge_1.srcOp].second;
+                assert(physical_idx_0 == in_edge_0.physical_qubit_idx);
+                assert(physical_idx_1 == in_edge_1.physical_qubit_idx);
+                // check whether they are neighbors
+                auto neighbor_list = device->get_input_neighbours(physical_idx_1);
+                bool is_neighbor = false;
+                for (int neighbor_qubit_idx: neighbor_list) {
+                    if (physical_idx_0 == neighbor_qubit_idx) is_neighbor = true;
+                }
+                if (is_neighbor) {
+                    executable_gate_set.insert(front_op);
+                }
+            } else {
+                // we do not support gates with more than 3 inputs
+                std::cout << "Found gate with >= 2 inputs" << std::endl;
+                assert(false);
+            }
+        }
+
+        return executable_gate_set;
     }
 
     bool is_circuit_finished(Graph &graph) {

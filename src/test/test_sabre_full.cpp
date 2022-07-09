@@ -2,7 +2,6 @@
 #include "quartz/tasograph/tasograph.h"
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
-#include "quartz/sabre/sabre.h"
 #include "quartz/sabre/sabre_swap.h"
 #include <iostream>
 

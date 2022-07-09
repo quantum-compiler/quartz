@@ -2012,33 +2012,41 @@ void Graph::propagate_mapping() {
             }
             // set out edge of target op (need to differentiate swap and other gates)
             if (target_op.ptr->tp == GateType::swap) {
-                for (auto& edge : outEdges[target_op]) {
-                    // notice that a swap has two outputs (can have less due to termination)
-                    if (edge.srcIdx == port_idx) edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
-                    else edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                if (outEdges.find(target_op) != outEdges.end()) {
+                    for (auto& edge : outEdges[target_op]) {
+                        // notice that a swap has two outputs (can have less due to termination)
+                        if (edge.srcIdx == port_idx) edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
+                        else edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                    }
                 }
             } else {
-                for (auto& edge : outEdges[target_op]) {
-                    if (edge.srcIdx != port_idx) continue;
-                    edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
-                    edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                if (outEdges.find(target_op) != outEdges.end()) {
+                    for (auto& edge : outEdges[target_op]) {
+                        if (edge.srcIdx != port_idx) continue;
+                        edge.logical_qubit_idx = cur_edge.logical_qubit_idx;
+                        edge.physical_qubit_idx = cur_edge.physical_qubit_idx;
+                    }
                 }
             }
             // put out edge into query list
             if (target_op.ptr->tp == GateType::swap) {
                 // swap gates put out edges when both out edges are finished
                 int finished_edge = 0;
-                for (const auto& edge : outEdges[target_op]) {
-                    if (edge.physical_qubit_idx != -1 && edge.logical_qubit_idx != -1) finished_edge++;
-                }
-                if (finished_edge == outEdges[target_op].size()) {
+                if (outEdges.find(target_op) != outEdges.end()) {
                     for (const auto& edge : outEdges[target_op]) {
-                        query_list.push(edge);
+                        if (edge.physical_qubit_idx != -1 && edge.logical_qubit_idx != -1) finished_edge++;
+                    }
+                    if (finished_edge == outEdges[target_op].size()) {
+                        for (const auto& edge : outEdges[target_op]) {
+                            query_list.push(edge);
+                        }
                     }
                 }
             } else {
-                for (const auto& edge : outEdges[target_op]) {
-                    if (edge.srcIdx == port_idx) query_list.push(edge);
+                if (outEdges.find(target_op) != outEdges.end()) {
+                    for (const auto& edge : outEdges[target_op]) {
+                        if (edge.srcIdx == port_idx) query_list.push(edge);
+                    }
                 }
             }
         }
@@ -2142,11 +2150,13 @@ double Graph::circuit_implementation_cost(const std::shared_ptr<DeviceTopologyGr
             if (input_qubit_edge->dstIdx == 1) candidate_1.insert(input_qubit_edge->dstOp);
             // move one step forward
             has_next = false;
-            for (const auto& next_edge : outEdges[input_qubit_edge->dstOp]) {
-                if (next_edge.srcIdx == input_qubit_edge->dstIdx) {
-                    has_next = true;
-                    input_qubit_edge = &next_edge;
-                    break;
+            if (outEdges.find(input_qubit_edge->dstOp) != outEdges.end()) {
+                for (const auto& next_edge : outEdges[input_qubit_edge->dstOp]) {
+                    if (next_edge.srcIdx == input_qubit_edge->dstIdx) {
+                        has_next = true;
+                        input_qubit_edge = &next_edge;
+                        break;
+                    }
                 }
             }
         }

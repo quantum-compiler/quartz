@@ -1,5 +1,6 @@
 #pragma once
 
+#include "quartz/sabre/sabre.h"
 #include "../tasograph/tasograph.h"
 
 namespace quartz {

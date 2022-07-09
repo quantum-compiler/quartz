@@ -91,6 +91,7 @@ namespace quartz {
 
     std::set<Op, OpCompare> find_executable_front_gates(Graph &graph,
                                                         const std::shared_ptr<DeviceTopologyGraph> &device) {
+        /// This functions assumes that a valid mapping has been given to the input graph.
         // get gates with at least one input input_qubit
         std::set<Op, OpCompare> tmp_front_gate_set;
         for (const auto &initial_qubit_mapping: graph.qubit_mapping_table) {

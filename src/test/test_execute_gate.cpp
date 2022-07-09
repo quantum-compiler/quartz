@@ -94,4 +94,8 @@ int main() {
     cout << "Sabre implementation cost " << sabre_implementation_cost << endl;
     cout << "Sabre real cost " << sabre_real_cost << endl;
 
+    // execute gate
+    execute_front_gate(graph, graph.inEdges.begin()->first);
+    cout << "Is circuit finished " << is_circuit_finished(graph) << endl;
+
 };

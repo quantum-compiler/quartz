@@ -13,11 +13,8 @@ namespace quartz {
         return stream << name_list[int(t)];
     }
 
-    void execute_gate(Graph &graph, Op op) {
+    void execute_front_gate(Graph &graph, Op op) {
         /// execute an op in a graph, the op must have all inputs as input qubit gate
-        /// Note that this function assumes that the graph has already been initialized
-        /// by SabreSwap (calculate_sabre_mapping) so that each non-input op in the graph
-        /// has #in_deg == #out_deg
 
         // check if the op is a valid op to execute
         if (op.ptr->tp == GateType::swap || op.ptr->tp == GateType::input_qubit) {
@@ -25,14 +22,16 @@ namespace quartz {
             assert(false);
         }
         // check if the op belongs to the graph
-        if (graph.inEdges.find(op) == graph.inEdges.end() ||
-            graph.outEdges.find(op) == graph.outEdges.end()) {
+        if (graph.inEdges.find(op) == graph.inEdges.end()) {
             std::cout << "Gate not in circuit." << std::endl;
             assert(false);
         }
         // check if all inputs are input qubit gates
         auto op_in_edge_set = graph.inEdges[op];
-        auto op_out_edge_set = graph.outEdges[op];
+        std::set<Edge, EdgeCompare> op_out_edge_set;
+        if (graph.outEdges.find(op) != graph.outEdges.end()) {
+            op_out_edge_set = graph.outEdges[op];
+        }
         for (const auto &edge: op_in_edge_set) {
             if (edge.srcOp.ptr->tp != GateType::input_qubit) {
                 std::cout << "Current gate is not in DAG first layer." << std::endl;
@@ -42,8 +41,10 @@ namespace quartz {
 
         // change edge connection
         for (const auto &in_edge: op_in_edge_set) {
+            bool found_out_edge = false;
             for (const auto &out_edge: op_out_edge_set) {
                 if (in_edge.dstIdx == out_edge.srcIdx) {
+                    found_out_edge = true;
                     // this means that the two edges should merge into one
                     auto previous_op = in_edge.srcOp;
                     auto previous_port = in_edge.srcIdx;
@@ -65,9 +66,31 @@ namespace quartz {
                     }
                 }
             }
+            // if we can not find corresponding out edge, it means that
+            // the op is a final op on some qubits, and we need to delete
+            // corresponding out edge from previous op
+            if (!found_out_edge) {
+                // remove edge
+                auto previous_op = in_edge.srcOp;
+                graph.outEdges[previous_op].erase(in_edge);
+                // if this makes outEdges empty, remove it too
+                if (graph.outEdges[previous_op].empty()) {
+                    graph.outEdges.erase(previous_op);
+                    // if this finishes all gates on a qubit, erase it from
+                    // qubit mapping table
+                    if (previous_op.ptr->tp == GateType::input_qubit) {
+                        graph.qubit_mapping_table.erase(previous_op);
+                    }
+                }
+            }
         }
         // delete gate from circuit
         graph.inEdges.erase(op);
         graph.outEdges.erase(op);
     }
+
+    bool is_circuit_finished(Graph &graph) {
+        return (graph.inEdges.empty() && graph.outEdges.empty() && graph.qubit_mapping_table.empty());
+    }
+
 }

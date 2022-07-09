@@ -1987,10 +1987,17 @@ void Graph::propagate_mapping() {
     std::queue<Edge> query_list;
     // initialize edges directed connected to input_qubits and put them into query list
     for (const auto& input_qubits_edges: qubit_mapping_table) {
-        auto& initial_edge = *(outEdges[input_qubits_edges.first].begin());
-        initial_edge.logical_qubit_idx = input_qubits_edges.second.first;
-        initial_edge.physical_qubit_idx = input_qubits_edges.second.second;
-        query_list.push(initial_edge);
+        auto cur_input_qubit = input_qubits_edges.first;
+        if (outEdges.find(cur_input_qubit) != outEdges.end() &&
+            !outEdges[cur_input_qubit].empty()) {
+            auto& initial_edge = *(outEdges[input_qubits_edges.first].begin());
+            initial_edge.logical_qubit_idx = input_qubits_edges.second.first;
+            initial_edge.physical_qubit_idx = input_qubits_edges.second.second;
+            query_list.push(initial_edge);
+        } else {
+            std::cout << "A qubit in mapping table has no successor gates" << std::endl;
+            assert(false);
+        }
         // std::cout << initial_edge.dstOp.guid << std::endl;
     }
     // scan through the circuit until the end

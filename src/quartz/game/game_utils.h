@@ -155,4 +155,90 @@ namespace quartz {
         return (graph.inEdges.empty() && graph.outEdges.empty() && graph.qubit_mapping_table.empty());
     }
 
+    void remove_gate(Graph &graph, Op op) {
+        /// remove a gate from given circuit
+        /// This is identical to execute_front_gate but does not check input.
+
+        // check if the op is a valid op to execute
+        if (op.ptr->tp == GateType::swap || op.ptr->tp == GateType::input_qubit) {
+            std::cout << "Try to execute invalid gate with type " << op.ptr->tp << std::endl;
+            assert(false);
+        }
+        // check if the op belongs to the graph
+        if (graph.inEdges.find(op) == graph.inEdges.end()) {
+            std::cout << "Gate not in circuit." << std::endl;
+            assert(false);
+        }
+        // check if all inputs are input qubit gates
+        auto op_in_edge_set = graph.inEdges[op];
+        std::set<Edge, EdgeCompare> op_out_edge_set;
+        if (graph.outEdges.find(op) != graph.outEdges.end()) {
+            op_out_edge_set = graph.outEdges[op];
+            assert(!op_out_edge_set.empty());
+        }
+
+        // change edge connection
+        for (const auto &in_edge: op_in_edge_set) {
+            bool found_out_edge = false;
+            for (const auto &out_edge: op_out_edge_set) {
+                if (in_edge.dstIdx == out_edge.srcIdx) {
+                    found_out_edge = true;
+                    // this means that the two edges should merge into one
+                    auto previous_op = in_edge.srcOp;
+                    auto previous_port = in_edge.srcIdx;
+                    auto successive_op = out_edge.dstOp;
+                    auto successive_port = out_edge.dstIdx;
+                    // change out edge of previous op
+                    for (auto &prev_out_edge: graph.outEdges[previous_op]) {
+                        if (prev_out_edge.srcIdx == in_edge.srcIdx) {
+                            prev_out_edge.dstOp = successive_op;
+                            prev_out_edge.dstIdx = successive_port;
+                        }
+                    }
+                    // change in edge of successive op
+                    for (auto &suc_in_edge: graph.inEdges[successive_op]) {
+                        if (suc_in_edge.dstIdx == out_edge.dstIdx) {
+                            suc_in_edge.srcOp = previous_op;
+                            suc_in_edge.srcIdx = previous_port;
+                        }
+                    }
+                }
+            }
+            // if we can not find corresponding out edge, it means that
+            // the op is a final op on some qubits, and we need to delete
+            // corresponding out edge from previous op
+            if (!found_out_edge) {
+                // remove edge
+                auto previous_op = in_edge.srcOp;
+                graph.outEdges[previous_op].erase(in_edge);
+                // if this makes outEdges empty, remove it too
+                if (graph.outEdges[previous_op].empty()) {
+                    graph.outEdges.erase(previous_op);
+                    // if this finishes all gates on a qubit, erase it from
+                    // qubit mapping table
+                    if (previous_op.ptr->tp == GateType::input_qubit) {
+                        graph.qubit_mapping_table.erase(previous_op);
+                    }
+                }
+            }
+        }
+        // delete gate from circuit
+        graph.inEdges.erase(op);
+        graph.outEdges.erase(op);
+    }
+
+    [[nodiscard]] int simplify_circuit(Graph &graph) {
+        /// This function simplifies given graph by removing all single qubit gates.
+        /// Note that the circuit can be restored using execution history + find_executable_front_gates
+        /// return: number of single qubit gates removed
+        auto tmp_in_edges = graph.inEdges;
+        int removed_gate_cnt = 0;
+        for (const auto& op_pair: tmp_in_edges) {
+            if (op_pair.second.size() == 1) {
+                removed_gate_cnt += 1;
+                remove_gate(graph, op_pair.first);
+            }
+        }
+        return removed_gate_cnt;
+    }
 }

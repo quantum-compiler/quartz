@@ -1,5 +1,7 @@
 #pragma once
 
+#include <utility>
+
 #include "../tasograph/tasograph.h"
 #include "game_utils.h"
 
@@ -29,7 +31,8 @@ namespace quartz {
     public:
         Game() = delete;
 
-        Game(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> &_device) : graph(_graph), device(_device) {
+        Game(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device) : graph(_graph),
+                                                                                  device(std::move(_device)) {
             /// Game expects that the input graph has been initialized !!!
             single_qubit_gate_count = simplify_circuit(graph);
             imp_cost = graph.circuit_implementation_cost(device);

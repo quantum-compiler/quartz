@@ -2,7 +2,7 @@
 #include "quartz/tasograph/tasograph.h"
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
-#include "quartz/game/game_utils.h"
+#include "quartz/game/game.h"
 #include <iostream>
 
 using namespace quartz;
@@ -82,20 +82,6 @@ int main() {
     cout << "Sabre search implementation cost is " << min_sabre_cost << endl;
 
     // simplify circuit
-    int original_gate_count = best_graph.gate_count();
-    int reduction = simplify_circuit(best_graph);
-    int new_gate_count = best_graph.gate_count();
-    cout << "Reduce gate count from " << original_gate_count << " to " << new_gate_count << endl;
-    cout << "#Single qubit gates: " << reduction << endl;
-
-    // find executable gates
-    while (true) {
-        auto executable_gates = find_executable_front_gates(best_graph, device);
-        for (const auto &executable_gate: executable_gates) {
-            cout << "Execute gate " << executable_gate.guid << " with type " << executable_gate.ptr->tp << endl;
-            execute_front_gate(best_graph, executable_gate);
-        }
-        if (is_circuit_finished(best_graph)) break;
-    }
+    Game new_game(best_graph, device);
 };
 

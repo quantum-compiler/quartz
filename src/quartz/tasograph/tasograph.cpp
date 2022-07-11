@@ -1541,7 +1541,7 @@ std::shared_ptr<Graph> Graph::optimize(
                   .count() /
               1000.0 >
           timeout) {
-        std::cout << "Timeout. Program terminated. Best gate count is "
+        std::cout << "Timeout. Program terminated. Best cost is "
                   << bestCost << std::endl;
         bestGraph->constant_and_rotation_elimination();
         return bestGraph;

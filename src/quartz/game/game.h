@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "../tasograph/tasograph.h"
+#include "../sabre/sabre_swap.h"
 #include "game_utils.h"
 
 namespace quartz {
@@ -134,12 +135,17 @@ namespace quartz {
             }
         }
 
+        Reward apply_action(const Action& action) {
+            // TODO: implement this
+            imp_cost += 1;
+            return imp_cost;
+        }
+
     public:
-        /// state related
-        // mapping table + remaining part of circuit
+        // graph & device
         Graph graph;
-        // device
         std::shared_ptr<DeviceTopologyGraph> device;
+
         // full mapping table
         // Note that the first #logical_qubit_num elements are the same as the mapping table in graph
         int logical_qubit_num;
@@ -147,8 +153,11 @@ namespace quartz {
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
 
-        /// reward related
+        // reward related
         int single_qubit_gate_count;
         double imp_cost;
+
+        // execution history
+        std::vector<ExecutionHistory> execution_history;
     };
 }

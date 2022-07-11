@@ -36,6 +36,8 @@ namespace quartz {
         };
     };
 
+    using Reward = double;
+
     std::ostream &operator<<(std::ostream &stream, GateType t) {
         const std::string name_list[] = {"h", "x", "y", "rx", "ry", "rz", "cx", "ccx", "add",
                                          "neg", "z", "s", "sdg", "t", "tdg", "ch", "swap", "p",

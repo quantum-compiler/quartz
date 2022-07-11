@@ -28,9 +28,10 @@ int main() {
     cout << "Circuit initialized\n";
 
     // initialize clique device
-    auto device = std::make_shared<quartz::SymmetricUniformDevice>(20);
-    for (int i = 0; i < 20; ++i) {
-        for (int j = i + 1; j < 20; ++j) {
+    int device_num_qubits = 8;
+    auto device = std::make_shared<quartz::SymmetricUniformDevice>(device_num_qubits);
+    for (int i = 0; i < device_num_qubits; ++i) {
+        for (int j = i + 1; j < device_num_qubits; ++j) {
             device->add_edge(i, j);
         }
     }
@@ -83,5 +84,8 @@ int main() {
 
     // simplify circuit
     Game new_game(best_graph, device);
+    auto action_space_physical_full = new_game.action_space(ActionType::PhysicalFull);
+    auto action_space_physical_front = new_game.action_space(ActionType::PhysicalFront);
+    auto action_space_logical = new_game.action_space(ActionType::Logical);
 };
 

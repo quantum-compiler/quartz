@@ -17,6 +17,11 @@ namespace quartz {
     public:
         ExecutionHistory() : guid{-10}, logical0{-10}, logical1{-10},
                              physical0{-10}, physical1{-10}, gate_type{GateType::input_param} {}
+
+        ExecutionHistory(int _guid, GateType _gate_type, int _logical0, int _logical1,
+                         int _physical0, int _physical1) : guid(_guid), gate_type(_gate_type),
+                                                           logical0(_logical0), logical1(_logical1),
+                                                           physical0(_physical0), physical1(_physical1) {}
     };
 
     std::string gate_type_to_string(GateType t) {

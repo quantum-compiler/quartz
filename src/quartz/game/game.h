@@ -135,10 +135,81 @@ namespace quartz {
             }
         }
 
-        Reward apply_action(const Action& action) {
-            // TODO: implement this
-            imp_cost += 1;
-            return imp_cost;
+        Reward apply_action(const Action &action) {
+            if (action.type == ActionType::PhysicalFront || action.type == ActionType::PhysicalFull) {
+                // physical action
+
+                // STEP 1: put swap into history & change mapping tables
+                // put action into execution history
+                int physical_0 = action.qubit_idx_0;
+                int physical_1 = action.qubit_idx_1;
+                int logical_0 = physical2logical[physical_0];
+                int logical_1 = physical2logical[physical_1];
+                execution_history.emplace_back(-1, GateType::swap, logical_0, logical_1, physical_0, physical_1);
+                // change full mapping table
+                logical2physical[logical_0] = physical_1;
+                logical2physical[logical_1] = physical_0;
+                physical2logical[physical_0] = logical_1;
+                physical2logical[physical_1] = logical_0;
+                // change mapping table in graph and propagate
+                int hit_count = 0;
+                for (auto& input_mapping_pair : graph.qubit_mapping_table) {
+                    int cur_logical_idx = input_mapping_pair.second.first;
+                    if (cur_logical_idx == logical_0) {
+                        input_mapping_pair.second.second = physical_1;
+                        hit_count += 1;
+                    }
+                    if (cur_logical_idx == logical_1) {
+                        input_mapping_pair.second.second = physical_0;
+                        hit_count += 1;
+                    }
+                }
+                assert(hit_count == 1 || hit_count == 2);
+                graph.propagate_mapping();
+
+                // STEP 2: execute all gates that are enabled by this swap and record them
+                int executed_gate_count = 0;
+                while (true) {
+                    auto executable_gate_list = find_executable_front_gates(graph, device);
+                    for (const auto &executable_gate: executable_gate_list) {
+                        assert(graph.inEdges[executable_gate].size() == 2);
+                        Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
+                        Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
+                        int input_logical_0 = in_edge_0.logical_qubit_idx;
+                        int input_logical_1 = in_edge_1.logical_qubit_idx;
+                        int input_physical_0 = in_edge_0.physical_qubit_idx;
+                        int input_physical_1 = in_edge_1.physical_qubit_idx;
+                        assert(input_physical_0 == logical2physical[input_logical_0]);
+                        assert(input_physical_1 == logical2physical[input_logical_1]);
+                        assert(input_logical_0 == physical2logical[input_physical_0]);
+                        assert(input_logical_1 == physical2logical[input_physical_1]);
+                        execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
+                                                       input_logical_0, input_logical_1,
+                                                       input_physical_0, input_physical_1);
+                        execute_front_gate(graph, executable_gate);
+                        executed_gate_count += 1;
+                    }
+                    if (executable_gate_list.empty()) break;
+                }
+
+                // STEP 3: calculate reward
+                double original_circuit_cost = imp_cost;
+                imp_cost = graph.circuit_implementation_cost(device);
+                double new_circuit_cost = imp_cost + executed_gate_count + 3;
+                Reward reward = original_circuit_cost - new_circuit_cost;
+                return reward;
+            } else if (action.type == ActionType::Logical) {
+                // logical action
+                // TODO: implement this
+                std::cout << "Logical action not implemented" << std::endl;
+                assert(false);
+                return NAN;
+            } else {
+                // unknown
+                std::cout << "Unknown action type" << std::endl;
+                assert(false);
+                return NAN;
+            }
         }
 
     public:

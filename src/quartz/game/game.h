@@ -6,38 +6,6 @@
 #include "game_utils.h"
 
 namespace quartz {
-    class State {
-
-    };
-
-    enum class ActionType {
-        PhysicalFull = 0,   // swaps between physical neighbors of all used logical qubits
-        PhysicalFront = 1,  // swaps between physical neighbors of inputs to front gates
-        Logical = 2,        // swaps between logical qubits, at least one must be used
-        Unknown = 3
-    };
-
-    class Action {
-    public:
-        Action() : type(ActionType::Unknown), qubit_idx_0(-1), qubit_idx_1(-1) {}
-
-        Action(ActionType _type, int _qubit_idx_0, int _qubit_idx_1) : type(_type), qubit_idx_0(_qubit_idx_0),
-                                                                       qubit_idx_1(_qubit_idx_1) {}
-
-    public:
-        ActionType type;
-        int qubit_idx_0;
-        int qubit_idx_1;
-    };
-
-    struct ActionCompare {
-        bool operator()(const Action &a, const Action &b) const {
-            if (a.type != b.type) return a.type < b.type;
-            if (a.qubit_idx_0 != b.qubit_idx_0) return a.qubit_idx_0 < b.qubit_idx_0;
-            return a.qubit_idx_1 < b.qubit_idx_1;
-        };
-    };
-
     class Game {
     public:
         Game() = delete;

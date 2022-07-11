@@ -27,14 +27,29 @@ int main() {
     Graph graph(&src_ctx, dag);
     cout << "Circuit initialized\n";
 
-    // initialize clique device
-    int device_num_qubits = 8;
-    auto device = std::make_shared<quartz::SymmetricUniformDevice>(device_num_qubits);
-    for (int i = 0; i < device_num_qubits; ++i) {
-        for (int j = i + 1; j < device_num_qubits; ++j) {
-            device->add_edge(i, j);
-        }
-    }
+    // initialize device
+    auto device = std::make_shared<quartz::SymmetricUniformDevice>(10);
+    // first row
+    device->add_edge(0, 1);
+    device->add_edge(1, 2);
+    device->add_edge(2, 3);
+    device->add_edge(3, 4);
+    // second row
+    device->add_edge(5, 6);
+    device->add_edge(6, 7);
+    device->add_edge(7, 8);
+    device->add_edge(8, 9);
+    // col
+    device->add_edge(0, 5);
+    device->add_edge(1, 6);
+    device->add_edge(2, 7);
+    device->add_edge(3, 8);
+    device->add_edge(4, 9);
+    // crossings
+    device->add_edge(1, 7);
+    device->add_edge(2, 6);
+    device->add_edge(3, 9);
+    device->add_edge(4, 8);
 
     // print gate count
     int total_gate_count = graph.gate_count();
@@ -63,7 +78,7 @@ int main() {
     for (const auto &iter_cnt: iter_list) {
         for (const auto &w_value: W_list) {
             for (const auto &use_extensive: use_extensive_list) {
-                for (int repeat = 0; repeat < 1; ++repeat) {
+                for (int repeat = 0; repeat < 10; ++repeat) {
                     auto tmp_graph = graph;
                     tmp_graph.init_physical_mapping(InitialMappingType::SABRE, device,
                                                     iter_cnt, use_extensive, w_value);

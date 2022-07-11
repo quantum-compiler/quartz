@@ -11,9 +11,9 @@ namespace quartz {
     };
 
     enum class ActionType {
-        PhysicalFull = 0,
-        PhysicalFront = 1,
-        Logical = 2,
+        PhysicalFull = 0,   // swaps between physical neighbors of all used logical qubits
+        PhysicalFront = 1,  // swaps between physical neighbors of inputs to front gates
+        Logical = 2,        // swaps between logical qubits, at least one must be used
         Unknown = 3
     };
 
@@ -93,7 +93,7 @@ namespace quartz {
 
         std::set<Action, ActionCompare> action_space(ActionType action_type) {
             if (action_type == ActionType::PhysicalFull) {
-                // Physical Full: swaps between neighbors of all logical qubits
+                // Physical Full: swaps between physical neighbors of all used logical qubits
                 std::set<Action, ActionCompare> physical_action_space;
                 for (const auto &qubit_pair: graph.qubit_mapping_table) {
                     int physical_idx = qubit_pair.second.second;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../game/game.h"
-#include "quartz/parser/qasm_parser.h"
+#include "../parser/qasm_parser.h"
 #include "../supported_devices/supported_devices.h"
 
 namespace quartz {
@@ -12,6 +12,9 @@ namespace quartz {
 
         // move one step forward in env
         virtual Reward step(Action action) = 0;
+
+        // check whether current game is finished
+        virtual bool is_finished() = 0;
 
         // state and action space
         virtual State get_state() = 0;
@@ -25,13 +28,16 @@ namespace quartz {
 
     class SimplePhysicalEnv : public BasicEnv {
     public:
+        SimplePhysicalEnv() = delete;
+
         SimplePhysicalEnv(const std::string &qasm_file_path, BackendType backend_type) {
             /// A simple physical environment that does not use curriculum
             /// Graph    qasm            fixed
-            ///          mapping type    sabre 3 round with random init
+            ///          mapping type    1 x sabre with random init
             /// Device   topology        fixed
             // initialize context, graph and device
-            context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t, GateType::tdg}));
+            context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
+                                                         GateType::tdg, GateType::input_qubit}));
             QASMParser qasm_parser(&(*context));
             DAG *dag = nullptr;
             if (!qasm_parser.load_qasm(qasm_file_path, dag)) {
@@ -62,6 +68,10 @@ namespace quartz {
             // apply action
             Reward reward = cur_game_ptr->apply_action(action);
             return reward;
+        }
+
+        bool is_finished() override {
+            return is_circuit_finished(cur_game_ptr->graph);
         }
 
         State get_state() override {

@@ -146,7 +146,7 @@ Please subscribe to the Quartz users mailing list (TODO)
 
 ## Citations
 
-* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia. [Quartz: Superoptimization of Quantum Circuits](). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
+* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia. [Quartz: Superoptimization of Quantum Circuits](https://arxiv.org/abs/2204.09033). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
 
 
 ## License

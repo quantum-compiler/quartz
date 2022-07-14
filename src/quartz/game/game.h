@@ -53,6 +53,9 @@ namespace quartz {
                     physical2logical[free_physical_idx] = logical_idx;
                 }
             }
+            // save into initial cache
+            initial_logical2physical = logical2physical;
+            initial_physical2logical = physical2logical;
         }
 
         State state() {
@@ -228,7 +231,9 @@ namespace quartz {
         int single_qubit_gate_count;
         double imp_cost;
 
-        // execution history
+        // execution history & initial mapping table
+        std::vector<int> initial_logical2physical;
+        std::vector<int> initial_physical2logical;
         std::vector<ExecutionHistory> execution_history;
     };
 }

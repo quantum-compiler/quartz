@@ -1965,15 +1965,25 @@ void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, i
                            bool use_extensive, double w_value) {
     // set a random initial mapping
     _trivial_mapping();
-    size_t num_qubits = qubit_mapping_table.size();
-    std::vector<int> l2p;
-    l2p.reserve(num_qubits);
-    for (int i = 0; i < num_qubits; ++i) {
-        l2p.emplace_back(i);
+    size_t num_logical_qubits = qubit_mapping_table.size();
+    size_t num_physical_qubits = device->get_num_qubits();
+
+    // generate a random permutation
+    std::vector<int> permutation;
+    permutation.reserve(num_physical_qubits);
+    for (int i = 0; i < num_physical_qubits; ++i) {
+        permutation.emplace_back(i);
     }
     std::random_device rd;
     std::mt19937 g(rd());
-    std::shuffle(l2p.begin(), l2p.end(), g);
+    std::shuffle(permutation.begin(), permutation.end(), g);
+
+    // generate a random initial mapping from this permutation
+    std::vector<int> l2p;
+    l2p.reserve(num_logical_qubits);
+    for (int i = 0; i < num_logical_qubits; ++i) {
+        l2p.emplace_back(permutation[i]);
+    }
     set_physical_mapping(l2p);
 
     // perform sabre search

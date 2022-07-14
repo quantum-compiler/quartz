@@ -27,7 +27,7 @@ namespace quartz {
             device = GetDevice(backend_type);
 
             // initialize mapping for graph and create game
-            graph->init_physical_mapping(InitialMappingType::SABRE, device, 3, true, 0.5);
+            graph->init_physical_mapping(InitialMappingType::SABRE, device, 4, true, 0.5);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
         }

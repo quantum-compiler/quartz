@@ -56,7 +56,7 @@ void benchmark_nam(const std::string &circuit_name) {
   start = std::chrono::steady_clock::now();
   // Optimization
   auto graph_after_search = graph_before_search->optimize(
-      0.999,
+      1.0001,
       0,
       false,
       &dst_ctx,

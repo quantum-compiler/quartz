@@ -56,11 +56,18 @@ namespace quartz {
             // save into initial cache
             initial_logical2physical = logical2physical;
             initial_physical2logical = physical2logical;
+
+            // save device edges
+            for (int i = 0; i < device->get_num_qubits(); ++i) {
+                auto neighbor_list = device->get_input_neighbours(i);
+                for (int j: neighbor_list) {
+                    device_edges.emplace_back(i, j);
+                }
+            }
         }
 
-        State state() {
-            // TODO: implement this
-            return {};
+        [[nodiscard]] State state() const {
+            return {device_edges, logical2physical, physical2logical, graph};
         }
 
         std::set<Action, ActionCompare> action_space(ActionType action_type) {
@@ -156,7 +163,7 @@ namespace quartz {
                 physical2logical[physical_1] = logical_0;
                 // change mapping table in graph and propagate
                 int hit_count = 0;
-                for (auto& input_mapping_pair : graph.qubit_mapping_table) {
+                for (auto &input_mapping_pair: graph.qubit_mapping_table) {
                     int cur_logical_idx = input_mapping_pair.second.first;
                     if (cur_logical_idx == logical_0) {
                         input_mapping_pair.second.second = physical_1;
@@ -219,6 +226,7 @@ namespace quartz {
         // graph & device
         Graph graph;
         std::shared_ptr<DeviceTopologyGraph> device;
+        std::vector<std::pair<int, int>> device_edges;
 
         // full mapping table
         // Note that the first #logical_qubit_num elements are the same as the mapping table in graph

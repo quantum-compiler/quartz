@@ -1,11 +1,27 @@
 #pragma once
 
 #include <iostream>
+#include <utility>
 #include "../tasograph/tasograph.h"
 
 namespace quartz {
     class State {
+    public:
+        State() = delete;
 
+        State(std::vector<std::pair<int, int>> _device_edges,
+              std::vector<int> _logical2physical,
+              std::vector<int> _physical2logical,
+              const Graph &_graph) : device_edges(std::move(_device_edges)),
+                                     logical2physical(std::move(_logical2physical)),
+                                     physical2logical(std::move(_physical2logical)),
+                                     graph(_graph) {}
+
+    public:
+        std::vector<std::pair<int, int>> device_edges;
+        std::vector<int> logical2physical;
+        std::vector<int> physical2logical;
+        Graph graph;
     };
 
     enum class ActionType {
@@ -267,7 +283,7 @@ namespace quartz {
         /// return: number of single qubit gates removed
         auto tmp_in_edges = graph.inEdges;
         int removed_gate_cnt = 0;
-        for (const auto& op_pair: tmp_in_edges) {
+        for (const auto &op_pair: tmp_in_edges) {
             if (op_pair.second.size() == 1) {
                 removed_gate_cnt += 1;
                 remove_gate(graph, op_pair.first);

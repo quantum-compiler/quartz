@@ -54,8 +54,7 @@ namespace quartz {
         }
 
         State get_state() override {
-            // TODO: implement this
-            return {};
+            return cur_game_ptr->state();
         }
 
         std::vector<Action> get_action_space() override {

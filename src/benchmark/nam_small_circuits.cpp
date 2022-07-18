@@ -50,12 +50,13 @@ void benchmark_nam(const std::string &circuit_name) {
                 .count() /
                 1000.0
             << " seconds: gate count = " << graph_before_search->gate_count()
+            << ", circuit depth = " << graph_before_search->circuit_depth()
             << ", cost = " << graph_before_search->total_cost() << std::endl;
 
   start = std::chrono::steady_clock::now();
   // Optimization
   auto graph_after_search = graph_before_search->optimize(
-      0.999,
+      1.0001,
       0,
       false,
       &dst_ctx,
@@ -75,6 +76,7 @@ void benchmark_nam(const std::string &circuit_name) {
                 .count() /
                 1000.0
             << " seconds: gate count = " << graph_after_search->gate_count()
+            << ", circuit depth = " << graph_after_search->circuit_depth()
             << ", cost = " << graph_after_search->total_cost() << std::endl;
 
   geomean_gate_count /= graph_after_search->gate_count();

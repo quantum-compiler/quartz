@@ -17,6 +17,8 @@ namespace quartz {
 		virtual ParamType compute(const std::vector< ParamType > &input_params);
 		[[nodiscard]] virtual bool
 		is_commutative() const; // for traditional gates
+        [[nodiscard]] virtual bool
+        is_symmetric() const; // for 2-qubit gates; currently unused (always false)
 		[[nodiscard]] int get_num_qubits() const;
 		[[nodiscard]] int get_num_parameters() const;
 		[[nodiscard]] bool is_parameter_gate() const;

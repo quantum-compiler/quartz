@@ -10,6 +10,8 @@ bool graph_cmp(std::shared_ptr<Graph> a, std::shared_ptr<Graph> b) {
 }
 
 int main() {
+//   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
+//                GateType::cx, GateType::x, GateType::rz, GateType::add});
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::x, GateType::rz, GateType::add});
 

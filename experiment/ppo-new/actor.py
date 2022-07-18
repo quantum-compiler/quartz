@@ -201,6 +201,7 @@ class PPOAgent:
         self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
 
+
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
         """respond to a single query"""
@@ -238,6 +239,7 @@ class PPOAgent:
         else:
             raise Exception(f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicate assignment occurs!')
 
+
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
             if self.pending_states == 0:
@@ -261,6 +263,7 @@ class PPOAgent:
                     temperature = torch.ones(1).to(self.device)
                 else:
                     temperature = 1 / (torch.log( self.hit_rate * (num_nodes - 1)/(1 - self.hit_rate) ))
+
                 b_softmax_node_values_pad = F.softmax(b_node_values_pad / temperature.unsqueeze(1), dim=-1)
                 b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
                 """collect embeddings of sampled nodes"""
@@ -315,6 +318,7 @@ class PPOAgent:
             for k, v in cost_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
             
+
         return info_dict
     
     def output_opt_path(
@@ -338,6 +342,7 @@ class PPOAgent:
             with open(os.path.join(output_dir, fname), 'w') as f:
                 if not isinstance(s_exp.next_state, str):
                     s_exp.next_state = s_exp.next_state.to_qasm_str()
+
                 f.write(s_exp.next_state)
         return output_dir
     

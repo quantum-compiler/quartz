@@ -270,7 +270,7 @@ class GraphBuffer:
             get_cost(self.original_graph, cost_type): [ self.original_graph, ],
         }
         self.hashset: Set[int] = { hash(self.original_graph) }
-        
+ 
         """other infos"""
         self.best_graph = self.original_graph
         

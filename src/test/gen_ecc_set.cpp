@@ -1,3 +1,4 @@
+#include "gen_ecc_set.h"
 #include "quartz/context/context.h"
 #include "quartz/generator/generator.h"
 

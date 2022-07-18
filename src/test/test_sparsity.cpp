@@ -71,7 +71,7 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
              .c_str());
   equiv_set.clear();
   equiv_set.load_json(&ctx, file_prefix + "verified.json");
-  equiv_set.normalize_to_minimal_circuit_representations(&ctx);
+  equiv_set.normalize_to_canonical_representations(&ctx);
   end = std::chrono::steady_clock::now();
   std::cout
       << std::dec << "There are "

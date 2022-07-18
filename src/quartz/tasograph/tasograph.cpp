@@ -1746,9 +1746,7 @@ Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                                    std::vector<int> instruction) {
   std::shared_ptr<Graph> graph(new Graph(*this));
   std::shared_ptr<Graph> new_graph(nullptr);
-  int a = 0;
   for (const auto direction : instruction) {
-    std::cout << a << std::endl;
     if (direction == 0) {
       new_graph = xfer->run_1_time(0, graph.get());
     } else {

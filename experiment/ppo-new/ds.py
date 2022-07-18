@@ -301,11 +301,14 @@ class GraphBuffer:
         
         vmem_perct = vmem_used_perct()
         old_len = len(self)
-        if vmem_perct > 85.0:
-            while len(self) >= 0.75 * old_len:
+        if vmem_perct > 80.0:
+            printfl(f'Buffer {self.name} starts to shrink.')
+            i_loop = 0 # NOTE: in case of infinite loop
+            while len(self) >= 0.75 * old_len and i_loop < 1000:
                 self.pop_some(1000)
+                i_loop += 1
             gc.collect()
-            printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %)')
+            printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).')
     
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
@@ -317,7 +320,7 @@ class GraphBuffer:
                 self.cost_to_graph[gcost] = []
             self.cost_to_graph[gcost].append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(self.cost_to_graph[gcost]) > int(5e2):
+            while len(self.cost_to_graph[gcost]) > int(5e2): # NOTE: limit the num of graph of each kind
                 self.cost_to_graph[gcost].pop(idx_to_pop)
             while len(self) > self.max_len:
                 self.pop_one()

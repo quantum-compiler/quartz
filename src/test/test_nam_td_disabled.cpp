@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
-  std::vector<int> trace{0, 0, 0, 0};
+  std::vector<int> trace;
   graph.toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
                                        xfer_pair.second, trace);
   auto graph_before_search = graph.toffoli_flip_by_instruction(

@@ -1601,7 +1601,7 @@ std::shared_ptr<Graph> Graph::optimize(
 } // namespace quartz
 
 std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
-                                       int gate_count_upper_bound,
+                                       double cost_upper_bound,
                                        std::string circuit_name,
                                        bool print_message, int timeout) {
   auto start = std::chrono::steady_clock::now();
@@ -1610,7 +1610,7 @@ std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
       candidates;
   std::set<size_t> hashmap;
   std::shared_ptr<Graph> best_graph(new Graph(*this));
-  auto best_gate_cnt = gate_count();
+  auto best_cost = total_cost();
 
   candidates.push(best_graph);
   hashmap.insert(hash());
@@ -1633,20 +1633,22 @@ std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
                     .count() /
                 1000.0 >
             timeout) {
-          std::cout << "Timeout. Program terminated. Best gate count is "
-                    << best_gate_cnt << std::endl;
+          std::cout << "Timeout. Program terminated. Best cost is "
+                    << best_cost << std::endl;
           return best_graph;
         }
         if (new_graph == nullptr)
           continue;
 
         auto new_hash = new_graph->hash();
-        auto new_cnt = new_graph->gate_count();
+        auto new_cost = new_graph->total_cost();
+        if(new_cost > cost_upper_bound)
+            continue;
         if (hashmap.find(new_hash) == hashmap.end()) {
           hashmap.insert(new_hash);
           candidates.push(new_graph);
-          if (new_cnt < best_gate_cnt) {
-            best_gate_cnt = new_cnt;
+          if (new_cost < best_cost) {
+            best_cost = new_cost;
             best_graph = new_graph;
           }
         } else
@@ -1656,7 +1658,7 @@ std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
     auto end = std::chrono::steady_clock::now();
     if (print_message) {
       std::cout << "[" << circuit_name << "] "
-                << "Best gate count: " << best_gate_cnt
+                << "Best cost: " << best_cost
                 << "\tcandidate number: " << candidates.size() << "\tafter "
                 << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
                        end - start)

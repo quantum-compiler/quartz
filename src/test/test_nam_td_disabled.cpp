@@ -49,18 +49,7 @@ int main(int argc, char **argv) {
                                        xfer_pair.second, trace);
   auto graph_before_search = graph.toffoli_flip_by_instruction(
       GateType::rz, xfer_pair.first, xfer_pair.second, trace);
-//   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
-
-// std::vector<std::vector<int>> traces = {{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}, {0, 0, 1, 1}, {0, 1, 0, 0}, {0, 1, 0, 1}, {0, 1, 1, 0}, {0, 1, 1, 1}};
-// int cnt = 0;
-// for(auto & trace : traces){
-//   auto graph_before_search = graph.toffoli_flip_by_instruction(
-//       GateType::rz, xfer_pair.first, xfer_pair.second, trace);
-//   graph_before_search->to_qasm(input_fn + "." + std::to_string(cnt++) +".toffoli_flip", false, false);
-//   std::cout << cnt << std::endl;
-// }
-// exit(1);
-
+  // graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);

@@ -1,6 +1,7 @@
 # distutils: language=c++
 
 from libcpp.vector cimport vector
+from libcpp.utility cimport pair
 from libcpp cimport bool
 from libc.stdint cimport uint32_t
 from libcpp.string cimport string
@@ -123,24 +124,32 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
         bool load_qasm(const string &, DAG *&) except +
 
 # Cython for physical mapping
-cdef extern from "device/device.h" namespace "quartz":
-    cdef cppclass DeviceTopologyGraph:
-        DeviceTopologyGraph(int)
-        void print()
-        void add_qubit()
-        void add_edge(int, int, double, bool)
-        bool has_edge(int, int)
-        int get_num_qubits() const
-        vector[int] get_input_neighbours(int)
-        double cal_swap_cost(int, int) const
-
-    cdef cppclass SymmetricUniformDevice:
-        SymmetricUniformDevice(int)
-        void add_edge(int, int)
-
 cdef extern from "supported_devices/supported_devices.h" namespace "quartz":
     cpdef enum class BackendType:
         Q20_CLIQUE,
         IBM_Q20_TOKYO
 
-    cpdef shared_ptr[DeviceTopologyGraph] GetDevice(BackendType)
+cdef extern from "game/game_utils.h" namespace "quartz":
+    ctypedef double Reward
+
+    cdef cppclass State:
+        State(vector[pair[int, int]], vector[int], vector[int], const Graph &)
+
+    cpdef enum class ActionType:
+        PhysicalFull,
+        PhysicalFront,
+        Logical,
+        Unknown
+
+    cdef cppclass Action:
+        Action(ActionType, int, int)
+
+
+cdef extern from "env/simple_physical_env" namespace "quartz":
+    cdef cppclass SimplePhysicalEnv:
+        SimplePhysicalEnv(const string &, BackendType)
+        void reset() except +
+        Reward step(Action)
+        bool is_finished()
+        State get_state()
+        vector[Action] get_action_space()

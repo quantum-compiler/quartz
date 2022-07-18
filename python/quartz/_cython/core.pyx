@@ -22,8 +22,8 @@ import torch
 ctypedef GraphXfer* GraphXfer_ptr
 
 # physical mapping
-from CCore cimport DeviceTopologyGraph
-from CCore cimport BackendType, GetDevice
+from CCore cimport Reward, State, ActionType, Action
+from CCore cimport SimplePhysicalEnv, BackendType
 
 
 def get_gate_type_from_str(gate_type_str):
@@ -69,24 +69,6 @@ cdef class PyQASMParser:
         success = self.parser.load_qasm(filename_bytes, dag.dag)
         assert(success, "Failed to load qasm file!")
         return dag
-
-# physical mapping
-cdef class PyDevice:
-    cdef shared_ptr[DeviceTopologyGraph] device
-
-    def __cinit__(self, *, int num_qubits=-1):
-        self.device = make_shared(SymmetricUniformDevice(num_qubits))
-
-    def print():
-        self.device.print()
-
-    def add_qubit():
-        self.device.add_qubit()
-
-    def add_edge(int src, int dst)
-        self.device.add_edge(src, dst)
-
-    def
 
 cdef class PyGate:
     cdef Gate *gate
@@ -445,4 +427,29 @@ cdef class PyGraph:
         cdef vector[Edge] edge_v
         deref(self.graph).all_edges(edge_v)
         return edge_v.size()
-        
+
+# physical mapping
+cdef class PySimplePhysicalEnv:
+    cdef SimplePhysicalEnv *env
+
+    def __cinit__(self, *, str qasm_file_path, BackendType backend_type):
+        encoded_path = qasm_file_path.encode('utf-8')
+        self.env = new SimplePhysicalEnv(encoded_path, backend_type)
+
+    def __dealloc__(self):
+        del self.env
+
+    def reset(self):
+        self.env.reset()
+
+    def step(self, Action action) -> Reward:
+        return self.env.step(action)
+
+    def is_finished(self) -> bool:
+        return self.env.is_finished()
+
+    def get_state(self) -> State:
+        return self.env.get_state()
+
+    def get_action_space(self) -> vector[Action]:
+        return self.env.get_action_space()

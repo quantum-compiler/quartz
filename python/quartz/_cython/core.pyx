@@ -21,6 +21,10 @@ import torch
 
 ctypedef GraphXfer* GraphXfer_ptr
 
+# physical mapping
+from CCore cimport DeviceTopologyGraph
+from CCore cimport BackendType, GetDevice
+
 
 def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "h": return GateType.h
@@ -65,6 +69,24 @@ cdef class PyQASMParser:
         success = self.parser.load_qasm(filename_bytes, dag.dag)
         assert(success, "Failed to load qasm file!")
         return dag
+
+# physical mapping
+cdef class PyDevice:
+    cdef shared_ptr[DeviceTopologyGraph] device
+
+    def __cinit__(self, *, int num_qubits=-1):
+        self.device = make_shared(SymmetricUniformDevice(num_qubits))
+
+    def print():
+        self.device.print()
+
+    def add_qubit():
+        self.device.add_qubit()
+
+    def add_edge(int src, int dst)
+        self.device.add_edge(src, dst)
+
+    def
 
 cdef class PyGate:
     cdef Gate *gate

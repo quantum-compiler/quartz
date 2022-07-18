@@ -121,3 +121,26 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:
         QASMParser(Context *)
         bool load_qasm(const string &, DAG *&) except +
+
+# Cython for physical mapping
+cdef extern from "device/device.h" namespace "quartz":
+    cdef cppclass DeviceTopologyGraph:
+        DeviceTopologyGraph(int)
+        void print()
+        void add_qubit()
+        void add_edge(int, int, double, bool)
+        bool has_edge(int, int)
+        int get_num_qubits() const
+        vector[int] get_input_neighbours(int)
+        double cal_swap_cost(int, int) const
+
+    cdef cppclass SymmetricUniformDevice:
+        SymmetricUniformDevice(int)
+        void add_edge(int, int)
+
+cdef extern from "supported_devices/supported_devices.h" namespace "quartz":
+    cpdef enum class BackendType:
+        Q20_CLIQUE,
+        IBM_Q20_TOKYO
+
+    cpdef shared_ptr[DeviceTopologyGraph] GetDevice(BackendType)

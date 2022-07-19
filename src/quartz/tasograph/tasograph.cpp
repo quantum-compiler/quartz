@@ -161,6 +161,117 @@ Graph::Graph(const Graph &graph) {
   outEdges = graph.outEdges;
 }
 
+std::unique_ptr<DAG> Graph::to_dag() const {
+  int num_input_qubits = get_num_qubits();
+  int num_input_params = 0;
+  std::unordered_map<Op, std::vector<int>, OpHash> op_2_param_idx;
+  // We need to topologically sort the Ops while prioritizing the ones
+  // with smaller guid.
+  std::priority_queue<Op, std::vector<Op>, std::greater<>> gates;
+  std::unordered_map<Op, int, OpHash> gate_indegree;
+
+  // Find all input parameters.
+  std::vector<std::pair<int, int>> guid_and_param_index;
+  for (const auto &it: outEdges) {
+    if (it.first.ptr->tp == GateType::input_param && op_2_param_idx.count(it.first) == 0) {
+      int idx = num_input_params++;
+      op_2_param_idx[it.first] = std::vector<int>(1, idx);
+      guid_and_param_index.emplace_back(it.first.guid, idx);
+      gates.push(it.first);
+    }
+  }
+  // Sort input parameter index by guid.
+  // This is the order originally in DAG.
+  std::sort(guid_and_param_index.begin(), guid_and_param_index.end());
+  std::vector<int> param_index_position(num_input_params, 0);
+  for (int i = 0; i < num_input_params; i++) {
+    param_index_position[guid_and_param_index[i].second] = i;
+  }
+  for (auto &it : op_2_param_idx) {
+    it.second[0] = param_index_position[it.second[0]];
+  }
+  // Construct the DAG.
+  auto dag = std::make_unique<DAG>(num_input_qubits, num_input_params);
+
+  // Add parameter gates.
+  int num_total_params = num_input_params;
+  guid_and_param_index.clear();
+  while (!gates.empty()) {
+    const auto &gate = gates.top();
+    gates.pop();
+    if (outEdges.count(gate) == 0) {
+      continue;
+    }
+    for (auto &edge : outEdges.find(gate)->second) {
+      if (!edge.dstOp.ptr->is_parameter_gate()) {
+        continue;
+      }
+      if (gate_indegree.count(edge.dstOp) == 0) {
+        gate_indegree[edge.dstOp] = edge.dstOp.ptr->get_num_parameters();
+      }
+      gate_indegree[edge.dstOp]--;
+      if (!gate_indegree[edge.dstOp]) {
+        // Append the gate.
+        std::vector<int> param_indices(edge.dstOp.ptr->get_num_parameters(), 0);
+        for (auto &inedge : inEdges.find(edge.dstOp)->second) {
+          param_indices[inedge.dstIdx] = op_2_param_idx[inedge.srcOp][inedge.srcIdx];
+        }
+        int output_param_index = 0;
+        bool ret = dag->add_gate(/*qubit_indices=*/{}, param_indices, edge.dstOp.ptr, &output_param_index);
+        assert(ret);
+        // Each parameter gate contains 1 output parameter.
+        assert(output_param_index == num_total_params);
+        op_2_param_idx[edge.dstOp] = std::vector<int>(1, num_total_params++);
+        gates.push(edge.dstOp);
+      }
+    }
+  }
+
+  // Add quantum gates.
+  std::unordered_map<Op, std::vector<int>, OpHash> op_2_qubit_idx;
+  for (const auto &it: outEdges) {
+    if (it.first.ptr->tp == GateType::input_qubit) {
+      auto idx = input_qubit_op_2_qubit_idx.find(it.first);
+      op_2_qubit_idx[it.first] = std::vector<int>(1, idx->second);
+      gates.push(it.first);
+    }
+  }
+  while (!gates.empty()) {
+    // Cannot use "const auto &" here!
+    auto gate = gates.top();
+    gates.pop();
+    if (outEdges.count(gate) == 0) {
+      continue;
+    }
+    for (auto &edge : outEdges.find(gate)->second) {
+      if (gate_indegree.count(edge.dstOp) == 0) {
+        gate_indegree[edge.dstOp] = edge.dstOp.ptr->get_num_qubits();
+        op_2_qubit_idx[edge.dstOp] = std::vector<int>(edge.dstOp.ptr->get_num_qubits(), 0);
+      }
+      gate_indegree[edge.dstOp]--;
+      op_2_qubit_idx[edge.dstOp][edge.dstIdx] = op_2_qubit_idx[edge.srcOp][edge.srcIdx];
+      if (!gate_indegree[edge.dstOp]) {
+        // Append the gate.
+        const auto &qubit_indices = op_2_qubit_idx[edge.dstOp];
+        std::vector<int> param_indices(edge.dstOp.ptr->get_num_parameters(), 0);
+        for (auto &inedge: inEdges.find(edge.dstOp)->second) {
+          if (inedge.srcOp.ptr->is_parameter_gate()
+              || inedge.srcOp.ptr->tp == GateType::input_param) {
+            // Parameters are ordered after qubits in Op.
+            assert(inedge.dstIdx >= edge.dstOp.ptr->get_num_qubits());
+            param_indices[inedge.dstIdx - edge.dstOp.ptr->get_num_qubits()] =
+                op_2_param_idx[inedge.srcOp][inedge.srcIdx];
+          }
+        }
+        bool ret = dag->add_gate(qubit_indices, param_indices, edge.dstOp.ptr, nullptr);
+        assert(ret);
+        gates.push(edge.dstOp);
+      }
+    }
+  }
+  return dag;
+}
+
 size_t Graph::get_next_special_op_guid() {
   if (special_op_guid >= GUID_PRESERVED) {
     std::cerr << "Run out of special guid." << std::endl;

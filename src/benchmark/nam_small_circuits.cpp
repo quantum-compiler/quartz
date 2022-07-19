@@ -10,7 +10,7 @@ static const std::string ecc_set_prefix = "Nam_4_3_";
 static const std::string
     ecc_set_name = ecc_set_prefix + "complete_ECC_set.json";
 
-static int num_benchmark = 0;
+static int num_benchmark = 0;       // for tracking overall performance
 static double geomean_gate_count = 1;
 
 void benchmark_nam(const std::string &circuit_name) {

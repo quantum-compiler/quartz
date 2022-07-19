@@ -1327,6 +1327,22 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
+std::shared_ptr<Graph> Graph::optimize_reuse(
+        float alpha, int budget, bool print_subst, Context *ctx,
+        const std::string &equiv_file_name, bool use_simulated_annealing,
+        bool enable_early_stop, bool use_rotation_merging_in_searching,
+        GateType target_rotation, std::string circuit_name, int timeout) {
+    EquivalenceSet eqs;
+    // Load equivalent dags from file
+    auto start = std::chrono::steady_clock::now();
+    if (!eqs.load_json(ctx, equiv_file_name)) {
+        std::cerr << "Failed to load equivalenc file: " << equiv_file_name
+                  << std::endl;
+        exit(1);
+    }
+
+}
+
 std::shared_ptr<Graph> Graph::optimize(
     float alpha, int budget, bool print_subst, Context *ctx,
     const std::string &equiv_file_name, bool use_simulated_annealing,

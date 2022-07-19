@@ -605,7 +605,7 @@ void GraphXfer::run(int depth, Graph *graph,
     for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++)
       if (pass) {
         OpX *dstOp = *dstIt;
-        pass = (pass & create_new_operator(dstOp, dstOp->mapOp));
+        pass = (pass && create_new_operator(dstOp, dstOp->mapOp)); //changed from bitwise and
       }
     if (!pass)
       return;

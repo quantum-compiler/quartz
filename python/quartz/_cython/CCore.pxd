@@ -134,6 +134,10 @@ cdef extern from "game/game_utils.h" namespace "quartz":
 
     cdef cppclass State:
         State(vector[pair[int, int]], vector[int], vector[int], const Graph &)
+        vector[pair[int, int]] device_edges
+        vector[int] logical2physical
+        vector[int] physical2logical
+        Graph graph
 
     cpdef enum class ActionType:
         PhysicalFull,
@@ -143,9 +147,12 @@ cdef extern from "game/game_utils.h" namespace "quartz":
 
     cdef cppclass Action:
         Action(ActionType, int, int)
+        ActionType type
+        int qubit_idx_0
+        int qubit_idx_1
 
 
-cdef extern from "env/simple_physical_env" namespace "quartz":
+cdef extern from "env/simple_physical_env.h" namespace "quartz":
     cdef cppclass SimplePhysicalEnv:
         SimplePhysicalEnv(const string &, BackendType)
         void reset() except +

@@ -428,7 +428,31 @@ cdef class PyGraph:
         deref(self.graph).all_edges(edge_v)
         return edge_v.size()
 
-# physical mapping
+# physical mapping finished
+cdef class PyState:
+    cdef shared_ptr[State] state_ptr
+
+    def __cinit__(self, *):
+        pass
+
+    def __dealloc__(self):
+        self.state_ptr.reset()
+
+    cdef set_this(self, shared_ptr[State] _state_ptr):
+        self.state_ptr = _state_ptr
+
+cdef class PyAction:
+    cdef shared_ptr[Action] action_ptr
+
+    def __cinit__(self, *):
+        pass
+
+    def __dealloc__(self):
+        self.action_ptr.reset()
+
+    cdef set_this(self, shared_ptr[Action] _action_ptr):
+        self.action_ptr = _action_ptr
+
 cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env
 
@@ -442,14 +466,25 @@ cdef class PySimplePhysicalEnv:
     def reset(self):
         self.env.reset()
 
-    def step(self, Action action) -> Reward:
-        return self.env.step(action)
+    def step(self, PyAction action) -> Reward:
+        return self.env.step(deref(action.action_ptr))
 
     def is_finished(self) -> bool:
         return self.env.is_finished()
 
-    def get_state(self) -> State:
-        return self.env.get_state()
+    def get_state(self):
+        cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
+        py_state = PyState()
+        py_state.set_this(c_state)
 
-    def get_action_space(self) -> vector[Action]:
-        return self.env.get_action_space()
+    def get_action_space(self) -> [PyAction]:
+        cdef vector[Action] c_action_space = self.env.get_action_space()
+        cdef shared_ptr[Action] tmp_c_action
+        total_size = c_action_space.size()
+        py_action_space = []
+        for i in range(total_size):
+            tmp_c_action = make_shared[Action](c_action_space[i])
+            py_action = PyAction()
+            py_action.set_this(tmp_c_action)
+            py_action_space.append(py_action)
+        return py_action_space

@@ -2,15 +2,16 @@
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
-from typing import Dict, Iterator, Set, List, Tuple, Any
-
+from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar, cast
 import math
 import random
 import itertools
+import gc
 
 import torch
 import dgl # type: ignore
 
+from utils import *
 import quartz # type: ignore
 import qtz
 from IPython import embed # type: ignore
@@ -26,6 +27,7 @@ class Action:
 @dataclass
 class ActionTmp:
     node: int
+    node_value: float
     xfer_dist: torch.Tensor
 
 @dataclass
@@ -35,6 +37,7 @@ class Experience:
     reward: float
     next_state: quartz.PyGraph
     game_over: bool
+    node_value: float
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
@@ -65,6 +68,7 @@ class SerializableExperience:
     reward: float
     next_state: str
     game_over: bool
+    node_value: float
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
@@ -87,6 +91,7 @@ class ExperienceList:
     reward: List[float]
     next_state: List[str | dgl.graph]
     game_over: List[bool]
+    node_value: List[float]
     next_nodes: List[List[int]]
     xfer_mask: List[torch.BoolTensor]
     xfer_logprob: List[float]
@@ -95,6 +100,12 @@ class ExperienceList:
     def __len__(self) -> int:
         return len(self.state)
     
+    def __iter__(self) -> Iterator:
+        return iter([
+            getattr(self, field.name)
+            for field in fields(self)
+        ])
+
     def __add__(self, other) -> ExperienceList:
         ret = ExperienceList.new_empty()
         for field in fields(self):
@@ -108,8 +119,15 @@ class ExperienceList:
     
     @staticmethod
     def new_empty() -> ExperienceList:
-        return ExperienceList(*[None]*len(fields(ExperienceList))) # type: ignore
+        return ExperienceList(*[[] for _ in range(len(fields(ExperienceList)))]) # type: ignore
 
+    def shuffle(self) -> None:
+        self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \
+        self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info = shuffle_lists(
+            self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value,
+            self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info
+        )
+    
     def get_batch(
         self,
         start_pos: int = 0,
@@ -124,30 +142,50 @@ class ExperienceList:
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device) # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
             exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device) # type: ignore
+            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
             exps.next_nodes = [ torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc] ] # type: ignore
             exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device) # type: ignore
             exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
         
         return exps
 
-class ExperienceListIterator:
+@dataclass
+class TrainExpList(ExperienceList):
+    target_values: List[float]
+    advantages: List[float]
 
-    def __init__(self, src: ExperienceList, batch_size: int = 1, device: torch.device = torch.device('cpu')):
-        self.src = src
-        self.batch_size = batch_size
-        self.device = device
-        self.start_pos = 0
+    @staticmethod
+    def new_empty() -> TrainExpList:
+        return TrainExpList(*[None]*len(fields(TrainExpList))) # type: ignore
+
+    def shuffle(self) -> None:
+        self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \
+        self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info, self.target_values, self.advantages = shuffle_lists(
+            self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value,
+            self.next_nodes, self.xfer_mask, self.xfer_logprob, self.info, self.target_values, self.advantages
+        )
     
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> BatchedExperience:
-        if self.start_pos < len(self.src):
-            ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
-            self.start_pos += self.batch_size
-            return ret
-        else:
-            raise StopIteration
+    def get_batch(
+        self,
+        start_pos: int = 0,
+        batch_size: int = 1,
+        device: torch.device = torch.device('cpu'),
+    ) -> TrainBatchExp:
+        exps = TrainBatchExp.new_empty()
+        if start_pos < len(self):
+            sc = slice(start_pos, start_pos + batch_size)
+            exps.state = dgl.batch(self.state[sc]).to(device)
+            exps.next_state = dgl.batch(self.next_state[sc]).to(device)
+            exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device) # type: ignore
+            exps.reward = torch.Tensor(self.reward[sc]).to(device)
+            exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device) # type: ignore
+            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
+            exps.next_nodes = [ torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc] ] # type: ignore
+            exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device) # type: ignore
+            exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
+            exps.target_values = torch.Tensor(self.target_values[sc]).to(device)
+            exps.advantages = torch.Tensor(self.advantages[sc]).to(device)
+        return exps
 
 @dataclass
 class BatchedExperience:
@@ -156,21 +194,23 @@ class BatchedExperience:
     reward: torch.Tensor # (B,)
     next_state: dgl.graph
     game_over: torch.BoolTensor # (B,)
+    node_value: torch.Tensor # (B,)
     next_nodes: List[torch.LongTensor]
     xfer_mask: torch.BoolTensor # (B,)
     xfer_logprob: torch.Tensor # (B,)
     
     @staticmethod
     def new_empty() -> BatchedExperience:
-        return BatchedExperience(*[[]]*len(fields(BatchedExperience))) # type: ignore
+        return BatchedExperience(*[None for _ in range(len(fields(BatchedExperience)))]) # type: ignore
 
-    def __add__(self, other) -> BatchedExperience:
+    def __add__(self, other: BatchedExperience) -> BatchedExperience:
         res = BatchedExperience.new_empty()
         res.state = dgl.batch([self.state, other.state])
         res.next_state = dgl.batch([self.next_state, other.next_state])
         res.action = torch.cat([self.action, other.action]) # type: ignore
         res.reward = torch.cat([self.reward, other.reward])
         res.game_over = torch.cat([self.game_over, other.game_over]) # type: ignore
+        res.node_value = torch.cat([self.node_value, other.node_value])
         res.next_nodes = self.next_nodes + other.next_nodes
         res.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask]) # type: ignore
         res.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
@@ -179,57 +219,189 @@ class BatchedExperience:
     def __len__(self) -> int:
         return len(self.next_nodes)
 
+class TrainBatchExp(BatchedExperience):
+    target_values: torch.Tensor
+    advantages: torch.Tensor
+    
+    @staticmethod
+    def new_empty() -> TrainBatchExp:
+        return TrainBatchExp(*[None for _ in range(len(fields(TrainBatchExp)))]) # type: ignore
+
+ExpListType = TypeVar('ExpListType', bound=ExperienceList)
+BatchExpType = TypeVar('BatchExpType', bound=BatchedExperience)
+class ExperienceListIterator:
+
+    def __init__(self, src: ExpListType, batch_size: int = 1, device: torch.device = torch.device('cpu')) -> None:
+        self.src = src
+        self.batch_size = batch_size
+        self.device = device
+        self.start_pos = 0
+    
+    def __iter__(self) -> ExperienceListIterator:
+        return self
+
+    def __next__(self) -> BatchExpType:
+        if self.start_pos < len(self.src):
+            ret = self.src.get_batch(self.start_pos, self.batch_size, self.device)
+            ret = cast(BatchExpType, ret)
+            self.start_pos += self.batch_size
+            return ret
+        else:
+            raise StopIteration
+
 class GraphBuffer:
     """store PyGraph of a class of circuits for init state sampling and maintain some other infos"""
     def __init__(
         self,
         name: str,
         original_graph_qasm: str,
+        cost_type: CostType,
         max_len: int | float,
         device: torch.device = torch.device('cpu'),
     ) -> None:
         self.name = name
-        # self.max_len = max_len
+        self.max_len = max_len
         self.device = device
+        self.cost_type = cost_type
         self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
+        self.original_cost = get_cost(self.original_graph, self.cost_type)
         
-        self.gc_to_graph: Dict[int, List[quartz.PyGraph]] = {
-            self.original_graph.gate_count: [ self.original_graph, ],
+        self.cost_to_graph: Dict[int, List[quartz.PyGraph]] = {
+            get_cost(self.original_graph, cost_type): [ self.original_graph, ],
         }
         self.hashset: Set[int] = { hash(self.original_graph) }
-                
+ 
         """other infos"""
         self.best_graph = self.original_graph
         
         self.eps_lengths: List[int] = []
         self.max_eps_length: int = 0
-        
         self.rewards: List[List[float]] = []
+        
+        self.init_graph_gcs: List[int] = []
+        self.graph_gcs: List[int] = []
+        self.init_graph_ccs: List[int] = []
+        self.graph_ccs: List[int] = []
+        self.init_graph_costs: List[int] = []
+        self.graph_costs: List[int] = []
     
     def __len__(self) -> int:
         return len(self.hashset)
     
-    def update_max_eps_length_by(self, x: int) -> Tuple[int, int]:
-        """Return: (best, old_best)"""
-        old = self.max_eps_length
-        self.max_eps_length = max(
-            self.max_eps_length, x
-        )
-        return self.max_eps_length, old
-    
-    def update_max_eps_length(self) -> Tuple[int, int, int]:
-        """Return: (best, current, old_best)"""
-        old = self.max_eps_length
-        cur = max(self.eps_lengths) if len(self.eps_lengths) > 0 else 0
-        self.max_eps_length = max(
-            self.max_eps_length, cur,
-        )
-        return self.max_eps_length, cur, old
-
     def prepare_for_next_iter(self) -> None:
-        self.update_max_eps_length()
         self.eps_lengths.clear()
         self.rewards.clear()
+        
+        self.init_graph_gcs.clear()
+        self.graph_gcs.clear()
+        self.init_graph_ccs.clear()
+        self.graph_ccs.clear()
+        self.init_graph_costs.clear()
+        self.graph_costs.clear()
+        
+        vmem_perct = vmem_used_perct()
+        old_len = len(self)
+        if vmem_perct > 80.0:
+            printfl(f'Buffer {self.name} starts to shrink.')
+            i_loop = 0 # NOTE: in case of infinite loop
+            while len(self) >= 0.75 * old_len and i_loop < 1000:
+                self.pop_some(1000)
+                i_loop += 1
+            gc.collect()
+            printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).')
+    
+    def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
+        if hash_value is None:
+            hash_value = hash(graph)
+        if hash_value not in self.hashset:
+            self.hashset.add(hash_value)
+            gcost = get_cost(graph, self.cost_type)
+            if gcost not in self.cost_to_graph:
+                self.cost_to_graph[gcost] = []
+            self.cost_to_graph[gcost].append(graph)
+            idx_to_pop = 0 if gcost != self.original_cost else 1
+            while len(self.cost_to_graph[gcost]) > int(5e2): # NOTE: limit the num of graph of each kind
+                self.cost_to_graph[gcost].pop(idx_to_pop)
+            while len(self) > self.max_len:
+                self.pop_one()
+            return True
+        else:
+            return False
+        
+    def pop_one(self) -> None:
+        if len(self) > 0:
+            max_key: int = -1
+            max_num_graphs: int = -1
+            for cost_key, graphs in self.cost_to_graph.items():
+                if max_key == -1 or len(graphs) > max_num_graphs:
+                    max_key, max_num_graphs = cost_key, len(graphs)
+            idx_to_pop = 0 if max_key != self.original_cost else 1
+            popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+            if len(self.cost_to_graph[max_key]) == 0:
+                self.cost_to_graph.pop(max_key, None)
+            self.hashset.remove(hash(popped_graph))
+    
+    def pop_some(self, num: int) -> None:
+        if len(self) > 0:
+            max_key: int = -1
+            max_num_graphs: int = -1
+            for cost_key, graphs in self.cost_to_graph.items():
+                if max_key == -1 or len(graphs) > max_num_graphs:
+                    max_key, max_num_graphs = cost_key, len(graphs)
+            idx_to_pop = 0 if max_key != self.original_cost else 1
+            for i in range(int(num)):
+                if len(self.cost_to_graph[max_key]) < idx_to_pop + 1:
+                    break
+                popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
+                if len(self.cost_to_graph[max_key]) == 0:
+                    self.cost_to_graph.pop(max_key, None)
+                    break
+                self.hashset.remove(hash(popped_graph))
+    
+    def sample(self, greedy: bool) -> quartz.PyGraph:
+        gcost_list = list(self.cost_to_graph.keys())
+        gcost = torch.Tensor(gcost_list).to(self.device)
+        if greedy:
+            weights = 1 / (gcost - gcost.min() + 0.2)
+        else:
+            weights = 1 / gcost**4
+        sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
+        sampled_gcost = gcost_list[sampled_gcost_idx]
+        sampled_graph = random.choice(self.cost_to_graph[sampled_gcost])
+        return sampled_graph
+
+    """Note that it's not concurrency-safe to call these functions."""
+    def push_nonexist_best(self, qasm: str) -> bool:
+        graph = qtz.qasm_to_graph(qasm)
+        if self.push_back(graph): # non-exist
+            """update best graph and return whether the best info is updated"""
+            if get_cost(graph, self.cost_type) < get_cost(self.best_graph, self.cost_type):
+                self.best_graph = graph
+                return True
+        # end if
+        return False
+    
+    def append_costs_from_graph(self, graph: quartz.PyGraph):
+        self.graph_gcs.append(graph.gate_count)
+        self.graph_ccs.append(graph.cx_count)
+        self.graph_costs.append(get_cost(graph, self.cost_type))
+    
+    def append_init_costs_from_graph(self, graph: quartz.PyGraph):
+        self.init_graph_gcs.append(graph.gate_count)
+        self.init_graph_ccs.append(graph.cx_count)
+        self.init_graph_costs.append(get_cost(graph, self.cost_type))
+    
+    def eps_len_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        max_eps_len = max(self.eps_lengths)
+        info[f'min_epslen'] = min(self.eps_lengths)
+        info[f'max_epslen'] = max_eps_len
+        info[f'mean_epslen'] = sum(self.eps_lengths) / len(self.eps_lengths)
+        
+        self.max_eps_length = max(self.max_eps_length, max_eps_len)
+        info[f'max_epslen_global'] = self.max_eps_length
+        
+        return info
     
     def rewards_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {}
@@ -248,38 +420,31 @@ class GraphBuffer:
         info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
         
         return info
-        
-    def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
-        if hash_value is None:
-            hash_value = hash(graph)
-        if hash_value not in self.hashset:
-            self.hashset.add(hash_value)
-            gc = int(graph.gate_count)
-            if gc not in self.gc_to_graph:
-                self.gc_to_graph[gc] = []
-            self.gc_to_graph[gc].append(graph)
-            return True
-        else:
-            return False
-        
-    def sample(self) -> quartz.PyGraph:
-        gc_list = list(self.gc_to_graph.keys())
-        gate_counts = torch.Tensor(gc_list).to(self.device)
-        weights = 1 / gate_counts ** 4
-        sampled_gc_idx = int(torch.multinomial(weights, num_samples=1))
-        sampled_gc = gc_list[sampled_gc_idx]
-        sampled_graph = random.choice(self.gc_to_graph[sampled_gc])
-        return sampled_graph
-
-    """Note that it's not concurrency-safe to call these functions."""
-    def push_nonexist_best(self, qasm: str) -> bool:
-        graph = qtz.qasm_to_graph(qasm)
-        if self.push_back(graph): # non-exist
-            """update best graph and return whether the best info is updated"""
-            if graph.gate_count < self.best_graph.gate_count:
-                self.best_graph = graph
-                return True
-        # end if
-        return False
     
+    def cost_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {}
+        
+        for name, values, init_values in [
+            ('gate_count', self.graph_gcs, self.init_graph_gcs),
+            ('cx_count', self.graph_ccs, self.init_graph_ccs),
+            ('cost', self.graph_costs, self.init_graph_costs),
+        ]:
+            info[f'min_init_{name}'] = min(init_values)
+            info[f'max_init_{name}'] = max(init_values)
+            info[f'mean_init_{name}'] = sum(init_values) / len(init_values)
+            
+            info[f'best_{name}_iter'] = min(values)
+            info[f'max_{name}_iter'] = max(values)
+            info[f'mean_{name}_iter'] = sum(values) / len(values)
+        
+        return info
     
+    # def shrink(self) -> None:
+    #     for cost_key in self.cost_to_graph:
+    #         cur = self.cost_to_graph[cost_key]
+    #         new = cur[len(cur) // 2 : ]
+    #         if cost_key == get_cost(self.original_graph, self.cost_type):
+    #             new.append(self.original_graph)
+    #         self.cost_to_graph[cost_key] = new
+    
+        

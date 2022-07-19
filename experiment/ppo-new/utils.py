@@ -1,8 +1,9 @@
 from __future__ import annotations
 from dataclasses import dataclass, fields
 import sys
+import psutil # type: ignore
 import random
-from typing import Callable, Iterable, Iterator, Optional, Tuple, List, Any, Sequence
+from typing import Tuple, List, Any
 import warnings
 from collections import deque, namedtuple
 from functools import partial
@@ -11,6 +12,7 @@ import time
 import datetime
 import copy
 import itertools
+from enum import Enum
 
 import torch
 import torch.nn as nn
@@ -24,6 +26,8 @@ from torch.futures import Future
 import dgl # type: ignore
 import numpy as np
 import quartz # type: ignore
+
+from ds import *
 
 from IPython import embed # type: ignore
 
@@ -42,7 +46,33 @@ class QuartzInitArgs:
     gate_set: List[str]
     ecc_file_path: str
     no_increase: bool
-    include_nop: bool
+    include_nop: bool 
+
+class CostType(Enum):
+    gate_count = 0
+    cx_count = 1
+    gate_cx = 2
+    
+    @staticmethod
+    def from_str(s: str) -> CostType:
+        if s == 'gate_count':
+            return CostType.gate_count
+        elif s == 'cx_count':
+            return CostType.cx_count
+        elif s == 'gate_cx':
+            return CostType.gate_cx
+        else:
+            raise NotImplementedError(f'Unexpected input to CostType {s}')
+
+def get_cost(graph: quartz.PyGraph, tp: CostType) -> int:
+    if tp is CostType.gate_count:
+        return graph.gate_count
+    elif tp is CostType.cx_count:
+        return graph.cx_count
+    elif tp is CostType.gate_cx:
+        return graph.gate_count + 2 * graph.cx_count
+    else:
+        raise NotImplementedError(f'Unexpected CostType {tp} ({tp.__class__()})')
 
 def get_agent_name(agent_id: int) -> str:
     return f'agent_{agent_id}'
@@ -81,3 +111,15 @@ def dur_ms(t1: int, t2: int) -> float:
 
 def sec_to_hms(sec: float) -> str:
     return str(datetime.timedelta(seconds=sec))
+
+def hms_to_sec(hms: str) -> float:
+    return sum(x * float(t) for x, t in zip([3600, 60, 1], hms.split(':')))
+
+def shuffle_lists(*ls):
+    zip_ls = list(zip(*ls))
+    random.shuffle(zip_ls)
+    shuf_lists = map(list, zip(*zip_ls))
+    return shuf_lists
+
+def vmem_used_perct() -> float:
+    return psutil.virtual_memory().percent

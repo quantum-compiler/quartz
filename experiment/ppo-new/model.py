@@ -92,3 +92,25 @@ class ActorCritic(nn.Module):
             nn.Linear(critic_hidden_size, 1)
         )
     
+    def forward(self, x: torch.Tensor, callee: str) -> torch.Tensor:
+        if callee == self.graph_embedding_name():
+            return self.graph_embedding(x)
+        elif callee == self.actor_name():
+            return self.actor(x)
+        elif callee == self.critic_name():
+            return self.critic(x)
+        else:
+            raise NotImplementedError(f'Unexpected callee name: {callee}')
+    
+    @staticmethod
+    def graph_embedding_name() -> str:
+        return 'graph_embedding'
+    
+    @staticmethod
+    def actor_name() -> str:
+        return 'actor'
+    
+    @staticmethod
+    def critic_name() -> str:
+        return 'critic'
+    

@@ -15,22 +15,7 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::x, GateType::rz, GateType::add});
 
-  // Construct circuit graph from qasm file
-//   QASMParser qasm_parser(&ctx);
-//   DAG *dag = nullptr;
-//   if (!qasm_parser.load_qasm(
-//           "../experiment/t_tdg_h_cx_toffoli_flip_dataset/barenco_tof_3.qasm.toffoli_flip", dag)) {
-//     std::cout << "Parser failed" << std::endl;
-    
-    // return 0;
-//   }
     auto graph = Graph::from_qasm_file(&ctx, "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
-
-//   ctx.get_and_gen_input_dis(dag->get_num_qubits());
-//   ctx.get_and_gen_hashing_dis(dag->get_num_qubits());
-//   ctx.get_and_gen_parameters(dag->get_num_input_parameters());
-
-//   std::shared_ptr<Graph> graph(new Graph(&ctx, dag));
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
@@ -105,32 +90,4 @@ int main() {
   }
 
   best_graph->to_qasm("test.qasm", false, false);
-  //   std::vector<Op> ops;
-  //   graph.all_ops(ops);
-  //   int num_xfers = xfers.size();
-  //   std::cout << "number of xfers: " << num_xfers << std::endl;
-  //   int num_ops = ops.size();
-  //   std::cout << "number of ops: " << num_ops << std::endl;
-  //   std::vector<Graph *> graphs;
-
-  //   for (int i = 0; i < num_ops; ++i) {
-  //     for (int j = 0; j < num_xfers; ++j) {
-  //       if (graph.xfer_appliable(xfers[j], ops[i])) {
-  //         std::cout << "Transfer " << j << " appliable to op " << i <<
-  //         std::endl; graphs.push_back(graph.apply_xfer(xfers[j], ops[i]));
-  //       }
-  //     }
-  //   }
-
-  //   for (auto g : graphs) {
-  //     std::vector<Op> g_ops;
-  //     g->all_ops(g_ops);
-  //   }
-  // for (auto it = ops.begin(); it != ops.end(); ++it) {
-  // 	std::cout << gate_type_name(it->ptr->tp) << std::endl;
-  // }
-  // for (auto it = ops.begin(); it != ops.end(); ++it) {
-  // 	bool xfer_ok = graph.xfer_appliable(xfer, &(*it));
-  // 	std::cout << (int)xfer_ok << std::endl;
-  // }
 }

@@ -189,6 +189,7 @@ public:
   size_t hash();
   bool equal(const Graph &other) const;
   bool check_correctness();
+  int specific_gate_count(GateType gate_type) const;
   [[nodiscard]] float total_cost() const;
   [[nodiscard]] int gate_count() const;
   [[nodiscard]] int circuit_depth() const;
@@ -205,6 +206,10 @@ public:
            bool enable_early_stop, bool use_rotation_merging_in_searching,
            GateType target_rotation, std::string circuit_name = "",
            int timeout = 86400 /*1 day*/);
+  std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
+                                  double gate_count_upper_bound,
+                                  std::string circuit_name, bool print_message,
+                                  int timeout = 86400 /*1 day*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result, bool print_id) const;
@@ -237,9 +242,11 @@ public:
   std::vector<size_t>
   appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
+                                    bool eliminate_rotation = false);
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
-  apply_xfer_and_track_node(GraphXfer *xfer, Op op, bool eliminate_rotation);
+  apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                            bool eliminate_rotation = false);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

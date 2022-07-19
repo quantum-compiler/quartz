@@ -18,7 +18,8 @@ main:
         ddp process:
             PPOMod.train
                 init self.ac_net : ActorCritic
-                init self.agent: Agent (each ddp process has an agent)
+                self.ac_net_old = self.ac_net.clone()
+                init self.agent: Agent(self.ac_net_old) (each ddp process has an agent)
                 Train loop:
                     PPOMod.train_iter
                         self.agent.collect_data
@@ -34,8 +35,23 @@ main:
                                         tell the observers that the results are ready
                             convert graph
                             maintain graph_buffer, best graph
-                            batch data
-                        update the network for K_epochs
+                            batch colleted data
+                        train the network
+                            for k in k_epochs:
+                                for mini-batch in all collected data (by list order)
+                                    optimizer.zero_grad()
+                                    node_embeddings in each graph = self.ac_net.graph_embedding(mini_batch.state)
+                                    action_node_values = self.ac_net.critic(embeddings of mini_batch.action_node)
+                                    xfer_dist = softmax( self.ac_net.actor(embeddings of mini_batch.action_node) )
+
+                                    with no gradient environment:
+                                        node_embeddings in each next_graph = self.ac_net.graph_embedding(mini_batch.next_state)
+                                        next_node_values = self.ac_net.critic( embeddings of mini_batch.next_node )
+                                    
+                                    advantages = mini_batch.reward + gamma * next_node_values - action_node_values
+                                    compute actor_loss, critic_loss
+                                    compute total loss
+                                    optimizer.step()
         
         observer process:
             sleep if there's no call

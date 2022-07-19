@@ -157,6 +157,7 @@ Graph::Graph(const Graph &graph) {
   constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
   input_qubit_op_2_qubit_idx = graph.input_qubit_op_2_qubit_idx;
+  pos_2_logical_qubit = graph.pos_2_logical_qubit;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
 }
@@ -391,6 +392,15 @@ int Graph::gate_count() const {
   for (const auto &it : inEdges) {
     if (it.first.ptr->tp != GateType::input_qubit &&
         it.first.ptr->tp != GateType::input_param)
+      cnt++;
+  }
+  return cnt;
+}
+
+int Graph::specific_gate_count(GateType gate_type) const {
+  int cnt = 0;
+  for (const auto &it : inEdges) {
+    if (it.first.ptr->tp == gate_type)
       cnt++;
   }
   return cnt;
@@ -988,6 +998,7 @@ void Graph::rotation_merging(GateType target_rotation) {
       }
     }
   }
+  constant_and_rotation_elimination();
 }
 
 size_t Graph::get_num_qubits() const {
@@ -1142,7 +1153,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
             }
           }
           if (!found) {
-            iss << f;
+            iss << "pi*" << f / PI;
           }
         }
         iss << ')';
@@ -1243,12 +1254,18 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          // Currently only support the format of pi*0.123
+          // Currently only support the format of pi*0.123, 0.123*pi or 0.123
           ParamType p;
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
             p = std::stod(d) * PI;
-          } else {
+          } 
+          else if(token.find("pi") != std::string::npos){
+            // 0.123*pi
+            auto d = token.substr(0, token.find("*"));
+            p = std::stod(d) * PI;
+          }
+          else {
             p = std::stod(token);
           }
           auto src_op = graph->add_parameter(p);
@@ -1583,6 +1600,76 @@ std::shared_ptr<Graph> Graph::optimize(
   return bestGraph;
 } // namespace quartz
 
+std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
+                                       double cost_upper_bound,
+                                       std::string circuit_name,
+                                       bool print_message, int timeout) {
+  auto start = std::chrono::steady_clock::now();
+  std::priority_queue<std::shared_ptr<Graph>,
+                      std::vector<std::shared_ptr<Graph>>, GraphCompare>
+      candidates;
+  std::set<size_t> hashmap;
+  std::shared_ptr<Graph> best_graph(new Graph(*this));
+  auto best_cost = total_cost();
+
+  candidates.push(best_graph);
+  hashmap.insert(hash());
+
+  int invoke_cnt = 0;
+
+  while (!candidates.empty()) {
+    auto graph = candidates.top();
+    candidates.pop();
+    std::vector<Op> all_nodes;
+    graph->topology_order_ops(all_nodes);
+    for (auto xfer : xfers) {
+      for (auto const &node : all_nodes) {
+        invoke_cnt++;
+        auto new_graph =
+            graph->apply_xfer(xfer, node, context->has_parameterized_gate());
+        auto end = std::chrono::steady_clock::now();
+        if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                       start)
+                    .count() /
+                1000.0 >
+            timeout) {
+          std::cout << "Timeout. Program terminated. Best cost is "
+                    << best_cost << std::endl;
+          return best_graph;
+        }
+        if (new_graph == nullptr)
+          continue;
+
+        auto new_hash = new_graph->hash();
+        auto new_cost = new_graph->total_cost();
+        if(new_cost > cost_upper_bound)
+            continue;
+        if (hashmap.find(new_hash) == hashmap.end()) {
+          hashmap.insert(new_hash);
+          candidates.push(new_graph);
+          if (new_cost < best_cost) {
+            best_cost = new_cost;
+            best_graph = new_graph;
+          }
+        } else
+          continue;
+      }
+    }
+    auto end = std::chrono::steady_clock::now();
+    if (print_message) {
+      std::cout << "[" << circuit_name << "] "
+                << "Best cost: " << best_cost
+                << "\tcandidate number: " << candidates.size() << "\tafter "
+                << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                       end - start)
+                           .count() /
+                       1000.0
+                << " seconds." << std::endl;
+    }
+  }
+  return best_graph;
+}
+
 std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   // Transform ccz to t, an naive solution
   // Simply 1 normal 1 inverse
@@ -1832,7 +1919,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return !fail;
 }
 
-std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
+std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
+                                         bool eliminate_rotation) {
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return nullptr;
   }
@@ -1972,6 +2060,11 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
       fail = true;
     }
   }
+  if (!fail) {
+    if (eliminate_rotation) {
+      new_graph->constant_and_rotation_elimination();
+    }
+  }
   while (!opx_op_dq.empty()) {
     auto opx_op_pair = opx_op_dq.back();
     opx_op_dq.pop_back();
@@ -1984,7 +2077,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
 Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
-                                 bool eliminate_rotation = false) {
+                                 bool eliminate_rotation) {
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {

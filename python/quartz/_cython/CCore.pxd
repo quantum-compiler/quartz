@@ -102,12 +102,14 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
-        shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
+        shared_ptr[Graph] apply_xfer(GraphXfer *, Op, bool) except +
         pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op, bool) except +
         vector[size_t] appliable_xfers(Op, const vector[GraphXfer *] &)
         vector[size_t] appliable_xfers_parallel(Op, const vector[GraphXfer *] &)
         void all_ops(vector[Op]&) const
         int gate_count() const
+        int cx_count() const
+        int specific_gate_count(GateType) const
         size_t hash()
         void all_edges(vector[Edge]&) const
         void topology_order_ops(vector[Op] &) const
@@ -120,6 +122,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         string to_qasm(bool, bool) const
         shared_ptr[Graph] ccz_flip_greedy_rz()
         bool equal(const Graph &) const
+        void rotation_merging(GateType)
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

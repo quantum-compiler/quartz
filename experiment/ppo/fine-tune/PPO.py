@@ -5,6 +5,7 @@ import dgl
 import time
 import wandb
 from ActorCritic import ActorCritic
+import random
 
 
 class RolloutBuffer:
@@ -20,6 +21,8 @@ class RolloutBuffer:
         self.is_start_point = []
         self.is_nops = []
         self.masks = []
+        self.values = []
+        self.next_values = []
 
     def clear(self):
         self.__init__()
@@ -36,7 +39,29 @@ class RolloutBuffer:
         self.is_start_point += other.is_start_point
         self.is_nops += other.is_nops
         self.masks += other.masks
+        self.values += other.values
+        self.next_values += other.next_values
         return self
+
+    def sample(self, p: float):
+        num_dp: int = len(self.graph)
+        sampled_dp_idxs = random.sample(range(0, num_dp), int(p * num_dp))
+        sampled_buffer = RolloutBuffer()
+        for idx in sampled_dp_idxs:
+            sampled_buffer.graphs.append(self.graphs[idx])
+            sampled_buffer.nodes.append(self.nodes[idx])
+            sampled_buffer.xfers.append(self.xfers[idx])
+            sampled_buffer.next_graphs.append(self.next_graphs[idx])
+            sampled_buffer.next_nodes.append(self.next_nodes[idx])
+            sampled_buffer.xfer_logprobs.append(self.xfer_logprobs[idx])
+            sampled_buffer.rewards.append(self.rewards[idx])
+            sampled_buffer.is_terminals.append(self.is_terminals[idx])
+            sampled_buffer.is_nops.append(self.is_nops[idx])
+            sampled_buffer.masks.append(self.masks[idx])
+            sampled_buffer.values.append(self.values[idx])
+            sampled_buffer.next_values.append(self.next_values[idx])
+
+        return sampled_buffer
 
 
 class PPO:
@@ -107,10 +132,10 @@ class PPO:
 
     def select_actions(self, graphs: list[PyGraph]):
         with torch.no_grad():
-            nodes, xfers, xfer_logprobs, masks = self.policy_old.act_batch(
+            nodes, values, xfers, xfer_logprobs, masks = self.policy_old.act_batch(
                 self.context, graphs)
 
-        return nodes, xfers, xfer_logprobs, masks
+        return nodes, values, xfers, xfer_logprobs, masks
 
     def update(self):
         # start = time.time()
@@ -254,6 +279,7 @@ class PPO:
                 yield torch.stack(buffer.rewards[i:i + mbs]).to(
                     self.device_update)
 
+        advantage_0 = []
         for _ in range(self.K_epochs):
             dp_num = len(self.buffer.graphs)
             # print(dp_num)
@@ -264,8 +290,10 @@ class PPO:
 
             self.optimizer.zero_grad()
 
-            for (eva_data, old_log_probs,
-                 rewards) in zip(eva_gen, log_prob_gen, reward_gen):
+            ###############################################
+
+            for i, (eva_data, old_log_probs, rewards) in enumerate(
+                    zip(eva_gen, log_prob_gen, reward_gen)):
                 # start = time.time()
 
                 values, next_values, xfer_logprobs, xfer_entropys = self.policy.evaluate(
@@ -279,10 +307,19 @@ class PPO:
 
                 # Finding Surrogate Loss
                 advantages = rewards + next_values * self.gamma - values
-                surr1 = ratios * advantages.clone().detach()
+
+                if _ == 0:
+                    advantage_0.append(advantages)
+
+                # surr1 = ratios * advantages.clone().detach()
+                # surr2 = torch.clamp(
+                #     ratios, 1 - self.eps_clip,
+                #     1 + self.eps_clip) * advantages.clone().detach()
+
+                surr1 = ratios * advantage_0[i].clone().detach()
                 surr2 = torch.clamp(
                     ratios, 1 - self.eps_clip,
-                    1 + self.eps_clip) * advantages.clone().detach()
+                    1 + self.eps_clip) * advantage_0[i].clone().detach()
 
                 actor_loss = -torch.min(surr1, surr2).sum() / dp_num
                 critic_loss = advantages.pow(2).sum() / dp_num

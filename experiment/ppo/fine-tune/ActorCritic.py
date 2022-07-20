@@ -99,15 +99,16 @@ class ActorCritic(nn.Module):
         node_vs_list = torch.split(node_vss, node_nums)
 
         nodes = []
+        values = []
         node_embeds = []
         masks = []
         for i in range(len(graphs)):
 
-            node_vs = node_vs_list[i] # (num of nodes, )
+            node_vs = node_vs_list[i]  # (num of nodes, )
 
             # Compute temperature
             # TODO: this rate should be a hyper parameter
-            hit_rate = 0.8
+            hit_rate = 0.9
             # Assume values of all nodes except one are 0
             temperature = 1 / math.log(
                 (node_nums[i] - 1) / (1 - hit_rate) * hit_rate)
@@ -117,6 +118,7 @@ class ActorCritic(nn.Module):
             node_dist = Categorical(probs=node_probs)
             node = node_dist.sample()
             nodes.append(node.item())
+            values.append(node_vs[node])
 
             node_embeds.append(graph_embeds_list[i][node])
 
@@ -126,8 +128,8 @@ class ActorCritic(nn.Module):
             mask[available_xfers] = True
             masks.append(mask)
 
-        node_embeds = torch.stack(node_embeds) # (num of graph, embed_size)
-        xfer_logits = self.actor(node_embeds) # (num of graph, action_dim)
+        node_embeds = torch.stack(node_embeds)  # (num of graph, embed_size)
+        xfer_logits = self.actor(node_embeds)  # (num of graph, action_dim)
 
         masks = torch.stack(masks).to(self.device)
         xfer_probs = masked_softmax(xfer_logits, masks)
@@ -135,8 +137,8 @@ class ActorCritic(nn.Module):
         xfer_dist = Categorical(probs=xfer_probs)
         xfers = xfer_dist.sample()
         xfer_logprobs = xfer_dist.log_prob(xfers)
-        
-        return nodes, xfers.tolist(), xfer_logprobs.detach(), masks
+
+        return nodes, values, xfers.tolist(), xfer_logprobs.detach(), masks
 
     def get_local_max_value(self, g, nodes):
         with torch.no_grad():

@@ -10,18 +10,18 @@ import wandb
 import random
 from PPO import PPO
 from torch.distributions import Categorical
-from Trajectory import get_trajectory_batch
+from Trajectory import get_trajectory_batch, split_circuit_get_trajectory_batch
 import math
 import json
 import copy
 
-wandb.init(project='ppo_fine_tune', mode='disabled')
+wandb.init(project='ppo_fine_tune', mode='online')
 
 os.environ['OMP_SCHEDULE'] = 'dynamic'
 
 # set device to cpu or cuda
 device_get_trajectory = torch.device('cuda:0')
-device_update = torch.device('cuda:1')
+device_update = torch.device('cuda:2')
 
 # if (torch.cuda.is_available()):
 #     device = torch.device('cuda:3')
@@ -38,14 +38,14 @@ device_update = torch.device('cuda:1')
 experiment_name = "rl_ppo_fine_tune"
 
 # max timesteps in one trajectory
-max_seq_len = 256
-batch_size = 128
+max_seq_len = 64
+batch_size = 256
 episodes = int(1e5)
 save_model_freq = 20
 
 ################ PPO hyperparameters ################
 
-K_epochs = 25  # update policy for K epochs
+K_epochs = 20  # update policy for K epochs
 eps_clip = 0.2  # clip parameter for PPO
 gamma = 0.95  # discount factor
 lr_graph_embedding = 3e-4  # learning rate for graph embedding network
@@ -54,7 +54,7 @@ lr_critic = 5e-4  # learning rate for critic network
 random_seed = 0  # set random seed if required (0 = no random seed)
 entropy_coefficient = 0.02
 gnn_layers = 6
-mini_batch_size = 1024
+mini_batch_size = 256
 invalid_reward = -1
 
 #####################################################
@@ -62,11 +62,14 @@ invalid_reward = -1
 # quartz initialization
 
 # context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg', 'x'],
-#                                filename='bfs_verified_simplified.json',
+#                                filename='../../ecc_set/t_tdg.json.ecc',
 #                                no_increase=False)
-context = quartz.QuartzContext(gate_set=['h', 'cx', 'x', 'rz', 'add'],
-                               filename='../../../Nam_complete_ECC_set.json',
+context = quartz.QuartzContext(gate_set=['h', 'cx', 'rz', 'add', 'x'],
+                               filename='../../ecc_set/nam.json.ecc',
                                no_increase=False)
+# context = quartz.QuartzContext(gate_set=['h', 'cx', 'x', 'rz', 'add'],
+#                                filename='../../../Nam_complete_ECC_set.json',
+#                                no_increase=False)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
 xfer_dim = context.num_xfers
@@ -75,24 +78,40 @@ global circ_info
 global circ_dataset
 global circ_names
 
-circ_names = ['barenco_tof_3']  #, 'mod5_4']
+# circ_names = [
+#     'barenco_tof_3', 'mod5_4', 'vbe_adder_3', 'gf2^4_mult', 'qcla_com_7'
+# ]
+# circ_names = ['barenco_tof_3']  # , 'mod5_4']
 # circ_names = ['mod5_4']  # , 'mod5_4']
 # circ_names = ['qcla_mod_7']
 # circ_names = ['csla_mux_3']
 # circ_names = ['gf2^4_mult']
+# circ_names = ['gf2^4_mult', 'gf2^4_mult_0', 'gf2^4_mult_1', 'gf2^4_mult_2']
 # circ_names = ['tof_3']
 # circ_names = ['rc_adder_6']
 # circ_names = ['qcla_com_7']
-# circ_names = ['adder_8']
+circ_names = ['adder_8']
 # circ_names = ['gf2^10_mult']
+# circ_names = ["all"]
+# circ_names = ["QFT8"]
 
 circ_dataset = {}
 for circ_name in circ_names:
     circ_dataset[circ_name] = {}
 
     if circ_name == 'barenco_tof_3':
+        # init_circ = PyGraph.from_qasm(context=context,
+        #                               filename="../../near_56_rz.qasm")
         init_circ = PyGraph.from_qasm(context=context,
-                                      filename="../../near_56_rz.qasm")
+                                      filename="../../near_56.qasm")
+    elif circ_name == "all":
+        init_circ = PyGraph.from_qasm(context=context,
+                                      filename="../../all.qasm")
+    elif circ_name[:3] == 'QFT':
+        init_circ = PyGraph.from_qasm(
+            context=context,
+            filename="../../../circuit/QFT_and_Adders/QFT8.qasm"
+        ).rotation_merging('rz')
     else:
         # init_dag = parser.load_qasm(
         #     # filename=
@@ -100,10 +119,12 @@ for circ_name in circ_names:
         #     filename=
         #     f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
         # init_circ = quartz.PyGraph(context=context, dag=init_dag)
+        # init_circ = PyGraph.from_qasm(
+        #     context=context,
+        #     filename=
+        #     f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
         init_circ = PyGraph.from_qasm(
-            context=context,
-            filename=
-            f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
+            context=context, filename=f"../../nam_circs/{circ_name}.qasm")
 
     circ_dataset[circ_name]['init_circ'] = init_circ
     circ_dataset[circ_name]['circs'] = {}
@@ -252,7 +273,7 @@ for i_episode in tqdm(range(episodes)):
         sampled_init_circs.append(
             (sampled_circ_name, sampled_circ, sampled_circ_gate_cnt))
 
-    intermediate_circs, trajectory_infos = get_trajectory_batch(
+    intermediate_circs, trajectory_infos = split_circuit_get_trajectory_batch(
         ppo_agent, context, sampled_init_circs, max_seq_len, invalid_reward)
 
     t_0 = time.time()

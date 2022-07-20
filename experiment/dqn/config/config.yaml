@@ -1,0 +1,48 @@
+mode: train
+resume: False
+ckpt_path: outputs/2022-05-10/13-29-42/last.ckpt
+
+test_topk: 3
+load_pretrained: False
+# pretrained_weight: '../pretrain/outputs/2022-05-12/04-12-25/epoch=479-val_loss=0.00-best.ckpt'
+pretrained_weight: '../pretrain/outputs/2022-05-11/06-32-51/epoch=103-val_loss=0.07-best.ckpt'
+weight: ''
+
+gpus: [0]
+seed: 98765
+wandb:
+  en: True
+  offline: False
+  entity: quartz
+
+# DQNMod
+init_graph_path: '../barenco_tof_3_opt_path/subst_history_39.qasm'
+
+gate_set: ['h', 'cx', 't', 'tdg']
+ecc_file: 'bfs_verified_simplified.json'
+no_increase: True
+include_nop: False
+nop_policy: ['s', 0.0]
+gamma: 0.9
+episode_length: 60
+max_additional_gates: 10
+
+lr: 1e-3
+batch_size: 1024
+scheduler: 'reduce'
+target_update_interval: 100
+agent_play_interval: 1
+replaybuf_size: 102400
+prioritized_buffer: False
+prio_alpha: 0.2
+prio_init_beta: 0.6
+double_dqn: False
+
+agent_episode: True
+strict_better: True
+restart_from_best: False
+sample_init: False
+init_state_buf_size: 512
+
+qgnn_h_feats: 64
+qgnn_inter_dim: 64

@@ -12,10 +12,67 @@ void OpX::add_input(const TensorX &input) { inputs.push_back(input); }
 
 void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 
-GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(10) {}
+GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(0) {}
+
+  bool GraphXfer::src_graph_connected(DAG *src_graph){
+    auto num_qubits = src_graph->get_num_qubits();
+    int input_qubit_cnt = 0;
+    std::vector<int> parent(num_qubits);
+    for(int i = 0; i < num_qubits; ++i){
+        parent[i] = i;
+    }
+    std::unordered_map<TensorX, int, TensorXHash> tensor_on_qubit;
+    for(const auto &opx : srcOps){
+        auto opx_gate = context->get_gate(opx->type);
+        auto opx_num_qubits = opx_gate->get_num_qubits();
+        if(opx_num_qubits == 0)
+            continue;
+        else{
+            for(size_t i = 0; i < opx_num_qubits; ++i){
+                if(opx->inputs[i].op == nullptr){
+                    tensor_on_qubit[opx->outputs[i]] = input_qubit_cnt++;
+                    assert(input_qubit_cnt <= num_qubits);
+                }
+                else{
+                    tensor_on_qubit[opx->outputs[i]] = tensor_on_qubit[opx->inputs[i]];
+                }
+            }
+            for(size_t i = 1; i < opx_num_qubits; ++i){
+                // Union operation
+                int ori_l = tensor_on_qubit[opx->outputs[0]], l = ori_l;
+                int ori_r = tensor_on_qubit[opx->outputs[i]], r = ori_r;
+                while(parent[l] != l) {
+                    l = parent[l];
+                }
+                parent[ori_l] = l;
+                
+                while(parent[r] != r){
+                    r = parent[r];
+                }
+                parent[ori_r] = r;
+                parent[r] = l;
+            }
+        }
+    }
+    // Find root
+    int root = 0;
+    while(parent[root] != root){
+        root = parent[root];
+    }
+    for(int i = 0; i < num_qubits; ++i){
+        int tmp = i;
+        while(parent[tmp] != tmp){
+            tmp = parent[tmp];
+        }
+        if(tmp != root)
+            return false;
+    }
+    return true;
+  }
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
-                                       const DAG *dst_graph) {
+                                       const DAG *dst_graph,
+                                       bool no_increase_gate_count) {
   // Remove common unused qubits
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   auto qubit_num = src_graph->get_num_qubits();
@@ -29,6 +86,11 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
   assert(ret);
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
+
+  // Eliminate transfers which increase gate count
+  if (no_increase_gate_count &&
+      src_dag->get_num_gates() < dst_dag->get_num_gates())
+    return nullptr;
 
   // TODO: remove common unused input parameters?
 
@@ -116,6 +178,11 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
     graphXfer->map_output(src_to_tx[src_dag->outputs[i]],
                           dst_to_tx[dst_dag->outputs[i]]);
   }
+
+  if(!graphXfer->src_graph_connected(src_dag)){
+    return nullptr;
+  }
+
   delete src_dag;
   delete dst_dag;
   return graphXfer;
@@ -248,7 +315,7 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
 
 GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
                      const DAG *dst_graph)
-    : context(_context), tensorId(10) {
+    : context(_context), tensorId(0) {
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   assert(src_graph->get_num_input_parameters() ==
          dst_graph->get_num_input_parameters());
@@ -391,7 +458,6 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
     }
     // Check output
     for (size_t i = 0; i < srcOp->outputs.size(); i++) {
-      TensorX out = srcOp->outputs[i];
       auto it = mappedOutputs.find(srcOp->outputs[i]);
       // If out is in mappedOutputs, it represents an external edge,
       // we don't check it here
@@ -654,7 +720,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
         // unmapped src -> mapped dst
         if (paramValues.find(dstOp->inputs[i].idx) != paramValues.end()) {
           // New constant parameters
-          Op input_constant_param_op(newGraph->get_next_special_op_guid(),
+          Op input_constant_param_op(context->next_global_unique_id(),
                                      context->get_gate(GateType::input_param));
           newGraph->constant_param_values[input_constant_param_op] =
               paramValues.find(dstOp->inputs[i].idx)->second;
@@ -673,51 +739,48 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
       }
   }
 
-  // Construct pos_2_logical_qubit
-  std::unordered_map<Op, int, OpHash> op_in_degree;
-  std::queue<Op> op_q;
-  for (auto it = newGraph->outEdges.cbegin(); it != newGraph->outEdges.cend();
-       ++it) {
-    if (it->first.ptr->tp == GateType::input_qubit ||
-        it->first.ptr->tp == GateType::input_param) {
-      op_q.push(it->first);
-    }
-  }
-
-  for (auto it = newGraph->inEdges.cbegin(); it != newGraph->inEdges.cend();
-       ++it) {
-    op_in_degree[it->first] = it->second.size();
-  }
-
-  while (!op_q.empty()) {
-    auto op = op_q.front();
-    op_q.pop();
-
-    // An input qubit
-    if (newGraph->qubit_2_idx.find(op) != newGraph->qubit_2_idx.end()) {
-      newGraph->pos_2_logical_qubit[Pos(op, 0)] = newGraph->qubit_2_idx[op];
-    }
-    if (newGraph->outEdges.find(op) != newGraph->outEdges.end()) {
-      auto op_out_edges = newGraph->outEdges.find(op)->second;
-      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
-           ++e_it) {
-        if (newGraph->pos_2_logical_qubit.find(
-                Pos(e_it->srcOp, e_it->srcIdx)) !=
-            newGraph->pos_2_logical_qubit.end()) {
-          newGraph->pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
-              newGraph->pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
-        }
-        assert(op_in_degree[e_it->dstOp] > 0);
-        op_in_degree[e_it->dstOp]--;
-        if (op_in_degree[e_it->dstOp] == 0) {
-          op_q.push(e_it->dstOp);
-        }
-      }
-    }
-  }
+  newGraph->_construct_pos_2_logical_qubit();
   return newGraph;
 }
 int GraphXfer::num_src_op() { return srcOps.size(); }
 int GraphXfer::num_dst_op() { return dstOps.size(); }
+
+std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
+  // TODO: Currenty only support non-parameter gates
+  std::string s;
+  std::ostringstream oss(s);
+  // return s;
+  std::unordered_map<TensorX, int, TensorXHash> mp;
+  for (auto const &opx : v) {
+    int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+    int num_params = context->get_gate(opx->type)->get_num_parameters();
+    int num_inputs = num_qubits + num_params;
+
+    std::vector<int> input_qubits(num_qubits);
+
+    for (int i = 0; i < num_qubits; ++i) {
+      if (opx->inputs[i].op == nullptr) {
+        input_qubits[i] = opx->inputs[i].idx;
+      } else {
+        input_qubits[i] = mp[opx->inputs[i]];
+      }
+    }
+
+    oss << gate_type_name(opx->type);
+    for (auto const &idx : input_qubits) {
+      oss << " " << idx;
+    }
+    oss << std::endl;
+
+    for (int i = 0; i < num_qubits; ++i) {
+      mp[opx->outputs[i]] = input_qubits[i];
+    }
+  }
+  return oss.str();
+}
+
+std::string GraphXfer::src_str() const { return to_str(srcOps); }
+
+std::string GraphXfer::dst_str() const { return to_str(dstOps); }
 
 }; // namespace quartz

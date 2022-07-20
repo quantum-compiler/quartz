@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "tasograph.h"
 #include <queue>
+#include <ostream>
 
 namespace quartz {
 
@@ -68,6 +69,7 @@ class GraphXfer {
 public:
   GraphXfer(Context *_context);
   GraphXfer(Context *_context, const DAG *src_graph, const DAG *dst_graph);
+  bool src_graph_connected(DAG *src_graph);
   TensorX new_tensor(void);
   bool map_output(const TensorX &src, const TensorX &dst);
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
@@ -82,10 +84,17 @@ public:
   bool create_new_operator(const OpX *opx, Op &op);
   int num_src_op();
   int num_dst_op();
+  std::string to_str(std::vector<OpX *> const & v) const;
+  std::string src_str() const;
+  std::string dst_str() const;
+  // TODO: not implemented
+//   std::string to_qasm(std::vector<OpX *> const &v) const;
+
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,
-                                     const DAG *dst_graph);
+                                     const DAG *dst_graph,
+                                     bool no_increase_gate_count = false);
   static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
                                                  Command src_cmd,
                                                  std::vector<Command> dst_cmds);

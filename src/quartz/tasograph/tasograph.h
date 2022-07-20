@@ -6,6 +6,7 @@
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
 #include "../device/device.h"
+#include "../parser/qasm_parser.h"
 
 #include <chrono>
 #include <fstream>
@@ -189,13 +190,20 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
+  Op add_qubit(int qubit_idx);
+  Op add_parameter(const ParamType p);
+  Op new_gate(GateType gt);
   bool has_loop() const;
   size_t hash();
+  bool equal(const Graph &other) const;
   bool check_correctness();
-  float total_cost() const;
-  int gate_count() const;
+  int specific_gate_count(GateType gate_type) const;
+  [[nodiscard]] float total_cost() const;
+  [[nodiscard]] int gate_count() const;
+  [[nodiscard]] int circuit_depth() const;
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
@@ -209,10 +217,23 @@ public:
            bool enable_early_stop, bool use_rotation_merging_in_searching,
            GateType target_rotation, std::string circuit_name = "",
            int timeout = 86400 /*1 day*/);
+  std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
+                                  double gate_count_upper_bound,
+                                  std::string circuit_name, bool print_message,
+                                  int timeout = 86400 /*1 day*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
+  std::string to_qasm(bool print_result, bool print_id) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_id) const;
+  template <class _CharT, class _Traits>
+  static std::shared_ptr<Graph>
+  _from_qasm_stream(Context *ctx,
+                    std::basic_istream<_CharT, _Traits> &qasm_stream);
+  static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
+                                               const std::string &filename);
+  static std::shared_ptr<Graph> from_qasm_str(Context *ctx,
+                                              const std::string qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits() const;
@@ -227,9 +248,16 @@ public:
   toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                               GraphXfer *inverse_xfer,
                               std::vector<int> instruction);
-  std::vector<size_t> appliable_xfers(Op op, const std::vector<GraphXfer *> &);
+  std::vector<size_t> appliable_xfers(Op op,
+                                      const std::vector<GraphXfer *> &) const;
+  std::vector<size_t>
+  appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
+                                    bool eliminate_rotation = false);
+  std::pair<std::shared_ptr<Graph>, std::vector<int>>
+  apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                            bool eliminate_rotation = false);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;
@@ -276,7 +304,7 @@ public:
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
-  std::unordered_map<Op, int, OpHash> qubit_2_idx;
+  std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
 
   // physical mapping related

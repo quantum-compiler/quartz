@@ -30,13 +30,16 @@ See all supported gate types in [gates.inc.h](src/quartz/gate/gates.inc.h) and t
 
 And then you can run `./gen_ecc_set.sh` to generate the ECC set.
 
-### Optimize a quantum circuit
+## Optimize a quantum circuit
 
-todo (zikun): instructions to optimize a quantum circuit (C++ or Python interface, whichever is easier)
+We show the steps to super-optimize a quantum circuit in Quartz.
 
 #### Input the circuit
 
-To optimize a circuit, you can write your circuit in the `qasm` language and write it to a `qasm` file. Currently we only support a subset of `qasm`'s gramma. Specifically, the `qasm` files we support should consist of a header and lines of `qasm` instructions. The header should be in the format below:
+To optimize a circuit, you can write your circuit in the `qasm` language and write it to a `qasm` file.
+Currently, we only support a subset of `qasm`'s grammar.
+Specifically, the `qasm` files we support should consist of a header and lines of `qasm` instructions.
+The header should be in the format below:
 
 ```
 OPENQASM 2.0;
@@ -139,11 +142,11 @@ Please let us know if you encounter any bugs or have any suggestions by [submitt
 
 We welcome all contributions to Quartz from bug fixes to new features and extensions.
 
-Please subscribe to the Quartz users mailing list for 
+Please subscribe to the Quartz users mailing list (TODO)
 
 ## Citations
 
-* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia. [Quartz: Superoptimization of Quantum Circuits](). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
+* Mingkuan Xu, Zikun Li, Oded Padon, Sina Lin, Jessica Pointing, Auguste Hirth, Henry Ma, Jens Palsberg, Alex Aiken, Umut A. Acar, and Zhihao Jia. [Quartz: Superoptimization of Quantum Circuits](https://arxiv.org/abs/2204.09033). In Proceedings of the Conference on Programming Language Design and Implementation (PLDI), June 2022.
 
 
 ## License

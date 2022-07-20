@@ -1,11 +1,11 @@
 # distutils: language=c++
 
 from libcpp.vector cimport vector
-from libcpp.utility cimport pair
 from libcpp cimport bool
 from libc.stdint cimport uint32_t
 from libcpp.string cimport string
 from libcpp.memory cimport shared_ptr
+from libcpp.pair cimport pair
 
 ctypedef float ParamType
 
@@ -59,6 +59,7 @@ cdef extern from "context/context.h" namespace "quartz":
     cdef cppclass Context:
         Context(const vector[GateType]) except +
         size_t next_global_unique_id()
+        bool has_parameterized_gate() const
 
 ctypedef Context* Context_ptr
 
@@ -77,9 +78,11 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
     cdef cppclass GraphXfer:
         GraphXfer(Context_ptr, const DAG_ptr, const DAG_ptr) except +
         @staticmethod
-        GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr)
+        GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr, bool no_increase)
         int num_src_op()
         int num_dst_op()
+        string src_str()
+        string dst_str()
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Op:
@@ -99,17 +102,28 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         Graph(Context *) except +
         Graph(Context *, const DAG *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
-        shared_ptr[Graph] apply_xfer(GraphXfer *, Op) except +
+        shared_ptr[Graph] apply_xfer(GraphXfer *, Op, bool) except +
+        pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op, bool) except +
         vector[size_t] appliable_xfers(Op, const vector[GraphXfer *] &)
+        vector[size_t] appliable_xfers_parallel(Op, const vector[GraphXfer *] &)
         void all_ops(vector[Op]&) const
         int gate_count() const
+        int cx_count() const
+        int specific_gate_count(GateType) const
         size_t hash()
         void all_edges(vector[Edge]&) const
         void topology_order_ops(vector[Op] &) const
         shared_ptr[Graph] ccz_flip_t(Context *)
         void to_qasm(const string &, bool, bool) const
+        @staticmethod
+        shared_ptr[Graph] from_qasm_file(Context *, const string &)
+        @staticmethod
+        shared_ptr[Graph] from_qasm_str(Context *, const string &)
+        string to_qasm(bool, bool) const
         shared_ptr[Graph] ccz_flip_greedy_rz()
-        
+        bool equal(const Graph &) const
+        void rotation_merging(GateType)
+
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":
     cdef cppclass EquivalenceSet:
@@ -122,6 +136,8 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:
         QASMParser(Context *)
         bool load_qasm(const string &, DAG *&) except +
+        bool load_qasm_str(const string &, DAG *&) except +
+
 
 # Cython for physical mapping
 cdef extern from "supported_devices/supported_devices.h" namespace "quartz":

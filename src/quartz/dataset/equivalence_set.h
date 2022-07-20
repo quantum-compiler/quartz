@@ -105,9 +105,9 @@ namespace quartz {
 		// Return the number of equivalent classes removed.
 		int remove_singletons(Context *ctx, bool verbose = false);
 
-		// Normalize each DAG to have the minimal circuit representation.
+		// Normalize each DAG to have the canonical representation.
 		// Return the number of equivalent classes modified.
-		int normalize_to_minimal_circuit_representations(Context *ctx, bool verbose = false);
+		int normalize_to_canonical_representations(Context *ctx, bool verbose = false);
 
 		// Remove unused internal parameters.
 		// Return the number of equivalent classes modified.

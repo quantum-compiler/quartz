@@ -17,6 +17,13 @@ git clone --recursive https://github.com/quantum-compiler/quartz.git
 cd quartz
 ```
 
+* Set up the environment (including Python, OpenMP) by conda.
+
+```shell
+conda env create --name quartz --file env.yml
+conda activate quartz
+```
+
 * Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`. 
 ```shell
 mkdir build; 

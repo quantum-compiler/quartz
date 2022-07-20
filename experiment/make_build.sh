@@ -4,6 +4,7 @@ set -e	# exit immediately if anything you're running returns a non-zero return c
 cd /workspace/quartz
 pwd
 
+mkdir -p build
 cd build
 cmake -D CMAKE_INSTALL_PREFIX:PATH=~/usr_local ..
 make -j8 install

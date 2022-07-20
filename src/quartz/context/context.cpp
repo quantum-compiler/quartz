@@ -6,10 +6,11 @@
 #include <cassert>
 #include <cmath>
 #include <random>
+#include <mutex>
 
 namespace quartz {
 	Context::Context(const std::vector< GateType > &supported_gates)
-	    : supported_gates_(supported_gates), global_unique_id(16384) {
+	    : global_unique_id(16384), supported_gates_(supported_gates) {
 		gates_.reserve(supported_gates.size());
 		for (const auto &gate : supported_gates) {
 			insert_gate(gate);
@@ -31,14 +32,24 @@ namespace quartz {
         get_and_gen_parameters(num_params);
     }
 
-	size_t Context::next_global_unique_id(void) { return global_unique_id++; }
+	size_t Context::next_global_unique_id(void) {
+      static std::mutex lock;
+      std::lock_guard<std::mutex> lg(lock);
+      return global_unique_id++;
+    }
 
 	void Context::set_generated_parameter(int id, ParamType param) {
 		get_generated_parameters(id);
 		random_parameters_[id] = param;
 	}
 
-	Gate *Context::get_gate(GateType tp) { return gates_[tp].get(); }
+	Gate *Context::get_gate(GateType tp) {
+      const auto it = gates_.find(tp);
+      if (it != gates_.end())
+        return it->second.get();
+      else
+        return nullptr;
+    }
 
 	bool Context::insert_gate(GateType tp) {
 		if (gates_.count(tp) > 0) {
@@ -174,6 +185,15 @@ namespace quartz {
 		return dis_real(gen);
 	}
 
+    bool Context::has_parameterized_gate() const{
+        for(auto it = gates_.begin(); it != gates_.end(); ++it){
+            if(it->second->is_parametrized_gate())
+                return true;
+        }
+        return false;
+    }
+
+
 	Context union_contexts(Context *ctx_0, Context *ctx_1) {
 		std::vector< GateType > union_vector;
 		std::set< GateType > gate_set_0(ctx_0->get_supported_gates().begin(),
@@ -189,5 +209,6 @@ namespace quartz {
 		}
 		return Context(union_vector);
 	}
+
 
 } // namespace quartz

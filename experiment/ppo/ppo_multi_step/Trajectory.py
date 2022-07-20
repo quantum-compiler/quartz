@@ -20,7 +20,7 @@ class Trajectory:
 
         self.done = False
         self.is_nop = False
-        self.in_local = False
+        self.in_local = True
 
         self.node_range = []
 

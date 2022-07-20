@@ -151,18 +151,19 @@ class ActorCritic(nn.Module):
         graph_embed_list = torch.split(batched_graph_embeds, node_nums)
 
         # Get values
-        graph_embeds_for_node_value = []
+        graph_embeds_for_nodes = []
         for i in range(batched_dgl_gs.batch_size):
-            graph_embeds_for_node_value.append(graph_embed_list[i][nodes[i]])
-        graph_embeds_for_node_value = torch.stack(graph_embeds_for_node_value)
-        values = self.critic(graph_embeds_for_node_value).squeeze()
+            graph_embeds_for_nodes.append(graph_embed_list[i][nodes[i]])
+        graph_embeds_for_nodes = torch.stack(graph_embeds_for_nodes)
+        values = self.critic(graph_embeds_for_nodes).squeeze()
 
         # Get xfer logprobs and xfer entropys
-        selected_node_embeds = []
-        for i in range(batched_dgl_gs.batch_size):
-            selected_node_embeds.append(graph_embed_list[i][nodes[i]])
-        selected_node_embeds = torch.stack(selected_node_embeds)
-        xfer_logits = self.actor(selected_node_embeds)
+        # selected_node_embeds = []
+        # for i in range(batched_dgl_gs.batch_size):
+        #     selected_node_embeds.append(graph_embed_list[i][nodes[i]])
+        # selected_node_embeds = torch.stack(selected_node_embeds)
+        # xfer_logits = self.actor(selected_node_embeds)
+        xfer_logits = self.actor(graph_embeds_for_nodes)
         xfer_probs = masked_softmax(xfer_logits, masks)
         xfer_dists = Categorical(xfer_probs)
         xfer_logprobs = xfer_dists.log_prob(

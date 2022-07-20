@@ -49,7 +49,7 @@ lr_actor = 3e-4  # learning rate for actor network
 lr_critic = 5e-4  # learning rate for critic network
 random_seed = 0  # set random seed if required (0 = no random seed)
 entropy_coefficient = 0.02
-gnn_layers = 8
+gnn_layers = 7
 invalid_reward = -1
 
 #####################################################

@@ -72,6 +72,7 @@ class PPO:
             'lr':
             lr_critic
         }])
+        wandb.watch(self.policy, log='all', log_freq=10)
 
         self.policy_old = ActorCritic(gnn_layers, num_gate_type,
                                       graph_embed_size, actor_hidden_size,
@@ -148,9 +149,10 @@ class PPO:
                 elif self.buffer.next_nodes[idx] == []:
                     discounted_reward = torch.tensor(0)
                 elif is_terminal:
-                    discounted_reward = self.policy.get_local_max_value(
-                        self.buffer.next_graphs[idx],
-                        self.buffer.next_nodes[idx])
+                    discounted_reward = torch.tensor(0)
+                    # discounted_reward = self.policy.get_local_max_value(
+                    #     self.buffer.next_graphs[idx],
+                    #     self.buffer.next_nodes[idx])
                 discounted_reward = reward + (self.gamma * discounted_reward)
                 rewards.insert(0, discounted_reward)
 

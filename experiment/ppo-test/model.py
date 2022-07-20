@@ -96,8 +96,9 @@ class ActorCritic(nn.Module):
 
     def load_ckpt(self, ckpt_path: str) -> None:
         ckpt = torch.load(ckpt_path)
-        model_state_dict = ckpt['model_state_dict']
-        self.load_state_dict(model_state_dict)
+        # model_state_dict = ckpt['model_state_dict']
+        # self.load_state_dict(model_state_dict)
+        self.load_state_dict(ckpt)
 
     def get_nodes_and_xfers_deterministic(
             self, context: quartz.QuartzContext, circ: quartz.PyGraph,

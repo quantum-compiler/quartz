@@ -11,6 +11,7 @@ import dgl
 import time
 from tqdm import tqdm
 import sys
+from qiskit import QuantumCircuit
 
 # set device to cpu or cuda
 device = torch.device('cpu')
@@ -204,7 +205,7 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward, log_f):
     trajectory_best_gate_count = min(graph.gate_count,
                                      trajectory_best_gate_count)
 
-    return trajectory_reward, trajectory_best_gate_count, trajectory_len
+    return trajectory_reward, trajectory_best_gate_count, trajectory_len, graph
 
 
 if __name__ == '__main__':
@@ -287,6 +288,7 @@ if __name__ == '__main__':
     init_graph = quartz.PyGraph(context=context, dag=init_dag)
     xfer_dim = context.num_xfers
     best_gate_cnt = init_graph.gate_count
+    best_circ = init_graph
 
     ############# print all hyperparameters #############
 
@@ -359,11 +361,15 @@ if __name__ == '__main__':
     tqdm_bar = tqdm(range(batch_size))
     for i in tqdm_bar:
         log_f.write(f'trajectory {i}\n')
-        t_reward, t_best_gate_cnt, t_seq_len = get_trajectory(
+        t_reward, t_best_gate_cnt, t_seq_len, last_graph = get_trajectory(
             ppo_agent, init_graph, max_seq_len, invalid_reward, log_f)
 
         current_ep_reward += t_reward
-        best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
+        if best_gate_cnt > t_best_gate_cnt:
+            best_gate_cnt = t_best_gate_cnt
+            best_circ = last_graph
+            qiskit_circ = QuantumCircuit.from_qasm_str(best_circ.to_qasm_str())
+            qiskit_circ.draw(output='mpl').savefig('best.png')
         ep_best_gate_cnt = min(ep_best_gate_cnt, t_best_gate_cnt)
         ep_seq_len += t_seq_len
         tqdm_bar.set_description(f'best: {best_gate_cnt}')

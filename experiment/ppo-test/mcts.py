@@ -9,17 +9,20 @@ actor_hidden_dim = 256
 critic_hidden_dim = 128
 hit_rate = 0.9
 
-gate_set = ['h', 'cx', 'x', 'rz', 'add']
-ECC_fn = 'Nam_complete_ECC_set.json'
+# gate_set = ['h', 'cx', 'x', 'rz', 'add']
+gate_set = ['t', 'tdg', 'h', 'x', 'cx']
+# ECC_fn = 'Nam_complete_ECC_set.json'
+ECC_fn = '../ecc_set/t_tdg.json.ecc'
 no_increase = False
 include_nop = True
 
-ckpt_path = "pretrained_model.pt"
+ckpt_path = "pretrained_model.pth"
 
-circ_qasm_path = '../nam_circs/barenco_tof_3.qasm'
+# circ_qasm_path = '../nam_circs/barenco_tof_3.qasm'
+circ_qasm_path = '../t_tdg_circs/barenco_tof_3.qasm'
 
 MCTS_C = 0.5
-MCTS_K = 10
+MCTS_K = 20
 MCTS_budget = 1000
 MCTS_max_step_len = 100
 MCTS_gamma = 0.95

@@ -53,8 +53,8 @@ def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "u3" :return GateType.u3
     if gate_type_str == "ccz" :return GateType.ccz
     if gate_type_str == "cz" :return GateType.cz
-    if gate_type_str == "input_qubit" :return GateType.input_qubit        
-    if gate_type_str == "input_param" :return GateType.input_param        
+    if gate_type_str == "input_qubit" :return GateType.input_qubit
+    if gate_type_str == "input_param" :return GateType.input_param
 
 cdef class PyQASMParser:
     cdef QASMParser *parser
@@ -159,19 +159,19 @@ cdef class PyDAG:
     @property
     def num_qubits(self):
         return self.dag.get_num_qubits()
-    
+
     @property
     def num_input_parameters(self):
         return self.dag.get_num_input_parameters()
-    
+
     @property
     def num_total_parameters(self):
-        return self.dag.get_num_total_parameters() 
+        return self.dag.get_num_total_parameters()
 
     @property
     def num_internal_parameters(self):
-        return self.dag.get_num_internal_parameters() 
-    
+        return self.dag.get_num_internal_parameters()
+
     @property
     def num_gates(self):
         return self.dag.get_num_gates()
@@ -199,12 +199,12 @@ cdef class PyXfer:
         if self.is_nop:
             self.graphXfer = NULL
         return self
-    
+
     # TODO: raise exception if NULL or NOP
     @property
     def src_gate_count(self):
         return self.graphXfer.num_src_op()
-    
+
     # TODO: raise exception if NULL or NOP
     @property
     def dst_gate_count(self):
@@ -330,7 +330,7 @@ cdef class QuartzContext:
     @property
     def num_equivalence_classes(self):
         return self.eqs.num_equivalence_classes()
-    
+
     @property
     def num_xfers(self):
         num = self.v_xfers.size()
@@ -351,7 +351,7 @@ cdef class PyNode:
 
     def __dealloc__(self):
         pass
-    
+
     @property
     def node_guid(self):
         return self.node.guid
@@ -438,7 +438,7 @@ cdef class PyGraph:
         if context.include_nop:
             result.push_back(context.num_xfers - 1)
         return result
-                    
+
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False) -> PyGraph:
         if xfer.is_nop:
@@ -502,7 +502,7 @@ cdef class PyGraph:
         dst_id = []
         src_idx = []
         dst_idx = []
-        
+
         for e in edges:
             src_id.append(e[0])
             dst_id.append(e[1])
@@ -566,7 +566,7 @@ cdef class PyGraph:
 
     def __lt__(self, other):
         return self.gate_count < other.gate_count
-    
+
     def __le__(self, other):
         return self.gate_count <= other.gate_count
 
@@ -594,29 +594,64 @@ cdef class PyGraph:
 
 
 # physical mapping finished
-cdef class PyState:
-    cdef shared_ptr[State] state_ptr
+def ToBackendType(tp_str: str) -> BackendType:
+    if tp_str == "Q20_CLIQUE":
+        return BackendType.Q20_CLIQUE
+    elif tp_str == "IBM_Q20_TOKYO":
+        return BackendType.IBM_Q20_TOKYO
+    elif tp_str == "Q5_TEST":
+        return BackendType.Q5_TEST
+    else:
+        raise NotImplementedError
 
-    def __cinit__(self, *):
-        pass
+def FromBackendType(tp: BackendType) -> str:
+    if tp == BackendType.Q20_CLIQUE:
+        return "Q20_CLIQUE"
+    elif tp == BackendType.IBM_Q20_TOKYO:
+        return "IBM_Q20_TOKYO"
+    elif tp == BackendType.Q5_TEST:
+        return "Q5_TEST"
+    else:
+        raise NotImplementedError
 
-    def __dealloc__(self):
-        self.state_ptr.reset()
+def ToActionType(tp_str: str) -> ActionType:
+    if tp_str == "PhysicalFull":
+        return ActionType.PhysicalFull
+    elif tp_str == "PhysicalFront":
+        return ActionType.PhysicalFront
+    elif tp_str == "Logical":
+        return ActionType.Logical
+    elif tp_str == "Unknown":
+        return ActionType.Unknown
+    else:
+        raise NotImplementedError
 
-    cdef set_this(self, shared_ptr[State] _state_ptr):
-        self.state_ptr = _state_ptr
+def FromActionType(tp: ActionType) -> str:
+    if tp == ActionType.PhysicalFull:
+        return "PhysicalFull"
+    elif tp == ActionType.PhysicalFront:
+        return "PhysicalFront"
+    elif tp == ActionType.Logical:
+        return "Logical"
+    elif tp == ActionType.Unknown:
+        return "Unknown"
+    else:
+        raise NotImplementedError
 
 cdef class PyAction:
     cdef shared_ptr[Action] action_ptr
 
-    def __cinit__(self, *, ActionType _type=ActionType.Unknown, int _qubit_idx_0=-1, int _qubit_idx_1=-1):
-        if _type == ActionType.Unknown and _qubit_idx_0 == -1 and _qubit_idx_1 == -1:
-            pass
+    def __cinit__(self, *, type_str="Unknown", qubit_idx_0=-1, qubit_idx_1=-1, instantiate=True):
+        cdef ActionType cur_tp = ToActionType(str(type_str))
+        cdef int cur_idx_0 = qubit_idx_0
+        cdef int cur_idx_1 = qubit_idx_1
+        if instantiate:
+            self.action_ptr = make_shared[Action](cur_tp, cur_idx_0, cur_idx_1)
         else:
-            self.action_ptr = make_shared[Action](_type, _qubit_idx_0, _qubit_idx_1)
+            pass
 
     def __dealloc__(self):
-        self.action_ptr.reset()
+        pass
 
     cdef set_this(self, shared_ptr[Action] _action_ptr):
         self.action_ptr = _action_ptr
@@ -630,15 +665,28 @@ cdef class PyAction:
         return deref(self.action_ptr).qubit_idx_1
 
     @property
-    def type(self) -> ActionType:
-        return deref(self.action_ptr).type
+    def type(self) -> str:
+        return FromActionType(deref(self.action_ptr).type)
+
+# cdef class PyState:
+#     cdef shared_ptr[State] state_ptr
+#
+#     def __cinit__(self, *):
+#         pass
+#
+#     def __dealloc__(self):
+#         self.state_ptr.reset()
+#
+#     cdef set_this(self, shared_ptr[State] _state_ptr):
+#         self.state_ptr = _state_ptr
 
 cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env
 
-    def __cinit__(self, *, str qasm_file_path, BackendType backend_type):
-        encoded_path = qasm_file_path.encode('utf-8')
-        self.env = new SimplePhysicalEnv(encoded_path, backend_type)
+    def __cinit__(self, *, qasm_file_path: str, backend_type_str: str):
+        cdef string encoded_path = qasm_file_path.encode('utf-8')
+        cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
+        self.env = new SimplePhysicalEnv(encoded_path, cur_backend_type)
 
     def __dealloc__(self):
         del self.env
@@ -652,10 +700,10 @@ cdef class PySimplePhysicalEnv:
     def is_finished(self) -> bool:
         return self.env.is_finished()
 
-    def get_state(self):
-        cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
-        py_state = PyState()
-        py_state.set_this(c_state)
+    # def get_state(self):
+    #     cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
+    #     py_state = PyState()
+    #     py_state.set_this(c_state)
 
     def get_action_space(self) -> [PyAction]:
         cdef vector[Action] c_action_space = self.env.get_action_space()
@@ -664,7 +712,7 @@ cdef class PySimplePhysicalEnv:
         py_action_space = []
         for i in range(total_size):
             tmp_c_action = make_shared[Action](c_action_space[i])
-            py_action = PyAction()
+            py_action = PyAction(instantiate=False)
             py_action.set_this(tmp_c_action)
             py_action_space.append(py_action)
         return py_action_space

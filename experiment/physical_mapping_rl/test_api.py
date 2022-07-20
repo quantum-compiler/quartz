@@ -1,13 +1,11 @@
-from quartz import PySimplePhysicalEnv, BackendType
+from quartz import PySimplePhysicalEnv
 
 
 def main():
-    circuit_file_name = "../sabre.qasm"
-    env = PySimplePhysicalEnv(circuit_file_name, BackendType.IBM_Q20_TOKYO)
-    state_before = env.get_state()
+    env = PySimplePhysicalEnv(qasm_file_path="./sabre.qasm", backend_type_str="IBM_Q20_TOKYO")
     action_space = env.get_action_space()
-    print(state_before)
-    print(action_space)
+    for action in action_space:
+        print(f"Type {action.type}, qubit_idx_0={action.qubit_idx_0}, qubit_idx_1={action.qubit_idx_1}.")
 
 
 if __name__ == '__main__':

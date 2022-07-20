@@ -143,7 +143,8 @@ cdef extern from "parser/qasm_parser.h" namespace "quartz":
 cdef extern from "supported_devices/supported_devices.h" namespace "quartz":
     cpdef enum class BackendType:
         Q20_CLIQUE,
-        IBM_Q20_TOKYO
+        IBM_Q20_TOKYO,
+        Q5_TEST
 
 cdef extern from "game/game_utils.h" namespace "quartz":
     ctypedef double Reward

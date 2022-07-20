@@ -7,7 +7,7 @@ pwd
 mkdir -p build
 cd build
 cmake -D CMAKE_INSTALL_PREFIX:PATH=~/usr_local ..
-make -j8 install
+make -j32 install
 
 cd ..
 cd python

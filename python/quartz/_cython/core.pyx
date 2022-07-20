@@ -444,14 +444,29 @@ cdef class PyState:
 cdef class PyAction:
     cdef shared_ptr[Action] action_ptr
 
-    def __cinit__(self, *):
-        pass
+    def __cinit__(self, *, ActionType _type=ActionType.Unknown, int _qubit_idx_0=-1, int _qubit_idx_1=-1):
+        if _type == ActionType.Unknown and _qubit_idx_0 == -1 and _qubit_idx_1 == -1:
+            pass
+        else:
+            self.action_ptr = make_shared[Action](_type, _qubit_idx_0, _qubit_idx_1)
 
     def __dealloc__(self):
         self.action_ptr.reset()
 
     cdef set_this(self, shared_ptr[Action] _action_ptr):
         self.action_ptr = _action_ptr
+
+    @property
+    def qubit_idx_0(self) -> int:
+        return deref(self.action_ptr).qubit_idx_0
+
+    @property
+    def qubit_idx_1(self) -> int:
+        return deref(self.action_ptr).qubit_idx_1
+
+    @property
+    def type(self) -> ActionType:
+        return deref(self.action_ptr).type
 
 cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env

@@ -294,7 +294,7 @@ class GraphBuffer:
         self.graph_costs: List[int] = []
 
         self.all_graphs: Dict[quartz.PyGraph, AllGraphDictValue] = {
-            self.original_graph: AllGraphDictValue(0, None, None, Action(0, 0)),
+            self.original_graph: AllGraphDictValue(0, self.original_cost, None, Action(0, 0)),
         }
     
     def __len__(self) -> int:

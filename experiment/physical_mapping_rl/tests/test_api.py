@@ -24,6 +24,8 @@ def main():
     print()
 
     # move one step forward
+    total_gate_count = cur_state.circuit.gate_count
+    print(f"Total gate count is {total_gate_count}")
     selected_action = action_space[0]
     reward = env.step(action=selected_action)
     print(f"Selected Action: Type={selected_action.type}, qubit_idx_0={selected_action.qubit_idx_0},"

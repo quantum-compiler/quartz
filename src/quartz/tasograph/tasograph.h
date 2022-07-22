@@ -199,11 +199,12 @@ public:
            GateType target_rotation, std::string circuit_name = "",
            int timeout = 86400 /*1 day*/, bool use_reuse = false /*to determine use of old or new search algorithm*/);
   std::shared_ptr<Graph>
-  optimize_reuse(float alpha, int budget, bool print_subst, Context *ctx,
-                          const std::string &equiv_file_name, bool use_simulated_annealing,
+  optimize_reuse(float alpha, float beta, int budget, Context *ctx,
+                          const std::string &equiv_file_name,
                           bool enable_early_stop, bool use_rotation_merging_in_searching,
                           GateType target_rotation, std::string circuit_name = "",
                           int timeout = 86400 /*1 day*/);
+  std::set<Graph *> build_subcircuits(std::shared_ptr<Graph> circuit);
   std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
                                   double gate_count_upper_bound,
                                   std::string circuit_name, bool print_message,

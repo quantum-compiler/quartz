@@ -1344,20 +1344,131 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
+// This implementation is based on the old API
 std::shared_ptr<Graph> Graph::optimize_reuse(
-        float alpha, int budget, bool print_subst, Context *ctx,
-        const std::string &equiv_file_name, bool use_simulated_annealing,
+        float alpha, float beta, int budget, Context *ctx,
+        const std::string &equiv_file_name,
         bool enable_early_stop, bool use_rotation_merging_in_searching,
         GateType target_rotation, std::string circuit_name, int timeout) {
     EquivalenceSet eqs;
     // Load equivalent dags from file
     auto start = std::chrono::steady_clock::now();
     if (!eqs.load_json(ctx, equiv_file_name)) {
-        std::cerr << "Failed to load equivalenc file: " << equiv_file_name
+        std::cerr << "Failed to load equivalence file: " << equiv_file_name
                   << std::endl;
         exit(1);
     }
+    auto end = std::chrono::steady_clock::now();
 
+    std::vector<GraphXfer *> xfers;
+    for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
+        bool first = true;
+        DAG *first_dag = nullptr;
+        for (const auto &dag : equiv_set) {
+            if (first) {
+                // Used raw pointer according to the GraphXfer API
+                // May switch to smart pointer later
+                first_dag = new DAG(*dag);
+                first = false;
+            } else {
+                DAG *other_dag = new DAG(*dag);
+                // first_dag is src, others dst
+                auto first_2_other =
+                        GraphXfer::create_GraphXfer(ctx, first_dag, other_dag);
+                // first_dag is dst, others src
+                auto other_2_first =
+                        GraphXfer::create_GraphXfer(ctx, other_dag, first_dag);
+                if (first_2_other != nullptr) {
+                    xfers.push_back(first_2_other);
+                }
+                if (other_2_first != nullptr) {
+                    xfers.push_back(other_2_first);
+                }
+                delete other_dag;
+            }
+        }
+        delete first_dag;
+    }
+    // I believe the above serves provides the set of verified transformations?
+    // Does such an object exist already?
+    // hyperparameters alpha and beta passed in
+    // alpha for optimization of circuit
+    // beta for optimization of subcircuits
+
+    // initialize priority queue
+    std::priority_queue<std::shared_ptr<Graph>,
+            std::vector<std::shared_ptr<Graph>>, GraphCompare>
+            candidates;
+    std::shared_ptr<Graph> bestGraph(new Graph(*this));
+    float bestCost = total_cost();
+    std::set<size_t> hashmap;
+    candidates.push(std::shared_ptr<Graph>(new Graph(*this)));
+    hashmap.insert(hash());
+    // New structure: dictionary of optimized subcircuits
+    std::unordered_map<std::size_t, std::set<Graph>> sub_candidates;
+    // TODO: Verify that this unordered_map uses the correct data structures
+    // TODO: Determine how best to organize values within sub_candidates
+
+    // I want the algorithm to look at smaller rewrite subcircuits before larger ones, so sub_candidiates
+    // needs to be ordered in some way.
+    // Binary search tree?
+    // Nested lists? (i.e. items within sub_candidates are dictionaries themselves, with keys being gate count
+    // and items being unordered lists of subcircuits
+    // Most straightforward implementation: ordered list.
+    // Insertion into ordered lists could potentially take longer for larger subcircuits
+    // Plan at this point: implement an ordered list, but consider nested unordered lists
+
+    // Optimizer
+    start = std::chrono::steady_clock::now();
+    while (!candidates.empty()) {
+        auto candidate = candidates.top();
+        if (use_rotation_merging_in_searching) {
+            candidate->rotation_merging(target_rotation);
+        }
+        candidates.pop();
+        if (candidate->total_cost() < bestCost) {
+            bestCost = candidate->total_cost();
+            bestGraph = candidate;
+        }
+
+        // TODO: Verify the following's purpose
+        candidate->constant_and_rotation_elimination();
+
+        // timeout check
+        end = std::chrono::steady_clock::now();
+        if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0 > timeout) {
+            std::cout << "Timeout. Program terminated. Best cost is "
+                    << bestCost << std::endl;
+            bestGraph->constant_and_rotation_elimination();
+            return bestGraph;
+        }
+        fprintf(stdout, "bestCost(%.4lf) candidates(%zu) after %.4lf seconds\n",
+                bestCost, candidates.size(),
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0);
+        fflush(stdout);
+
+        std::set<Graph *> subCircuits = build_subcircuits(candidate);
+        for (Graph *subCircuit : subCircuits) {
+            auto dagSub = subCircuit;
+        }
+
+
+    }
+
+    return bestGraph;
+}
+
+// Construct a set of all possible subcircuits up to a certain size present in an input circuit
+std::set<Graph *> Graph::build_subcircuits(std::shared_ptr<Graph> circuit) {
+    std::set<Graph *> subCircuits{};
+    // TODO: Add empty graph?
+    std::vector<Op> ops;
+    circuit->topology_order_ops(ops);
+    assert(ops.size() == (size_t)circuit->gate_count());
+    for (auto const op : ops) {
+
+    }
+    return subCircuits;
 }
 
 std::shared_ptr<Graph> Graph::optimize(
@@ -1868,7 +1979,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
   }
   if (!fail) {
-    // Check qubit consistancy
+    // Check qubit consistency
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
@@ -1946,7 +2057,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   mapped_opx.insert(*xfer->srcOps.begin());
   opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
-  // input Op, output OpX, output Op can match. Because the source graphs is
+  // input Op, output OpX, output Op can match. Because the source graph is
   // connected, by doing this we can traverse all nodes.
   bool fail = false;
   size_t idx = 0;
@@ -2018,7 +2129,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
     }
   }
   if (!fail) {
-    // Check qubit consistancy
+    // Check qubit consistency
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {
@@ -2105,7 +2216,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
   mapped_opx.insert(*xfer->srcOps.begin());
   opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
-  // input Op, output OpX, output Op can match. Because the source graphs is
+  // input Op, output OpX, output Op can match. Because the source graph is
   // connected, by doing this we can traverse all nodes.
   bool fail = false;
   size_t idx = 0;
@@ -2177,7 +2288,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
     }
   }
   if (!fail) {
-    // Check qubit consistancy
+    // Check qubit consistency
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {

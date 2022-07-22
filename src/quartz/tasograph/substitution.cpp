@@ -402,10 +402,10 @@ bool GraphXfer::map_output(const TensorX &src, const TensorX &dst) {
 bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // This function takes in an OpX, and will check all its input and
   // output tensors. If there are tensors connecting it with other already
-  // mapped ops, check whether these edges exists in the given Graph. No
+  // mapped ops, check whether these edges exist in the given Graph. No
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
-  // be checked. This gauarentee that every edges are checked at the end.
+  // be checked. This guarantees that all edges are checked at the end.
   // Check gate type
   if (op == Op::INVALID_OP)
     return false;
@@ -512,7 +512,7 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
   for (size_t i = 0; i < srcOp->inputs.size(); i++) {
     TensorX in = srcOp->inputs[i];
     if (in.op == nullptr) {
-      // Update mappedInputsa
+      // Update mappedInputs
       auto it = mappedInputs.find(in.idx);
       mappedInputs.erase(it);
     }

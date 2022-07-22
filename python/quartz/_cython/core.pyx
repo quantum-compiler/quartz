@@ -3,7 +3,8 @@
 from cython.operator cimport dereference as deref
 from libcpp.string cimport string
 from libcpp.vector cimport vector
-from libcpp.memory cimport shared_ptr, make_shared
+from libcpp.utility cimport pair
+from libcpp.memory cimport shared_ptr, make_shared, nullptr
 from libcpp cimport bool
 from CCore cimport GateType
 from CCore cimport Gate
@@ -668,17 +669,86 @@ cdef class PyAction:
     def type(self) -> str:
         return FromActionType(deref(self.action_ptr).type)
 
-# cdef class PyState:
-#     cdef shared_ptr[State] state_ptr
-#
-#     def __cinit__(self, *):
-#         pass
-#
-#     def __dealloc__(self):
-#         self.state_ptr.reset()
-#
-#     cdef set_this(self, shared_ptr[State] _state_ptr):
-#         self.state_ptr = _state_ptr
+class PyDevice:
+    def __init__(self):
+        self.edge_list = []
+
+    def add_edge(self, reg_idx_0: int, reg_idx_1: int):
+        self.edge_list.append([reg_idx_0, reg_idx_1])
+
+class PyMappingTable:
+    def __init__(self):
+        self.map = {}
+
+    def add_mapping(self, from_idx: int, to_idx: int):
+        assert from_idx not in self.map
+        self.map[from_idx] = to_idx
+
+cdef class PyState:
+    cdef shared_ptr[State] state_ptr
+    cdef object graph
+    cdef object device_edges
+    cdef object logical2physical
+    cdef object physical2logical
+
+    def __init__(self):
+        self.graph = None               # PyGraph
+        self.device_edges = None        # PyDevice
+        self.logical2physical = None    # PyMappingTable
+        self.physical2logical = None    # PyMappingTable
+
+    def __cinit__(self, *):
+        pass
+
+    def __dealloc__(self):
+        pass
+
+    cdef set_this(self, shared_ptr[State] _state_ptr):
+        # set state ptr, this is original date from c side
+        self.state_ptr = _state_ptr
+
+        # extract data: graph
+        cdef shared_ptr[Graph] c_graph = make_shared[Graph](deref(_state_ptr).graph)
+        graph = PyGraph()
+        graph.set_this(c_graph)
+        self.graph = graph
+
+        # extract data: device edges
+        cdef vector[pair[int, int]] c_device_edges = deref(_state_ptr).device_edges
+        cdef int edge_count = c_device_edges.size()
+        self.device_edges = PyDevice()
+        for i in range(edge_count):
+            self.device_edges.add_edge(c_device_edges[i].first, c_device_edges[i].second)
+
+        # extract data: mapping table
+        cdef vector[int] c_logical2physical = deref(_state_ptr).logical2physical
+        cdef int num_qubits = c_logical2physical.size()
+        self.logical2physical = PyMappingTable()
+        for i in range(num_qubits):
+            self.logical2physical.add_mapping(i, c_logical2physical[i])
+        cdef vector[int] c_physical2logical = deref(_state_ptr).physical2logical
+        cdef int num_regs =  c_physical2logical.size()
+        self.physical2logical = PyMappingTable()
+        for i in range(num_regs):
+            self.physical2logical.add_mapping(i, c_physical2logical[i])
+        assert num_regs == num_qubits
+
+    @property
+    def circuit(self) -> PyGraph:
+        return self.graph
+
+    @property
+    def device_edges_list(self) -> [[int, int]]:
+        return self.device_edges.edge_list
+
+    @property
+    def logical2physical_mapping(self) -> {int: int}:
+        return self.logical2physical.map
+
+    @property
+    def physical2logical_mapping(self) -> {int: int}:
+        return self.physical2logical.map
+
 
 cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env
@@ -700,10 +770,11 @@ cdef class PySimplePhysicalEnv:
     def is_finished(self) -> bool:
         return self.env.is_finished()
 
-    # def get_state(self):
-    #     cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
-    #     py_state = PyState()
-    #     py_state.set_this(c_state)
+    def get_state(self) -> PyState:
+        cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
+        py_state = PyState()
+        py_state.set_this(c_state)
+        return py_state
 
     def get_action_space(self) -> [PyAction]:
         cdef vector[Action] c_action_space = self.env.get_action_space()

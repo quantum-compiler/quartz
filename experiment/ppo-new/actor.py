@@ -211,6 +211,12 @@ class PPOAgent:
         self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
 
+        #####
+        self.split_cnt: int = 100
+        self.self_new_best: bool = False
+        self.others_new_best: bool = False
+        #####
+
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
         """respond to a single query"""
@@ -523,6 +529,9 @@ class PPOAgent:
                     os.path.join(sync_dir, f'best_info_{r}.json'))
             # end if r
         # end for r
+        if not self.others_new_best and not self.self_new_best:
+            self.split_cnt = math.floor(1.2 * self.split_cnt)
+            print(f"split circuit size becomes {self.split_cnt}")
 
     def load_best_info(self, best_info_path: str) -> None:
         best_info: List[Dict[str, Any]]
@@ -533,6 +542,9 @@ class PPOAgent:
             info = best_info[i]
             assert buffer.name == info['name']
             if buffer.push_nonexist_best(info['qasm']):
+                #####
+                self.others_new_best = True
+                #####
                 printfl(
                     f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
                 )
@@ -633,6 +645,10 @@ class PPOAgent:
         eps_lists: List[ExperienceList] = [
             ExperienceList.new_empty() for _ in range(num_eps)
         ]
+        #####
+        self.self_new_best = False
+        self.others_new_best = False
+        #####
         """sample init state"""
         buffer_idx_list: List[int] = []
         init_graph_list: List[quartz.PyGraph] = []
@@ -646,7 +662,8 @@ class PPOAgent:
             self.init_buffer_turn = (self.init_buffer_turn + 1) % len(
                 self.graph_buffers)
             ##### Split circuit
-            circuit_pieces_info = split_qasm(init_graph.to_qasm_str(), 200)
+            circuit_pieces_info = split_qasm(init_graph.to_qasm_str(),
+                                             self.split_cnt)
             circuit_pieces_info_list.append(circuit_pieces_info)
             qasm_str: str = circuit_pieces_info[0]
             init_graph = quartz.PyGraph.from_qasm_str(
@@ -814,7 +831,13 @@ class PPOAgent:
                         seq_path = self.output_seq(graph_buffer.name,
                                                    next_graph_cost, seq)
                         msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
-                        printfl(f'\n{msg}\n')
+                        ##### print information about xfer
+                        xfer: quartz.PyXfer = qtz.quartz_context.get_xfer_from_id(
+                            id=action.xfer)
+                        xfer_info: str = f"xfer_id: {action.xfer}\nsrc:\n{xfer.src_str}\ndst:\n{xfer.dst_str}"
+                        printfl(f'\n{msg}\n{xfer_info}\n')
+                        self.self_new_best = True
+                        #####
                         if self.id == 0:  # TODO multi-processing logging
                             wandb.alert(
                                 title='Better graph is found!',
@@ -834,7 +857,7 @@ class PPOAgent:
                     init_graph = graph_buffer.sample(greedy_sample)
                     ##### Split circuit
                     circuit_pieces_info = split_qasm(init_graph.to_qasm_str(),
-                                                     200)
+                                                     self.split_cnt)
                     circuit_pieces_info_list[i_eps] = circuit_pieces_info
                     qasm_str = circuit_pieces_info[0]
                     init_graph = quartz.PyGraph.from_qasm_str(

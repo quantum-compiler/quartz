@@ -163,11 +163,13 @@ class PPOAgent:
         dyn_eps_len: bool,
         max_eps_len: int,
         min_eps_len: int,
+        output_full_seq: bool,
         output_dir: str,
     ) -> None:
         self.id = agent_id
         self.num_agents = num_agents
         self.device = device
+        self.output_full_seq = output_full_seq
         self.output_dir = output_dir
         self.dyn_eps_len = dyn_eps_len
         self.max_eps_len = max_eps_len
@@ -564,17 +566,34 @@ class PPOAgent:
     def output_seq(
         self,
         name: str,
-        best_gc: int,
+        best_cost: int,
         seq: List[Tuple[quartz.PyGraph, Action, float]]
     ) -> str:
-        output_dir = os.path.join(self.output_dir, name, f'{best_gc}_{self.id}')
+        output_dir = os.path.join(self.output_dir, name, f'{best_cost}_{self.id}')
         os.makedirs(output_dir)
         for i_step, (graph, action, reward) in enumerate(seq):
+            # NOTE: action here is what action to apply on this graph to get the next graph
             fname = f'{i_step}_{get_cost(graph, self.cost_type)}_{int(reward)}_' \
                     f'{action.node}_{action.xfer}.qasm'
             qasm = graph.to_qasm_str()
             with open(os.path.join(output_dir, fname), 'w') as f:
                 f.write(qasm)
+        return output_dir
+
+    def output_full_opt_seq(
+        self, all_graphs: Dict[quartz.PyGraph, AllGraphDictValue],
+        name: str, best_graph: quartz.PyGraph, best_cost: int,
+    ) -> str:
+        output_dir = os.path.join(self.output_dir, name, f'fullseq_{best_cost}_{self.id}')
+        graph = best_graph
+        while graph is not None:
+            info: AllGraphDictValue = all_graphs[graph]
+            # NOTE: action here is how this graph is got from its predecessors
+            fname = f'{info.dist}_{info.cost}_{info.action.node}_{info.action.xfer}.qasm'
+            qasm = graph.to_qasm_str()
+            with open(os.path.join(output_dir, fname), 'w') as f:
+                f.write(qasm)
+            graph = info.pre_graph
         return output_dir
     
     @torch.no_grad()
@@ -713,6 +732,8 @@ class PPOAgent:
                     
                 graph_buffer.rewards[-1].append(reward)
                 graph_buffer.append_costs_from_graph(next_graph)
+                if self.output_full_seq:
+                    graph_buffer.push_back_all_graphs(next_graph, next_graph_cost, graph, action)
                 if not game_over and not qtz.is_nop(action.xfer) and \
                     next_graph_cost <= get_cost(graph_seq[0], self.cost_type):
                     graph_buffer.push_back(next_graph)
@@ -736,6 +757,10 @@ class PPOAgent:
                                 wait_duration=0,
                             ) # send alert to slack
                         graph_buffer.best_graph = next_graph
+                        if self.output_full_seq:
+                            printfl(f'{self.id}: saving full seq...')
+                            full_seq_path = self.output_full_opt_seq(graph_buffer.all_graphs, graph_buffer.name, next_graph, next_graph_cost)
+                            printfl(f'{self.id}: full seq saved to {full_seq_path}')
                     # end if better
                 # end if
                 

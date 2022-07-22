@@ -2,6 +2,7 @@
 """data structures"""
 from __future__ import annotations
 from dataclasses import dataclass, fields
+import heapq
 from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar, cast
 import math
 import random
@@ -249,6 +250,13 @@ class ExperienceListIterator:
         else:
             raise StopIteration
 
+@dataclass
+class AllGraphDictValue:
+    dist: int
+    cost: int
+    pre_graph: quartz.PyGraph
+    action: Action
+
 class GraphBuffer:
     """store PyGraph of a class of circuits for init state sampling and maintain some other infos"""
     def __init__(
@@ -284,6 +292,10 @@ class GraphBuffer:
         self.graph_ccs: List[int] = []
         self.init_graph_costs: List[int] = []
         self.graph_costs: List[int] = []
+
+        self.all_graphs: Dict[quartz.PyGraph, AllGraphDictValue] = {
+            self.original_graph: AllGraphDictValue(0, None, None, Action(0, 0)),
+        }
     
     def __len__(self) -> int:
         return len(self.hashset)
@@ -438,6 +450,17 @@ class GraphBuffer:
             info[f'mean_{name}_iter'] = sum(values) / len(values)
         
         return info
+
+    def push_back_all_graphs(
+        self, graph: quartz.PyGraph, cost: int, pre_graph: quartz.PyGraph, action: Action,
+    ) -> None:
+        # assert pre_graph in self.all_graphs
+        dist = 1 + self.all_graphs[pre_graph].dist
+        pre_cand = self.all_graphs.pop(graph, AllGraphDictValue(math.inf, None, None, None))
+        if dist < pre_cand.dist + 1:
+            pre_cand = AllGraphDictValue(dist, cost, pre_graph, action)
+            # NOTE: action here is how this graph is got from pre_graph
+        self.all_graphs[graph] = pre_cand
     
     # def shrink(self) -> None:
     #     for cost_key in self.cost_to_graph:

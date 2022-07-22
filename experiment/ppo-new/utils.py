@@ -94,14 +94,14 @@ def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor
     logits[~mask] -= 1e10
     return F.softmax(logits, dim=-1)
 
-def errprint(s: str, file = sys.stderr) -> None:
-    print(s, file=file)
+def errprint(s: str, file = sys.stderr, end = '\n') -> None:
+    print(s, file=file, end=end)
 
-def printfl(s: str) -> None:
-    print(s, flush=True)
+def printfl(s: str, end = '\n') -> None:
+    print(s, flush=True, end=end)
     
-def logprintfl(s: str) -> None:
-    print(f'[{datetime.datetime.now()}] {s}', flush=True)
+def logprintfl(s: str, end = '\n') -> None:
+    print(f'[{datetime.datetime.now()}] {s}', flush=True, end=end)
 
 def get_time_ns() -> int:
     return time.time_ns()

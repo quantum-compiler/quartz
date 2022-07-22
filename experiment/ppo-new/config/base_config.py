@@ -97,6 +97,9 @@ class BaseConfig:
     update_policy_interval: int = 1
     save_ckpt_interval: int = 5
     time_budget: str = ''
+
+    # logging
+    output_full_seq: bool = False
     
 @dataclass
 class TestConfig(BaseConfig):

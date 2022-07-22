@@ -585,6 +585,7 @@ class PPOAgent:
         name: str, best_graph: quartz.PyGraph, best_cost: int,
     ) -> str:
         output_dir = os.path.join(self.output_dir, name, f'fullseq_{best_cost}_{self.id}')
+        os.makedirs(output_dir)
         graph = best_graph
         while graph is not None:
             info: AllGraphDictValue = all_graphs[graph]
@@ -758,9 +759,9 @@ class PPOAgent:
                             ) # send alert to slack
                         graph_buffer.best_graph = next_graph
                         if self.output_full_seq:
-                            printfl(f'{self.id}: saving full seq...')
+                            printfl(f'Agent {self.id}: saving full seq...')
                             full_seq_path = self.output_full_opt_seq(graph_buffer.all_graphs, graph_buffer.name, next_graph, next_graph_cost)
-                            printfl(f'{self.id}: full seq saved to {full_seq_path}')
+                            printfl(f'Agent {self.id}: full seq saved to {full_seq_path}')
                     # end if better
                 # end if
                 

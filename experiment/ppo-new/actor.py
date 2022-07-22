@@ -733,7 +733,7 @@ class PPOAgent:
                     
                 graph_buffer.rewards[-1].append(reward)
                 graph_buffer.append_costs_from_graph(next_graph)
-                if self.output_full_seq:
+                if next_graph is not graph and self.output_full_seq:
                     graph_buffer.push_back_all_graphs(next_graph, next_graph_cost, graph, action)
                 if not game_over and not qtz.is_nop(action.xfer) and \
                     next_graph_cost <= get_cost(graph_seq[0], self.cost_type):

@@ -100,6 +100,7 @@ class BaseConfig:
 
     # logging
     output_full_seq: bool = False
+    full_seq_path: str = '' # for read in
     
 @dataclass
 class TestConfig(BaseConfig):

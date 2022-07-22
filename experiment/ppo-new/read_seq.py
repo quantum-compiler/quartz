@@ -16,7 +16,7 @@ def read_seq(
     graph_list: List[quartz.PyGraph] = []
     for circ_file in circ_files:
         # 10_54_47_8323.qasm
-        with open(circ_file) as f:
+        with open(os.path.join(dir_path, circ_file)) as f:
             qasm = f.read()
         graph = qtz.qasm_to_graph(qasm)
         splitted_fname = os.path.splitext(circ_file)[0].split('_')
@@ -34,7 +34,7 @@ def read_seq(
             assert hash(this_graph) == hash(graph)
             
         graph_list.append(graph)
-        print(f'Got cost = {cost}, graph = {graph}')
+        print(f'Got i_step = {i_step}, cost = {cost}, graph = {graph}')
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:

@@ -1,13 +1,19 @@
 from typing import List, Dict, cast
 import os
+from matplotlib.pyplot import text
 from natsort import natsorted
 
 import hydra
 
+import qiskit
+from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from qiskit.tools.visualization import circuit_drawer
 import quartz
 
 import qtz
 from config.config import *
+
+from IPython import embed
 
 def read_seq(
     dir_path: str
@@ -35,6 +41,12 @@ def read_seq(
             
         graph_list.append(graph)
         print(f'Got i_step = {i_step}, cost = {cost}, graph = {graph}')
+
+        circ = QuantumCircuit.from_qasm_str(qasm)
+        print(circ.draw(output='text'))
+        # circuit_drawer(circ, output='text')
+        embed()
+
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:

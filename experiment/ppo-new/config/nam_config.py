@@ -21,8 +21,8 @@ class NamFTConfig(NamConfig):
     greedy_sample: bool = True
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
-            'qcla_com_7',
-            '../nam_circs/qcla_com_7.qasm',
+            'barenco_tof_3',
+            '../nam_circs/barenco_tof_3.qasm',
         ),
     ])
 

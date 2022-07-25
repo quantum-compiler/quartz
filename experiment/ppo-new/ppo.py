@@ -129,8 +129,11 @@ class PPOMod:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
         torch.cuda.set_device(self.device)
         self.ac_net = ActorCritic(
+            gnn_type=self.cfg.gnn_type,
             num_gate_type=self.num_gate_type,
-            graph_embed_size=self.cfg.graph_embed_size,
+            gnn_num_layers=self.cfg.gnn_num_layers,
+            gnn_hidden_dim=self.cfg.gnn_hidden_dim,
+            gnn_output_dim=self.cfg.gnn_output_dim,
             actor_hidden_size=self.cfg.actor_hidden_size,
             critic_hidden_size=self.cfg.critic_hidden_size,
             action_dim=qtz.quartz_context.num_xfers,
@@ -159,8 +162,8 @@ class PPOMod:
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
         self.optimizer = torch.optim.Adam([
             {
-                'params': self.ddp_ac_net.module.graph_embedding.parameters(), # type: ignore
-                'lr': self.cfg.lr_graph_embedding,
+                'params': self.ddp_ac_net.module.gnn.parameters(), # type: ignore
+                'lr': self.cfg.lr_gnn,
             },
             {
                 'params': self.ddp_ac_net.module.actor.parameters(), # type: ignore
@@ -186,6 +189,7 @@ class PPOMod:
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
         """train loop"""
+        self.ddp_ac_net.train()
         limited_time_budget: bool = len(self.cfg.time_budget) > 0
         if limited_time_budget:
             sec_budget: float = hms_to_sec(self.cfg.time_budget)
@@ -257,7 +261,7 @@ class PPOMod:
                 next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
                 """get embeds"""
                 # (batch_next_graphs_nodes, embed_dim)
-                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.graph_embedding_name())
+                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.gnn_name())
                 next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
                 """select embeds"""
                 # ( sum(num_next_nodes), embed_dim )
@@ -301,7 +305,7 @@ class PPOMod:
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
                 # (batch_num_nodes, embed_dim)
-                b_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.state, ActorCritic.graph_embedding_name())
+                b_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.state, ActorCritic.gnn_name())
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset

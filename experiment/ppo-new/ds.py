@@ -88,10 +88,10 @@ class SerializableExperience:
 
 @dataclass
 class ExperienceList:
-    state: List[str | dgl.graph]
+    state: List[str | dgl.DGLGraph]
     action: List[Action]
     reward: List[float]
-    next_state: List[str | dgl.graph]
+    next_state: List[str | dgl.DGLGraph]
     game_over: List[bool]
     node_value: List[float]
     next_nodes: List[List[int]]
@@ -191,10 +191,10 @@ class TrainExpList(ExperienceList):
 
 @dataclass
 class BatchedExperience:
-    state: dgl.graph
+    state: dgl.DGLGraph
     action: torch.LongTensor # (B, 2)
     reward: torch.Tensor # (B,)
-    next_state: dgl.graph
+    next_state: dgl.DGLGraph
     game_over: torch.BoolTensor # (B,)
     node_value: torch.Tensor # (B,)
     next_nodes: List[torch.LongTensor]

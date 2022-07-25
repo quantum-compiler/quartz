@@ -200,7 +200,7 @@ class PPOAgent:
         """helper vars for select_action"""
         self.future_actions: Future[List[ActionTmp]] = Future()
         self.pending_states = len(self.obs_rrefs)
-        self.states_buf: List[dgl.graph] = [None] * len(self.obs_rrefs)
+        self.states_buf: List[dgl.DGLGraph] = [None] * len(self.obs_rrefs)
         self.lock = threading.Lock()
 
 
@@ -208,10 +208,10 @@ class PPOAgent:
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
         """respond to a single query"""
         pygraph: quartz.PyGraph = qtz.qasm_to_graph(state_str)
-        dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
+        dgl_graph: dgl.DGLGraph = pygraph.to_dgl_graph().to(self.device)
         num_nodes: int = dgl_graph.num_nodes()
         """compute embeds and use Critic to evaluate each node"""
-        node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
+        node_embeds: torch.Tensor = self.ac_net.gnn(dgl_graph)
         node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
         temperature: float
         if not self.softmax_temp_en:
@@ -235,7 +235,7 @@ class PPOAgent:
         ) # this single action is returned for the obs that calls this function
         # It is available after self.future_actions is set
         pygraph: quartz.PyGraph = qtz.qasm_to_graph(state_str)
-        dgl_graph: dgl.graph = pygraph.to_dgl_graph().to(self.device)
+        dgl_graph: dgl.DGLGraph = pygraph.to_dgl_graph().to(self.device)
         if self.states_buf[obs_id] is None:
             self.states_buf[obs_id] = dgl_graph
         else:
@@ -246,11 +246,11 @@ class PPOAgent:
             self.pending_states -= 1
             if self.pending_states == 0:
                 """collected a batch, start batch inference"""
-                b_state: dgl.graph = dgl.batch(self.states_buf)
+                b_state: dgl.DGLGraph = dgl.batch(self.states_buf)
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
                 """compute embeds and use Critic to evaluate each node"""
                 # (batch_num_nodes, embed_dim)
-                b_node_embeds: torch.Tensor = self.ac_net.graph_embedding(b_state)
+                b_node_embeds: torch.Tensor = self.ac_net.gnn(b_state)
                 # (batch_num_nodes, )
                 b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
                 # list with length num_graphs; each member is a tensor of node values in a graph
@@ -403,8 +403,8 @@ class PPOAgent:
         # wait until all obervers have finished their episode
         s_exp_lists: List[List[SerializableExperience]] = torch.futures.wait_all(future_exp_lists)
         """convert graph and maintain infos in graph_buffer"""
-        state_dgl_list: List[dgl.graph] = []
-        next_state_dgl_list: List[dgl.graph] = []
+        state_dgl_list: List[dgl.DGLGraph] = []
+        next_state_dgl_list: List[dgl.DGLGraph] = []
         for buffer_id, obs_res in zip(init_buffer_ids, s_exp_lists):
             """for each observer's results (several episodes)"""
             graph_buffer = self.graph_buffers[buffer_id]
@@ -513,11 +513,11 @@ class PPOAgent:
     ):
         num_eps = len(cur_graphs)
         """compute embeds and use Critic to evaluate each node"""
-        dgl_graphs: List[dgl.graph] = [g.to_dgl_graph() for g in cur_graphs]
-        b_state: dgl.graph = dgl.batch(dgl_graphs).to(self.device)
+        dgl_graphs: List[dgl.DGLGraph] = [g.to_dgl_graph() for g in cur_graphs]
+        b_state: dgl.DGLGraph = dgl.batch(dgl_graphs).to(self.device)
         num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
         # (batch_num_nodes, embed_dim)
-        b_node_embeds: torch.Tensor = self.ac_net.graph_embedding(b_state)
+        b_node_embeds: torch.Tensor = self.ac_net.gnn(b_state)
         # (batch_num_nodes, )
         b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
         # list with length num_graphs; each member is a tensor of node values in a graph
@@ -647,7 +647,7 @@ class PPOAgent:
         last_eps_ends: List[int] = [-1 for _ in range(num_eps)]
         for i_step in range(max_eps_len_for_all):
             """inference by mini-batches"""
-            dgl_graphs: List[dgl.graph] = []
+            dgl_graphs: List[dgl.DGLGraph] = []
             action_nodes: List[int] = []
             action_xfers: List[int] = []
             action_node_values: List[float] = []

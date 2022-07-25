@@ -58,7 +58,10 @@ class BaseConfig:
     ])
     
     # network
-    graph_embed_size: int = 128
+    gnn_type: str = 'GIN' # 'qgnn'
+    gnn_num_layers: int = 6
+    gnn_hidden_dim: int = 128
+    gnn_output_dim: int = 128
     actor_hidden_size: int = 256
     critic_hidden_size: int = 128
 
@@ -91,7 +94,7 @@ class BaseConfig:
     num_eps_per_iter: int = 128 # 30
     mini_batch_size: int = 3840 # per DDP process; < num_eps_per_iter * len_episode
     k_epochs: int = 25
-    lr_graph_embedding: float = 3e-4
+    lr_gnn: float = 3e-4
     lr_actor: float = 3e-4
     lr_critic: float = 5e-4
     update_policy_interval: int = 1

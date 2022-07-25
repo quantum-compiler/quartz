@@ -328,7 +328,7 @@ class Agent:
     ) -> Tuple[torch.tensor]:
         if np.random.random() < (1 - eps):
             # greedy
-            cur_state: dgl.graph = self.env.state.to_dgl_graph().to(self.device)
+            cur_state: dgl.DGLGraph = self.env.state.to_dgl_graph().to(self.device)
             # (num_nodes, num_actions)
             q_values = q_net(cur_state)
             topk_q_values, topk_actions = topk_2d(q_values, topk, as_tuple=False)
@@ -665,11 +665,11 @@ class DQNMod(pl.LightningModule):
             
             Return: batched data
                 batch: (states, action_nodes, action_xfers, rewards, next_states, game_overs)
-                    b_states: dgl.graph (batched_graph)
+                    b_states: dgl.DGLGraph (batched_graph)
                     b_action_nodes: torch.tensor
                     b_action_xfers: torch.tensor
                     b_rewards: torch.Tensor
-                    b_next_states: dgl.graph (batched_graph)
+                    b_next_states: dgl.DGLGraph (batched_graph)
                     b_game_overs: torch.tensor of 
             """
             states, action_nodes, action_xfers, rewards, next_states, game_overs, ids = \
@@ -757,7 +757,7 @@ class DQNMod(pl.LightningModule):
                 if cur_depth >= self.hparams.episode_length:
                     continue
                 
-                cur_dgl_graph: dgl.graph = cur_graph.to_dgl_graph().to(self.device)
+                cur_dgl_graph: dgl.DGLGraph = cur_graph.to_dgl_graph().to(self.device)
                 # (num_nodes, num_actions)
                 q_values = self.q_net(cur_dgl_graph)
                 topk_q_values, topk_actions = topk_2d(q_values, self.hparams.test_topk, as_tuple=False)

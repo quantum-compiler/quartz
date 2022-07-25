@@ -8,6 +8,7 @@ import math
 import random
 import itertools
 import gc
+import sys
 
 import torch
 import dgl # type: ignore
@@ -321,7 +322,10 @@ class GraphBuffer:
                 i_loop += 1
             gc.collect()
             printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).')
-    
+
+            if vmem_used_perct() > 95.0:
+                raise MemoryError(f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.')
+
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
             hash_value = hash(graph)

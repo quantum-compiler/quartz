@@ -48,7 +48,7 @@ class BaseConfig:
     ecc_file: str = '../ecc_set/t_tdg.json.ecc'
     no_increase: bool = False
     include_nop: bool = True
-    num_gate_type: int = 29
+    num_gate_types: int = 29
     
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
@@ -59,9 +59,13 @@ class BaseConfig:
     
     # network
     gnn_type: str = 'QGIN' # 'qgnn'
+    gate_type_embed_dim: int = 16
     gnn_num_layers: int = 6
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
+    gin_num_mlp_layers: int = 2
+    gin_learn_eps: bool = True
+    gin_neighbor_pooling_type: str = 'sum' # 'mean', 'max'
     actor_hidden_size: int = 256
     critic_hidden_size: int = 128
 

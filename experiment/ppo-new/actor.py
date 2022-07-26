@@ -25,7 +25,7 @@ from omegaconf.dictconfig import DictConfig
 
 from ds import *
 from utils import *
-from model import ActorCritic
+from model.actor_critic import ActorCritic
 from IPython import embed # type: ignore
 from icecream import ic # type: ignore
 

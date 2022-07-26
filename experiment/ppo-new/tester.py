@@ -14,7 +14,7 @@ import qtz
 from config.config import *
 from ds import *
 from utils import *
-from model import ActorCritic
+from model.actor_critic import ActorCritic
 
 @dataclass
 class PrevExp:

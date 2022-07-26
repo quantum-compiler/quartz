@@ -47,6 +47,13 @@ public:
       return ptr < b.ptr;
     return false;
   }
+  inline bool operator>(const Op &b) const {
+    if (guid != b.guid)
+      return guid > b.guid;
+    if (ptr != b.ptr)
+      return ptr > b.ptr;
+    return false;
+  }
   Op &operator=(const Op &op) {
     guid = op.guid;
     ptr = op.ptr;
@@ -171,6 +178,7 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  [[nodiscard]] std::unique_ptr<DAG> to_dag() const;
   void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+
 class QConv(nn.Module):
     def __init__(self, in_feat: int, inter_dim: int, out_feat: int):
         super(QConv, self).__init__()
@@ -19,13 +20,17 @@ class QConv(nn.Module):
     def message_func(self, edges):
         #print(f'node h {edges.src["h"].shape}')
         #print(f'node w {edges.data["w"].shape}')
+        """incorporate edges' features by cat"""
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
         # print(f'node m {nodes.mailbox["m"].shape}')
+        # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
         tmp = self.linear1(nodes.mailbox['m'])
         tmp = F.leaky_relu(tmp)
-        h = torch.mean(tmp, dim=1)
+        """aggregate neighbors' features"""
+        # (num_nodes, num_neighbors, msg_dim) -> (num_nodes, msg_dim)
+        h = torch.mean(tmp, dim=1) # average on dim of num_neighbors
         # h = torch.max(tmp, dim=1).values
         return {'h_N': h}
 
@@ -33,7 +38,8 @@ class QConv(nn.Module):
         g.ndata['h'] = h
         #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
         g.update_all(self.message_func, self.reduce_func)
-        h_N = g.ndata['h_N']
+        h_N = g.ndata['h_N'] # (num_nodes, inter_dim)
+        """combine node's feature with its neighbors' to get its feature at the next layer"""
         h_total = torch.cat([h, h_N], dim=1)
         h_linear = self.linear2(h_total)
         h_relu = F.relu(h_linear)
@@ -97,7 +103,7 @@ class ActorCritic(nn.Module):
         if gnn_type.lower() == 'QGNN'.lower():
             self.gnn = QGNN(gnn_num_layers, num_gate_type, gnn_hidden_dim, gnn_hidden_dim)
             gnn_output_dim = gnn_hidden_dim
-        elif gnn_type.lower() == 'GIN'.lower():
+        elif gnn_type.lower() == 'QGIN'.lower():
             pass
         else:
             raise NotImplementedError(f'Unknown GNN type {gnn_type}.')

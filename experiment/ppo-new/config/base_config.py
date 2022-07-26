@@ -58,7 +58,7 @@ class BaseConfig:
     ])
     
     # network
-    gnn_type: str = 'GIN' # 'qgnn'
+    gnn_type: str = 'QGIN' # 'qgnn'
     gnn_num_layers: int = 6
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128

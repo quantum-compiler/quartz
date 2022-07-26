@@ -206,6 +206,7 @@ class PPOAgent:
 
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:
+        self.ac_net.eval()
         """respond to a single query"""
         pygraph: quartz.PyGraph = qtz.qasm_to_graph(state_str)
         dgl_graph: dgl.DGLGraph = pygraph.to_dgl_graph().to(self.device)
@@ -245,6 +246,7 @@ class PPOAgent:
         with self.lock: # avoid data race on self.pending_states
             self.pending_states -= 1
             if self.pending_states == 0:
+                self.ac_net.eval()
                 """collected a batch, start batch inference"""
                 b_state: dgl.DGLGraph = dgl.batch(self.states_buf)
                 num_nodes: torch.Tensor = b_state.batch_num_nodes() # (num_graphs, ) assert each elem > 0
@@ -511,6 +513,7 @@ class PPOAgent:
     def select_action_for_self(
         self, cur_graphs: List[quartz.PyGraph],
     ):
+        self.ac_net.eval()
         num_eps = len(cur_graphs)
         """compute embeds and use Critic to evaluate each node"""
         dgl_graphs: List[dgl.DGLGraph] = [g.to_dgl_graph() for g in cur_graphs]
@@ -780,5 +783,4 @@ class PPOAgent:
         for eps_list in eps_lists:
             eps_list_cat += eps_list
         return eps_list_cat
-        
         

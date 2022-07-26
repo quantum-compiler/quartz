@@ -143,6 +143,12 @@ class PPOMod:
             action_dim=qtz.quartz_context.num_xfers,
             device=self.device,
         ).to(self.device)
+        self.ac_net = nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
+        """use a holder class for convenience but split the model into 3 modules
+        to avoid issue with BN + DDP 
+        (https://github.com/pytorch/pytorch/issues/66504)
+        """
+        # TODO
         self.ac_net_old = copy.deepcopy(self.ac_net)
         # NOTE should not use self.ac_net later
         self.agent = PPOAgent(
@@ -164,6 +170,7 @@ class PPOMod:
             output_dir=self.output_dir,
         )
         self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
+        self.ddp_ac_net.eval()
         self.optimizer = torch.optim.Adam([
             {
                 'params': self.ddp_ac_net.module.gnn.parameters(), # type: ignore
@@ -192,8 +199,8 @@ class PPOMod:
         self.tot_exps_collected: int = 0
         if self.cfg.resume:
             self.load_ckpt(self.cfg.ckpt_path)
+
         """train loop"""
-        self.ddp_ac_net.train()
         limited_time_budget: bool = len(self.cfg.time_budget) > 0
         if limited_time_budget:
             sec_budget: float = hms_to_sec(self.cfg.time_budget)
@@ -299,6 +306,7 @@ class PPOMod:
             train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs) # type: ignore
         # end with
         """update the network for K epochs"""
+        self.ddp_ac_net.train()
         for k_epoch in range(self.cfg.k_epochs):
             train_exp_list.shuffle()
             for i_step, exps in enumerate(

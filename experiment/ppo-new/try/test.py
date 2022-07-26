@@ -36,11 +36,17 @@ class ToyModel(nn.Module):
     def __init__(self):
         super(ToyModel, self).__init__()
         self.net1 = nn.Linear(10, 10)
+        self.bn = nn.SyncBatchNorm(10)
         self.relu = nn.ReLU()
         self.net2 = nn.Linear(10, 10)
 
-    def forward(self, x):
-        return self.net2(self.relu(self.net1(x)))
+        self.net3 = nn.Linear(10, 10)
+
+    def forward(self, x, part=0):
+        if part == 0:
+            return self.net2(self.bn(self.relu(self.net1(x))))
+        else:
+            return self.net3(x)
     
     def forward2(self, x):
         return self.net1(x)
@@ -55,6 +61,7 @@ def demo_basic(rank, world_size):
     model = ToyModel().to(device)
     # print(model.state_dict())
     torch.cuda.set_device(device)
+    # model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     ddp_model = DDP(model, device_ids=[device])
     # print(f'sleeping...') # 1231+1097
     # time.sleep(20)
@@ -74,29 +81,25 @@ def demo_basic(rank, world_size):
         }
     ])
     
-    x = torch.zeros(world_size).to(device)
-    print
-    x[rank] = rank * 100 + 1
-    for i in range(world_size):
-        dist.broadcast(x[i], i)
-        
-    print(x)
-    
-    return
-
     # optimizer = optim.Adam(ddp_model.parameters())
-    
+    torch.autograd.set_detect_anomaly(True)
     optimizer.zero_grad()
     x = torch.randn(20, 10) + rank * 100
     x = x.to(device)
 
     for i in range(1):
+        optimizer.zero_grad()
+
         x = torch.randn(20, 10) #  + rank * 100
         x = x.to(device)
         labels = x + rank * 10000
 
         # outputs = ddp_model.module.forward2(x)
-        outputs = ddp_model(x)
+        ddp_model.eval()
+        with torch.no_grad():
+            y = ddp_model(torch.randn(20, 10), part=1)
+        # ddp_model.train()
+        outputs = ddp_model(x) +  ddp_model(torch.randn(20, 10), part=1)
 
         loss_fn(outputs, labels).backward()
         optimizer.step()

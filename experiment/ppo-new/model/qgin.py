@@ -119,7 +119,10 @@ class QGINConv(nn.Module):
 
     def __reduce_neigh_edge_to_feat(self, nodes):
         # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
-        feats: torch.Tensor = self.compress_mlp(nodes.mailbox['m'])
+        m: torch.Tensor = nodes.mailbox['m']
+        _m = m.view(-1, m.shape[2]) # adapt for BatchNorm1d
+        _feats: torch.Tensor = self.compress_mlp(_m)
+        feats = _feats.view(m.shape[0], m.shape[1], -1)
         if self._aggregator_type == 'sum':
             neigh_feat = torch.sum(feats, dim=1)
         elif self._aggregator_type == 'mean':
@@ -242,7 +245,7 @@ class MLP(nn.Module):
             self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
 
             for layer in range(num_layers - 1):
-                self.batch_norms.append(nn.BatchNorm1d((hidden_dim)))
+                self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
     def forward(self, x):
         if self.linear_or_not:
@@ -306,6 +309,12 @@ class QGIN(nn.Module):
     def forward(self, g: dgl.DGLGraph):
         # Use embedding layer to generate init features for nodes in the graph
         h = self.gate_type_embedding(g.ndata['gate_type'])
+        # Create edge info
+        g.edata['w'] = torch.cat([
+            torch.unsqueeze(g.edata['src_idx'], 1),
+            torch.unsqueeze(g.edata['dst_idx'], 1),
+            torch.unsqueeze(g.edata['reversed'], 1),
+        ], dim=1)
 
         # list of hidden representation at each layer (including input)
         # hidden_rep = []

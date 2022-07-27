@@ -206,13 +206,20 @@ public:
            bool enable_early_stop, bool use_rotation_merging_in_searching,
            GateType target_rotation, std::string circuit_name = "",
            int timeout = 86400 /*1 day*/, bool use_reuse = false /*to determine use of old or new search algorithm*/);
-  std::shared_ptr<Graph>
+
+    [[maybe_unused]] std::shared_ptr<Graph>
   optimize_reuse(float alpha, float beta, int budget, Context *ctx,
                           const std::string &equiv_file_name,
                           bool enable_early_stop, bool use_rotation_merging_in_searching,
                           GateType target_rotation, std::string circuit_name = "",
                           int timeout = 86400 /*1 day*/);
-  std::set<Graph *> build_subcircuits(std::shared_ptr<Graph> circuit);
+  void build_subcircuits(Op op, std::set<std::shared_ptr<Graph>> &subCircuits);
+  std::set<std::shared_ptr<Graph>>
+  sub_optimize(const std::vector<GraphXfer *>& xfers, double sub_upper_bound, std::shared_ptr<Graph> &subCircuit, bool print_message, int timeout = 120);
+  std::shared_ptr<Graph> optimize_reuse(const std::vector<GraphXfer *>&xfers,
+                                        double cost_upper_bound,
+                                        const std::string& circuit_name, bool print_message,
+                                        int timeout = 86400 /*1 day*/);
   std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
                                   double gate_count_upper_bound,
                                   std::string circuit_name, bool print_message,

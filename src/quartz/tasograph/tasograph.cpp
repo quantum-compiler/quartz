@@ -1456,7 +1456,7 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 // This implementation is based on the old API
-std::shared_ptr<Graph> Graph::optimize_reuse(
+    [[maybe_unused]] [[maybe_unused]] std::shared_ptr<Graph> Graph::optimize_reuse(
         float alpha, float beta, int budget, Context *ctx,
         const std::string &equiv_file_name,
         bool enable_early_stop, bool use_rotation_merging_in_searching,
@@ -1558,10 +1558,10 @@ std::shared_ptr<Graph> Graph::optimize_reuse(
                 (double)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0);
         fflush(stdout);
 
-        std::set<Graph *> subCircuits = build_subcircuits(candidate);
+        /*std::set<Graph *> subCircuits = build_subcircuits(candidate);
         for (Graph *subCircuit : subCircuits) {
             auto dagSub = subCircuit;
-        }
+        }*/
 
 
     }
@@ -1570,16 +1570,67 @@ std::shared_ptr<Graph> Graph::optimize_reuse(
 }
 
 // Construct a set of all possible subcircuits up to a certain size present in an input circuit
-std::set<Graph *> Graph::build_subcircuits(std::shared_ptr<Graph> circuit) {
-    std::set<Graph *> subCircuits{};
-    // TODO: Add empty graph?
-    std::vector<Op> ops;
-    circuit->topology_order_ops(ops);
-    assert(ops.size() == (size_t)circuit->gate_count());
-    for (auto const op : ops) {
+void Graph::build_subcircuits(Op op, std::set<std::shared_ptr<Graph>> &subCircuits) {
+    // Does circuit need to be passed in the signature, or can it be referred to without that?
+    auto subCircuit = Graph(context);
+    // Insert subCircuit into subCircuits
 
+}
+
+std::set<std::shared_ptr<Graph>>
+Graph::sub_optimize(const std::vector<GraphXfer *>& xfers, double sub_upper_bound, std::shared_ptr<Graph> &subCircuit, bool print_message, int timeout) {
+    auto start = std::chrono::steady_clock::now();
+    std::set<std::shared_ptr<Graph>> equivalent_subgraphs;
+    std::priority_queue<std::shared_ptr<Graph>, std::vector<std::shared_ptr<Graph>>, GraphCompare>
+            candidates;
+    std::set<size_t> hashmap;
+    std::shared_ptr<Graph> first_graph(new Graph(*subCircuit));
+    // auto best_cost = subCircuit.total_cost();
+
+    candidates.push(first_graph);
+    hashmap.insert(hash());
+
+    int invoke_cnt = 0;
+
+    while (!candidates.empty()) {
+        auto graph = candidates.top();
+        candidates.pop();
+        std::vector<Op> all_nodes;
+        graph->topology_order_ops(all_nodes);
+        for (auto xfer : xfers) {
+            for (auto const &node : all_nodes) {
+                invoke_cnt++;
+                auto new_graph =
+                        graph->apply_xfer(xfer, node, context->has_parameterized_gate());
+                auto end = std::chrono::steady_clock::now();
+                if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+                        .count() / 1000.0 > timeout) {
+                    return equivalent_subgraphs;
+                }
+                if (new_graph == nullptr) {
+                    // I can't envision a circumstance where this condition would be true
+                    continue;
+                }
+                auto new_hash = new_graph->hash();
+                auto new_cost = new_graph->total_cost();
+                if (new_cost > sub_upper_bound) {
+                    continue;
+                }
+                if (hashmap.find(new_hash) == hashmap.end()) {
+                    hashmap.insert(new_hash);
+                    candidates.push(new_graph);
+
+                    // new
+                    equivalent_subgraphs.insert(new_graph);
+                } else {
+                    continue;
+                }
+            }
+        }
+        auto end = std::chrono::steady_clock::now();
+        // optional print message here
     }
-    return subCircuits;
+    return equivalent_subgraphs;
 }
 
 std::shared_ptr<Graph> Graph::optimize(
@@ -1837,6 +1888,94 @@ std::shared_ptr<Graph> Graph::optimize(
   bestGraph->constant_and_rotation_elimination();
   return bestGraph;
 } // namespace quartz
+
+std::shared_ptr<Graph> Graph::optimize_reuse(const std::vector<GraphXfer *>& xfers,
+                                             double cost_upper_bound,
+                                             const std::string& circuit_name,
+                                             bool print_message, int timeout) {
+    auto start = std::chrono::steady_clock::now();
+    std::priority_queue<std::shared_ptr<Graph>, std::vector<std::shared_ptr<Graph>>, GraphCompare>
+            candidates;
+    std::set<size_t> hashmap;
+    std::shared_ptr<Graph> best_graph(new Graph(*this));
+    auto best_cost = total_cost();
+
+    // temporary value; consider others
+    double alpha = 1.0001;
+
+    candidates.push(best_graph);
+    hashmap.insert(hash());
+
+    // new structure
+    std::unordered_map<std::size_t, std::set<std::shared_ptr<Graph>>> subCandidates;
+
+    int invoke_cnt = 0;
+    while (!candidates.empty()) {
+
+        auto candidate = candidates.top();
+        candidates.pop();
+        std::vector<Op> all_nodes;
+        candidate->topology_order_ops(all_nodes);
+
+        // Construct a set of all subcircuits present in the circuit up to a certain size
+        // Iterate through each node, build subcircuits starting from each node
+        // Reduce redundancy by only adding nodes to graphs by following outEdges of single-qubit gates
+        // Only look at inEdges of 2+ qubit gates
+        // The above still result in a little redundancy, but redundant graphs shouldn't be inserted into the set
+        for (Op op: all_nodes) {
+            std::set<std::shared_ptr<Graph>> subCircuits{};
+            build_subcircuits(op, subCircuits);
+            for (std::shared_ptr<Graph> subCircuit: subCircuits) {
+                auto subCircuitDag = subCircuit->to_dag();
+                size_t dagHash = subCircuitDag->hash(context);
+                if (subCandidates.find(dagHash) == subCandidates.end()) {
+                    // Check that the correct method is used below
+                    double subCostUpperBound = alpha * subCircuit->total_cost();
+                    subCandidates.insert({dagHash,
+                                          sub_optimize(xfers, subCostUpperBound,
+                                                       subCircuit, true)});
+                } else if (subCandidates[dagHash].find(subCircuit) ==
+                           subCandidates[dagHash].end()) {
+                    subCandidates[dagHash].insert(subCircuit);
+                }
+                for (const auto& subCandidate: subCandidates[dagHash]) {
+                    if (subCandidate == subCircuit) {
+                        continue;
+                    }
+                    auto src_dag = subCircuit->to_dag();
+                    auto dst_dag = subCandidate->to_dag();
+                    auto xfer = GraphXfer(context, src_dag.get(), dst_dag.get());
+                    auto new_graph = candidate->apply_xfer(&xfer, op);
+                    auto new_hash = new_graph->hash();
+                    auto new_cost = new_graph->total_cost();
+                    if (new_cost > cost_upper_bound) {
+                        continue;
+                    }
+                    if (hashmap.find(new_hash) == hashmap.end()) {
+                        hashmap.insert(new_hash);
+                        candidates.push(new_graph);
+                        if (new_cost < best_cost) {
+                            best_cost = new_cost;
+                            best_graph = new_graph;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+            }
+        }
+        auto end = std::chrono::steady_clock::now();
+        if (print_message) {
+            std::cout << "[" << circuit_name << "]"
+            << "Best cost: " << best_cost
+            << "\tcandidate number: " << candidates.size() << "\tafter "
+            << (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+                    .count() / 1000.0
+                    << "seconds." << std::endl;
+        }
+    }
+    return best_graph;
+}
 
 std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
                                        double cost_upper_bound,

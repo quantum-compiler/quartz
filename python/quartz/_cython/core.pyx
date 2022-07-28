@@ -746,17 +746,20 @@ cdef class PyState:
         return self.device_edges.edge_list
 
     def get_device_dgl(self):
-        # pack device edges into tensor
+        # pack device edges into tensor and gather degree as node feature
         src_id = []
         dst_id = []
+        node_degree = [0] * len(self.physical2logical.map)
         for edge in self.device_edges.edge_list:
             assert len(edge) == 2
             src_id.append(edge[0])
             dst_id.append(edge[1])
+            node_degree[edge[0]] += 1
 
         # create dgl graph
         dgl_graph = dgl.graph((torch.tensor(src_id, dtype=torch.int32),
                                torch.tensor(dst_id, dtype=torch.int32)))
+        dgl_graph.ndata['degree'] = torch.tensor(node_degree, dtype=torch.int32)
         return dgl_graph
 
     @property

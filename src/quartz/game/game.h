@@ -14,9 +14,8 @@ namespace quartz {
         Game(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device) : graph(_graph),
                                                                                   device(std::move(_device)) {
             /// Game expects that the input graph has been initialized !!!
-            // reward related
+            // simplify circuit
             single_qubit_gate_count = simplify_circuit(graph);
-            imp_cost = graph.circuit_implementation_cost(device);
 
             // state related (mapping table)
             // initialize
@@ -64,6 +63,32 @@ namespace quartz {
                     device_edges.emplace_back(i, j);
                 }
             }
+
+            // reward related: execute all currently executable gates and set imp cost
+            executed_logical_gate_count = 0;
+            while (true) {
+                auto executable_gate_list = find_executable_front_gates(graph, device);
+                for (const auto &executable_gate: executable_gate_list) {
+                    assert(graph.inEdges[executable_gate].size() == 2);
+                    Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
+                    Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
+                    int input_logical_0 = in_edge_0.logical_qubit_idx;
+                    int input_logical_1 = in_edge_1.logical_qubit_idx;
+                    int input_physical_0 = in_edge_0.physical_qubit_idx;
+                    int input_physical_1 = in_edge_1.physical_qubit_idx;
+                    assert(input_physical_0 == initial_logical2physical[input_logical_0]);
+                    assert(input_physical_1 == initial_logical2physical[input_logical_1]);
+                    assert(input_logical_0 == initial_physical2logical[input_physical_0]);
+                    assert(input_logical_1 == initial_physical2logical[input_physical_1]);
+                    execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
+                                                   input_logical_0, input_logical_1,
+                                                   input_physical_0, input_physical_1);
+                    execute_front_gate(graph, executable_gate);
+                    executed_logical_gate_count += 1;
+                }
+                if (executable_gate_list.empty()) break;
+            }
+            imp_cost = graph.circuit_implementation_cost(device);
         }
 
         [[nodiscard]] State state() const {
@@ -201,6 +226,7 @@ namespace quartz {
                     }
                     if (executable_gate_list.empty()) break;
                 }
+                executed_logical_gate_count += executed_gate_count;
 
                 // STEP 3: calculate reward
                 double original_circuit_cost = imp_cost;
@@ -237,6 +263,7 @@ namespace quartz {
 
         // reward related
         int single_qubit_gate_count;
+        int executed_logical_gate_count;  // i.e. we do not consider swaps here
         double imp_cost;
 
         // execution history & initial mapping table

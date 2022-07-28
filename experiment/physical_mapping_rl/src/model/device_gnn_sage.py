@@ -3,7 +3,7 @@ import torch.nn as nn
 from dgl.nn import SAGEConv
 
 
-class DeviceGNN(nn.Module):
+class DeviceGNNSAGE(nn.Module):
     def __init__(self,
                  # embedding
                  num_feature_types,  # # of node features (i.e. max degree)
@@ -13,7 +13,7 @@ class DeviceGNN(nn.Module):
                  hidden_dimension,  # dimension of each internal GNN layer
                  out_dimension,  # output dimension of final GNN layer
                  ):
-        super(DeviceGNN, self).__init__()
+        super(DeviceGNNSAGE, self).__init__()
         # embedding network
         self.node_feature_embedding = nn.Embedding(num_feature_types, feature_embedding_dim)
         # conv layers

@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable, Tuple, List, Any
 import torch
 import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.nn.functional as F
 import dgl
 
@@ -11,19 +12,22 @@ from model.qgin import *
 class ActorCritic(nn.Module):
     def __init__(
         self,
-        gnn_type: str,
-        num_gate_types: int,
-        gate_type_embed_dim: int,
-        gnn_num_layers: int,
-        gnn_hidden_dim: int,
-        gnn_output_dim: int,
-        gin_num_mlp_layers: int,
-        gin_learn_eps: bool,
-        gin_neighbor_pooling_type: str, # sum', 'mean', 'max'
-        actor_hidden_size: int,
-        critic_hidden_size: int,
-        action_dim: int,
-        device: torch.device,
+        gnn_type: str = 'QGIN',
+        num_gate_types: int = 20,
+        gate_type_embed_dim: int = 16,
+        gnn_num_layers: int = 6,
+        gnn_hidden_dim: int = 32,
+        gnn_output_dim: int = 32,
+        gin_num_mlp_layers: int = 2,
+        gin_learn_eps: bool = False,
+        gin_neighbor_pooling_type: str = 'sum', # sum', 'mean', 'max'
+        actor_hidden_size: int = 32,
+        critic_hidden_size: int = 32,
+        action_dim: int = 32,
+        device: torch.device = 'cpu',
+        gnn: nn.Module = None,
+        actor: nn.Module = None,
+        critic: nn.Module = None,
     ) -> None:
         """
         Args:
@@ -31,6 +35,17 @@ class ActorCritic(nn.Module):
             
         """
         super().__init__()
+        """init the network with existed modules"""
+        if gnn is not None:
+            assert actor is not None
+            assert critic is not None
+            self.gnn = gnn
+            self.actor = actor
+            self.critic = critic
+            self.device = device
+            return
+        
+        self.device = device
         if gnn_type.lower() == 'QGNN'.lower():
             self.gnn = QGNN(
                 gnn_num_layers, num_gate_types, gate_type_embed_dim,
@@ -61,6 +76,16 @@ class ActorCritic(nn.Module):
             nn.ReLU(),
             nn.Linear(critic_hidden_size, 1)
         )
+    
+    def ddp_model(self) -> ActorCritic:
+        """make ddp verison instances for each sub-model"""
+        _ddp_model = ActorCritic(
+            device=self.device,
+            gnn=DDP(self.gnn, device_ids=[self.device]),
+            actor=DDP(self.actor, device_ids=[self.device]),
+            critic=DDP(self.critic, device_ids=[self.device]),
+        )
+        return _ddp_model
     
     def forward(self, x: torch.Tensor | dgl.DGLGraph, callee: str) -> torch.Tensor:
         if callee == self.gnn_name():

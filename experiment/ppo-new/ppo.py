@@ -1,7 +1,7 @@
 # this file is under mypy's checking
 from __future__ import annotations
 import os
-from typing import List, Dict, cast
+from typing import List, Dict, cast, OrderedDict
 import warnings
 from functools import partial
 import time
@@ -128,7 +128,7 @@ class PPOMod:
         else:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
         torch.cuda.set_device(self.device)
-        self.ac_net = ActorCritic(
+        self.ac_net: ActorCritic = ActorCritic(
             gnn_type=self.cfg.gnn_type,
             num_gate_types=self.num_gate_types,
             gate_type_embed_dim=self.cfg.gate_type_embed_dim,
@@ -143,14 +143,8 @@ class PPOMod:
             action_dim=qtz.quartz_context.num_xfers,
             device=self.device,
         ).to(self.device)
-        self.ac_net = nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
-        """use a holder class for convenience but split the model into 3 modules
-        to avoid issue with BN + DDP 
-        (https://github.com/pytorch/pytorch/issues/66504)
-        """
-        # TODO
+        self.ac_net = cast(ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net))
         self.ac_net_old = copy.deepcopy(self.ac_net)
-        # NOTE should not use self.ac_net later
         self.agent = PPOAgent(
             agent_id=self.rank,
             num_agents=self.ddp_processes,
@@ -169,19 +163,23 @@ class PPOMod:
             output_full_seq=self.cfg.output_full_seq,
             output_dir=self.output_dir,
         )
-        self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
+        """use a holder class for convenience but split the model into 3 modules
+        to avoid issue with BN + DDP 
+        (https://github.com/pytorch/pytorch/issues/66504)
+        """
+        self.ddp_ac_net = self.ac_net.ddp_model()
         self.ddp_ac_net.eval()
         self.optimizer = torch.optim.Adam([
             {
-                'params': self.ddp_ac_net.module.gnn.parameters(), # type: ignore
+                'params': self.ddp_ac_net.gnn.parameters(),
                 'lr': self.cfg.lr_gnn,
             },
             {
-                'params': self.ddp_ac_net.module.actor.parameters(), # type: ignore
+                'params': self.ddp_ac_net.actor.parameters(),
                 'lr': self.cfg.lr_actor,
             },
             {
-                'params': self.ddp_ac_net.module.critic.parameters(), # type: ignore
+                'params': self.ddp_ac_net.critic.parameters(),
                 'lr': self.cfg.lr_critic,
             }
         ])
@@ -209,7 +207,7 @@ class PPOMod:
         while self.i_iter < max_iterations:
             self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
-                self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
+                self.ac_net_old.load_state_dict(self.ac_net.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
                 self.save_ckpt(f'iter_{self.i_iter}.pt')
             self.i_iter += 1
@@ -373,6 +371,7 @@ class PPOMod:
             # exps = None
             # torch.cuda.empty_cache()
         # end for k_epochs
+        self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
@@ -383,7 +382,7 @@ class PPOMod:
         if not only_rank_zero or self.rank == 0:
             torch.save({
                 'i_iter': self.i_iter,
-                'model_state_dict': self.ddp_ac_net.state_dict(),
+                'model_state_dict': self.ac_net.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 # 'loss': LOSS,
             }, ckpt_path)
@@ -393,13 +392,24 @@ class PPOMod:
         """load model and optimizer"""
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
         self.i_iter = int(ckpt['i_iter']) + 1
-        model_state_dict = ckpt['model_state_dict']
+        model_state_dict = cast(OrderedDict[str, torch.Tensor], ckpt['model_state_dict'])
         if self.cfg.load_non_ddp_ckpt:
-            self.ddp_ac_net.module.load_state_dict(model_state_dict)
+            self.ac_net.load_state_dict(model_state_dict)
             self.ac_net_old.load_state_dict(model_state_dict)
+            # the weights of self.ddp_ac_net should also be changed
+            # ddp_v = list(self.ddp_ac_net.state_dict().values())
+            # v = list(model_state_dict.values())
+            # assert len(ddp_v) == len(v)
+            # for i in range(len(v)):
+            #     if not torch.equal(ddp_v[i], v[i]):
+            #         ic(ddp_v[i])
+            #         ic(v[i])
+            #         raise ValueError
+            #     else:
+            #         printfl(f'{i} equal')
         else:
             self.ddp_ac_net.load_state_dict(model_state_dict)
-            self.ac_net_old.load_state_dict(self.ddp_ac_net.module.state_dict())
+            self.ac_net_old.load_state_dict(self.ac_net.state_dict())
         self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         printfl(f'resumed from "{ckpt_path}"!')
         """load best graph info"""
@@ -427,7 +437,7 @@ class PPOMod:
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
-        self.ac_net = ActorCritic(
+        self.ac_net: ActorCritic = ActorCritic(
             gnn_type=self.cfg.gnn_type,
             num_gate_types=self.num_gate_types,
             gate_type_embed_dim=self.cfg.gate_type_embed_dim,
@@ -442,7 +452,7 @@ class PPOMod:
             action_dim=qtz.quartz_context.num_xfers,
             device=self.device,
         ).to(self.device)
-        self.ddp_ac_net = DDP(self.ac_net, device_ids=[self.device])
+        self.ddp_ac_net = self.ac_net.ddp_model()
 
     @torch.no_grad()
     def test(self, rank: int, world_size: int) -> None:
@@ -454,14 +464,14 @@ class PPOMod:
             ckpt = torch.load(ckpt_path, map_location=self.device)
             model_state_dict = ckpt['model_state_dict']
             if self.cfg.load_non_ddp_ckpt:
-                self.ddp_ac_net.module.load_state_dict(model_state_dict)
+                self.ac_net.load_state_dict(model_state_dict)
             else:
                 self.ddp_ac_net.load_state_dict(model_state_dict)
             printfl(f'rank {rank} resumed from "{ckpt_path}"!')
         
         tester = Tester(
             cost_type=CostType.from_str(self.cfg.cost_type),
-            ac_net=self.ddp_ac_net.module, # type: ignore
+            ac_net=self.ac_net, # type: ignore
             device=self.device,
             output_dir=self.output_dir,
             rank=rank,
@@ -517,7 +527,7 @@ class PPOMod:
                     if not os.path.exists(posb_path):
                         out_path = posb_path
                         break
-            torch.save(self.ddp_ac_net.module.state_dict(), out_path)
+            torch.save(self.ac_net.state_dict(), out_path)
             printfl(f'saved "{out_path}"!')
 
 
@@ -545,7 +555,6 @@ def main(config: Config) -> None:
             nprocs=tot_processes,
             join=True,
         )
-    # TODO profiling; some parts of this code are slow
     elif cfg.mode == 'test':
         mp.spawn(
             fn=ppo_mod.test,

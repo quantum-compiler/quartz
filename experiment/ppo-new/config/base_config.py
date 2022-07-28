@@ -27,8 +27,8 @@ class BaseConfig:
     
     mode: str = 'train'
     resume: bool = False
-    ckpt_path: str = 'outputs/2022-06-21/17-33-40/ckpts/iter_174.pt'
-    load_non_ddp_ckpt: bool = False
+    ckpt_path: str = 'outputs/2022-07-28/15-47-54/ckpts/iter_2.pt'
+    load_non_ddp_ckpt: bool = True
     load_best_info: bool = False
     best_info_dir: str = 'outputs/2022-06-26/08-45-11/sync_dir'
 
@@ -102,7 +102,7 @@ class BaseConfig:
     lr_actor: float = 3e-4
     lr_critic: float = 5e-4
     update_policy_interval: int = 1
-    save_ckpt_interval: int = 5
+    save_ckpt_interval: int = 1
     time_budget: str = ''
 
     # logging

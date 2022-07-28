@@ -11,6 +11,8 @@ import torch.multiprocessing as mp
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from icecream import ic
+
 # On Windows platform, the torch.distributed package only
 # supports Gloo backend, FileStore and TcpStore.
 # For FileStore, set init_method parameter in init_process_group
@@ -50,6 +52,10 @@ class ToyModel(nn.Module):
     
     def forward2(self, x):
         return self.net1(x)
+    
+    def add_mod(self):
+        self.net4 = nn.Linear(10, 10)
+        return self
 
 
 def demo_basic(rank, world_size):
@@ -58,7 +64,7 @@ def demo_basic(rank, world_size):
 
     # create model and move it to GPU
     device = torch.device(f'cuda:{rank}')
-    model = ToyModel().to(device)
+    model = ToyModel().add_mod().to(device)
     # print(model.state_dict())
     torch.cuda.set_device(device)
     # model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -81,6 +87,41 @@ def demo_basic(rank, world_size):
         }
     ])
     
+    if rank == 0:
+        ic(ddp_model.state_dict().values())
+    return
+    # state_dict = ddp_model.state_dict()
+    # # assert state_dict is ddp_model.state_dict()
+    # for k, v in state_dict.items():
+    #     state_dict[k] = v + 100
+    # if rank == 0:
+    #     ic(ddp_model.state_dict())
+    #     ic(state_dict)
+    #     torch.save(state_dict, 'test_state.pt')
+    # dist.barrier()
+    # loaded_dict = torch.load('test_state.pt')
+    # ddp_model.load_state_dict(loaded_dict)
+    # if rank == 1:
+    #     ic(ddp_model.state_dict())
+    #     ic(model.state_dict())
+
+    state_dict = model.state_dict()
+    # assert state_dict is ddp_model.state_dict()
+    for k, v in state_dict.items():
+        state_dict[k] = v + 100
+    if rank == 0:
+        ic(ddp_model.state_dict())
+        ic(state_dict)
+        torch.save(state_dict, 'test_state.pt')
+    dist.barrier()
+    loaded_dict = torch.load('test_state.pt')
+    model.load_state_dict(loaded_dict)
+    if rank == 1:
+        ic(ddp_model.state_dict())
+
+    assert model is ddp_model.module
+    return
+
     # optimizer = optim.Adam(ddp_model.parameters())
     torch.autograd.set_detect_anomaly(True)
     optimizer.zero_grad()

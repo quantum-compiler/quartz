@@ -205,7 +205,7 @@ namespace quartz {
                 // STEP 3: calculate reward
                 double original_circuit_cost = imp_cost;
                 imp_cost = graph.circuit_implementation_cost(device);
-                double new_circuit_cost = imp_cost + executed_gate_count + 3;
+                double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
                 Reward reward = original_circuit_cost - new_circuit_cost;
                 return reward;
             } else if (action.type == ActionType::Logical) {

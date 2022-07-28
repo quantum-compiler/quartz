@@ -7,6 +7,8 @@
 #include <algorithm>
 
 namespace quartz {
+    const double SWAPCOST = 3.0f;
+
     struct DeviceEdge {
     public:
         DeviceEdge() = default;
@@ -202,7 +204,7 @@ namespace quartz {
         }
 
         void add_edge(int src_idx, int dst_idx) {
-            DeviceTopologyGraph::add_edge(src_idx, dst_idx, 3.0f, true);
+            DeviceTopologyGraph::add_edge(src_idx, dst_idx, SWAPCOST, true);
         }
     };
 }

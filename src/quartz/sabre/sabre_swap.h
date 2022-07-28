@@ -326,7 +326,7 @@ namespace quartz {
             assert (execution_history.gate_type != GateType::input_qubit
                     && execution_history.gate_type != GateType::input_param);
             if (execution_history.gate_type == GateType::swap) {
-                cost += 3;
+                cost += SWAPCOST;
             } else {
                 cost += 1;
             }

@@ -515,7 +515,8 @@ cdef class PyGraph:
         dst_idx2 = dst_idx + src_idx
         reverse = [0] * len(src_id) + [1] * len(src_id)
 
-        g = dgl.graph((torch.tensor(src_id2), torch.tensor(dst_id2)))
+        g = dgl.graph((torch.tensor(src_id2, dtype=torch.int32),
+                       torch.tensor(dst_id2, dtype=torch.int32)))
         g.edata['src_idx'] = torch.tensor(src_idx2, dtype=torch.int32)
         g.edata['dst_idx'] = torch.tensor(dst_idx2, dtype=torch.int32)
         g.edata['reversed'] = torch.tensor(reverse, dtype=torch.int32)
@@ -737,9 +738,26 @@ cdef class PyState:
     def circuit(self) -> PyGraph:
         return self.graph
 
+    def get_circuit_dgl(self):
+        return self.graph.to_dgl_graph()
+
     @property
     def device_edges_list(self) -> [[int, int]]:
         return self.device_edges.edge_list
+
+    def get_device_dgl(self):
+        # pack device edges into tensor
+        src_id = []
+        dst_id = []
+        for edge in self.device_edges.edge_list:
+            assert len(edge) == 2
+            src_id.append(edge[0])
+            dst_id.append(edge[1])
+
+        # create dgl graph
+        dgl_graph = dgl.graph((torch.tensor(src_id, dtype=torch.int32),
+                               torch.tensor(dst_id, dtype=torch.int32)))
+        return dgl_graph
 
     @property
     def logical2physical_mapping(self) -> {int: int}:

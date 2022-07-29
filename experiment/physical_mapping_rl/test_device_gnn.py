@@ -1,6 +1,6 @@
 from quartz import PySimplePhysicalEnv
 
-from src.model.device_gnn_local import DeviceGNNSAGE
+from src.model.device_gnn_local import DeviceGNNSAGE, DeviceGNNGINLocal
 
 
 def test_sage():
@@ -16,11 +16,31 @@ def test_sage():
     state = env.get_state()
     device_dgl = state.get_device_dgl()
     res = device_gnn(device_dgl)
+    print(device_dgl)
+    print(res.shape)
+
+
+def test_gin_local():
+    device_gnn = DeviceGNNGINLocal(feature_type='both',  # degree / id / both
+                                   num_degree_types=20,
+                                   num_id_types=20,
+                                   degree_embedding_dim=48,
+                                   id_embedding_dim=16,
+                                   num_layers=5,
+                                   hidden_dimension=128,
+                                   out_dimension=84,)
+    env = PySimplePhysicalEnv(qasm_file_path="tests/rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
+    state = env.get_state()
+    device_dgl = state.get_device_dgl()
+    res = device_gnn(device_dgl)
+    print(device_dgl)
     print(res.shape)
 
 
 def main():
     test_sage()
+    print()
+    test_gin_local()
 
 
 if __name__ == '__main__':

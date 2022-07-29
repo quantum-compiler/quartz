@@ -750,6 +750,7 @@ cdef class PyState:
         src_id = []
         dst_id = []
         node_degree = [0] * len(self.physical2logical.map)
+        node_id = list(range(len(self.physical2logical.map)))
         for edge in self.device_edges.edge_list:
             assert len(edge) == 2
             src_id.append(edge[0])
@@ -760,6 +761,7 @@ cdef class PyState:
         dgl_graph = dgl.graph((torch.tensor(src_id, dtype=torch.int32),
                                torch.tensor(dst_id, dtype=torch.int32)))
         dgl_graph.ndata['degree'] = torch.tensor(node_degree, dtype=torch.int32)
+        dgl_graph.ndata['id'] = torch.tensor(node_id, dtype=torch.int32)
         return dgl_graph
 
     @property

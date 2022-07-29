@@ -64,7 +64,7 @@ class BaseConfig:
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
     gin_num_mlp_layers: int = 2
-    gin_learn_eps: bool = True
+    gin_learn_eps: bool = False # TODO
     gin_neighbor_pooling_type: str = 'sum' # 'mean', 'max'
     gin_graph_pooling_type: str = 'none' # 'sum', 'mean', 'max'
     actor_hidden_size: int = 256

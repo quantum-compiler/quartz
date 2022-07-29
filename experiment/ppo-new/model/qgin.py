@@ -113,7 +113,7 @@ class QGINConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
         # MLP: (N, input_dim + edge_info_dim) -> (N, input_dim)
-        self.compress_mlp = MLP(2, input_dim + 3, input_dim, input_dim)
+        self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim) # TODO
 
     def __msg_func_with_edge_info(self, edges):
         return { 'm': torch.cat([ edges.src['h'], edges.data['w'] ], dim=1) }
@@ -132,7 +132,7 @@ class QGINConv(nn.Module):
             neigh_feat = torch.max(feats, dim=1).values
         return { 'neigh': neigh_feat }
 
-    def forward(self, graph, feat, edge_weight=None):
+    def forward(self, graph: dgl.DGLGraph, feat: torch.Tensor, edge_weight=None):
         r"""
 
         Description
@@ -173,10 +173,13 @@ class QGINConv(nn.Module):
                 graph.edata['_edge_weight'] = edge_weight
                 aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
-            feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
+            # feat_src, feat_dst = expand_as_pair(feat, graph)
+            # graph.srcdata['h'] = feat_src
+            # graph.update_all(aggregate_fn, reducer)
+            # rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            graph.ndata['h'] = feat
             graph.update_all(aggregate_fn, reducer)
-            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
+            rst = (1 + self.eps) * feat + graph.ndata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             # activation
@@ -196,7 +199,7 @@ Author's implementation: https://github.com/weihua916/powerful-gnns
 """
 
 class ApplyNodeFunc(nn.Module):
-    """Update the node feature hv with MLP, BN and ReLU."""
+    """Update the node feature h with MLP, BN and ReLU."""
     def __init__(self, mlp):
         super(ApplyNodeFunc, self).__init__()
         self.mlp = mlp
@@ -348,7 +351,8 @@ class QGIN(nn.Module):
 
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
-            h = self.batch_norms[i](h)
+            # h = self.batch_norms[i](h)
+            # h = F.relu(h)
             hidden_rep.append(h)            
         
         if self.global_pool:
@@ -357,7 +361,7 @@ class QGIN(nn.Module):
 
             # perform pooling over all nodes in each graph in every layer
             for i, h in enumerate(hidden_rep):
-                h = F.relu(h)
+                # h = F.relu(h)
                 pooled_h = self.pool(g, h)
                 feat_over_layer += self.drop(self.linears_prediction[i](pooled_h))
             

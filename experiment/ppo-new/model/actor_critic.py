@@ -70,13 +70,15 @@ class ActorCritic(nn.Module):
 
         self.actor = nn.Sequential(
             nn.Linear(gnn_output_dim, actor_hidden_size),
+            # nn.BatchNorm1d(actor_hidden_size), # TODO
             nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim)
+            nn.Linear(actor_hidden_size, action_dim),
         )
         self.critic = nn.Sequential(
             nn.Linear(gnn_output_dim, critic_hidden_size),
+            # nn.BatchNorm1d(critic_hidden_size),
             nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1)
+            nn.Linear(critic_hidden_size, 1),
         )
     
     def ddp_model(self) -> ActorCritic:

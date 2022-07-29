@@ -349,15 +349,15 @@ class QGIN(nn.Module):
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
             h = self.batch_norms[i](h)
-            h = F.relu(h)
-            hidden_rep.append(h)
+            hidden_rep.append(h)            
         
         if self.global_pool:
-            num_graphs = len(g.batch_num_nodes())
+            # num_graphs = len(g.batch_num_nodes())
             feat_over_layer = cast(torch.Tensor, 0)
 
             # perform pooling over all nodes in each graph in every layer
             for i, h in enumerate(hidden_rep):
+                h = F.relu(h)
                 pooled_h = self.pool(g, h)
                 feat_over_layer += self.drop(self.linears_prediction[i](pooled_h))
             

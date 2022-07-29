@@ -303,7 +303,7 @@ class QGIN(nn.Module):
 
         # List of MLPs
         self.ginlayers = torch.nn.ModuleList()
-        self.batch_norms = torch.nn.ModuleList()
+        # self.batch_norms = torch.nn.ModuleList()
 
         for layer in range(self.num_layers):
             mlp_input_dim = input_dim if layer == 0 else hidden_dim
@@ -312,7 +312,7 @@ class QGIN(nn.Module):
             self.ginlayers.append(QGINConv(
                 mlp_input_dim, ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps,
             ))
-            self.batch_norms.append(nn.BatchNorm1d(mlp_output_dim))
+            # self.batch_norms.append(nn.BatchNorm1d(mlp_output_dim))
         
         self.global_pool: bool = False
         if graph_pooling_type != 'none':

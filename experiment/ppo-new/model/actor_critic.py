@@ -6,6 +6,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.nn.functional as F
 import dgl
 
+from model.basis import *
 from model.qgnn import *
 from model.qgin import *
 
@@ -68,18 +69,8 @@ class ActorCritic(nn.Module):
         else:
             raise NotImplementedError(f'Unknown GNN type {gnn_type}.')
 
-        self.actor = nn.Sequential(
-            nn.Linear(gnn_output_dim, actor_hidden_size),
-            # nn.BatchNorm1d(actor_hidden_size), # TODO
-            nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim),
-        )
-        self.critic = nn.Sequential(
-            nn.Linear(gnn_output_dim, critic_hidden_size),
-            # nn.BatchNorm1d(critic_hidden_size),
-            nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1),
-        )
+        self.actor = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
+        self.critic = MLP(2, gnn_output_dim, critic_hidden_size, 1)
     
     def ddp_model(self) -> ActorCritic:
         """make ddp verison instances for each sub-model"""

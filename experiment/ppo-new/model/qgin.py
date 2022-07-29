@@ -9,6 +9,8 @@ import dgl.function as fn
 from dgl.utils import expand_as_pair
 from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 
+from model.basis import *
+
 """QGINConv is stolen with modification from DGL source code for dgl.nn.pytorch.conv.ginconv"""
 # https://docs.dgl.ai/en/0.8.x/_modules/dgl/nn/pytorch/conv/ginconv.html#GINConv
 
@@ -208,59 +210,8 @@ class ApplyNodeFunc(nn.Module):
     def forward(self, h):
         h = self.mlp(h)
         h = self.bn(h)
-        h = F.relu(h)
+        h = F.leaky_relu(h)
         return h
-
-
-class MLP(nn.Module):
-    """MLP with linear output"""
-    def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
-        """MLP layers construction
-        Paramters
-        ---------
-        num_layers: int
-            The number of linear layers
-        input_dim: int
-            The dimensionality of input features
-        hidden_dim: int
-            The dimensionality of hidden units at ALL layers
-        output_dim: int
-            The number of classes for prediction
-        """
-        super(MLP, self).__init__()
-        self.linear_or_not = True  # default is linear model
-        self.num_layers = num_layers
-        self.output_dim = output_dim
-
-        if num_layers < 1:
-            raise ValueError("number of layers should be positive!")
-        elif num_layers == 1:
-            # Linear model
-            self.linear = nn.Linear(input_dim, output_dim)
-        else:
-            # Multi-layer model
-            self.linear_or_not = False
-            self.linears = torch.nn.ModuleList()
-            self.batch_norms = torch.nn.ModuleList()
-
-            self.linears.append(nn.Linear(input_dim, hidden_dim, bias=False))
-            for layer in range(num_layers - 2):
-                self.linears.append(nn.Linear(hidden_dim, hidden_dim, bias=False))
-            self.linears.append(nn.Linear(hidden_dim, output_dim, bias=False))
-
-            for layer in range(num_layers - 1):
-                self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-
-    def forward(self, x):
-        if self.linear_or_not:
-            # If linear model
-            return self.linear(x)
-        else:
-            # If MLP
-            h = x
-            for i in range(self.num_layers - 1):
-                h = F.relu(self.batch_norms[i](self.linears[i](h)))
-            return self.linears[-1](h)
 
 class QGIN(nn.Module):
     """QGIN model"""
@@ -303,7 +254,6 @@ class QGIN(nn.Module):
 
         # List of MLPs
         self.ginlayers = torch.nn.ModuleList()
-        # self.batch_norms = torch.nn.ModuleList()
 
         for layer in range(self.num_layers):
             mlp_input_dim = input_dim if layer == 0 else hidden_dim
@@ -312,7 +262,7 @@ class QGIN(nn.Module):
             self.ginlayers.append(QGINConv(
                 mlp_input_dim, ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps,
             ))
-            # self.batch_norms.append(nn.BatchNorm1d(mlp_output_dim))
+            # NOTE: ApplyNodeFunc already has BN and Activation
         
         self.global_pool: bool = False
         if graph_pooling_type != 'none':
@@ -351,8 +301,6 @@ class QGIN(nn.Module):
 
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
-            # h = self.batch_norms[i](h)
-            # h = F.relu(h)
             hidden_rep.append(h)            
         
         if self.global_pool:
@@ -361,7 +309,6 @@ class QGIN(nn.Module):
 
             # perform pooling over all nodes in each graph in every layer
             for i, h in enumerate(hidden_rep):
-                # h = F.relu(h)
                 pooled_h = self.pool(g, h)
                 feat_over_layer += self.drop(self.linears_prediction[i](pooled_h))
             

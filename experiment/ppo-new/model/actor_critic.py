@@ -21,6 +21,7 @@ class ActorCritic(nn.Module):
         gin_num_mlp_layers: int = 2,
         gin_learn_eps: bool = False,
         gin_neighbor_pooling_type: str = 'sum', # sum', 'mean', 'max'
+        gin_graph_pooling_type: str = None, # 'sum', 'mean', 'max'
         actor_hidden_size: int = 32,
         critic_hidden_size: int = 32,
         action_dim: int = 32,
@@ -62,6 +63,7 @@ class ActorCritic(nn.Module):
                 output_dim=gnn_output_dim,
                 learn_eps=gin_learn_eps,
                 neighbor_pooling_type=gin_neighbor_pooling_type,
+                graph_pooling_type=gin_graph_pooling_type,
             )
         else:
             raise NotImplementedError(f'Unknown GNN type {gnn_type}.')

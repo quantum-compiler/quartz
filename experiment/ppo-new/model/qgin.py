@@ -1,3 +1,4 @@
+from typing import cast, List
 import torch
 import torch as th
 from torch import nn
@@ -6,7 +7,7 @@ import torch.nn.functional as F
 import dgl
 import dgl.function as fn
 from dgl.utils import expand_as_pair
-
+from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 
 """QGINConv is stolen with modification from DGL source code for dgl.nn.pytorch.conv.ginconv"""
 # https://docs.dgl.ai/en/0.8.x/_modules/dgl/nn/pytorch/conv/ginconv.html#GINConv
@@ -258,13 +259,13 @@ class MLP(nn.Module):
                 h = F.relu(self.batch_norms[i](self.linears[i](h)))
             return self.linears[-1](h)
 
-
 class QGIN(nn.Module):
     """QGIN model"""
     def __init__(
-        self, num_layers, num_mlp_layers,
-        num_gate_types, gate_type_embed_dim, hidden_dim, output_dim,
-        learn_eps, neighbor_pooling_type,
+        self, num_layers: int, num_mlp_layers: int,
+        num_gate_types: int, gate_type_embed_dim: int, hidden_dim: int, output_dim: int,
+        learn_eps: bool, neighbor_pooling_type: str,
+        graph_pooling_type: str = 'none', final_dropout: float = 0.,
     ):
         """model parameters setting
         Paramters
@@ -284,6 +285,10 @@ class QGIN(nn.Module):
             If False, aggregate neighbors and center nodes altogether.
         neighbor_pooling_type: str
             how to aggregate neighbors (sum, mean, or max)
+        graph_pooling_type: str
+            how to aggregate entire nodes in a graph (sum, mean, max or none)
+            when this is 'none', only return per-node feature
+            when this is not 'none', return a pair (pre-node feature, pre-graph feature)
         """
         super(QGIN, self).__init__()
         self.num_layers = num_layers
@@ -305,6 +310,28 @@ class QGIN(nn.Module):
                 mlp_input_dim, ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps,
             ))
             self.batch_norms.append(nn.BatchNorm1d(mlp_output_dim))
+        
+        self.global_pool: bool = False
+        if graph_pooling_type != 'none':
+            self.global_pool = True
+            if graph_pooling_type == 'sum':
+                self.pool = SumPooling()
+            elif graph_pooling_type == 'mean':
+                self.pool = AvgPooling()
+            elif graph_pooling_type == 'max':
+                self.pool = MaxPooling()
+            else:
+                raise NotImplementedError
+
+            self.drop = nn.Dropout(final_dropout)
+
+            self.linears_prediction = torch.nn.ModuleList()
+            for layer in range(num_layers):
+                in_dim = hidden_dim if layer < self.num_layers - 1 else output_dim
+                self.linears_prediction.append(
+                    nn.Linear(in_dim, output_dim)
+                )
+            self.output_dim = output_dim
 
     def forward(self, g: dgl.DGLGraph):
         # Use embedding layer to generate init features for nodes in the graph
@@ -317,13 +344,24 @@ class QGIN(nn.Module):
         ], dim=1)
 
         # list of hidden representation at each layer (including input)
-        # hidden_rep = []
+        hidden_rep: List[torch.Tensor] = []
 
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
             h = self.batch_norms[i](h)
             h = F.relu(h)
-            # hidden_rep.append(h)
+            hidden_rep.append(h)
+        
+        if self.global_pool:
+            num_graphs = len(g.batch_num_nodes())
+            feat_over_layer = cast(torch.Tensor, 0)
 
-        return h
+            # perform pooling over all nodes in each graph in every layer
+            for i, h in enumerate(hidden_rep):
+                pooled_h = self.pool(g, h)
+                feat_over_layer += self.drop(self.linears_prediction[i](pooled_h))
+            
+            return hidden_rep[-1], feat_over_layer
+        else:
+            return hidden_rep[-1]
 

@@ -66,6 +66,7 @@ class BaseConfig:
     gin_num_mlp_layers: int = 2
     gin_learn_eps: bool = True
     gin_neighbor_pooling_type: str = 'sum' # 'mean', 'max'
+    gin_graph_pooling_type: str = 'none' # 'sum', 'mean', 'max'
     actor_hidden_size: int = 256
     critic_hidden_size: int = 128
 

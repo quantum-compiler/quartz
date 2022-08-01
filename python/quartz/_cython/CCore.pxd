@@ -146,15 +146,32 @@ cdef extern from "supported_devices/supported_devices.h" namespace "quartz":
         IBM_Q20_TOKYO,
         Q5_TEST
 
+
+cdef extern from "tasograph/tasograph.h" namespace "quartz":
+    cdef cppclass GraphState:
+        int number_of_nodes
+        vector[int] node_id
+        vector[bool] is_input
+        vector[int] input_logical_idx
+        vector[int] input_physical_idx
+        vector[int] node_type
+        int number_of_edges
+        vector[int] edge_from
+        vector[int] edge_to
+        vector[bool] edge_reversed
+        vector[int] edge_logical_idx
+        vector[int] edge_physical_idx
+
+
 cdef extern from "game/game_utils.h" namespace "quartz":
     ctypedef double Reward
 
     cdef cppclass State:
-        State(vector[pair[int, int]], vector[int], vector[int], const Graph &)
+        State(vector[pair[int, int]], vector[int], vector[int], GraphState)
         vector[pair[int, int]] device_edges
         vector[int] logical2physical
         vector[int] physical2logical
-        Graph graph
+        GraphState graph_state
 
     cpdef enum class ActionType:
         PhysicalFull,

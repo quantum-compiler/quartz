@@ -25,7 +25,7 @@ import torch
 ctypedef GraphXfer* GraphXfer_ptr
 
 # physical mapping
-from CCore cimport Reward, State, ActionType, Action
+from CCore cimport Reward, GraphState, State, ActionType, Action
 from CCore cimport SimplePhysicalEnv, BackendType
 
 
@@ -595,7 +595,7 @@ cdef class PyGraph:
         return edge_v.size()
 
 
-# physical mapping finished
+# physical mapping related
 def ToBackendType(tp_str: str) -> BackendType:
     if tp_str == "Q20_CLIQUE":
         return BackendType.Q20_CLIQUE
@@ -685,15 +685,30 @@ class PyMappingTable:
         assert from_idx not in self.map
         self.map[from_idx] = to_idx
 
+class PyGraphState:
+    def __init__(self):
+        self.number_of_nodes = 0
+        self.node_id = []
+        self.is_input = []
+        self.input_logical_idx = []
+        self.input_physical_idx = []
+        self.node_type = []
+        self.number_of_edges = 0
+        self.edge_from = []
+        self.edge_to = []
+        self.edge_reversed = []
+        self.edge_logical_idx = []
+        self.edge_physical_idx = []
+
 cdef class PyState:
     cdef shared_ptr[State] state_ptr
-    cdef object graph
+    cdef object graph_state
     cdef object device_edges
     cdef object logical2physical
     cdef object physical2logical
 
     def __init__(self):
-        self.graph = None               # PyGraph
+        self.graph_state = None         # PyGraphState
         self.device_edges = None        # PyDevice
         self.logical2physical = None    # PyMappingTable
         self.physical2logical = None    # PyMappingTable
@@ -709,10 +724,23 @@ cdef class PyState:
         self.state_ptr = _state_ptr
 
         # extract data: graph
-        cdef shared_ptr[Graph] c_graph = make_shared[Graph](deref(_state_ptr).graph)
-        graph = PyGraph()
-        graph.set_this(c_graph)
-        self.graph = graph
+        cdef GraphState c_graph_state = deref(_state_ptr).graph_state
+        py_graph_state = PyGraphState()
+        py_graph_state.number_of_nodes = c_graph_state.number_of_nodes
+        for i in range(py_graph_state.number_of_nodes):
+            py_graph_state.node_id.append(c_graph_state.node_id[i])
+            py_graph_state.is_input.append(c_graph_state.is_input[i])
+            py_graph_state.input_logical_idx.append(c_graph_state.input_logical_idx[i])
+            py_graph_state.input_physical_idx.append(c_graph_state.input_physical_idx[i])
+            py_graph_state.node_type.append(c_graph_state.node_type[i])
+        py_graph_state.number_of_edges = c_graph_state.number_of_edges
+        for i in range(py_graph_state.number_of_edges):
+            py_graph_state.edge_from.append(c_graph_state.edge_from[i])
+            py_graph_state.edge_to.append(c_graph_state.edge_to[i])
+            py_graph_state.edge_reversed.append(c_graph_state.edge_reversed[i])
+            py_graph_state.edge_logical_idx.append(c_graph_state.edge_logical_idx[i])
+            py_graph_state.edge_physical_idx.append(c_graph_state.edge_physical_idx[i])
+        self.graph_state = py_graph_state
 
         # extract data: device edges
         cdef vector[pair[int, int]] c_device_edges = deref(_state_ptr).device_edges
@@ -735,11 +763,17 @@ cdef class PyState:
         assert num_regs == num_qubits
 
     @property
-    def circuit(self) -> PyGraph:
-        return self.graph
+    def circuit(self) -> PyGraphState:
+        return self.graph_state
 
     def get_circuit_dgl(self):
-        return self.graph.to_dgl_graph()
+        g = dgl.graph((torch.tensor(self.graph_state.edge_from, dtype=torch.int32),
+                       torch.tensor(self.graph_state.edge_to, dtype=torch.int32)))
+        g.edata['logical_idx'] = torch.tensor(self.graph_state.edge_logical_idx, dtype=torch.int32)
+        g.edata['physical_idx'] = torch.tensor(self.graph_state.edge_physical_idx, dtype=torch.int32)
+        g.edata['reversed'] = torch.tensor(self.graph_state.edge_reversed, dtype=torch.int32)
+        g.ndata['is_input'] = torch.tensor(self.graph_state.is_input, dtype=torch.int32)
+        return g
 
     @property
     def device_edges_list(self) -> [[int, int]]:

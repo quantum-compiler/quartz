@@ -1,7 +1,7 @@
 set -x	# print commands and their arguments as they are executed.
 set -e	# exit immediately if anything you're running returns a non-zero return code
 
-cd /workspace/quartz
+cd /workspace/quartz_physical_mapping_rl
 pwd
 
 mkdir -p build

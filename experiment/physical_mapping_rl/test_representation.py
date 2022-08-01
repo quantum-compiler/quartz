@@ -12,9 +12,9 @@ def main():
                              h_feats=96,
                              inter_dim=128)
     encoder = EncoderLayer(d_model=96,
-                           d_inner=128,
-                           n_head=3,
-                           d_k=48,
+                           d_inner=384,
+                           n_head=6,
+                           d_k=64,
                            d_v=64)
     env = PySimplePhysicalEnv(qasm_file_path="tests/rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
 
@@ -22,10 +22,10 @@ def main():
     state = env.get_state()
     circuit_dgl = state.get_circuit_dgl()
     raw_rep = circuit_gnn(circuit_dgl)[:10]
-    print(circuit_dgl)
-    print(raw_rep.shape)
+    raw_rep = raw_rep[None, :]  # add batch dimension
+    print(f"Shape after circuit GNN {raw_rep.shape}")  # (10, 96)
     real_rep = encoder(raw_rep)
-    print(real_rep)
+    print(f"Shape after attention Rep:{real_rep[0].shape}, Attention score:{real_rep[1].shape}")
 
 
 if __name__ == '__main__':

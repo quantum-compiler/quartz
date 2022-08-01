@@ -4,6 +4,7 @@ git@github.com:jadore801120/attention-is-all-you-need-pytorch.git (MIT license)
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ScaledDotProductAttention(nn.Module):

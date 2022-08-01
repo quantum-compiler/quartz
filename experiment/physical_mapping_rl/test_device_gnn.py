@@ -1,6 +1,6 @@
 from quartz import PySimplePhysicalEnv
 
-from src.model.device_gnn_local import DeviceGNNSAGE, DeviceGNNGINLocal
+from src.model.device_gnn import DeviceGNNSAGE, DeviceGNNGINLocal
 
 
 def test_sage():

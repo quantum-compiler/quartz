@@ -12,16 +12,16 @@ namespace quartz {
         State(std::vector<std::pair<int, int>> _device_edges,
               std::vector<int> _logical2physical,
               std::vector<int> _physical2logical,
-              const Graph &_graph) : device_edges(std::move(_device_edges)),
-                                     logical2physical(std::move(_logical2physical)),
-                                     physical2logical(std::move(_physical2logical)),
-                                     graph(_graph) {}
+              GraphState _graph_state) : device_edges(std::move(_device_edges)),
+                                         logical2physical(std::move(_logical2physical)),
+                                         physical2logical(std::move(_physical2logical)),
+                                         graph_state(std::move(_graph_state)) {}
 
     public:
         std::vector<std::pair<int, int>> device_edges;
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
-        Graph graph;
+        GraphState graph_state;
     };
 
     enum class ActionType {

@@ -91,8 +91,8 @@ namespace quartz {
             imp_cost = graph.circuit_implementation_cost(device);
         }
 
-        [[nodiscard]] State state() const {
-            return {device_edges, logical2physical, physical2logical, graph};
+        [[nodiscard]] State state() {
+            return {device_edges, logical2physical, physical2logical, graph.convert_circuit_to_state()};
         }
 
         std::set<Action, ActionCompare> action_space(ActionType action_type) {

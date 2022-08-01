@@ -183,6 +183,24 @@ enum class InitialMappingType{
     TRIVIAL, SABRE
 };
 
+struct GraphState{
+public:
+    // node related
+    int number_of_nodes;
+    std::vector<int> node_id;
+    std::vector<bool> is_input;
+    std::vector<int> input_logical_idx;
+    std::vector<int> input_physical_idx;
+    std::vector<int> node_type;
+    // edge related
+    int number_of_edges;
+    std::vector<int> edge_from;
+    std::vector<int> edge_to;
+    std::vector<bool> edge_reversed;
+    std::vector<int> edge_logical_idx;
+    std::vector<int> edge_physical_idx;
+};
+
 class GraphXfer;
 
 class Graph {
@@ -278,6 +296,7 @@ public:
   void add_swap(const Edge& e1, const Edge& e2);
   // utils
   void set_physical_mapping(const std::vector<int>& logical2physical);
+  GraphState convert_circuit_to_state();
 
 
 private:

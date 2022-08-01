@@ -2794,4 +2794,93 @@ void Graph::set_physical_mapping(const std::vector<int>& logical2physical) {
     propagate_mapping();
 }
 
+GraphState Graph::convert_circuit_to_state() {
+    GraphState graph_state = GraphState();
+    // map each op to a different node represented by id
+    std::map<Op, int, OpCompare> op2node_id;
+    int cur_node_id = 0;
+    if (!outEdges.empty()) {
+        // input qubit first
+        for (const auto& op_edge: outEdges) {
+            if (op_edge.first.ptr->tp == GateType::input_qubit) {
+                op2node_id[op_edge.first] = cur_node_id;
+                graph_state.node_id.emplace_back(cur_node_id);
+                graph_state.is_input.emplace_back(true);
+                graph_state.input_logical_idx.emplace_back(qubit_mapping_table[op_edge.first].first);
+                graph_state.input_physical_idx.emplace_back(qubit_mapping_table[op_edge.first].second);
+                graph_state.node_type.emplace_back(static_cast<int>(op_edge.first.ptr->tp));
+                cur_node_id += 1;
+            }
+        }
+    }
+    if (!inEdges.empty()) {
+        // all other gates (this is enough since each gate other than input qubit must have input)
+        for (const auto& op_edge: inEdges) {
+            assert(op_edge.first.ptr->tp != GateType::input_qubit);
+            assert(op2node_id.find(op_edge.first) == op2node_id.end());
+            op2node_id[op_edge.first] = cur_node_id;
+            graph_state.node_id.emplace_back(cur_node_id);
+            graph_state.is_input.emplace_back(false);
+            graph_state.input_logical_idx.emplace_back(-1);
+            graph_state.input_physical_idx.emplace_back(-1);
+            graph_state.node_type.emplace_back(static_cast<int>(op_edge.first.ptr->tp));
+            cur_node_id += 1;
+        }
+    }
+    graph_state.number_of_nodes = cur_node_id;
+    assert(graph_state.node_id.size() == cur_node_id);
+    assert(graph_state.is_input.size() == cur_node_id);
+    assert(graph_state.input_logical_idx.size() == cur_node_id);
+    assert(graph_state.input_physical_idx.size() == cur_node_id);
+    assert(graph_state.node_type.size() == cur_node_id);
+
+    // store all edges
+    std::set<Edge, EdgeCompare> finished_edge_set;
+    int edge_count = 0;
+    if (!outEdges.empty()) {
+        for (const auto& op_edge: outEdges) {
+            assert(!op_edge.second.empty());
+            for (const Edge& edge : op_edge.second) {
+                if (finished_edge_set.find(edge) == finished_edge_set.end()) {
+                    finished_edge_set.insert(edge);
+                    // extract information
+                    int logical_idx = edge.logical_qubit_idx;
+                    int physical_idx = edge.physical_qubit_idx;
+                    int src_node_idx = op2node_id[edge.srcOp];
+                    int dst_node_idx = op2node_id[edge.dstOp];
+                    // add edge to graph state
+                    graph_state.edge_from.emplace_back(src_node_idx);
+                    graph_state.edge_to.emplace_back(dst_node_idx);
+                    graph_state.edge_logical_idx.emplace_back(logical_idx);
+                    graph_state.edge_physical_idx.emplace_back(physical_idx);
+                    graph_state.edge_reversed.emplace_back(false);
+                    // add reverse edge to graph state
+                    graph_state.edge_from.emplace_back(dst_node_idx);
+                    graph_state.edge_to.emplace_back(src_node_idx);
+                    graph_state.edge_logical_idx.emplace_back(logical_idx);
+                    graph_state.edge_physical_idx.emplace_back(physical_idx);
+                    graph_state.edge_reversed.emplace_back(true);
+                    edge_count += 2;
+                }
+            }
+        }
+    }
+    graph_state.number_of_edges = edge_count;
+    assert(graph_state.edge_from.size() == edge_count);
+    assert(graph_state.edge_to.size() == edge_count);
+    assert(graph_state.edge_logical_idx.size() == edge_count);
+    assert(graph_state.edge_physical_idx.size() == edge_count);
+    assert(graph_state.edge_reversed.size() == edge_count);
+    if (!inEdges.empty()) {
+        for (const auto& op_edge: inEdges) {
+            assert(!op_edge.second.empty());
+            for (const Edge& edge : op_edge.second) {
+                assert(finished_edge_set.find(edge) != finished_edge_set.end());
+            }
+        }
+    }
+
+    // return
+    return graph_state;
+}
 }; // namespace quartz

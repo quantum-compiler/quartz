@@ -114,18 +114,35 @@ As shown in the example above, the grammar for the rules are simple. Also, if a 
 #### Optimization
 
 You can use the API:
+```cpp
+std::shared_ptr<Graph> optimize(Context *ctx,
+                                const std::string &equiv_file_name,
+                                const std::string &circuit_name,
+                                bool print_message,
+                                double cost_upper_bound = -1 /*default = current cost * 1.05*/,
+                                int timeout = 3600 /*1 hour*/);
+```
+
+Explanation for some of the parameters:
+- `equiv_file_name`: The file name of the ECC set.
+- `circuit_name`: The name of the circuit, which will be printed with the intermediate result.
+- `print_message`: Print debug message to the console.
+- `cost_upper_bound`: Maximum circuit cost to be searched during optimization.
+- `timeout`: Timeout for optimization in seconds.
+
+You can also use the deprecated API for now:
 ``` cpp
-Graph::optimize(float alpha, int budget, bool print_subst, Context *ctx,
-           const std::string &equiv_file_name, bool use_simulated_annealing,
-           bool enable_early_stop, bool use_rotation_merging_in_searching,
-           GateType target_rotation, std::string circuit_name = "",
-           int timeout = 86400 /*1 day*/);
+Graph::optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
+                       const std::string &equiv_file_name, bool use_simulated_annealing,
+                       bool enable_early_stop, bool use_rotation_merging_in_searching,
+                       GateType target_rotation, std::string circuit_name = "",
+                       int timeout = 86400 /*1 day*/);
 ```
 
 Explanation for some of the parameters:
 
 - `print_subst`: Deprecated will be removed in future version.
-- `equiv_file_name`: The filename of the file that stores the ECC set. 
+- `equiv_file_name`: The file name of the ECC set. 
 - `use_simulated_annealing`: Use simulated annealing in searching.
 - `use_rotation_merging_in_searching`: Enable rotation merging in each iteration of the back-track searching.
 - `target_rotation`: The target rotation used if you enable rotation merging in search.

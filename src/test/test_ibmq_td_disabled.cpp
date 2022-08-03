@@ -57,16 +57,13 @@ int main(int argc, char **argv) {
   auto graph_before_search = graph_new_ctx->toffoli_flip_by_instruction(
       GateType::u1, xfer_pair.first, xfer_pair.second, trace);
 
-  // Optimization
-  auto graph_after_search = graph_before_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::u1);
-  //  eqset_fn = "../IBM_with_U3_2_1_complete_ECC_set.json";
-  //  Graph *graph_after_u3_pass = graph_after_search->optimize(
-  //      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-  //      /*rotation_merging_in_searching*/ false, GateType::u1);
-  auto end = std::chrono::steady_clock::now();
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
+  // Optimization
+  auto graph_after_search = graph_before_search->optimize(&dst_ctx,
+                                                          eqset_fn,
+                                                          fn, /*print_message=*/
+                                                          true);
+  auto end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
             << " on IBMQ gate set." << std::endl
             << "Gate count after optimization: "

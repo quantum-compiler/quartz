@@ -1370,7 +1370,7 @@ Graph::_from_qasm_stream(Context *ctx,
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
             p = std::stod(d) * PI;
-          } 
+          }
           else if(token.find("pi") != std::string::npos){
             // 0.123*pi
             auto d = token.substr(0, token.find("*"));
@@ -1455,7 +1455,7 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-std::shared_ptr<Graph> Graph::optimize(
+std::shared_ptr<Graph> Graph::optimize_legacy(
     float alpha, int budget, bool print_subst, Context *ctx,
     const std::string &equiv_file_name, bool use_simulated_annealing,
     bool enable_early_stop, bool use_rotation_merging_in_searching,
@@ -1711,9 +1711,47 @@ std::shared_ptr<Graph> Graph::optimize(
   return bestGraph;
 } // namespace quartz
 
-std::shared_ptr<Graph> Graph::optimize(std::vector<GraphXfer *> xfers,
+std::shared_ptr<Graph> Graph::optimize(Context *ctx,
+                                       const std::string &equiv_file_name,
+                                       const std::string &circuit_name,
+                                       bool print_message,
                                        double cost_upper_bound,
-                                       std::string circuit_name,
+                                       int timeout) {
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(ctx, equiv_file_name)) {
+    std::cout << "Failed to load equivalence file \"" << equiv_file_name
+              << "\"." << std::endl;
+    assert(false);
+  }
+
+  // Get xfer from the equivalent set
+  auto ecc = eqs.get_all_equivalence_sets();
+  std::vector<GraphXfer *> xfers;
+  for (const auto &eqcs : ecc) {
+    for (auto circ_0 : eqcs) {
+      for (auto circ_1 : eqcs) {
+        if (circ_0 != circ_1) {
+          auto xfer = GraphXfer::create_GraphXfer(ctx, circ_0, circ_1, false);
+          if (xfer != nullptr) {
+            xfers.push_back(xfer);
+          }
+        }
+      }
+    }
+  }
+  if (print_message) {
+    std::cout << "Number of xfers: " << xfers.size() << std::endl;
+  }
+  if (cost_upper_bound == -1) {
+    cost_upper_bound = total_cost() * 1.05;
+  }
+  return optimize(xfers, cost_upper_bound, circuit_name, print_message, timeout);
+}
+
+std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
+                                       double cost_upper_bound,
+                                       const std::string &circuit_name,
                                        bool print_message, int timeout) {
   auto start = std::chrono::steady_clock::now();
   std::priority_queue<std::shared_ptr<Graph>,

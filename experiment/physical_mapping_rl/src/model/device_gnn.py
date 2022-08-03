@@ -4,18 +4,30 @@ import torch.nn as nn
 from dgl.nn import SAGEConv, GINConv
 
 
+class DeviceEmbedding(nn.Module):
+    def __init__(self,
+                 num_registers,         # number of registers on device
+                 embedding_dimension,   # dimension of embedding vector
+                 ):
+        super(DeviceEmbedding, self).__init__()
+        self.embedding = nn.Embedding(num_registers, embedding_dimension)
+
+    def forward(self, register_id_list):
+        return self.embedding(register_id_list)
+
+
 class DeviceGNNSAGE(nn.Module):
     def __init__(self,
                  # embedding
-                 feature_type,  # degree / id / both
-                 num_degree_types,  # max degree + 1
-                 num_id_types,  # max node id
-                 degree_embedding_dim,  # dimension of feature embedding
-                 id_embedding_dim,  # dimension of id embedding
+                 feature_type,              # degree / id / both
+                 num_degree_types,          # max degree + 1
+                 num_id_types,              # max node id
+                 degree_embedding_dim,      # dimension of feature embedding
+                 id_embedding_dim,          # dimension of id embedding
                  # graph conv
-                 num_layers,  # # of convolution layers
-                 hidden_dimension,  # dimension of each internal GNN layer
-                 out_dimension,  # output dimension of final GNN layer
+                 num_layers,                # # of convolution layers
+                 hidden_dimension,          # dimension of each internal GNN layer
+                 out_dimension,             # output dimension of final GNN layer
                  ):
         super(DeviceGNNSAGE, self).__init__()
         # embedding network
@@ -62,15 +74,15 @@ class DeviceGNNSAGE(nn.Module):
 class DeviceGNNGINLocal(nn.Module):
     def __init__(self,
                  # embedding
-                 feature_type,  # degree / id / both
-                 num_degree_types,  # max degree + 1
-                 num_id_types,  # max node id
-                 degree_embedding_dim,  # dimension of feature embedding
-                 id_embedding_dim,  # dimension of id embedding
+                 feature_type,              # degree / id / both
+                 num_degree_types,          # max degree + 1
+                 num_id_types,              # max node id
+                 degree_embedding_dim,      # dimension of feature embedding
+                 id_embedding_dim,          # dimension of id embedding
                  # graph conv
-                 num_layers,  # # of convolution layers
-                 hidden_dimension,  # dimension of each internal GNN layer
-                 out_dimension,  # output dimension of final GNN layer
+                 num_layers,                # # of convolution layers
+                 hidden_dimension,          # dimension of each internal GNN layer
+                 out_dimension,             # output dimension of final GNN layer
                  ):
         super(DeviceGNNGINLocal, self).__init__()
         # embedding network

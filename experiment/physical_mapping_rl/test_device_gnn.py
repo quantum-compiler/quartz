@@ -1,7 +1,8 @@
 from quartz import PySimplePhysicalEnv
 
-from src.model.device_gnn import DeviceGNNSAGE, DeviceGNNGINLocal
+from src.model.device_gnn import DeviceGNNSAGE, DeviceGNNGINLocal, DeviceEmbedding
 
+import torch
 
 def test_sage():
     device_gnn = DeviceGNNSAGE(feature_type='both',  # degree / id / both
@@ -37,10 +38,19 @@ def test_gin_local():
     print(res.shape)
 
 
+def test_device_embedding():
+    device_embedding_network = DeviceEmbedding(20, 4)
+    res = device_embedding_network(torch.tensor(list(range(20))))
+    print(res)
+    print(res.shape)
+
+
 def main():
     test_sage()
     print()
     test_gin_local()
+    print()
+    test_device_embedding()
 
 
 if __name__ == '__main__':

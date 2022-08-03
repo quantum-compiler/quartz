@@ -123,6 +123,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         shared_ptr[Graph] ccz_flip_greedy_rz()
         bool equal(const Graph &) const
         void rotation_merging(GateType)
+        int circuit_depth() const
         
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

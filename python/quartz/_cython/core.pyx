@@ -588,3 +588,6 @@ cdef class PyGraph:
         deref(self.graph).all_edges(edge_v)
         return edge_v.size()
 
+    @property
+    def depth(self) -> int:
+        return deref(self.graph).circuit_depth()

@@ -20,10 +20,11 @@ def main():
 
     # forward pass
     state = env.get_state()
+    num_qubits = sum(state.circuit.is_input)
     circuit_dgl = state.get_circuit_dgl()
-    raw_rep = circuit_gnn(circuit_dgl)[:10]
+    raw_rep = circuit_gnn(circuit_dgl)[:num_qubits]
     raw_rep = raw_rep[None, :]  # add batch dimension
-    print(f"Shape after circuit GNN {raw_rep.shape}")  # (10, 96)
+    print(f"Shape after circuit GNN {raw_rep.shape}")  # (num_qubits, 96)
     real_rep = encoder(raw_rep)
     print(f"Shape after attention Rep:{real_rep[0].shape}, Attention score:{real_rep[1].shape}")
 

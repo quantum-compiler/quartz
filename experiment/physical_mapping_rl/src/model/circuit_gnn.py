@@ -71,13 +71,10 @@ class CircuitGNN(nn.Module):
     def forward(self, g: dgl.DGLGraph):
         # print(g.ndata['gate_type'])
         # print(self.embedding)
-        g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-            dim=1)
+        g.ndata['h'] = self.embedding(g.ndata['is_input'])
+        w = torch.cat([torch.unsqueeze(g.edata['logical_idx'], 1),
+                       torch.unsqueeze(g.edata['physical_idx'], 1),
+                       torch.unsqueeze(g.edata['reversed'], 1)], dim=1)
         g.edata['w'] = w
         h = self.conv_0(g, g.ndata['h'])
         for i in range(len(self.convs)):

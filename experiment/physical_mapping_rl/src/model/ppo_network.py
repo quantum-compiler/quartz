@@ -33,7 +33,7 @@ def PolicyNetworkSimple(attention_score, action_space):
     logit_mat = attention_score + attention_score.transpose(0, 1)
     logit_list = []
     for action in action_space:
-        action_logit = logit_mat[action.qubit_idx_0][action.qubit_idx_1].view(1)
+        action_logit = logit_mat[action[0]][action[1]].view(1)
         logit_list.append(action_logit)
     action_logits = torch.concat(logit_list, dim=0)
     action_prob = F.softmax(action_logits, dim=0)

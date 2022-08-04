@@ -1,9 +1,8 @@
-import time
-
 from quartz import PySimplePhysicalEnv
 
-from src.model.representation_network import RepresentationNetworkSimple
 from src.model.ppo_network import ValueNetwork, PolicyNetworkSimple
+from src.model.representation_network import RepresentationNetworkSimple
+from src.utils import DecodePyActionList
 
 
 def main():
@@ -18,7 +17,8 @@ def main():
                                               attention_v_dimension=64)
     env = PySimplePhysicalEnv(qasm_file_path="tests/rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
     state = env.get_state()
-    rep, attention = rep_network(state)
+    rep, attention = rep_network.forward(circuit=state.circuit, circuit_dgl=state.get_circuit_dgl(),
+                                         physical2logical_mapping=state.physical2logical_mapping)
     print(f"{rep.shape=}")
     print(f"{attention.shape=}")
 
@@ -29,7 +29,8 @@ def main():
 
     # policy
     action_space = env.get_action_space()
-    policy = PolicyNetworkSimple(attention_score=attention, action_space=action_space)
+    decoded_action_space = DecodePyActionList(action_space)
+    policy = PolicyNetworkSimple(attention_score=attention, action_space=decoded_action_space)
     print(f"{policy=}")
     print(f"{policy.shape=}", f"{len(action_space)}")
 

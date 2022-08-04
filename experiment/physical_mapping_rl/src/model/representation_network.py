@@ -1,7 +1,8 @@
-from quartz import PySimplePhysicalEnv, PyState
+from quartz import PyGraphState, PyMappingTable
 import torch
 import torch.nn as nn
 import numpy as np
+from dgl import DGLGraph
 from src.model.circuit_gnn import CircuitGNN
 from src.model.device_gnn import DeviceGNNGINLocal, DeviceEmbedding
 from src.model.multihead_self_attention import EncoderLayer
@@ -88,19 +89,19 @@ class RepresentationNetworkSimple(nn.Module):
                                               n_head=num_attention_heads,
                                               d_k=attention_qk_dimension, d_v=attention_v_dimension)
 
-    def forward(self, state: PyState):
+    def forward(self, circuit: PyGraphState, circuit_dgl: DGLGraph,
+                physical2logical_mapping: PyMappingTable):
         # representation for each logical qubit
-        num_qubits = sum(state.circuit.is_input)
-        circuit_dgl = state.get_circuit_dgl()
+        num_qubits = sum(circuit.is_input)
         logical_qubit_rep = self.circuit_gnn(circuit_dgl)[:num_qubits]
 
         # append empty representation
-        num_registers = len(state.physical2logical_mapping)
+        num_registers = len(physical2logical_mapping)
         logical_qubit_rep_padding = torch.zeros(num_registers - num_qubits, self.circuit_out_dimension)
         logical_qubit_rep = torch.concat([logical_qubit_rep, logical_qubit_rep_padding], dim=0)
 
         # reorder circuit representation
-        qubit_physical_idx = state.circuit.input_physical_idx[:num_qubits]
+        qubit_physical_idx = circuit.input_physical_idx[:num_qubits]
         for i in range(num_registers):
             if i not in qubit_physical_idx:
                 qubit_physical_idx.append(i)

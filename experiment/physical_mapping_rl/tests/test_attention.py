@@ -16,7 +16,7 @@ def main():
                            n_head=6,
                            d_k=64,
                            d_v=64)
-    env = PySimplePhysicalEnv(qasm_file_path="tests/rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
+    env = PySimplePhysicalEnv(qasm_file_path="rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
 
     # forward pass
     state = env.get_state()

@@ -13,10 +13,11 @@ def main():
                                           num_attention_heads=8,
                                           attention_qk_dimension=64,
                                           attention_v_dimension=64)
-    env = PySimplePhysicalEnv(qasm_file_path="tests/rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
+    env = PySimplePhysicalEnv(qasm_file_path="rollout.qasm", backend_type_str="IBM_Q20_TOKYO")
     state = env.get_state()
     start = time.time()
-    rep, attention = network(state)
+    rep, attention = network.forward(circuit=state.circuit, circuit_dgl=state.get_circuit_dgl(),
+                                     physical2logical_mapping=state.physical2logical_mapping)
     end = time.time()
     inference_time = "{:.2f}".format(end - start)
     print(f"Inference time: {inference_time}s")

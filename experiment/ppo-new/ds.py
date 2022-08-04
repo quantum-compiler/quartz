@@ -293,6 +293,8 @@ class GraphBuffer:
         self.graph_ccs: List[int] = []
         self.init_graph_costs: List[int] = []
         self.graph_costs: List[int] = []
+        self.init_graph_depths: List[int] = []
+        self.graph_depths: List[int] = []
 
         self.all_graphs: Dict[quartz.PyGraph, AllGraphDictValue] = {
             self.original_graph: AllGraphDictValue(0, self.original_cost, None, Action(0, 0)),
@@ -402,11 +404,13 @@ class GraphBuffer:
     def append_costs_from_graph(self, graph: quartz.PyGraph):
         self.graph_gcs.append(graph.gate_count)
         self.graph_ccs.append(graph.cx_count)
+        self.graph_depths.append(graph.depth)
         self.graph_costs.append(get_cost(graph, self.cost_type))
     
     def append_init_costs_from_graph(self, graph: quartz.PyGraph):
         self.init_graph_gcs.append(graph.gate_count)
         self.init_graph_ccs.append(graph.cx_count)
+        self.init_graph_depths.append(graph.depth)
         self.init_graph_costs.append(get_cost(graph, self.cost_type))
     
     def eps_len_info(self) -> Dict[str, float]:
@@ -445,13 +449,14 @@ class GraphBuffer:
         for name, values, init_values in [
             ('gate_count', self.graph_gcs, self.init_graph_gcs),
             ('cx_count', self.graph_ccs, self.init_graph_ccs),
+            ('depth', self.graph_depths, self.init_graph_depths),
             ('cost', self.graph_costs, self.init_graph_costs),
         ]:
             info[f'min_init_{name}'] = min(init_values)
             info[f'max_init_{name}'] = max(init_values)
             info[f'mean_init_{name}'] = sum(init_values) / len(init_values)
             
-            info[f'best_{name}_iter'] = min(values)
+            info[f'min_{name}_iter'] = min(values)
             info[f'max_{name}_iter'] = max(values)
             info[f'mean_{name}_iter'] = sum(values) / len(values)
         

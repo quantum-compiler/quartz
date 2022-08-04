@@ -305,10 +305,14 @@ class PPOAgent:
     def other_info_dict(self) -> Dict[str, float | int]:
         info_dict: Dict[str, float | int] = {}
         for buffer in self.graph_buffers:
-            best_cost_global = get_cost(buffer.best_graph, self.cost_type)
-            info_dict[f'{buffer.name}_best_cost'] = best_cost_global
-            info_dict[f'{buffer.name}_best_cost_global'] = best_cost_global
-            info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
+            best_graph_info: Dict[str, int] = {
+                'cost': get_cost(buffer.best_graph, self.cost_type),
+                'gate_count': buffer.best_graph.gate_count,
+                'cx_count': buffer.best_graph.cx_count,
+                'depth': buffer.best_graph.depth,
+            }
+            for metric_name, value in best_graph_info.items():
+                info_dict[f'{buffer.name}_best_graph_{metric_name}'] = value
             
             eps_len_info = buffer.eps_len_info()
             for k, v in eps_len_info.items():
@@ -321,8 +325,9 @@ class PPOAgent:
             cost_info = buffer.cost_info()
             for k, v in cost_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
-            
 
+            info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
+        # end for
         return info_dict
     
     def output_opt_path(

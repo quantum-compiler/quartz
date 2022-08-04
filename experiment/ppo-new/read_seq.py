@@ -22,12 +22,13 @@ def read_seq(
     graph_list: List[quartz.PyGraph] = []
     for circ_file in circ_files:
         # 10_54_47_8323.qasm
-        with open(os.path.join(dir_path, circ_file)) as f:
-            qasm = f.read()
-        graph = qtz.qasm_to_graph(qasm)
         splitted_fname = os.path.splitext(circ_file)[0].split('_')
         assert len(splitted_fname) == 4
         i_step, cost, action_node, action_xfer = list(map(int, splitted_fname))
+        
+        with open(os.path.join(dir_path, circ_file)) as f:
+            qasm = f.read()
+        graph = qtz.qasm_to_graph(qasm)
         
         if len(graph_list) > 0:
             pre_graph = graph_list[-1]
@@ -43,9 +44,9 @@ def read_seq(
         print(f'Got i_step = {i_step}, cost = {cost}, graph = {graph}')
 
         circ = QuantumCircuit.from_qasm_str(qasm)
-        print(circ.draw(output='text'))
+        # print(circ.draw(output='text'))
         # circuit_drawer(circ, output='text')
-        embed()
+        # embed()
 
 
 @hydra.main(config_path='config', config_name='config')

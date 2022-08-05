@@ -45,7 +45,7 @@ class PPONetwork(nn.Module):
     def policy_forward(self, circuit, circuit_dgl, physical2logical_mapping, action_space):
         """
         input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: action space
+                action_space: decoded action space (see utils.DecodePyActionList)
         output: selected action: a tuple (qubit idx 0, qubit idx 1)
                 log probability of selected action
         """
@@ -64,7 +64,7 @@ class PPONetwork(nn.Module):
     def evaluate_action(self, circuit, circuit_dgl, physical2logical_mapping, action_space, action_id):
         """
         input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: action space
+                action_space: decoded action space (see utils.DecodePyActionList)
                 action_id: selected action id
         output: selected action: a tuple (qubit idx 0, qubit idx 1)
                 log probability of selected action

@@ -12,6 +12,13 @@ def py_action_2_list(action_list: [PyAction]):
     return decoded_actions
 
 
+def action_2_id(input_action, action_space):
+    for idx, action in enumerate(action_space):
+        if action[0] == input_action[0] and action[1] == input_action[1]:
+            return torch.tensor([idx])
+    assert False
+
+
 def graph_state_2_dgl(graph_state: PyGraphState):
     g = dgl.graph((torch.tensor(graph_state.edge_from, dtype=torch.int32),
                    torch.tensor(graph_state.edge_to, dtype=torch.int32)))

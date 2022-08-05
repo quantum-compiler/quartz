@@ -42,53 +42,58 @@ class PPONetwork(nn.Module):
         self.value_network = ValueNetwork(register_embedding_dimension=circuit_out_dimension+device_out_dimension)
         self.policy_network = PolicyNetworkSimple   # this is a function
 
-    def policy_forward(self, circuit, circuit_dgl, physical2logical_mapping, action_space):
+    def policy_forward(self, circuit_batch, physical2logical_mapping_batch, action_space_batch):
         """
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: decoded action space (see utils.DecodePyActionList)
-        output: selected action: a tuple (qubit idx 0, qubit idx 1)
-                log probability of selected action
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+                action_space_batch: list of decoded action space (see utils.DecodePyActionList)
+        output: selected_action_list: a list of tuples (qubit idx 0, qubit idx 1)
+                selected_action_prob_list: a list of log probability of selected action
         """
         # get action probability
-        _, attention_score = self.representation_network(circuit=circuit,
-                                                         circuit_dgl=circuit_dgl,
-                                                         physical2logical_mapping=physical2logical_mapping)
-        action_prob = self.policy_network(attention_score, action_space)
+        _, attention_score = self.representation_network(circuit_batch=circuit_batch,
+                                                         physical2logical_mapping_batch=physical2logical_mapping_batch)
+        action_prob_batch = self.policy_network(attention_score, action_space_batch)
 
         # sample action and return
-        action_dist = Categorical(probs=action_prob)
-        selected_action_id = action_dist.sample()
-        selected_action_log_prob = action_dist.log_prob(selected_action_id)
-        return action_space[selected_action_id], selected_action_log_prob
+        selected_action_list, selected_action_prob_list = [], []
+        for action_prob, action_space in zip(action_prob_batch, action_space_batch):
+            action_dist = Categorical(probs=action_prob)
+            selected_action_id = action_dist.sample()
+            selected_action_log_prob = action_dist.log_prob(selected_action_id)
+            selected_action_list.append(action_space[selected_action_id])
+            selected_action_prob_list.append(selected_action_log_prob)
+        return selected_action_list, selected_action_prob_list
 
-    def evaluate_action(self, circuit, circuit_dgl, physical2logical_mapping, action_space, action_id):
+    def evaluate_action(self, circuit_batch, physical2logical_mapping_batch, action_space_batch, action_id_batch):
         """
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: decoded action space (see utils.DecodePyActionList)
-                action_id: selected action id
-        output: selected action: a tuple (qubit idx 0, qubit idx 1)
-                log probability of selected action
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+                action_space_batch: list of decoded action space (see utils.DecodePyActionList)
+                action_id_batch: list of selected actions index
+        output: selected_action_prob_list: a list of log probability of selected action
+                dist_entropy_list: a list of distribution entropy
         """
         # get action probability
-        _, attention = self.representation_network(circuit=circuit,
-                                                   circuit_dgl=circuit_dgl,
-                                                   physical2logical_mapping=physical2logical_mapping)
-        action_prob = self.policy_network(attention_score, action_space)
+        _, attention_score = self.representation_network(circuit_batch=circuit_batch,
+                                                         physical2logical_mapping_batch=physical2logical_mapping_batch)
+        action_prob_batch = self.policy_network(attention_score, action_space_batch)
 
         # return statistics of given action
-        action_dist = Categorical(probs=action_prob)
-        action_log_prob = action_dist.log_prob(action_id)
-        dist_entropy = action_dist.entropy()
-        return action_log_prob, dist_entropy
+        selected_action_prob_list, dist_entropy_list = [], []
+        for action_prob, action_id in zip(action_prob_batch, action_id_batch):
+            action_dist = Categorical(probs=action_prob)
+            action_log_prob = action_dist.log_prob(action_id)
+            dist_entropy = action_dist.entropy()
+            selected_action_prob_list.append(action_log_prob)
+            dist_entropy_list.append(dist_entropy)
+        return selected_action_prob_list, dist_entropy_list
 
-    def value_forward(self, circuit, circuit_dgl, physical2logical_mapping):
+    def value_forward(self, circuit_batch, physical2logical_mapping_batch):
         """
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-        output:
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+        output: a list of values
         """
         # get action probability
-        register_rep, _ = self.representation_network(circuit=circuit,
-                                                      circuit_dgl=circuit_dgl,
-                                                      physical2logical_mapping=physical2logical_mapping)
-        value = self.value_network(register_rep)
-        return value
+        register_rep, _ = self.representation_network(circuit_batch=circuit_batch,
+                                                      physical2logical_mapping_batch=physical2logical_mapping_batch)
+        value_batch = self.value_network(register_rep)
+        return value_batch

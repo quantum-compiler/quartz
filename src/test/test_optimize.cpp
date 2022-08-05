@@ -34,5 +34,5 @@ int main() {
   }
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
-  graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", true);
+  graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", true);
 }

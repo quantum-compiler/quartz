@@ -1746,12 +1746,24 @@ std::shared_ptr<Graph> Graph::optimize(Context *ctx,
   if (cost_upper_bound == -1) {
     cost_upper_bound = total_cost() * 1.05;
   }
-  return optimize(xfers, cost_upper_bound, circuit_name, print_message, timeout);
+  auto log_file_name =
+      equiv_file_name.substr(0, std::max(0, (int) equiv_file_name.size() - 21))
+          +
+              circuit_name.substr(0, std::max(0, (int) circuit_name.size() - 5))
+          +
+              ".log";
+  return optimize(xfers,
+                  cost_upper_bound,
+                  circuit_name,
+                  log_file_name,
+                  print_message,
+                  timeout);
 }
 
 std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
                                        double cost_upper_bound,
                                        const std::string &circuit_name,
+                                       const std::string &log_file_name,
                                        bool print_message, int timeout) {
   auto start = std::chrono::steady_clock::now();
   std::priority_queue<std::shared_ptr<Graph>,
@@ -1765,6 +1777,19 @@ std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
   hashmap.insert(hash());
 
   int invoke_cnt = 0;
+
+  FILE *fout = nullptr;
+  if (print_message) {
+    if (!log_file_name.empty()) {
+      fout = fopen(log_file_name.c_str(), "w");
+    } else {
+      fout = stdout;
+    }
+  }
+
+  // TODO: make these numbers configurable
+  constexpr int kMaxNumCandidates = 2000;
+  constexpr int kShrinkToNumCandidates = 1000;
 
   while (!candidates.empty()) {
     auto graph = candidates.top();
@@ -1804,16 +1829,54 @@ std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
           continue;
       }
     }
+    if (candidates.size() > kMaxNumCandidates) {
+      if (print_message) {
+        fprintf(fout, "%s: shrink the priority queue with %d candidates.\n",
+                circuit_name.c_str(), (int)candidates.size());
+      }
+      auto shrink_start = std::chrono::steady_clock::now();
+      std::priority_queue<std::shared_ptr<Graph>,
+                          std::vector<std::shared_ptr<Graph>>, GraphCompare>
+          new_candidates;
+      std::map<float, int> cost_count;
+      while (!candidates.empty()) {
+        auto candidate = candidates.top();
+        cost_count[candidate->total_cost()]++;
+        if (new_candidates.size() < kShrinkToNumCandidates) {
+          new_candidates.push(candidate);
+        }
+        candidates.pop();
+      }
+      std::swap(candidates, new_candidates);
+      auto shrink_end = std::chrono::steady_clock::now();
+      if (print_message) {
+        fprintf(
+            fout,
+            "%s: shrank the priority queue to %d candidates in %.3f seconds.\n",
+            circuit_name.c_str(), (int) candidates.size(),
+            (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                shrink_end - shrink_start)
+                .count() /
+                1000.0);
+        for (auto &it : cost_count) {
+          fprintf(fout, "%d circuits have cost %.2f\n", it.second, it.first);
+        }
+        fflush(fout);
+      }
+    }
     auto end = std::chrono::steady_clock::now();
     if (print_message) {
-      std::cout << "[" << circuit_name << "] "
-                << "Best cost: " << best_cost
-                << "\tcandidate number: " << candidates.size() << "\tafter "
-                << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
-                       end - start)
-                           .count() /
-                       1000.0
-                << " seconds." << std::endl;
+      fprintf(
+          fout,
+          "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f seconds.\n",
+          circuit_name.c_str(),
+          best_cost,
+          candidates.size(),
+          (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+              end - start)
+              .count() /
+              1000.0);
+      fflush(fout);
     }
   }
   return best_graph;

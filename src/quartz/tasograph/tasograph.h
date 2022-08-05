@@ -218,9 +218,21 @@ public:
                                   bool print_message,
                                   double cost_upper_bound = -1 /*default = current cost * 1.05*/,
                                   int timeout = 3600 /*1 hour*/);
+  /**
+   * Optimize this circuit.
+   * @param xfers The circuit transformations.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param circuit_name The circuit name shown in the log.
+   * @param log_file_name The file name to output the log. If empty, the log
+   * will be outputted to the screen.
+   * @param print_message To output the log or not.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
   std::shared_ptr<Graph> optimize(const std::vector<GraphXfer *> &xfers,
                                   double cost_upper_bound,
                                   const std::string &circuit_name,
+                                  const std::string &log_file_name,
                                   bool print_message,
                                   int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();

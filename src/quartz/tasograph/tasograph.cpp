@@ -1748,10 +1748,8 @@ std::shared_ptr<Graph> Graph::optimize(Context *ctx,
   }
   auto log_file_name =
       equiv_file_name.substr(0, std::max(0, (int) equiv_file_name.size() - 21))
-          +
-              circuit_name.substr(0, std::max(0, (int) circuit_name.size() - 5))
-          +
-              ".log";
+          + circuit_name +
+          ".log";
   return optimize(xfers,
                   cost_upper_bound,
                   circuit_name,

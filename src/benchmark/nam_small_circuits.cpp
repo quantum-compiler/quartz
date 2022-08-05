@@ -95,6 +95,7 @@ int main() {
          GateType::add}, ecc_set_prefix, true, 3, 2, 4);
     std::cout << "ECC set generated." << std::endl;
   }
+  // Logs are printed to Nam_4_3_tof_3.log, Nam_4_3_barenco_tof_3.log, ...
   benchmark_nam("tof_3");  // 45 gates
   benchmark_nam("barenco_tof_3");  // 58 gates
   benchmark_nam("mod_mult_55");  // 119 gates

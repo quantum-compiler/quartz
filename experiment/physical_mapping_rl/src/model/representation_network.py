@@ -109,8 +109,19 @@ class RepresentationNetworkSimple(nn.Module):
             logical_qubit_rep = torch.concat([logical_qubit_rep, logical_qubit_rep_padding], dim=0)
 
             # reorder circuit representation
-            logical_idx_order = [physical2logical_mapping[i] for i in range(num_registers)]
-            gather_indices = [logical_idx_order for _ in range(self.circuit_out_dimension)]
+            # (This inversion is necessary because logical id may not be continuous)
+            qubit_physical_idx = circuit.input_physical_idx[:num_qubits]
+            for i in range(num_registers):
+                if i not in qubit_physical_idx:
+                    qubit_physical_idx.append(i)
+
+            def invert_permutation(permutation):
+                inv = np.empty_like(permutation)
+                inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
+                return inv
+
+            inverted_physical_idx = np.array(invert_permutation(qubit_physical_idx))
+            gather_indices = [inverted_physical_idx for _ in range(self.circuit_out_dimension)]
             gather_indices = np.array(gather_indices)
             gather_indices = torch.tensor(gather_indices).transpose(0, 1)
             sorted_logical_qubit_rep = torch.gather(input=logical_qubit_rep, dim=0, index=gather_indices)

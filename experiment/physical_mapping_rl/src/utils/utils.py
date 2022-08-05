@@ -5,10 +5,10 @@ import torch
 import dgl
 
 
-def DecodePyActionList(action_list: [PyAction]):
+def py_action_2_list(action_list: [PyAction]):
     decoded_actions = []
     for action in action_list:
-        decoded_actions.append((action.qubit_idx_0, action.qubit_idx_0))
+        decoded_actions.append((action.qubit_idx_0, action.qubit_idx_1))
     return decoded_actions
 
 

@@ -56,6 +56,7 @@ class CostType(Enum):
     
     depth = 3
     depth_gc = 4
+    depth_2_gc = 5
     
     @staticmethod
     def from_str(s: str) -> CostType:
@@ -69,6 +70,8 @@ class CostType(Enum):
             return CostType.depth
         elif s == 'depth_gc':
             return CostType.depth_gc
+        elif s == 'depth_2_gc':
+            return CostType.depth_2_gc
         else:
             raise NotImplementedError(f'Unexpected input to CostType {s}')
 
@@ -82,6 +85,8 @@ def get_cost(graph: quartz.PyGraph, tp: CostType) -> int:
     elif tp is CostType.depth:
         return graph.depth
     elif tp is CostType.depth_gc:
+        return graph.depth + graph.gate_count
+    elif tp is CostType.depth_2_gc:
         return 2 * graph.depth + graph.gate_count
     else:
         raise NotImplementedError(f'Unexpected CostType {tp} ({tp.__class__()})')

@@ -47,62 +47,57 @@ class PPOModel:
     def lr_decay(self, cur_episode, total_episodes):
         update_linear_schedule(self.optimizer, cur_episode, total_episodes, self.lr)
 
-    def get_actions(self, circuit, circuit_dgl, physical2logical_mapping, action_space):
+    def get_actions(self, circuit_batch, physical2logical_mapping_batch, action_space_batch):
         """
         Compute actions and value function predictions for the given inputs.
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: decoded action space (see utils.DecodePyActionList)
-        output: value, selected action, log_probability of selected action
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+                action_space_batch: list of decoded action space (see utils.DecodePyActionList)
+        output: value, selected action, log_probability of selected action (each is a list)
         """
-        action, action_log_prob = \
-            self.actor_critic.policy_forward(circuit=circuit,
-                                             circuit_dgl=circuit_dgl,
-                                             physical2logical_mapping=physical2logical_mapping,
-                                             action_space=action_space)
-        value = self.actor_critic.value_forward(circuit=circuit,
-                                                circuit_dgl=circuit_dgl,
-                                                physical2logical_mapping=physical2logical_mapping)
-        return value, action, action_log_prob
+        selected_action_list, selected_action_prob_list = \
+            self.actor_critic.policy_forward(circuit_batch=circuit_batch,
+                                             physical2logical_mapping_batch=physical2logical_mapping_batch,
+                                             action_space_batch=action_space_batch)
+        value_batch = self.actor_critic.value_forward(circuit_batch=circuit_batch,
+                                                      physical2logical_mapping_batch=physical2logical_mapping_batch)
+        return value_batch, selected_action_list, selected_action_prob_list
 
-    def get_values(self, circuit, circuit_dgl, physical2logical_mapping):
+    def get_values(self, circuit_batch, physical2logical_mapping_batch):
         """
         Get value function predictions.
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-        output: value
+        input:  circuit, physical2logical_mapping: list of observations
+        output: a list of values
         """
-        value = self.actor_critic.value_forward(circuit=circuit,
-                                                circuit_dgl=circuit_dgl,
-                                                physical2logical_mapping=physical2logical_mapping)
-        return value
+        value_batch = self.actor_critic.value_forward(circuit_batch=circuit_batch,
+                                                      physical2logical_mapping_batch=physical2logical_mapping_batch)
+        return value_batch
 
-    def evaluate_actions(self, circuit, circuit_dgl, physical2logical_mapping,
-                         action_space, action_id):
+    def evaluate_actions(self, circuit_batch, physical2logical_mapping_batch, action_space_batch, action_id_batch):
         """
         Get action log_prob / entropy and value function predictions for actor update.
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-                action_space: decoded action space (see utils.DecodePyActionList)
-                action_id: selected action id
-        output: value, log probabilities of the input action, distribution entropy
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+                action_space_batch: list of decoded action space (see utils.DecodePyActionList)
+                action_id_batch: list of selected actions index
+        output: value, log probabilities of the input action, distribution entropy (each is a list)
         """
-        action_log_prob, dist_entropy = \
-            self.actor_critic.evaluate_action(circuit=circuit,
-                                              circuit_dgl=circuit_dgl,
-                                              physical2logical_mapping=physical2logical_mapping,
-                                              action_space=action_space,
-                                              action_id=action_id)
-        value = self.actor_critic.value_forward(circuit=circuit,
-                                                circuit_dgl=circuit_dgl,
-                                                physical2logical_mapping=physical2logical_mapping)
-        return value, action_log_prob, dist_entropy
+        action_log_prob_batch, dist_entropy_batch = \
+            self.actor_critic.evaluate_action(circuit_batch=circuit_batch,
+                                              physical2logical_mapping_batch=physical2logical_mapping_batch,
+                                              action_space_batch=action_space_batch,
+                                              action_id_batch=action_id_batch)
+        value_batch = self.actor_critic.value_forward(circuit_batch=circuit_batch,
+                                                      physical2logical_mapping_batch=physical2logical_mapping_batch)
+        return value_batch, action_log_prob_batch, dist_entropy_batch
 
-    def act(self, circuit, circuit_dgl, physical2logical_mapping, action_space):
+    def act(self, circuit_batch, physical2logical_mapping_batch, action_space_batch):
         """
         Compute actions using the given inputs.
-        input:  circuit, circuit_dgl, physical2logical_mapping: observation
-        output:
+        input:  circuit_batch, physical2logical_mapping_batch: list of observations
+                action_space_batch: list of decoded action space (see utils.DecodePyActionList)
+        output: a list of selected actions
         """
-        action, _ = self.actor_critic.policy_forward(circuit=circuit,
-                                                     circuit_dgl=circuit_dgl,
-                                                     physical2logical_mapping=physical2logical_mapping,
-                                                     action_space=action_space)
-        return action
+        selected_action_list, _ = \
+            self.actor_critic.policy_forward(circuit_batch=circuit_batch,
+                                             physical2logical_mapping_batch=physical2logical_mapping_batch,
+                                             action_space_batch=action_space_batch)
+        return selected_action_list

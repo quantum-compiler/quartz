@@ -1,7 +1,8 @@
-from quartz import PyAction
+from quartz import PyAction, PyGraphState
 import numpy as np
 import math
 import torch
+import dgl
 
 
 def DecodePyActionList(action_list: [PyAction]):
@@ -9,6 +10,16 @@ def DecodePyActionList(action_list: [PyAction]):
     for action in action_list:
         decoded_actions.append((action.qubit_idx_0, action.qubit_idx_0))
     return decoded_actions
+
+
+def graph_state_2_dgl(graph_state: PyGraphState):
+    g = dgl.graph((torch.tensor(graph_state.edge_from, dtype=torch.int32),
+                   torch.tensor(graph_state.edge_to, dtype=torch.int32)))
+    g.edata['logical_idx'] = torch.tensor(graph_state.edge_logical_idx, dtype=torch.int32)
+    g.edata['physical_idx'] = torch.tensor(graph_state.edge_physical_idx, dtype=torch.int32)
+    g.edata['reversed'] = torch.tensor(graph_state.edge_reversed, dtype=torch.int32)
+    g.ndata['is_input'] = torch.tensor(graph_state.is_input, dtype=torch.int32)
+    return g
 
 
 def update_linear_schedule(optimizer, epoch, total_num_epochs, initial_lr):

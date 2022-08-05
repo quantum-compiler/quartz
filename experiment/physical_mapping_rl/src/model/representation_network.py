@@ -6,6 +6,7 @@ from dgl import DGLGraph
 from src.model.circuit_gnn import CircuitGNN
 from src.model.device_gnn import DeviceGNNGINLocal, DeviceEmbedding
 from src.model.multihead_self_attention import EncoderLayer
+from src.utils.utils import graph_state_2_dgl
 
 
 class RepresentationNetwork(nn.Module):
@@ -89,42 +90,39 @@ class RepresentationNetworkSimple(nn.Module):
                                               n_head=num_attention_heads,
                                               d_k=attention_qk_dimension, d_v=attention_v_dimension)
 
-    def forward(self, circuit: PyGraphState, circuit_dgl: DGLGraph,
-                physical2logical_mapping: PyMappingTable):
-        # representation for each logical qubit
-        num_qubits = sum(circuit.is_input)
-        logical_qubit_rep = self.circuit_gnn(circuit_dgl)[:num_qubits]
+    def forward(self, circuit_batch: [PyGraphState], physical2logical_mapping_batch: [PyMappingTable]):
+        assert len(circuit_batch) == len(physical2logical_mapping_batch)
 
-        # append empty representation
-        num_registers = len(physical2logical_mapping)
-        logical_qubit_rep_padding = torch.zeros(num_registers - num_qubits, self.circuit_out_dimension)
-        logical_qubit_rep = torch.concat([logical_qubit_rep, logical_qubit_rep_padding], dim=0)
+        # generate batched circuit representation using circuit GNN
+        concatenated_raw_rep_list = []
+        for circuit, physical2logical_mapping in zip(circuit_batch, physical2logical_mapping_batch):
+            # get circuit dgl
+            circuit_dgl = graph_state_2_dgl(circuit)
 
-        # reorder circuit representation
-        qubit_physical_idx = circuit.input_physical_idx[:num_qubits]
-        for i in range(num_registers):
-            if i not in qubit_physical_idx:
-                qubit_physical_idx.append(i)
+            # representation for each logical qubit
+            num_qubits = sum(circuit.is_input)
+            logical_qubit_rep = self.circuit_gnn(circuit_dgl)[:num_qubits]
 
-        def invert_permutation(permutation):
-            inv = np.empty_like(permutation)
-            inv[permutation] = np.arange(len(inv), dtype=inv.dtype)
-            return inv
+            # append empty representation
+            num_registers = len(physical2logical_mapping)
+            logical_qubit_rep_padding = torch.zeros(num_registers - num_qubits, self.circuit_out_dimension)
+            logical_qubit_rep = torch.concat([logical_qubit_rep, logical_qubit_rep_padding], dim=0)
 
-        inverted_physical_idx = invert_permutation(qubit_physical_idx)
-        gather_indices = [inverted_physical_idx for _ in range(self.circuit_out_dimension)]
-        gather_indices = np.array(gather_indices)
-        gather_indices = torch.tensor(gather_indices).transpose(0, 1)
-        sorted_logical_qubit_rep = torch.gather(input=logical_qubit_rep, dim=0, index=gather_indices)
+            # reorder circuit representation
+            logical_idx_order = [physical2logical_mapping[i] for i in range(num_registers)]
+            gather_indices = [logical_idx_order for _ in range(self.circuit_out_dimension)]
+            gather_indices = np.array(gather_indices)
+            gather_indices = torch.tensor(gather_indices).transpose(0, 1)
+            sorted_logical_qubit_rep = torch.gather(input=logical_qubit_rep, dim=0, index=gather_indices)
 
-        # concatenate with device embedding
-        device_embedding_input = torch.tensor(list(range(num_registers)))
-        device_embedding = self.device_embedding_network(device_embedding_input)
-        concatenated_raw_rep = torch.concat([sorted_logical_qubit_rep, device_embedding], dim=1)
-        concatenated_raw_rep = concatenated_raw_rep[None, :]
+            # concatenate with device embedding
+            device_embedding_input = torch.tensor(list(range(num_registers)))
+            device_embedding = self.device_embedding_network(device_embedding_input)
+            concatenated_raw_rep = torch.concat([sorted_logical_qubit_rep, device_embedding], dim=1)
+            concatenated_raw_rep_list.append(concatenated_raw_rep[None, :])
+        concatenated_raw_rep = torch.concat(concatenated_raw_rep_list, dim=0)
 
         # send into self attention layer and return
         register_representation, attention_score_mat = self.attention_encoder(concatenated_raw_rep)
-        register_representation = register_representation[0, :]
-        attention_score_mat = torch.sum(attention_score_mat[0, :], dim=0)
+        attention_score_mat = torch.sum(attention_score_mat, dim=1)
         return register_representation, attention_score_mat

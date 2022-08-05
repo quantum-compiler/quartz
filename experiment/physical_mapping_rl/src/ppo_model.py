@@ -1,6 +1,6 @@
 import torch
 from src.model.ppo_network import PPONetwork
-from src.utils import update_linear_schedule
+from src.utils.utils import update_linear_schedule
 
 
 class PPOModel:

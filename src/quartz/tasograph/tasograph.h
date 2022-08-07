@@ -212,15 +212,39 @@ public:
                   GateType target_rotation,
                   std::string circuit_name = "",
                   int timeout = 86400 /*1 day*/);
+  /**
+   * Optimize this circuit.
+   * @param ctx The context variable.
+   * @param equiv_file_name The ECC set file name.
+   * @param circuit_name The circuit name shown in the log.
+   * @param print_message To output the log or not. The log will be outputted
+   * to a file with name combined by the ECC set file name and the circuit
+   * file name.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
   std::shared_ptr<Graph> optimize(Context *ctx,
                                   const std::string &equiv_file_name,
                                   const std::string &circuit_name,
                                   bool print_message,
                                   double cost_upper_bound = -1 /*default = current cost * 1.05*/,
                                   int timeout = 3600 /*1 hour*/);
+  /**
+   * Optimize this circuit.
+   * @param xfers The circuit transformations.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param circuit_name The circuit name shown in the log.
+   * @param log_file_name The file name to output the log. If empty, the log
+   * will be outputted to the screen.
+   * @param print_message To output the log or not.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
   std::shared_ptr<Graph> optimize(const std::vector<GraphXfer *> &xfers,
                                   double cost_upper_bound,
                                   const std::string &circuit_name,
+                                  const std::string &log_file_name,
                                   bool print_message,
                                   int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();

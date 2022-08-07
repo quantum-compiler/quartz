@@ -59,10 +59,18 @@ public:
 };
 
 class GraphCompare {
-public:
-  bool operator()(std::shared_ptr<Graph> lhs, std::shared_ptr<Graph> rhs) {
-    return lhs->total_cost() > rhs->total_cost();
+ public:
+  GraphCompare() {
+    cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
+  GraphCompare(const std::function<float(Graph *)> &cost_function)
+      : cost_function_(cost_function) {}
+  bool operator()(const std::shared_ptr<Graph> &lhs,
+                  const std::shared_ptr<Graph> &rhs) {
+    return cost_function_(lhs.get()) > cost_function_(rhs.get());
+  }
+ private:
+  std::function<float(Graph *)> cost_function_;
 };
 
 class GraphXfer {

@@ -74,9 +74,10 @@ int main(int argc, char **argv) {
     auto graph_before_search =
         new_graph->context_shift(&dst_ctx, &rigetti_ctx, &union_ctx_0, &rules);
     std::cout << "Optimization results of Quartz for " << fn
-              << " on Rigetti gate set." << std::endl
-              << "Gate count after optimization: "
-              << graph_before_search->total_cost() << ", "
+              << " on Rigetti gate set."
+              << " Gate count after optimization: "
+              << graph_before_search->gate_count() << ", "
+              << "Circuit depth: " << graph_before_search->circuit_depth() << ", "
               << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                   end - start)
                   .count() /
@@ -114,9 +115,10 @@ int main(int argc, char **argv) {
                                                     true);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
-            << " on Rigetti gate set." << std::endl
-            << "Gate count after optimization: "
-            << graph_after_search->total_cost() << ", "
+            << " on Rigetti gate set."
+            << " Gate count after optimization: "
+            << graph_after_search->gate_count() << ", "
+            << "Circuit depth: " << graph_after_search->circuit_depth() << ", "
             << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
                 end - start)
                 .count() /

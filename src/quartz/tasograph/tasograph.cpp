@@ -1715,8 +1715,13 @@ std::shared_ptr<Graph> Graph::optimize(Context *ctx,
                                        const std::string &equiv_file_name,
                                        const std::string &circuit_name,
                                        bool print_message,
+                                       std::function<float(Graph *)> cost_function,
                                        double cost_upper_bound,
                                        int timeout) {
+  if (cost_function == nullptr) {
+    cost_function = [] (Graph *graph) { return graph->total_cost(); };
+  }
+
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(ctx, equiv_file_name)) {
@@ -1755,6 +1760,7 @@ std::shared_ptr<Graph> Graph::optimize(Context *ctx,
                   circuit_name,
                   log_file_name,
                   print_message,
+                  cost_function,
                   timeout);
 }
 
@@ -1762,14 +1768,19 @@ std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
                                        double cost_upper_bound,
                                        const std::string &circuit_name,
                                        const std::string &log_file_name,
-                                       bool print_message, int timeout) {
+                                       bool print_message,
+                                       std::function<float(Graph *)> cost_function,
+                                       int timeout) {
+  if (cost_function == nullptr) {
+    cost_function = [] (Graph *graph) { return graph->total_cost(); };
+  }
   auto start = std::chrono::steady_clock::now();
   std::priority_queue<std::shared_ptr<Graph>,
                       std::vector<std::shared_ptr<Graph>>, GraphCompare>
-      candidates;
+      candidates((GraphCompare(cost_function)));
   std::set<size_t> hashmap;
   std::shared_ptr<Graph> best_graph(new Graph(*this));
-  auto best_cost = total_cost();
+  auto best_cost = cost_function(this);
 
   candidates.push(best_graph);
   hashmap.insert(hash());
@@ -1813,8 +1824,8 @@ std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
           continue;
 
         auto new_hash = new_graph->hash();
-        auto new_cost = new_graph->total_cost();
-        if(new_cost > cost_upper_bound)
+        auto new_cost = cost_function(new_graph.get());
+        if (new_cost > cost_upper_bound)
             continue;
         if (hashmap.find(new_hash) == hashmap.end()) {
           hashmap.insert(new_hash);
@@ -1835,11 +1846,11 @@ std::shared_ptr<Graph> Graph::optimize(const std::vector<GraphXfer *> &xfers,
       auto shrink_start = std::chrono::steady_clock::now();
       std::priority_queue<std::shared_ptr<Graph>,
                           std::vector<std::shared_ptr<Graph>>, GraphCompare>
-          new_candidates;
+          new_candidates((GraphCompare(cost_function)));
       std::map<float, int> cost_count;
       while (!candidates.empty()) {
         auto candidate = candidates.top();
-        cost_count[candidate->total_cost()]++;
+        cost_count[cost_function(candidate.get())]++;
         if (new_candidates.size() < kShrinkToNumCandidates) {
           new_candidates.push(candidate);
         }

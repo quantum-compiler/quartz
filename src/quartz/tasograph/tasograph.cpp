@@ -1731,16 +1731,27 @@ std::shared_ptr<Graph> Graph::optimize(Context *ctx,
   }
 
   // Get xfer from the equivalent set
-  auto ecc = eqs.get_all_equivalence_sets();
+  auto eccs = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
-  for (const auto &eqcs : ecc) {
-    for (auto circ_0 : eqcs) {
-      for (auto circ_1 : eqcs) {
-        if (circ_0 != circ_1) {
-          auto xfer = GraphXfer::create_GraphXfer(ctx, circ_0, circ_1, false);
-          if (xfer != nullptr) {
-            xfers.push_back(xfer);
-          }
+  for (const auto &ecc : eccs) {
+    DAG *representative = ecc.front();
+    /*int representative_depth = representative->get_circuit_depth();
+    for (auto &circuit : ecc) {
+      int circuit_depth = circuit->get_circuit_depth();
+      if (circuit_depth < representative_depth) {
+        representative = circuit;
+        representative_depth = circuit_depth;
+      }
+    }*/
+    for (auto &circuit : ecc) {
+      if (circuit != representative) {
+        auto xfer = GraphXfer::create_GraphXfer(ctx, circuit, representative, false);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, false);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
         }
       }
     }

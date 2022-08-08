@@ -556,7 +556,6 @@ class PPOAgent:
         b_node_embeds, b_readouts = self.ac_net.gnn(b_state)
         """compute state values"""
         state_values: torch.Tensor = self.ac_net.critic(b_readouts).squeeze()
-        print(f"state_values: {state_values}")
         """transform readouts to smaller dimension and concat with node embeds"""
         b_readout_features: torch.Tensor = self.ac_net.actor_readout(
             b_readouts)
@@ -578,8 +577,10 @@ class PPOAgent:
         sampled_node_embeds: list[torch.Tensor] = []
         for i, (node_embed,
                 graph) in enumerate(zip(new_node_embed_list, cur_graphs)):
-            node_logit = self.ac_net.actor_node(node_embed).squeeze()
-            node_dist = torch.distributions.Categorical(logits=node_logit)
+            node_logit: torch.Tensor = self.ac_net.actor_node(
+                node_embed).squeeze()
+            node_probs: torch.Tensor = F.softmax(node_logit, dim=0)
+            node_dist = torch.distributions.Categorical(probs=node_probs)
             node: torch.Tensor = node_dist.sample()
             node_logprob: torch.Tensor = node_dist.log_prob(node)
             nodes.append(int(node.item()))
@@ -732,6 +733,7 @@ class PPOAgent:
                     reward = self.invalid_reward
                     game_over = True
                     next_graph = graph
+                    print(f'invalid action: {action}')
                 elif qtz.is_nop(action.xfer):
                     reward = 0.
                     game_over = nop_stop

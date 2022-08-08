@@ -338,9 +338,10 @@ class PPOMod:
                 b_new_node_embeds = torch.cat(new_node_embed_list, dim=0)
                 for node_embeds, node in zip(new_node_embed_list,
                                              exps.action[:, 0]):
-                    node_logits = self.ddp_ac_net(
+                    node_logits: torch.Tensor = self.ddp_ac_net(
                         node_embeds, ActorCritic.actor_node_name())
-                    node_dist = Categorical(logits=node_logits)
+                    node_probs: torch.Tensor = F.softmax(node_logits, dim=0)
+                    node_dist = Categorical(probs=node_probs)
                     node_logprob_new_list.append(node_dist.log_prob(node))
                     node_entropy_list.append(node_dist.entropy())
                 node_logprobs_new: torch.Tensor = torch.stack(

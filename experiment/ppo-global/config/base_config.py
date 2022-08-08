@@ -72,7 +72,7 @@ class BaseConfig:
     gnn_num_layers: int = 6
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
-    gnn_readout_feature_dim: int = 128
+    gnn_readout_feature_dim: int = 64
     gin_num_mlp_layers: int = 2
     gin_learn_eps: bool = False  # TODO
     gin_neighbor_pooling_type: str = 'sum'  # 'mean', 'max'
@@ -111,7 +111,7 @@ class BaseConfig:
     k_epochs: int = 25
     lr_gnn: float = 5e-4
     lr_actor: float = 5e-4
-    lr_critic: float = 5e-4
+    lr_critic: float = 1e-3
     update_policy_interval: int = 1
     save_ckpt_interval: int = 5
     time_budget: str = ''

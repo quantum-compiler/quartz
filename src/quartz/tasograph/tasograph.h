@@ -220,6 +220,7 @@ public:
    * @param print_message To output the log or not. The log will be outputted
    * to a file with name combined by the ECC set file name and the circuit
    * file name.
+   * @param cost_function The cost function for the search.
    * @param cost_upper_bound The maximum cost of the circuits to be searched.
    * @param timeout Timeout in seconds.
    * @return The optimized circuit.
@@ -228,6 +229,7 @@ public:
                                   const std::string &equiv_file_name,
                                   const std::string &circuit_name,
                                   bool print_message,
+                                  std::function<float(Graph *)> cost_function = nullptr,
                                   double cost_upper_bound = -1 /*default = current cost * 1.05*/,
                                   int timeout = 3600 /*1 hour*/);
   /**
@@ -238,6 +240,7 @@ public:
    * @param log_file_name The file name to output the log. If empty, the log
    * will be outputted to the screen.
    * @param print_message To output the log or not.
+   * @param cost_function The cost function for the search.
    * @param timeout Timeout in seconds.
    * @return The optimized circuit.
    */
@@ -246,6 +249,7 @@ public:
                                   const std::string &circuit_name,
                                   const std::string &log_file_name,
                                   bool print_message,
+                                  std::function<float(Graph *)> cost_function = nullptr,
                                   int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);

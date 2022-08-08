@@ -60,7 +60,8 @@ void benchmark_nam(const std::string &circuit_name) {
   auto graph_after_search = graph_before_search->optimize(&dst_ctx,
                                                           ecc_set_name,
                                                           circuit_name, /*print_message=*/
-                                                          true, /*cost_upper_bound=*/
+                                                          true, /*cost_function=*/
+                                                          nullptr, /*cost_upper_bound=*/
                                                           -1, /*timeout=*/
                                                           10);
   end = std::chrono::steady_clock::now();

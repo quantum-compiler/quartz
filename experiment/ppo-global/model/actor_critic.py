@@ -123,7 +123,7 @@ class ActorCritic(nn.Module):
                 x: (B, gnn_output_dim + gnn_readout_feature_dim)
             Return: torch.Tensor (B, 1)
             """
-            return self.actor_node(x).squeeze()
+            return self.actor_node(x)
         elif callee == self.actor_readout_name():
             """
             Evaluate readout for a node

@@ -339,7 +339,7 @@ class PPOMod:
                 for node_embeds, node in zip(new_node_embed_list,
                                              exps.action[:, 0]):
                     node_logits: torch.Tensor = self.ddp_ac_net(
-                        node_embeds, ActorCritic.actor_node_name())
+                        node_embeds, ActorCritic.actor_node_name()).squeeze(1)
                     node_probs: torch.Tensor = F.softmax(node_logits, dim=0)
                     node_dist = Categorical(probs=node_probs)
                     node_logprob_new_list.append(node_dist.log_prob(node))

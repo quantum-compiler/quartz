@@ -558,7 +558,7 @@ class PPOAgent:
         state_values: torch.Tensor = self.ac_net.critic(b_readouts).squeeze()
         """transform readouts to smaller dimension and concat with node embeds"""
         b_readout_features: torch.Tensor = self.ac_net.actor_readout(
-            b_readouts)
+            b_readouts)  # An affine transformation of the readouts
         node_embed_list: List[torch.Tensor] = torch.split(b_node_embeds,
                                                           num_nodes,
                                                           dim=0)
@@ -569,6 +569,7 @@ class PPOAgent:
             new_node_embed_list.append(
                 torch.cat([node_embed, readout_features], dim=1))
         """compute node logits and sample a node, meanwhile compute masks"""
+        """also compute logprobs for node selection"""
         nodes: list[int] = []
         node_logprobs: list[float] = []
         masks: torch.Tensor = torch.zeros((num_eps, self.ac_net.action_dim),
@@ -578,7 +579,7 @@ class PPOAgent:
         for i, (node_embed,
                 graph) in enumerate(zip(new_node_embed_list, cur_graphs)):
             node_logit: torch.Tensor = self.ac_net.actor_node(
-                node_embed).squeeze()
+                node_embed).squeeze(1)
             node_probs: torch.Tensor = F.softmax(node_logit, dim=0)
             node_dist = torch.distributions.Categorical(probs=node_probs)
             node: torch.Tensor = node_dist.sample()

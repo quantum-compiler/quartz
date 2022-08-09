@@ -824,6 +824,14 @@ cdef class PySimplePhysicalEnv:
     def step(self, PyAction action) -> Reward:
         return self.env.step(deref(action.action_ptr))
 
+    def step_with_id(self, qubit_idx_0: int, qubit_idx_1: int) -> Reward:
+        cdef int _qubit_idx_0 = qubit_idx_0
+        cdef int _qubit_idx_1 = qubit_idx_1
+        cdef shared_ptr[Action] action = make_shared[Action](ActionType.PhysicalFront,
+                                                             _qubit_idx_0,
+                                                             _qubit_idx_1)
+        return self.env.step(deref(action))
+
     def is_finished(self) -> bool:
         return self.env.is_finished()
 

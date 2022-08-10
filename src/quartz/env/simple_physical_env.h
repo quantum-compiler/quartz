@@ -30,6 +30,7 @@ namespace quartz {
             graph->init_physical_mapping(InitialMappingType::SABRE, device, 4, true, 0.5);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
+            if (is_finished()) reset();
         }
 
         void reset() override {
@@ -37,6 +38,7 @@ namespace quartz {
             graph->init_physical_mapping(InitialMappingType::SABRE, device, 3, true, 0.5);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
+            if (is_finished()) reset();
         }
 
         Reward step(Action action) override {

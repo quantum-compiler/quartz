@@ -55,6 +55,11 @@ namespace quartz {
             return is_circuit_finished(cur_game_ptr->graph);
         }
 
+        int total_cost() override {
+            // call this only when game ends !!!
+            return cur_game_ptr->total_cost();
+        }
+
         State get_state() override {
             return cur_game_ptr->state();
         }

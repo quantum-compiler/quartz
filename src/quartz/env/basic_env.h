@@ -14,6 +14,9 @@ namespace quartz {
         // check whether current game is finished
         virtual bool is_finished() = 0;
 
+        // return total cost of the circuit after game ends
+        virtual int total_cost() = 0;
+
         // state and action space
         virtual State get_state() = 0;
 

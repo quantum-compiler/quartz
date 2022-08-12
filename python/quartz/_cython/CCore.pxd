@@ -192,5 +192,6 @@ cdef extern from "env/simple_physical_env.h" namespace "quartz":
         void reset() except +
         Reward step(Action)
         bool is_finished()
+        int total_cost()
         State get_state()
         vector[Action] get_action_space()

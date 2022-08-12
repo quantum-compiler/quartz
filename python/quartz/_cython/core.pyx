@@ -835,6 +835,9 @@ cdef class PySimplePhysicalEnv:
     def is_finished(self) -> bool:
         return self.env.is_finished()
 
+    def total_cost(self) -> int:
+        return self.env.total_cost()
+
     def get_state(self) -> PyState:
         cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
         py_state = PyState()

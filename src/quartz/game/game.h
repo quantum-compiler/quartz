@@ -15,6 +15,7 @@ namespace quartz {
                                                                                   device(std::move(_device)) {
             /// Game expects that the input graph has been initialized !!!
             // simplify circuit
+            original_gate_count = graph.gate_count();
             single_qubit_gate_count = simplify_circuit(graph);
 
             // state related (mapping table)
@@ -66,6 +67,7 @@ namespace quartz {
 
             // reward related: execute all currently executable gates and set imp cost
             executed_logical_gate_count = 0;
+            swaps_inserted = 0;
             while (true) {
                 auto executable_gate_list = find_executable_front_gates(graph, device);
                 for (const auto &executable_gate: executable_gate_list) {
@@ -227,6 +229,7 @@ namespace quartz {
                     if (executable_gate_list.empty()) break;
                 }
                 executed_logical_gate_count += executed_gate_count;
+                swaps_inserted += 1;
 
                 // STEP 3: calculate reward
                 double original_circuit_cost = imp_cost;
@@ -248,6 +251,12 @@ namespace quartz {
             }
         }
 
+        [[nodiscard]] int total_cost() const {
+            // this function can only be called at the end of a game
+            assert(is_circuit_finished(graph));
+            return static_cast<int>(execution_history.size());
+        }
+
     public:
         // graph & device
         Graph graph;
@@ -262,8 +271,10 @@ namespace quartz {
         std::vector<int> physical2logical;
 
         // reward related
+        int original_gate_count;  // number of gates in the graph at beginning
         int single_qubit_gate_count;
-        int executed_logical_gate_count;  // i.e. we do not consider swaps here
+        int executed_logical_gate_count;  // we do not consider swaps here
+        int swaps_inserted;
         double imp_cost;
 
         // execution history & initial mapping table

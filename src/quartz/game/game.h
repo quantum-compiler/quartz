@@ -253,8 +253,11 @@ namespace quartz {
 
         [[nodiscard]] int total_cost() const {
             // this function can only be called at the end of a game
+            // some quick sanity checks
             assert(is_circuit_finished(graph));
-            return static_cast<int>(execution_history.size());
+            assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count);
+            assert(execution_history.size() == swaps_inserted + original_gate_count);
+            return original_gate_count + int(SWAPCOST) * swaps_inserted;
         }
 
     public:

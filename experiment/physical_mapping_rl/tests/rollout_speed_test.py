@@ -40,10 +40,11 @@ def main():
 
         if is_finished:
             used_time = time.time() - start_time
+            total_cost = env.total_cost()
             print(f"Time since start = {used_time}, steps = {step_count},"
                   f" rollout speed = {int(step_count / used_time)} steps/s")
             print(f"total reward = {total_reward}, avg reward = {total_reward / step_count},"
-                  f" max reward = {max_reward}")
+                  f" max reward = {max_reward}, total_cost = {total_cost}")
 
 
 if __name__ == '__main__':

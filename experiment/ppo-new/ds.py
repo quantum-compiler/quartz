@@ -427,17 +427,17 @@ class GraphBuffer:
     
     def rewards_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {}
-        best_eps_reward: float = - math.inf
+        max_eps_reward: float = - math.inf
         mean_eps_reward: float = 0.
         for eps_rewards in self.rewards:
             # assert len(eps_rewards) > 0
             eps_sum = sum(eps_rewards)
-            best_eps_reward = max(best_eps_reward, eps_sum)
+            max_eps_reward = max(max_eps_reward, eps_sum)
             mean_eps_reward += eps_sum / len(self.rewards)
         
         all_rewards = list(itertools.chain(*self.rewards))
         
-        info['best_eps_reward'] = best_eps_reward
+        info['max_eps_reward'] = max_eps_reward
         info['mean_eps_reward'] = mean_eps_reward
         info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
         

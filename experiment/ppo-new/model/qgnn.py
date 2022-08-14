@@ -4,68 +4,74 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
-class QConv(nn.Module):
-    def __init__(self, in_feat: int, inter_dim: int, out_feat: int):
-        super(QConv, self).__init__()
-        self.linear2 = nn.Linear(in_feat + inter_dim, out_feat)
-        self.linear1 = nn.Linear(in_feat + 3, inter_dim, bias=False)
-        self.reset_parameters()
 
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        gain = nn.init.calculate_gain('relu')
-        nn.init.xavier_normal_(self.linear1.weight, gain=gain)
-        nn.init.xavier_normal_(self.linear2.weight, gain=gain)
+class QConv(nn.Module):
+    def __init__(self,
+                 in_feat,
+                 inter_dim,
+                 out_feat,
+                 aggregator='sum',
+                 normalize=False):
+        super(QConv, self).__init__()
+        self.linear1 = nn.Sequential(nn.Linear(in_feat + 3, inter_dim),
+                                     nn.ReLU())
+        self.linear2 = nn.Sequential(
+            nn.Linear(in_feat + inter_dim, out_feat, bias=False), nn.ReLU())
+        self.apply(self._init_weights)
+        self.aggregator: str = aggregator
+        self.normalize: bool = normalize
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            nn.init.xavier_normal_(module.weight)
+            if module.bias is not None:
+                nn.init.constant_(module.bias, 0)
+        elif isinstance(module, nn.LayerNorm):
+            nn.init.constant_(module.weight, 1)
+            nn.init.constant_(module.bias, 0)
 
     def message_func(self, edges):
-        #print(f'node h {edges.src["h"].shape}')
-        #print(f'node w {edges.data["w"].shape}')
-        """incorporate edges' features by cat"""
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
-        # print(f'node m {nodes.mailbox["m"].shape}')
-        # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
         tmp = self.linear1(nodes.mailbox['m'])
-        tmp = F.leaky_relu(tmp)
-        """aggregate neighbors' features"""
-        # (num_nodes, num_neighbors, msg_dim) -> (num_nodes, msg_dim)
-        h = torch.mean(tmp, dim=1) # average on dim of num_neighbors
-        # h = torch.max(tmp, dim=1).values
+        if self.aggregator == 'sum':
+            h = torch.sum(tmp, dim=1)
+        elif self.aggregator == 'mean':
+            h = torch.mean(tmp, dim=1)
+        elif self.aggregator == 'max':
+            h = torch.max(tmp, dim=1)[0]
+        else:
+            raise NotImplementedError
         return {'h_N': h}
 
-    def forward(self, g: dgl.DGLGraph, h: torch.Tensor):
+    def forward(self, g, h):
         g.ndata['h'] = h
-        #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
         g.update_all(self.message_func, self.reduce_func)
-        h_N = g.ndata['h_N'] # (num_nodes, inter_dim)
-        """combine node's feature with its neighbors' to get its feature at the next layer"""
+        h_N = g.ndata['h_N']
         h_total = torch.cat([h, h_N], dim=1)
-        h_linear = self.linear2(h_total)
-        h_relu = F.relu(h_linear)
-        # h_norm = torch.unsqueeze(torch.linalg.norm(h_relu, dim=1), dim=1)
-        # h_normed = torch.divide(h_relu, h_norm)
-        # return h_normed
-        return h_relu
+        h = self.linear2(h_total)
+        if self.normalize:
+            h = F.normalize(h, p=2, dim=-1)
+        return h
+
 
 class QGNN(nn.Module):
-    def __init__(
-        self, num_layers, num_gate_types, gate_type_embed_dim, h_feats, inter_dim
-    ) -> None:
+    def __init__(self, num_layers, num_gate_types, gate_type_embed_dim,
+                 h_feats, inter_dim) -> None:
         """
         output_dim = h_feats
         """
         super(QGNN, self).__init__()
         self.embedding = nn.Embedding(num_gate_types, gate_type_embed_dim)
-        self.conv_0 = QConv(gate_type_embed_dim, inter_dim, h_feats)
-        convs: List[nn.Module] = []
+        convs_: List[nn.Module] = []
+        conv_0: nn.Module = QConv(gate_type_embed_dim, inter_dim, h_feats)
+        convs_.append(conv_0)
         for _ in range(num_layers - 1):
-            convs.append(QConv(h_feats, inter_dim, h_feats))
-        self.convs: nn.Module = nn.ModuleList(convs)
+            convs_.append(QConv(h_feats, inter_dim, h_feats))
+        self.convs: nn.ModuleList = nn.ModuleList(convs_)
 
-    def forward(self, g: dgl.DGLGraph):
-        #print(g.ndata['gate_type'])
-        #print(self.embedding)
+    def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
         w = torch.cat([
             torch.unsqueeze(g.edata['src_idx'], 1),
@@ -74,8 +80,7 @@ class QGNN(nn.Module):
         ],
                       dim=1)
         g.edata['w'] = w
-        h = self.conv_0(g, g.ndata['h'])
+        h: torch.Tensor = g.ndata['h']
         for i in range(len(self.convs)):
             h = self.convs[i](g, h)
         return h
-

@@ -11,6 +11,13 @@ namespace quartz {
         Q5_TEST = 2,
     };
 
+    std::ostream &operator<<(std::ostream &stream, BackendType t) {
+        const std::string name_list[] = {"Q20_CLIQUE",
+                                         "IBM_Q20_TOKYO",
+                                         "Q5_TEST"};
+        return stream << name_list[int(t)];
+    }
+
     std::shared_ptr<DeviceTopologyGraph> GetDevice(BackendType backend_type) {
         // return device according to input device_type
         if (backend_type == BackendType::Q20_CLIQUE) return Q20_Clique();

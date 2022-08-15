@@ -44,6 +44,8 @@ int main() {
     // perform sabre layout and sabre swap
     int best_implementation_cost = LARGE_INT;
     int best_execution_cost = LARGE_INT;
+    int total_implementation_cost = 0;
+    int total_execution_cost = 0;
     for (int experiment_id = 0; experiment_id < num_experiments; ++experiment_id) {
         // sabre layout for initial mapping
         graph.init_physical_mapping(InitialMappingType::SABRE, device, sabre_layout_iterations,
@@ -51,6 +53,7 @@ int main() {
         assert(graph.check_mapping_correctness() == MappingStatus::VALID);
         int cur_implementation_cost = static_cast<int>(graph.circuit_implementation_cost(device));
         best_implementation_cost = min(best_implementation_cost, cur_implementation_cost);
+        total_implementation_cost += best_implementation_cost;
 
         // sabre swap for qubit routing
         vector<ExecutionHistory> execution_history = sabre_swap(graph, device,
@@ -58,6 +61,7 @@ int main() {
         assert(check_execution_history(graph, device, execution_history) == ExecutionHistoryStatus::VALID);
         int cur_execution_cost = execution_cost(execution_history);
         best_execution_cost = min(best_execution_cost, cur_execution_cost);
+        total_execution_cost += cur_execution_cost;
 
     }
 
@@ -65,4 +69,6 @@ int main() {
     cout << "Gate count: " << graph.gate_count() << endl;
     cout << "Best implementation cost after sabre layout: " << best_implementation_cost << endl;
     cout << "Best execution cost using Sabre layout & Sabre swap: " << best_execution_cost << endl;
+    cout << "Avg. implementation cost after sabre layout: " << total_implementation_cost / num_experiments << endl;
+    cout << "Avg. execution cost using Sabre layout & Sabre swap: " << total_execution_cost / num_experiments << endl;
 }

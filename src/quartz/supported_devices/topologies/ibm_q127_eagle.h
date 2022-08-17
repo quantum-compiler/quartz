@@ -145,7 +145,7 @@ namespace quartz {
         device->add_edge(96, 109);
         device->add_edge(109, 114);
         device->add_edge(100, 110);
-        device->add_edge(100, 118);
+        device->add_edge(110, 118);
         device->add_edge(104, 111);
         device->add_edge(111, 122);
         device->add_edge(108, 112);

@@ -256,7 +256,7 @@ namespace quartz {
             // some quick sanity checks
             assert(is_circuit_finished(graph));
             assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count);
-            assert(execution_history.size() == swaps_inserted + original_gate_count);
+            assert(execution_history.size() == swaps_inserted + executed_logical_gate_count);
             return original_gate_count + int(SWAPCOST) * swaps_inserted;
         }
 

@@ -122,7 +122,14 @@ namespace quartz {
             if (!found_out_edge) {
                 // remove edge
                 auto previous_op = in_edge.srcOp;
-                graph.outEdges[previous_op].erase(in_edge);
+                auto edge_to_erase = graph.outEdges[previous_op].end();
+                for (auto it = graph.outEdges[previous_op].cbegin(); it != graph.outEdges[previous_op].cend(); ++it) {
+                    if (it->srcOp.guid == in_edge.srcOp.guid && it->dstOp.guid == in_edge.dstOp.guid
+                        && it->srcIdx == in_edge.srcIdx && it->dstIdx == in_edge.dstIdx) {
+                        edge_to_erase = it;
+                    }
+                }
+                graph.outEdges[previous_op].erase(edge_to_erase);
                 // if this makes outEdges empty, remove it too
                 if (graph.outEdges[previous_op].empty()) {
                     graph.outEdges.erase(previous_op);
@@ -201,7 +208,7 @@ namespace quartz {
         return executable_gate_set;
     }
 
-    bool is_circuit_finished(Graph &graph) {
+    bool is_circuit_finished(const Graph &graph) {
         return (graph.inEdges.empty() && graph.outEdges.empty() && graph.qubit_mapping_table.empty());
     }
 
@@ -260,7 +267,14 @@ namespace quartz {
             if (!found_out_edge) {
                 // remove edge
                 auto previous_op = in_edge.srcOp;
-                graph.outEdges[previous_op].erase(in_edge);
+                auto edge_to_erase = graph.outEdges[previous_op].end();
+                for (auto it = graph.outEdges[previous_op].cbegin(); it != graph.outEdges[previous_op].cend(); ++it) {
+                    if (it->srcOp.guid == in_edge.srcOp.guid && it->dstOp.guid == in_edge.dstOp.guid
+                        && it->srcIdx == in_edge.srcIdx && it->dstIdx == in_edge.dstIdx) {
+                        edge_to_erase = it;
+                    }
+                }
+                graph.outEdges[previous_op].erase(edge_to_erase);
                 // if this makes outEdges empty, remove it too
                 if (graph.outEdges[previous_op].empty()) {
                     graph.outEdges.erase(previous_op);

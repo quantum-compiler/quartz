@@ -132,17 +132,20 @@ namespace quartz {
                 graph.outEdges[previous_op].erase(edge_to_erase);
                 // if this makes outEdges empty, remove it too
                 if (graph.outEdges[previous_op].empty()) {
-                    graph.outEdges.erase(previous_op);
+                    size_t _erase = graph.outEdges.erase(previous_op);
+                    assert(_erase == 1);
                     // if this finishes all gates on a qubit, erase it from
                     // qubit mapping table
                     if (previous_op.ptr->tp == GateType::input_qubit) {
-                        graph.qubit_mapping_table.erase(previous_op);
+                        size_t _erase_2 = graph.qubit_mapping_table.erase(previous_op);
+                        assert(_erase_2 == 1);
                     }
                 }
             }
         }
         // delete gate from circuit
-        graph.inEdges.erase(op);
+        size_t _erase = graph.inEdges.erase(op);
+        assert(_erase == 1);
         graph.outEdges.erase(op);
     }
 
@@ -277,17 +280,20 @@ namespace quartz {
                 graph.outEdges[previous_op].erase(edge_to_erase);
                 // if this makes outEdges empty, remove it too
                 if (graph.outEdges[previous_op].empty()) {
-                    graph.outEdges.erase(previous_op);
+                    size_t _erase = graph.outEdges.erase(previous_op);
+                    assert(_erase == 1);
                     // if this finishes all gates on a qubit, erase it from
                     // qubit mapping table
                     if (previous_op.ptr->tp == GateType::input_qubit) {
-                        graph.qubit_mapping_table.erase(previous_op);
+                        size_t _erase2 = graph.qubit_mapping_table.erase(previous_op);
+                        assert(_erase2 == 1);
                     }
                 }
             }
         }
         // delete gate from circuit
-        graph.inEdges.erase(op);
+        size_t _erase =  graph.inEdges.erase(op);
+        assert(_erase == 1);
         graph.outEdges.erase(op);
     }
 

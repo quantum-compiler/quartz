@@ -99,7 +99,8 @@ namespace quartz {
                 // line 9 - 16
                 for (const Op &gate: executable_gate_list) {
                     // line 10, execute
-                    front_set.erase(gate);
+                    size_t _erase = front_set.erase(gate);
+                    assert(_erase == 1);
                     executed_set.insert(gate);
                     // sabre swap: add gate to execution history
                     if (gate.ptr->tp != GateType::input_qubit) {

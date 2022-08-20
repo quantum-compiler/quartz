@@ -301,7 +301,7 @@ class QGIN(nn.Module):
 
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
-            hidden_rep.append(h)            
+            hidden_rep.append(h)
         
         if self.global_pool:
             # num_graphs = len(g.batch_num_nodes())

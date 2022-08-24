@@ -119,6 +119,7 @@ std::shared_ptr<Graph> optimize(Context *ctx,
                                 const std::string &equiv_file_name,
                                 const std::string &circuit_name,
                                 bool print_message,
+                                std::function<float(Graph *)> cost_function = nullptr,
                                 double cost_upper_bound = -1 /*default = current cost * 1.05*/,
                                 int timeout = 3600 /*1 hour*/);
 ```
@@ -127,8 +128,20 @@ Explanation for some of the parameters:
 - `equiv_file_name`: The file name of the ECC set.
 - `circuit_name`: The name of the circuit, which will be printed with the intermediate result.
 - `print_message`: Print debug message to the console.
+- `cost_function`: The cost function used in the search.
 - `cost_upper_bound`: Maximum circuit cost to be searched during optimization.
 - `timeout`: Timeout for optimization in seconds.
+
+Usage example:
+```c++
+auto graph_optimized = graph->optimize(&context,
+                                       equiv_file_name,
+                                       circuit_name,
+                                       /*print_message=*/true,
+                                       [] (Graph *graph) { return graph->total_cost(); },
+                                       /*cost_upper_bound=*/-1,
+                                       /*timeout=*/10);
+```
 
 You can also use the deprecated API for now:
 ``` cpp

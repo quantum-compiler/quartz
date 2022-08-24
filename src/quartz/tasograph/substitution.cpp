@@ -395,31 +395,31 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
       else if (!(graph->has_edge(in.op->mapOp, op, in.idx, i)))
         return false;
     }
-    // Check output
-    for (size_t i = 0; i < srcOp->outputs.size(); i++) {
-      auto it = mappedOutputs.find(srcOp->outputs[i]);
-      // If out is in mappedOutputs, it represents an external edge,
-      // we don't check it here
-      if (it == mappedOutputs.end()) {
-        // We have to find out the dst op of this output edge and
-        // check its existence in the Graph
-        bool found = false;
-        for (auto mapped_ops_it = mappedOps.cbegin();
-             mapped_ops_it != mappedOps.cend(); ++mapped_ops_it) {
-          OpX *output_src_opx = mapped_ops_it->second;
-          for (size_t j = 0; j < output_src_opx->inputs.size(); ++j) {
-            auto input_tensor = output_src_opx->inputs[j];
-            if (input_tensor == srcOp->outputs[i]) {
-              found = true;
-              if (!graph->has_edge(op, mapped_ops_it->first, i, j)) {
-                return false;
-              } else
-                break;
-            }
+  }
+  // Check output
+  for (size_t i = 0; i < srcOp->outputs.size(); i++) {
+    auto it = mappedOutputs.find(srcOp->outputs[i]);
+    // If out is in mappedOutputs, it represents an external edge,
+    // we don't check it here
+    if (it == mappedOutputs.end()) {
+      // We have to find out the dst op of this output edge and
+      // check its existence in the Graph
+      bool found = false;
+      for (auto mapped_ops_it = mappedOps.cbegin();
+           mapped_ops_it != mappedOps.cend(); ++mapped_ops_it) {
+        OpX *output_src_opx = mapped_ops_it->second;
+        for (size_t j = 0; j < output_src_opx->inputs.size(); ++j) {
+          auto input_tensor = output_src_opx->inputs[j];
+          if (input_tensor == srcOp->outputs[i]) {
+            found = true;
+            if (!graph->has_edge(op, mapped_ops_it->first, i, j)) {
+              return false;
+            } else
+              break;
           }
-          if (found)
-            break;
         }
+        if (found)
+          break;
       }
     }
   }

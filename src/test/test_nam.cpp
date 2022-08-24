@@ -62,31 +62,35 @@ int main(int argc, char **argv) {
   auto end = std::chrono::steady_clock::now();
   if (disable_search) {
     std::cout << "Optimization results of Quartz for " << fn
-              << " on Nam's gate set." << std::endl
-              << "Gate count after optimization: "
-              << graph_before_search->total_cost() << ", "
-              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                     end - start)
-                         .count() /
-                     1000.0
+              << " on Nam's gate set."
+              << " Gate count after optimization: "
+              << graph_before_search->gate_count() << ", "
+              << "Circuit depth: " << graph_before_search->circuit_depth()
+              << ", "
+              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                  end - start)
+                  .count() /
+                  1000.0
               << " seconds." << std::endl;
 
     return 0;
   }
 
   // Optimization
-  auto graph_after_search = graph_before_search->optimize(
-      0.999, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::rz, fn);
+  auto graph_after_search = graph_before_search->optimize(&dst_ctx,
+                                                          eqset_fn,
+                                                          fn, /*print_message=*/
+                                                          true);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
-            << " on Nam's gate set." << std::endl
-            << "Gate count after optimization: "
-            << graph_after_search->total_cost() << ", "
-            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                   end - start)
-                       .count() /
-                   1000.0
+            << " on Nam's gate set."
+            << " Gate count after optimization: "
+            << graph_after_search->gate_count() << ", "
+            << "Circuit depth: " << graph_after_search->circuit_depth() << ", "
+            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
+                end - start)
+                .count() /
+                1000.0
             << " seconds." << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);
 }

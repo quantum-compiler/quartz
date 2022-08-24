@@ -5,6 +5,7 @@
 #include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
+#include "../parser/qasm_parser.h"
 
 #include <chrono>
 #include <fstream>
@@ -44,6 +45,13 @@ public:
       return guid < b.guid;
     if (ptr != b.ptr)
       return ptr < b.ptr;
+    return false;
+  }
+  inline bool operator>(const Op &b) const {
+    if (guid != b.guid)
+      return guid > b.guid;
+    if (ptr != b.ptr)
+      return ptr > b.ptr;
     return false;
   }
   Op &operator=(const Op &op) {
@@ -170,13 +178,21 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  [[nodiscard]] std::unique_ptr<DAG> to_dag() const;
+  void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
+  Op add_qubit(int qubit_idx);
+  Op add_parameter(const ParamType p);
+  Op new_gate(GateType gt);
   bool has_loop() const;
   size_t hash();
+  bool equal(const Graph &other) const;
   bool check_correctness();
-  float total_cost() const;
-  int gate_count() const;
+  int specific_gate_count(GateType gate_type) const;
+  [[nodiscard]] float total_cost() const;
+  [[nodiscard]] int gate_count() const;
+  [[nodiscard]] int circuit_depth() const;
   size_t get_next_special_op_guid();
   size_t get_special_op_guid();
   void set_special_op_guid(size_t _special_op_guid);
@@ -185,16 +201,69 @@ public:
                                        RuleParser *rule_parser,
                                        bool ignore_toffoli = false);
   std::shared_ptr<Graph>
-  optimize(float alpha, int budget, bool print_subst, Context *ctx,
-           const std::string &equiv_file_name, bool use_simulated_annealing,
-           bool enable_early_stop, bool use_rotation_merging_in_searching,
-           GateType target_rotation, std::string circuit_name = "",
-           int timeout = 86400 /*1 day*/);
+  optimize_legacy(float alpha,
+                  int budget,
+                  bool print_subst,
+                  Context *ctx,
+                  const std::string &equiv_file_name,
+                  bool use_simulated_annealing,
+                  bool enable_early_stop,
+                  bool use_rotation_merging_in_searching,
+                  GateType target_rotation,
+                  std::string circuit_name = "",
+                  int timeout = 86400 /*1 day*/);
+  /**
+   * Optimize this circuit.
+   * @param ctx The context variable.
+   * @param equiv_file_name The ECC set file name.
+   * @param circuit_name The circuit name shown in the log.
+   * @param print_message To output the log or not. The log will be outputted
+   * to a file with name combined by the ECC set file name and the circuit
+   * file name.
+   * @param cost_function The cost function for the search.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
+  std::shared_ptr<Graph> optimize(Context *ctx,
+                                  const std::string &equiv_file_name,
+                                  const std::string &circuit_name,
+                                  bool print_message,
+                                  std::function<float(Graph *)> cost_function = nullptr,
+                                  double cost_upper_bound = -1 /*default = current cost * 1.05*/,
+                                  int timeout = 3600 /*1 hour*/);
+  /**
+   * Optimize this circuit.
+   * @param xfers The circuit transformations.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param circuit_name The circuit name shown in the log.
+   * @param log_file_name The file name to output the log. If empty, the log
+   * will be outputted to the screen.
+   * @param print_message To output the log or not.
+   * @param cost_function The cost function for the search.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
+  std::shared_ptr<Graph> optimize(const std::vector<GraphXfer *> &xfers,
+                                  double cost_upper_bound,
+                                  const std::string &circuit_name,
+                                  const std::string &log_file_name,
+                                  bool print_message,
+                                  std::function<float(Graph *)> cost_function = nullptr,
+                                  int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result, bool print_id) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_id) const;
+  template <class _CharT, class _Traits>
+  static std::shared_ptr<Graph>
+  _from_qasm_stream(Context *ctx,
+                    std::basic_istream<_CharT, _Traits> &qasm_stream);
+  static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
+                                               const std::string &filename);
+  static std::shared_ptr<Graph> from_qasm_str(Context *ctx,
+                                              const std::string qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
   size_t get_num_qubits() const;
@@ -209,11 +278,16 @@ public:
   toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                               GraphXfer *inverse_xfer,
                               std::vector<int> instruction);
-  std::vector<size_t> appliable_xfers(Op op, const std::vector<GraphXfer *> &);
+  std::vector<size_t> appliable_xfers(Op op,
+                                      const std::vector<GraphXfer *> &) const;
+  std::vector<size_t>
+  appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
-  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op);
+  std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
+                                    bool eliminate_rotation = false);
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
-  apply_xfer_and_track_node(GraphXfer *xfer, Op op);
+  apply_xfer_and_track_node(GraphXfer *xfer, Op op,
+                            bool eliminate_rotation = false);
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

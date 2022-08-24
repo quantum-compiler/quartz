@@ -461,7 +461,7 @@ namespace quartz {
 				break;
 			}
 			if (normalize_to_minimal_circuit_representation &&
-			    normalize_to_minimal_circuit_representations(ctx, verbose)) {
+                normalize_to_canonical_representations(ctx, verbose)) {
 				remaining_optimizations = kNumOptimizationsToPerform;
 				ever_simplified = true;
 			}
@@ -549,7 +549,7 @@ namespace quartz {
 	}
 
 	int
-	EquivalenceSet::normalize_to_minimal_circuit_representations(Context *ctx, bool verbose) {
+	EquivalenceSet::normalize_to_canonical_representations(Context *ctx, bool verbose) {
 		int num_class_modified = 0;
 		for (auto &item : classes_) {
 			auto dags = item->extract();
@@ -558,7 +558,7 @@ namespace quartz {
 			std::unordered_set< DAGHashType > hash_values_to_remove;
 			int class_modified = 0;
 			for (auto &dag : dags) {
-				bool is_minimal = dag->minimal_circuit_representation(&new_dag);
+				bool is_minimal = dag->canonical_representation(&new_dag);
 				if (!is_minimal) {
 					class_modified++;
 					new_dags.push_back(std::move(new_dag));

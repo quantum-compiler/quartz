@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 from cython.operator cimport dereference as deref
+from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory cimport shared_ptr, make_shared
 from libcpp cimport bool
@@ -66,6 +67,13 @@ cdef class PyQASMParser:
         success = self.parser.load_qasm(filename_bytes, dag.dag)
         assert(success, "Failed to load qasm file!")
         return dag
+    
+    def load_qasm_str(self, str qasm_str) -> PyDAG:
+        dag = PyDAG()
+        qasm_str_bytes = qasm_str.encode('utf-8')
+        success = self.parser.load_qasm_str(qasm_str_bytes, dag.dag)
+        assert(success, "Failed to load qasm file!")
+        return dag
 
 cdef class PyGate:
     cdef Gate *gate
@@ -116,6 +124,17 @@ cdef class PyGate:
     @property
     def num_parameters(self):
         return self.gate.num_parameters
+    
+    @staticmethod
+    def rebuild(GateType _type, int _num_qubits, int _num_params):
+        gate = PyGate()
+        inner_gate = new Gate(_type, _num_qubits, _num_params)
+        gate.set_this(inner_gate)
+        return gate
+    
+    def __reduce__(self):
+        return (self.__class__.rebuild, (self.tp, self.num_qubits, self.num_parameters))
+
 
 cdef class PyDAG:
     cdef DAG_ptr dag
@@ -151,7 +170,7 @@ cdef class PyDAG:
     
     @property
     def num_gates(self):
-        return self.dag.get_num_gates() 
+        return self.dag.get_num_gates()
 
 cdef class PyXfer:
     cdef GraphXfer *graphXfer
@@ -195,6 +214,18 @@ cdef class PyXfer:
     def is_NOP(self):
         return self.is_nop
 
+    @property
+    def src_str(self):
+        if self.is_nop:
+            return 'NOP'
+        return self.graphXfer.src_str().decode('utf-8')
+
+    @property
+    def dst_str(self):
+        if self.is_nop:
+            return 'NOP'
+        return self.graphXfer.dst_str().decode('utf-8')
+
 cdef class QuartzContext:
     cdef Context *context
     cdef EquivalenceSet *eqs
@@ -215,17 +246,39 @@ cdef class QuartzContext:
 
         eq_sets = self.eqs.get_all_equivalence_sets()
 
+        # for i in range(eq_sets.size()):
+        #     for j in range(eq_sets[i].size()):
+        #         if j != 0:
+        #             dag_ptr_0 = eq_sets[i][0]
+        #             dag_ptr_1 = eq_sets[i][j]
+        #             xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+        #             xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
+        #             if xfer_0 != NULL:
+        #                 self.v_xfers.push_back(xfer_0)
+        #             if xfer_1 != NULL:
+        #                 self.v_xfers.push_back(xfer_1)
+
+        # for i in range(eq_sets.size()):
+        #     for j in range(eq_sets[i].size()):
+        #         if j != 0:
+        #             dag_ptr_0 = eq_sets[i][0]
+        #             dag_ptr_1 = eq_sets[i][j]
+        #             xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+        #             xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
+        #             if xfer_0 != NULL and xfer_0.num_dst_op() - xfer_0.num_src_op() < 2:
+        #                 self.v_xfers.push_back(xfer_0)
+        #             if xfer_1 != NULL and xfer_1.num_dst_op() - xfer_1.num_src_op() < 2:
+        #                 self.v_xfers.push_back(xfer_1)
+
         for i in range(eq_sets.size()):
             for j in range(eq_sets[i].size()):
-                if j != 0:
-                    dag_ptr_0 = eq_sets[i][0]
-                    dag_ptr_1 = eq_sets[i][j]
-                    xfer_0 = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
-                    xfer_1 = GraphXfer.create_GraphXfer(self.context, dag_ptr_1, dag_ptr_0, no_increase)
-                    if xfer_0 != NULL:
-                        self.v_xfers.push_back(xfer_0)
-                    if xfer_1 != NULL:
-                        self.v_xfers.push_back(xfer_1)
+                for k in range(eq_sets[i].size()):
+                    if j != k:
+                        dag_ptr_0 = eq_sets[i][j]
+                        dag_ptr_1 = eq_sets[i][k]
+                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                        if xfer != NULL:
+                            self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
 
     cdef load_json(self, filename):
@@ -258,6 +311,18 @@ cdef class QuartzContext:
             xfer = None
         return xfer
 
+    def xfer_id_is_nop(self, *, xfer_id) -> bool:
+        if xfer_id == self.v_xfers.size():
+            if self.include_nop:
+                return True
+            else:
+                assert False
+        else:
+            return False
+
+    def has_parameterized_gate(self) -> bool:
+        return self.context.has_parameterized_gate()
+
     @property
     def num_equivalence_classes(self):
         return self.eqs.num_equivalence_classes()
@@ -268,6 +333,8 @@ cdef class QuartzContext:
         if self.include_nop:
             num += 1
         return num
+
+from functools import partial
 
 cdef class PyNode:
     cdef Op node
@@ -286,6 +353,10 @@ cdef class PyNode:
         return self.node.guid
 
     @property
+    def guid(self):
+        return self.node.guid
+
+    @property
     def gate(self):
         return PyGate().set_this(self.node.ptr)
 
@@ -293,30 +364,52 @@ cdef class PyNode:
     def gate_tp(self):
         return self.node.ptr.tp
 
+    def __reduce__(self):
+        return (
+            partial(self.__class__, guid=self.node_guid, gate=self.gate), ()
+        )
 
 cdef class PyGraph:
     cdef shared_ptr[Graph] graph
-    cdef vector[Op] nodes
+    cdef object _nodes
+
+    property nodes:
+        def __get__(self):
+            return self._nodes
+        
+        def __set__(self, nodes):
+            self._nodes = nodes
 
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
+        self.nodes = []
         if context != None and dag != None:
             self.graph = make_shared[Graph](context.context, dag.dag)
-            gate_count = self.gate_count
-            self.nodes.reserve(gate_count)
-            deref(self.graph).topology_order_ops(self.nodes)
+            self.get_nodes()
         else:
             self.graph = shared_ptr[Graph](NULL)
-            self.nodes.clear()
 
     def __dealloc__(self):
         self.graph.reset()
 
+    def __hash__(self):
+        return deref(self.graph).hash()
+
+    def get_nodes(self):
+        gate_count = self.gate_count
+        cdef vector[Op] nodes_vec
+        nodes_vec.reserve(gate_count)
+        deref(self.graph).topology_order_ops(nodes_vec)
+
+        self.nodes = []
+        for i in range(gate_count):
+            self.nodes.append(PyNode(
+                guid=nodes_vec[i].guid,
+                gate=PyGate().set_this(nodes_vec[i].ptr)
+            ))
+
     cdef set_this(self, shared_ptr[Graph] graph_):
         self.graph = graph_
-        gate_count = self.gate_count
-        self.nodes.clear()
-        self.nodes.reserve(gate_count)
-        deref(self.graph).topology_order_ops(self.nodes)
+        self.get_nodes()
         return self
 
     # TODO: deprecate this function
@@ -335,61 +428,65 @@ cdef class PyGraph:
         if context.include_nop:
             result.push_back(context.num_xfers - 1)
         return result
+
+    def available_xfers_parallel(self, *, QuartzContext context, PyNode node, output_format="int"):
+        result = deref(self.graph).appliable_xfers_parallel(node.node, context.v_xfers)
+        if context.include_nop:
+            result.push_back(context.num_xfers - 1)
+        return result
                     
     # TODO: use node_id directly instead of using PyNode
-    def apply_xfer(self, *, PyXfer xfer, PyNode node) -> PyGraph:
+    def apply_xfer(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False) -> PyGraph:
         if xfer.is_nop:
             return self
-        ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node)
+        ret = deref(self.graph).apply_xfer(xfer.graphXfer, node.node, eliminate_rotation)
         if ret.get() == NULL:
             return None
         else:
             return PyGraph().set_this(ret)
 
     # TODO: use node_id directly instead of using PyNode
-    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node):
+    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False):
         if xfer.is_nop:
             return self, []
-        ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node)
+        ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node, eliminate_rotation)
         if ret.first.get() == NULL:
             return None, []
         else:
             return PyGraph().set_this(ret.first), ret.second
-        
+    
+    def all_nodes(self):
+        return self.nodes
+
     def all_nodes_with_id(self) -> list:
-        py_node_list = []
-        gate_count = self.gate_count
-        for i in range(gate_count):
-            node_dict = {}
-            node_dict['id'] = i
-            node_dict['node'] = PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr))
-            py_node_list.append(node_dict)
-        return py_node_list
+        nodes_with_id = [
+            { "id": i, 'node': node }
+            for (i, node) in enumerate(self.nodes)
+        ]
+        return nodes_with_id
 
-    def all_nodes(self) -> list:
-        py_node_list = []
-        gate_count = self.gate_count
-        for i in range(gate_count):
-            py_node_list.append(PyNode(guid=self.nodes[i].guid, gate=PyGate().set_this(self.nodes[i].ptr)))
-        return py_node_list
-
-    def get_node_from_id(self, *, id) -> PyNode:
+    def get_node_from_id(self, *, id : int) -> PyNode:
+        n = self.num_nodes
+        if id >= n:
+            print(id)
+            print(n)
+            self.to_qasm(filename='a.qasm')
         assert(id < self.num_nodes)
-        return PyNode(guid=self.nodes[id].guid, gate=PyGate().set_this(self.nodes[id].ptr))
+        return self.nodes[id]
 
     def hash(self):
         return deref(self.graph).hash()
 
     def all_edges(self):
         id_guid_mapping = {}
-        gate_cnt = self.nodes.size()
+        gate_cnt = len(self.nodes)
         for i in range(gate_cnt):
             id_guid_mapping[self.nodes[i].guid] = i
 
         cdef vector[Edge] edge_v
         deref(self.graph).all_edges(edge_v)
-        edges = []
         cdef int edge_cnt = edge_v.size()
+        edges = []
         for i in range(edge_cnt):
             e = (id_guid_mapping[edge_v[i].srcOp.guid], id_guid_mapping[edge_v[i].dstOp.guid], edge_v[i].srcIdx, edge_v[i].dstIdx)
             edges.append(e)
@@ -414,22 +511,20 @@ cdef class PyGraph:
         reverse = [0] * len(src_id) + [1] * len(src_id)
 
         g = dgl.graph((torch.tensor(src_id2), torch.tensor(dst_id2)))
-        g.edata['src_idx'] = torch.tensor(src_idx2)
-        g.edata['dst_idx'] = torch.tensor(dst_idx2)
-        g.edata['reversed'] = torch.tensor(reverse)
+        g.edata['src_idx'] = torch.tensor(src_idx2, dtype=torch.int32)
+        g.edata['dst_idx'] = torch.tensor(dst_idx2, dtype=torch.int32)
+        g.edata['reversed'] = torch.tensor(reverse, dtype=torch.int32)
 
-        nodes = self.all_nodes()
-        node_gate_tp = [node.gate_tp for node in nodes]
-        g.ndata['gate_type'] = torch.tensor(node_gate_tp)
+        node_gate_tp = [node.gate_tp for node in self.nodes]
+        g.ndata['gate_type'] = torch.tensor(node_gate_tp, dtype=torch.int32)
 
         return g
 
     def get_available_xfers_matrix(self, *, context):
         rows, cols = (self.num_nodes, context.num_xfers)
         arr = [[0 for i in range(cols)] for j in range(rows)]
-        nodes = self.all_nodes()
         for i in range(rows):
-            available_list = self.available_xfers(context=context, node=nodes[i], output_format='int')
+            available_list = self.available_xfers(context=context, node=self.nodes[i], output_format='int')
             for xfer_id in available_list:
                 arr[i][xfer_id] = 1
         return arr
@@ -442,6 +537,25 @@ cdef class PyGraph:
     def to_qasm(self, *, str filename):
         fn_bytes = filename.encode('utf-8')
         deref(self.graph).to_qasm(fn_bytes, False, False)
+    
+    def to_qasm_str(self, *) -> str:
+        cdef string s = deref(self.graph).to_qasm(False, False)
+        return s.decode('utf-8')
+
+    def rotation_merging(self, gate_type:str):
+        deref(self.graph).rotation_merging(get_gate_type_from_str(gate_type))
+        self.get_nodes()
+        return self
+
+    @staticmethod
+    def from_qasm(*, context : QuartzContext, filename : str):
+        filename_bytes = filename.encode('utf-8')
+        return PyGraph().set_this(Graph.from_qasm_file(context.context, filename_bytes))
+
+    @staticmethod
+    def from_qasm_str(*, context : QuartzContext, qasm_str : str):
+        qasm_str_bytes = qasm_str.encode('utf-8')
+        return PyGraph().set_this(Graph.from_qasm_str(context.context, qasm_str_bytes))
 
     def ccz_flip_greedy_rz(self, *, rotation_merging=False):
         return PyGraph().set_this(deref(self.graph).ccz_flip_greedy_rz())
@@ -457,12 +571,20 @@ cdef class PyGraph:
         return deref(self.graph).gate_count()
 
     @property
+    def cx_count(self):
+        return deref(self.graph).specific_gate_count(GateType.cx)
+
+    @property
+    def t_count(self):
+        return deref(self.graph).specific_gate_count(GateType.t) + deref(self.graph).specific_gate_count(GateType.tdg)
+
+    @property
     def num_nodes(self):
-        return self.nodes.size()
+        return len(self.nodes)
 
     @property
     def num_edges(self):
         cdef vector[Edge] edge_v
         deref(self.graph).all_edges(edge_v)
         return edge_v.size()
-        
+

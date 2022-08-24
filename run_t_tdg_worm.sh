@@ -1,0 +1,30 @@
+cd src/test
+
+python test_t_tdg_worm.py adder_8 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py barenco_tof_3 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py barenco_tof_4 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py barenco_tof_5 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py barenco_tof_10 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py csla_mux_3 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py csum_mux_9 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^4_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^5_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^6_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^7_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^8_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^9_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^10_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^16_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py gf2^32_mult ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py mod5_4 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py mod_mult_55 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py mod_red_21 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py qcla_adder_10 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py qcla_com_7 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py qcla_mod_7 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py rc_adder_6 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py tof_3 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py tof_4 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py tof_5 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py tof_10 ../../t_tdg_worm_output & sleep 1200
+python test_t_tdg_worm.py vbe_adder_3 ../../t_tdg_worm_output & sleep 1200

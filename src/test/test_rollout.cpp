@@ -34,6 +34,7 @@ int main() {
         // log
         if (is_finished) {
             int total_cost = env.total_cost();
+            env.cur_game_ptr->save_execution_history_to_file("./test.eh", "./test.qasm", false);
             cout << "Total reward: " << total_reward << endl;
             cout << "Step count: " << step_count << endl;
             cout << "Avg reward: " << total_reward / step_count << endl;

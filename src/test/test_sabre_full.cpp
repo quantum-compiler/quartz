@@ -149,5 +149,18 @@ int main() {
     }
     int real_cost = execution_cost(execution_history);
     cout << "Sabre swap real cost is " << real_cost << endl;
+
+    // output execution history
+    bool include_swap = false;
+    std::ofstream qasm_file;
+    qasm_file.open("./sabre_full_result.qasm");
+    // output qasm file
+    qasm_file << "OPENQASM 2.0;" << "\n";
+    qasm_file << "include \"qelib1.inc\";" << "\n";
+    qasm_file << "qreg q[" << graph.get_num_qubits() << "];\n";
+    for (const ExecutionHistory& eh : execution_history) {
+        if (!include_swap && eh.gate_type == GateType::swap) continue;
+        qasm_file << eh.gate_type << " q[" << eh.logical0 << "], q[" << eh.logical1 << "];\n";
+    }
 };
 

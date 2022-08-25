@@ -115,6 +115,11 @@ namespace quartz {
                             execution_history.logical1 = std::next(graph.inEdges[gate].begin())->logical_qubit_idx;
                             execution_history.physical1 = logical2physical[execution_history.logical1];
                         }
+                        if (graph.inEdges[gate].begin()->dstIdx == 1) {
+                            // this means that the gate has two inputs and the order is reversed
+                            std::swap(execution_history.logical0, execution_history.logical1);
+                            std::swap(execution_history.physical0, execution_history.physical1);
+                        }
                         execution_history_list.emplace_back(execution_history);
                     }
                     // apply swap to the mapping

@@ -74,6 +74,7 @@ namespace quartz {
                     assert(graph.inEdges[executable_gate].size() == 2);
                     Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
                     Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
+                    if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
                     int input_logical_0 = in_edge_0.logical_qubit_idx;
                     int input_logical_1 = in_edge_1.logical_qubit_idx;
                     int input_physical_0 = in_edge_0.physical_qubit_idx;
@@ -212,6 +213,7 @@ namespace quartz {
                         assert(graph.inEdges[executable_gate].size() == 2);
                         Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
                         Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
+                        if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
                         int input_logical_0 = in_edge_0.logical_qubit_idx;
                         int input_logical_1 = in_edge_1.logical_qubit_idx;
                         int input_physical_0 = in_edge_0.physical_qubit_idx;
@@ -259,6 +261,53 @@ namespace quartz {
             assert(execution_history.size() == swaps_inserted + executed_logical_gate_count);
             assert(check_execution_history(graph, device, execution_history) == ExecutionHistoryStatus::VALID);
             return original_gate_count + int(SWAPCOST) * swaps_inserted;
+        }
+
+        void save_execution_history_to_file(const std::string& eh_file_name,
+                                            const std::string& qasm_file_name,
+                                            bool include_swap = true) const {
+            assert(is_circuit_finished(graph));
+
+            // initialize file
+            std::ofstream eh_file;
+            std::ofstream qasm_file;
+            eh_file.open(eh_file_name);
+            qasm_file.open(qasm_file_name);
+
+            // output initial mapping table
+            eh_file << logical2physical.size() << "\n";
+            for (int idx : initial_physical2logical) {
+                eh_file << idx << " ";
+            }
+            eh_file << "\n";
+            for (int idx : initial_logical2physical) {
+                eh_file << idx << " ";
+            }
+            eh_file << "\n";
+
+            // output execution history
+            eh_file << execution_history.size() << "\n";
+            for (const ExecutionHistory& eh : execution_history) {
+                eh_file << eh.guid << " "
+                     << eh.gate_type << " "
+                     << eh.physical0 << " "
+                     << eh.physical1 << " "
+                     << eh.logical0 << " "
+                     << eh.logical1 << "\n";
+            }
+
+            // output qasm file
+            qasm_file << "OPENQASM 2.0;" << "\n";
+            qasm_file << "include \"qelib1.inc\";" << "\n";
+            qasm_file << "qreg q[" << logical_qubit_num << "];\n";
+            for (const ExecutionHistory& eh : execution_history) {
+                if (!include_swap && eh.gate_type == GateType::swap) continue;
+                qasm_file << eh.gate_type << " q[" << eh.logical0 << "], q[" << eh.logical1 << "];\n";
+            }
+
+            // clean up
+            eh_file.close();
+            qasm_file.close();
         }
 
     public:

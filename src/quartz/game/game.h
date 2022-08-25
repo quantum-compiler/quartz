@@ -275,7 +275,7 @@ namespace quartz {
             qasm_file.open(qasm_file_name);
 
             // output initial mapping table
-            eh_file << logical2physical.size() << "\n";
+            eh_file << logical2physical.size() << " " << logical_qubit_num << "\n";
             for (int idx : initial_physical2logical) {
                 eh_file << idx << " ";
             }

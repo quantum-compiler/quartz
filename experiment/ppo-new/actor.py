@@ -730,7 +730,8 @@ class PPOAgent:
                     if self.subgraph_opt:
                         next_dgl_graph, next_nodes = self.khop_subgraph(next_dgl_graph, next_nodes)
                     eps_list.next_state.append(next_dgl_graph)
-                    eps_list.next_nodes.append(next_nodes)
+                # add next_nodes in all steps
+                eps_list.next_nodes.append(next_nodes)
 
                 # collect cur_graph info
                 if self.subgraph_opt:
@@ -745,14 +746,13 @@ class PPOAgent:
                 eps_list.reward.append(reward)
                 eps_list.game_over.append(game_over)
                 eps_list.node_value.append(action_node_values[i_eps])
-                eps_list.next_nodes.append(next_nodes)
                 eps_list.xfer_mask.append(cast(torch.BoolTensor, av_xfer_masks[i_eps]))
                 eps_list.xfer_logprob.append(action_xfer_logps[i_eps])
                 eps_list.info.append({})
                 
                 """collect info for graph buffer"""
                 graph_buffer = self.graph_buffers[buffer_idx_list[i_eps]]
-                
+
                 if i_step == last_eps_end + 1:
                     # the first step in an episode
                     graph_buffer.rewards.append([])
@@ -812,6 +812,7 @@ class PPOAgent:
         eps_list_cat = ExperienceList.new_empty()
         for eps_list in eps_lists:
             eps_list_cat += eps_list
+        eps_list_cat.sanity_check()
         return eps_list_cat
         
     def khop_subgraph(self, g: dgl.DGLGraph, nodes: List[int]) -> dgl.DGLGraph:

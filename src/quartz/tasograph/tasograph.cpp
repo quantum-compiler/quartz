@@ -2795,8 +2795,11 @@ void Graph::set_physical_mapping(const std::vector<int>& logical2physical) {
     propagate_mapping();
 }
 
-GraphState Graph::convert_circuit_to_state() {
+GraphState Graph::convert_circuit_to_state(int num_layers, bool include_forward_edge) {
     GraphState graph_state = GraphState();
+    // only consider ops within #layers from front for better performance on GNN side
+    std::set<Op, OpCompare> front_set = get_front_layers(num_layers, include_forward_edge);
+
     // map each op to a different node represented by id
     std::map<Op, int, OpCompare> op2node_id;
     int cur_node_id = 0;
@@ -2817,6 +2820,9 @@ GraphState Graph::convert_circuit_to_state() {
     if (!inEdges.empty()) {
         // all other gates (this is enough since each gate other than input qubit must have input)
         for (const auto& op_edge: inEdges) {
+            // ignore ops not in front layers
+            if (front_set.find(op_edge.first) == front_set.end()) continue;
+            // insert node features otherwise
             assert(op_edge.first.ptr->tp != GateType::input_qubit);
             assert(op2node_id.find(op_edge.first) == op2node_id.end());
             op2node_id[op_edge.first] = cur_node_id;
@@ -2834,6 +2840,7 @@ GraphState Graph::convert_circuit_to_state() {
     assert(graph_state.input_logical_idx.size() == cur_node_id);
     assert(graph_state.input_physical_idx.size() == cur_node_id);
     assert(graph_state.node_type.size() == cur_node_id);
+    assert(front_set.size() == cur_node_id);
 
     // store all edges
     std::set<Edge, EdgeCompare> finished_edge_set;
@@ -2841,8 +2848,12 @@ GraphState Graph::convert_circuit_to_state() {
     if (!outEdges.empty()) {
         for (const auto& op_edge: outEdges) {
             assert(!op_edge.second.empty());
+            // ignore ops not in front layers (since each valid edge must have both ends in front set)
+            if (front_set.find(op_edge.first) == front_set.end()) continue;
+            // consider the op's out edges otherwise
             for (const Edge& edge : op_edge.second) {
-                if (finished_edge_set.find(edge) == finished_edge_set.end()) {
+                if (finished_edge_set.find(edge) == finished_edge_set.end() &&
+                    front_set.find(edge.dstOp) != front_set.end()) {
                     finished_edge_set.insert(edge);
                     // extract information
                     int logical_idx = edge.logical_qubit_idx;
@@ -2850,18 +2861,21 @@ GraphState Graph::convert_circuit_to_state() {
                     int src_node_idx = op2node_id[edge.srcOp];
                     int dst_node_idx = op2node_id[edge.dstOp];
                     // add edge to graph state
-                    graph_state.edge_from.emplace_back(src_node_idx);
-                    graph_state.edge_to.emplace_back(dst_node_idx);
-                    graph_state.edge_logical_idx.emplace_back(logical_idx);
-                    graph_state.edge_physical_idx.emplace_back(physical_idx);
-                    graph_state.edge_reversed.emplace_back(false);
+                    if (include_forward_edge) {
+                        graph_state.edge_from.emplace_back(src_node_idx);
+                        graph_state.edge_to.emplace_back(dst_node_idx);
+                        graph_state.edge_logical_idx.emplace_back(logical_idx);
+                        graph_state.edge_physical_idx.emplace_back(physical_idx);
+                        graph_state.edge_reversed.emplace_back(false);
+                        edge_count += 1;
+                    }
                     // add reverse edge to graph state
                     graph_state.edge_from.emplace_back(dst_node_idx);
                     graph_state.edge_to.emplace_back(src_node_idx);
                     graph_state.edge_logical_idx.emplace_back(logical_idx);
                     graph_state.edge_physical_idx.emplace_back(physical_idx);
                     graph_state.edge_reversed.emplace_back(true);
-                    edge_count += 2;
+                    edge_count += 1;
                 }
             }
         }
@@ -2875,7 +2889,9 @@ GraphState Graph::convert_circuit_to_state() {
     if (!inEdges.empty()) {
         for (const auto& op_edge: inEdges) {
             assert(!op_edge.second.empty());
+            if (front_set.find(op_edge.first) == front_set.end()) continue;
             for (const Edge& edge : op_edge.second) {
+                if (front_set.find(edge.srcOp) == front_set.end()) continue;
                 assert(finished_edge_set.find(edge) != finished_edge_set.end());
             }
         }

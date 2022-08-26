@@ -95,7 +95,8 @@ namespace quartz {
         }
 
         [[nodiscard]] State state() {
-            return {device_edges, logical2physical, physical2logical, graph.convert_circuit_to_state()};
+            return {device_edges, logical2physical, physical2logical,
+                    graph.convert_circuit_to_state(7, true)};
         }
 
         std::set<Action, ActionCompare> action_space(ActionType action_type) {

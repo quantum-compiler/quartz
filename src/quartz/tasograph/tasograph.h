@@ -296,7 +296,7 @@ public:
   void add_swap(const Edge& e1, const Edge& e2);
   // utils
   void set_physical_mapping(const std::vector<int>& logical2physical);
-  GraphState convert_circuit_to_state();
+  GraphState convert_circuit_to_state(int num_layers, bool include_forward_edge);
   std::map<Op, int, OpCompare> get_topology_ordering();
   std::set<Op, OpCompare> get_front_layers(int num_layers, bool include_input);
 

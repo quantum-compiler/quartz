@@ -102,5 +102,5 @@ int main() {
 
     // init sabre mapping and print cost
     graph.init_physical_mapping(InitialMappingType::SABRE, device, 5, true, 0.5);
-    GraphState graph_state = graph.convert_circuit_to_state();
+    GraphState graph_state = graph.convert_circuit_to_state(7, true);
 };

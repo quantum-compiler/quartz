@@ -42,7 +42,8 @@ def check_op_eq_from_path(path_x: str, path_y: str) -> bool:
 if __name__ == '__main__':
     import sys
 
-    check_seq = sys.argv[1] == 'seq'
+    check_seq = sys.argv[1][:3] == 'seq'
+    check_seqs = sys.argv[1] == 'seqs'
 
     if not check_seq:
         file_x = sys.argv[2]
@@ -59,27 +60,35 @@ if __name__ == '__main__':
             qc_file_root = os.path.splitext(qc_file)[0]
             return list(map(int, qc_file_root.split('_')))
 
-        seq_dir = sys.argv[2]
-        qc_files = cast(List[str], natsorted(os.listdir(seq_dir)))
-        last_qc_path: str | None = None
-        last_action: Tuple[int, int] = (0, 0)
-        for qc_file in tqdm(qc_files):
-            # 0_36_-2_28_78.qasm: i_step, cost, reward, action_node, action_xfer
-            i_step, cost, reward, action_node, action_xfer = filename_to_info(qc_file)
-            full_qc_path = os.path.join(seq_dir, qc_file)
-            if last_qc_path is not None:
-                sv_eq = check_sv_eq_from_path(last_qc_path, full_qc_path)
-                op_eq = check_op_eq_from_path(last_qc_path, full_qc_path)
-                if not (sv_eq and op_eq):
-                    ic(sv_eq, op_eq)
-                    print(f'Non equivalent circs: {last_qc_path}, {full_qc_path}')
-                    xfer = qtz.quartz_context.get_xfer_from_id(id=last_action[1])
-                    print(
-                        f'{full_qc_path} is transformed from {last_qc_path} by\n'
-                        f'Action{last_action} {xfer}:\n'
-                        f'src:\n{xfer.src_str}\ndst:\n{xfer.dst_str}'
-                    )
+        arg_seq_dir = sys.argv[2]
 
-            # end if
-            last_qc_path = full_qc_path
-            last_action = (action_node, action_xfer)
+        if check_seqs:
+            seq_dirs = list(reversed(natsorted(os.listdir(arg_seq_dir))))
+            seq_dirs = [os.path.join(arg_seq_dir, d) for d in seq_dirs]
+        else:
+            seq_dirs = [arg_seq_dir]
+
+        for seq_dir in seq_dirs:
+            qc_files = cast(List[str], natsorted(os.listdir(seq_dir)))
+            last_qc_path: str | None = None
+            last_action: Tuple[int, int] = (0, 0)
+            for qc_file in tqdm(qc_files, desc=f'{seq_dir}'):
+                # 0_36_-2_28_78.qasm: i_step, cost, reward, action_node, action_xfer
+                i_step, cost, reward, action_node, action_xfer = filename_to_info(qc_file)
+                full_qc_path = os.path.join(seq_dir, qc_file)
+                if last_qc_path is not None:
+                    sv_eq = check_sv_eq_from_path(last_qc_path, full_qc_path)
+                    op_eq = check_op_eq_from_path(last_qc_path, full_qc_path)
+                    if not (sv_eq and op_eq):
+                        ic(sv_eq, op_eq)
+                        print(f'Non equivalent circs: {last_qc_path}, {full_qc_path}')
+                        xfer = qtz.quartz_context.get_xfer_from_id(id=last_action[1])
+                        print(
+                            f'{full_qc_path} is transformed from {last_qc_path} by\n'
+                            f'Action{last_action} {xfer}:\n'
+                            f'src:\n{xfer.src_str}\ndst:\n{xfer.dst_str}'
+                        )
+
+                # end if
+                last_qc_path = full_qc_path
+                last_action = (action_node, action_xfer)

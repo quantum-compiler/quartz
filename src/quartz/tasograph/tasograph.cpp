@@ -1,6 +1,7 @@
 #include "tasograph.h"
 #include "substitution.h"
 #include "../sabre/sabre.h"
+#include "../game/game_utils.h"
 
 #include <cassert>
 #include <iomanip>
@@ -2882,5 +2883,43 @@ GraphState Graph::convert_circuit_to_state() {
 
     // return
     return graph_state;
+}
+
+std::map<Op, int, OpCompare> Graph::get_topology_ordering() {
+    /// This function gives a topology ordering for each op in the circuit.
+    /// Input qubits has ordering 0. Each layer of gates after input qubits has topology ordering +1.
+    // initialize
+    Graph tmp_graph = *this;
+    std::map<Op, int, OpCompare> topology_ordering;
+
+    // set ordering of input qubits as 0
+    if (!outEdges.empty()) {
+        // input qubit first
+        for (const auto& op_edge: outEdges) {
+            if (op_edge.first.ptr->tp == GateType::input_qubit) {
+                assert(topology_ordering.find(op_edge.first) == topology_ordering.end());
+                topology_ordering[op_edge.first] = 0;
+            }
+        }
+    }
+
+    // loop through the rest
+    bool is_finished = false;
+    int cur_topology_ordering = 1;
+    while (!is_finished) {
+        // find front gates and set ordering for them
+        std::set<Op, OpCompare> front_gate_set = find_front_gates(tmp_graph);
+        for (const Op& front_gate : front_gate_set) {
+            assert(topology_ordering.find(front_gate) == topology_ordering.end());
+            topology_ordering[front_gate] = cur_topology_ordering;
+            execute_front_gate(tmp_graph, front_gate);
+        }
+
+        // execute gates and continue
+        cur_topology_ordering += 1;
+        is_finished = is_circuit_finished(tmp_graph);
+    }
+
+    return std::move(topology_ordering);
 }
 }; // namespace quartz

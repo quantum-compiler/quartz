@@ -132,7 +132,7 @@ class ExperienceList:
     def sanity_check(self) -> None:
         for name, field in self.items():
             assert len(field) == len(self), \
-                f'{len(name)} = len({name}) != len(self.state) = {len(self.state)})'
+                f'{len(name)} = len({name}) != len(self) = {len(self)})'
 
 
     def shuffle(self) -> None:

@@ -161,6 +161,7 @@ class PPOMod:
             dyn_eps_len=self.cfg.dyn_eps_len,
             max_eps_len=self.cfg.max_eps_len,
             min_eps_len=self.cfg.min_eps_len,
+            subgraph_opt=self.cfg.subgraph_opt,
             output_full_seq=self.cfg.output_full_seq,
             output_dir=self.output_dir,
         )

@@ -163,6 +163,7 @@ class PPOAgent:
         dyn_eps_len: bool,
         max_eps_len: int,
         min_eps_len: int,
+        subgraph_opt: bool,
         output_full_seq: bool,
         output_dir: str,
     ) -> None:
@@ -176,6 +177,7 @@ class PPOAgent:
         self.min_eps_len = min_eps_len
         self.cost_type = cost_type
         self.invalid_reward = invalid_reward
+        self.subgraph_opt = subgraph_opt
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
         self.softmax_temp_en = softmax_temp_en
@@ -568,7 +570,7 @@ class PPOAgent:
         xfer_dists = Categorical(softmax_xfer_logits)
         action_xfers = xfer_dists.sample()
         action_xfer_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
-        action_node_values: List[float] = b_node_values_pad[ [i for i in range(num_eps)], action_nodes ].tolist()
+        action_node_values: List[float] = b_node_values_pad[ list(range(num_eps)), action_nodes ].tolist()
         return dgl_graphs, action_nodes, action_xfers.tolist(), action_node_values, action_xfer_logps.tolist(), av_xfer_masks.cpu()
     
     def output_seq(
@@ -703,19 +705,43 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    game_over = (graph_cost > original_costs[i_eps] * max_cost_ratio) or \
-                        (graph.gate_count > original_graph_list[i_eps].gate_count * max_cost_ratio)
+                    game_over = (graph_cost > original_costs[i_eps] * max_cost_ratio)
+                        # or (graph.gate_count > original_graph_list[i_eps].gate_count * max_cost_ratio)
+                    # TODO Colin add configs like limit the gate count even though the cost doesn't consider gate count
                 if i_step - last_eps_end >= max_eps_len_for_all:
-                    game_over = True
+                    game_over = True # exceed len limit
                 
                 """collect data"""
-                if i_step > 0:
-                    eps_list.next_state.append(dgl_graphs[i_eps])
-                    last_next_nodes = eps_list.next_nodes[-1]
-                    if len(last_next_nodes) > 0 and max(last_next_nodes) >= graph.gate_count:
-                        eps_list.next_nodes[-1] = []
+                
+                # collect next_graph info
+                if i_step - last_eps_end > 1:
+                    # not the first step of a trajactory; cur_graph is next_graph of last step
+                    if self.subgraph_opt:
+                        last_next_nodes = eps_list.next_nodes[-1]
+                        sub_graph, new_indices = self.khop_subgraph(dgl_graphs[i_eps], last_next_nodes)
+                        eps_list.next_nodes[-1] = new_indices
+                        eps_list.next_state.append(sub_graph)
+                    else:
+                        eps_list.next_state.append(dgl_graphs[i_eps])
+                
+                if game_over or i_step == max_eps_len_for_all - 1:
+                    # the last step of this trajectory; add next_graph info for itself
+                    next_dgl_graph = next_graph.to_dgl_graph()
+                    if self.subgraph_opt:
+                        next_dgl_graph, next_nodes = self.khop_subgraph(next_dgl_graph, next_nodes)
+                    eps_list.next_state.append(next_dgl_graph)
+                    eps_list.next_nodes.append(next_nodes)
+
+                # collect cur_graph info
+                if self.subgraph_opt:
+                    dgl_graphs[i_eps], new_indices = dgl.khop_out_subgraph(
+                        dgl_graphs[i_eps], action.node, k=self.ac_net.gnn_num_layers,
+                    )
+                    action.node = new_indices[0]
                 eps_list.state.append(dgl_graphs[i_eps])
                 eps_list.action.append(action)
+                
+                # collect other info
                 eps_list.reward.append(reward)
                 eps_list.game_over.append(game_over)
                 eps_list.node_value.append(action_node_values[i_eps])
@@ -724,15 +750,9 @@ class PPOAgent:
                 eps_list.xfer_logprob.append(action_xfer_logps[i_eps])
                 eps_list.info.append({})
                 
+                """collect info for graph buffer"""
                 graph_buffer = self.graph_buffers[buffer_idx_list[i_eps]]
                 
-                if i_step == max_eps_len_for_all - 1:
-                    # the last step
-                    eps_list.next_state.append(next_graph.to_dgl_graph())
-                    if not game_over:
-                        graph_buffer.eps_lengths.append(i_step - last_eps_end)
-                
-                """collect info for graph buffer"""
                 if i_step == last_eps_end + 1:
                     # the first step in an episode
                     graph_buffer.rewards.append([])
@@ -773,6 +793,11 @@ class PPOAgent:
                     # end if better
                 # end if
                 
+                if i_step == max_eps_len_for_all - 1:
+                    # the last step; the loop goes to end
+                    if not game_over:
+                        graph_buffer.eps_lengths.append(i_step - last_eps_end)
+
                 if game_over:
                     # batch inference, restart
                     init_graph = graph_buffer.sample(greedy_sample)
@@ -789,3 +814,6 @@ class PPOAgent:
             eps_list_cat += eps_list
         return eps_list_cat
         
+    def khop_subgraph(self, g: dgl.DGLGraph, nodes: List[int]) -> dgl.DGLGraph:
+        subgraph, new_indices = dgl.khop_out_subgraph(g, nodes, k=self.ac_net.gnn_num_layers)
+        return subgraph, cast(torch.Tensor, new_indices).tolist()

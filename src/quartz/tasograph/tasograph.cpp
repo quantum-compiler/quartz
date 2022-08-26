@@ -2922,4 +2922,43 @@ std::map<Op, int, OpCompare> Graph::get_topology_ordering() {
 
     return std::move(topology_ordering);
 }
+
+std::set<Op, OpCompare> Graph::get_front_layers(int num_layers) {
+    /// This function returns all gates within #layers from circuit front.
+    /// Note: 1. This function assumes that the graph has already been initialized.
+    ///       2. This function is different from first #layers in topology ordering.
+    ///          (use this in RL for faster computation)
+    std::set<Op, OpCompare> front_set;
+
+    // loop through all input qubits for front set
+    for (const auto& op_mapping : qubit_mapping_table) {
+        // initialize query set of current qubit
+        std::set<Op> query_set;
+        query_set.insert(op_mapping.first);
+
+        // iterative query (input qubit layer is 0, so we need n+1 loops)
+        for (int layer_idx = 0; layer_idx <= num_layers; ++layer_idx) {
+            std::set<Op> next_query_set;
+
+            // loop through all ops in current layer
+            for (const Op& cur_op : query_set) {
+                // put op in current layer into front set
+                front_set.insert(cur_op);
+                // put following ops into next layer's query list
+                if (outEdges.find(cur_op) != outEdges.end() && !outEdges[cur_op].empty()) {
+                    for (const Edge& edge : outEdges[cur_op]) {
+                        auto dst_op = edge.dstOp;
+                        next_query_set.insert(dst_op);
+                    }
+                }
+            }
+
+            // set query set for next layer
+            query_set.clear();
+            query_set = next_query_set;
+        }
+    }
+
+    return front_set;
+}
 }; // namespace quartz

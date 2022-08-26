@@ -298,6 +298,7 @@ public:
   void set_physical_mapping(const std::vector<int>& logical2physical);
   GraphState convert_circuit_to_state();
   std::map<Op, int, OpCompare> get_topology_ordering();
+  std::set<Op, OpCompare> get_front_layers(int num_layers);
 
 
 private:

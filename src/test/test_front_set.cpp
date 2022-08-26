@@ -73,5 +73,6 @@ int main() {
     cout << "Avg. execution cost using Sabre layout & Sabre swap: " << total_execution_cost / num_experiments << endl;
 
     // test topology
-    auto front_set = graph.get_front_layers(7);
+    auto front_set = graph.get_front_layers(7, true);
+    cout << front_set.size() << endl;
 }

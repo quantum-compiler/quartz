@@ -2923,11 +2923,13 @@ std::map<Op, int, OpCompare> Graph::get_topology_ordering() {
     return std::move(topology_ordering);
 }
 
-std::set<Op, OpCompare> Graph::get_front_layers(int num_layers) {
+std::set<Op, OpCompare> Graph::get_front_layers(int num_layers, bool include_input) {
     /// This function returns all gates within #layers from circuit front.
     /// Note: 1. This function assumes that the graph has already been initialized.
     ///       2. This function is different from first #layers in topology ordering.
     ///          (use this in RL for faster computation)
+    ///       3. set include_input = true if we consider both original and reversed edges
+    ///          set include_input = false if we only considers reversed edges
     std::set<Op, OpCompare> front_set;
 
     // loop through all input qubits for front set
@@ -2949,6 +2951,13 @@ std::set<Op, OpCompare> Graph::get_front_layers(int num_layers) {
                     for (const Edge& edge : outEdges[cur_op]) {
                         auto dst_op = edge.dstOp;
                         next_query_set.insert(dst_op);
+                    }
+                }
+                // also include input (since they may not be considered)
+                if (include_input && inEdges.find(cur_op) != inEdges.end()) {
+                    for (const Edge& edge: inEdges[cur_op]) {
+                        auto src_op = edge.srcOp;
+                        next_query_set.insert(src_op);
                     }
                 }
             }

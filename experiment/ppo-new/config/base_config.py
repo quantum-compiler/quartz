@@ -93,6 +93,7 @@ class BaseConfig:
     greedy_sample: bool = False
     agent_collect: bool = True
     agent_batch_size: int = 128
+    subgraph_opt: bool = True
 
     # training
     max_iterations: int = int(1e8)

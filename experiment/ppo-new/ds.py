@@ -107,6 +107,12 @@ class ExperienceList:
             getattr(self, field.name)
             for field in fields(self)
         ])
+    
+    def items(self):
+        return {
+            field.name: getattr(self, field.name)
+            for field in fields(self)
+        }.items()
 
     def __add__(self, other) -> ExperienceList:
         ret = ExperienceList.new_empty()
@@ -122,6 +128,12 @@ class ExperienceList:
     @staticmethod
     def new_empty() -> ExperienceList:
         return ExperienceList(*[[] for _ in range(len(fields(ExperienceList)))]) # type: ignore
+
+    def sanity_check(self) -> None:
+        for name, field in self.items():
+            assert len(field) == len(self), \
+                f'{len(name)} = len({name}) != len(self) = {len(self)})'
+
 
     def shuffle(self) -> None:
         self.state, self.action, self.reward, self.next_state, self.game_over, self.node_value, \

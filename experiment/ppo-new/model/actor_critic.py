@@ -47,6 +47,7 @@ class ActorCritic(nn.Module):
             self.device = device
             return
         
+        self.gnn_num_layers = gnn_num_layers
         self.device = device
         if gnn_type.lower() == 'QGNN'.lower():
             self.gnn = QGNN(

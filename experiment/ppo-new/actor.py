@@ -769,6 +769,7 @@ class PPOAgent:
                     """best graph maintenance"""
                     cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
                     if next_graph_cost < cur_best_cost:
+                        # create a list of tuple: (graph, action taken on this graph, reward of action)
                         seq: List[Tuple[quartz.PyGraph, Action, float]] = []
                         for i_glob_step in range(last_eps_end + 1, i_step + 1):
                             i_eps_step = i_glob_step - (last_eps_end + 1)
@@ -776,6 +777,7 @@ class PPOAgent:
                                 (graph_seq[i_eps_step], eps_list.action[i_glob_step], eps_list.reward[i_glob_step])
                             )
                         seq.append((next_graph, Action(0, 0), 0))
+                        # output the seq and log info
                         seq_path = self.output_seq(graph_buffer.name, next_graph_cost, seq)
                         msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                         printfl(f'\n{msg}\n')

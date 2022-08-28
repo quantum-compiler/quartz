@@ -5,7 +5,7 @@
 namespace quartz {
 
     std::shared_ptr<DeviceTopologyGraph> IBM_Q27_Falcon() {
-        // initialize device IBM Q20 Tokyo
+        // initialize device IBM Q27 Falcon
         auto device = std::make_shared<quartz::SymmetricUniformDevice>(27);
         // first row
         device->add_edge(0, 1);

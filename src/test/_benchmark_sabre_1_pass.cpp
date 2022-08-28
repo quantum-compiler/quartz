@@ -14,8 +14,8 @@ const int LARGE_INT = 987654321;
 
 int main() {
     // parameters
-    string circuit_file_name = "barenco_tof_3_before.qasm";
-    BackendType device_type = BackendType::IBM_Q20_TOKYO;
+    string circuit_file_name = "gf2^E5_mult_after_heavy.qasm";
+    BackendType device_type = BackendType::IBM_Q27_FALCON;
     int num_experiments = 32;
     int sabre_layout_iterations = 3;
     bool sabre_use_extensive_heuristic = true;
@@ -30,7 +30,7 @@ int main() {
     // initialize circuit and device
     // circuit
     Context src_ctx({GateType::h, GateType::x, GateType::cx, GateType::input_qubit,
-                     GateType::t, GateType::tdg});
+                     GateType::t, GateType::tdg, GateType::s, GateType::sdg});
     QASMParser qasm_parser(&src_ctx);
     DAG *dag = nullptr;
     if (!qasm_parser.load_qasm("../circuit/nam-circuits/qasm_files/" + circuit_file_name, dag)) {

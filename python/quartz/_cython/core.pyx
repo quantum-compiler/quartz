@@ -339,7 +339,7 @@ from functools import partial
 cdef class PyNode:
     cdef Op node
 
-    def __cinit__(self, *, int guid = -1, PyGate gate = None):
+    def __cinit__(self, *, size_t guid = -1, PyGate gate = None):
         if id != -1 and gate != None:
             self.node = Op(guid, gate.gate)
         else:

@@ -453,7 +453,7 @@ class PPOAgent:
                     seq_path = self.output_opt_path(graph_buffer.name, next_graph_cost, exp_seq)
                     msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                     printfl(f'\n{msg}\n')
-                    if self.id == 0: # TODO multi-processing logging
+                    if self.id == 0: # TODO(not going to do) Colin multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',
                             text=msg, level=wandb.AlertLevel.INFO,
@@ -779,7 +779,7 @@ class PPOAgent:
                         seq_path = self.output_seq(graph_buffer.name, next_graph_cost, seq)
                         msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                         printfl(f'\n{msg}\n')
-                        if self.id == 0: # TODO multi-processing logging
+                        if self.id == 0: # TODO(not going to do) multi-processing logging
                             wandb.alert(
                                 title='Better graph is found!',
                                 text=msg, level=wandb.AlertLevel.INFO,

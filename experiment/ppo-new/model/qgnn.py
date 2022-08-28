@@ -6,17 +6,19 @@ import dgl
 
 
 class QConv(nn.Module):
-    def __init__(self,
-                 in_feat,
-                 inter_dim,
-                 out_feat,
-                 aggregator='sum',
-                 normalize=False):
+    def __init__(
+        self, in_feat: int, inter_dim: int, out_feat: int,
+        aggregator: str = 'sum', normalize: bool = False,
+    ):
         super(QConv, self).__init__()
-        self.linear1 = nn.Sequential(nn.Linear(in_feat + 3, inter_dim),
-                                     nn.ReLU())
+        self.linear1 = nn.Sequential(
+            nn.Linear(in_feat + 3, inter_dim),
+            nn.ReLU(),
+        )
         self.linear2 = nn.Sequential(
-            nn.Linear(in_feat + inter_dim, out_feat, bias=False), nn.ReLU())
+            nn.Linear(in_feat + inter_dim, out_feat, bias=False),
+            nn.ReLU(),
+        )
         self.apply(self._init_weights)
         self.aggregator: str = aggregator
         self.normalize: bool = normalize
@@ -34,7 +36,7 @@ class QConv(nn.Module):
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
-        tmp = self.linear1(nodes.mailbox['m'])
+        tmp = self.linear1(nodes.mailbox['m']) # TODO Colin is it necessary?
         if self.aggregator == 'sum':
             h = torch.sum(tmp, dim=1)
         elif self.aggregator == 'mean':
@@ -57,8 +59,10 @@ class QConv(nn.Module):
 
 
 class QGNN(nn.Module):
-    def __init__(self, num_layers, num_gate_types, gate_type_embed_dim,
-                 h_feats, inter_dim) -> None:
+    def __init__(
+        self, num_layers: int, num_gate_types: int,
+        gate_type_embed_dim: int, h_feats: int, inter_dim: int,
+    ) -> None:
         """
         output_dim = h_feats
         """
@@ -77,8 +81,7 @@ class QGNN(nn.Module):
             torch.unsqueeze(g.edata['src_idx'], 1),
             torch.unsqueeze(g.edata['dst_idx'], 1),
             torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-                      dim=1)
+        ], dim=1)
         g.edata['w'] = w
         h: torch.Tensor = g.ndata['h']
         for i in range(len(self.convs)):

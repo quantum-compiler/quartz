@@ -65,7 +65,6 @@ class PPOMod:
                     'name': input_graph.name,
                     'qasm': f.read(),
                 })
-        self.num_gate_types: int = cfg.num_gate_types
         
     def print_cfg(self) -> None:
         print('================ Configs ================')
@@ -120,17 +119,11 @@ class PPOMod:
             )
         # block until all rpcs finish
         rpc.shutdown()
-    
-    def train(self) -> None:
-        """init agent and network"""
-        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-            self.device = torch.device('cpu')
-        else:
-            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
-        torch.cuda.set_device(self.device)
-        self.ac_net: ActorCritic = ActorCritic(
+
+    def _make_actor_critic(self, ) -> ActorCritic:
+        return ActorCritic(
             gnn_type=self.cfg.gnn_type,
-            num_gate_types=self.num_gate_types,
+            num_gate_types=self.cfg.num_gate_types,
             gate_type_embed_dim=self.cfg.gate_type_embed_dim,
             gnn_num_layers=self.cfg.gnn_num_layers,
             gnn_hidden_dim=self.cfg.gnn_hidden_dim,
@@ -144,6 +137,15 @@ class PPOMod:
             action_dim=qtz.quartz_context.num_xfers,
             device=self.device,
         ).to(self.device)
+    
+    def train(self) -> None:
+        """init agent and network"""
+        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+            self.device = torch.device('cpu')
+        else:
+            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
+        torch.cuda.set_device(self.device)
+        self.ac_net: ActorCritic = self._make_actor_critic()
         self.ac_net = cast(ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net))
         self.ac_net_old = copy.deepcopy(self.ac_net)
         self.agent = PPOAgent(
@@ -377,7 +379,7 @@ class PPOMod:
         self.agent.sync_best_graph()
         
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
-        # TODO save top-k model
+        # TODO(not going to do) save top-k model
         ckpt_dir = os.path.join(self.output_dir, 'ckpts')
         os.makedirs(ckpt_dir, exist_ok=True)
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
@@ -439,22 +441,7 @@ class PPOMod:
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
-        self.ac_net: ActorCritic = ActorCritic(
-            gnn_type=self.cfg.gnn_type,
-            num_gate_types=self.num_gate_types,
-            gate_type_embed_dim=self.cfg.gate_type_embed_dim,
-            gnn_num_layers=self.cfg.gnn_num_layers,
-            gnn_hidden_dim=self.cfg.gnn_hidden_dim,
-            gnn_output_dim=self.cfg.gnn_output_dim,
-            gin_num_mlp_layers=self.cfg.gin_num_mlp_layers,
-            gin_learn_eps=self.cfg.gin_learn_eps,
-            gin_neighbor_pooling_type=self.cfg.gin_neighbor_pooling_type,
-            gin_graph_pooling_type=self.cfg.gin_graph_pooling_type,
-            actor_hidden_size=self.cfg.actor_hidden_size,
-            critic_hidden_size=self.cfg.critic_hidden_size,
-            action_dim=qtz.quartz_context.num_xfers,
-            device=self.device,
-        ).to(self.device)
+        self.ac_net: ActorCritic = self._make_actor_critic()
         self.ddp_ac_net = self.ac_net.ddp_model()
 
     @torch.no_grad()

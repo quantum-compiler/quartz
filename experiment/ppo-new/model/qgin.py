@@ -115,7 +115,7 @@ class QGINConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
         # MLP: (N, input_dim + edge_info_dim) -> (N, input_dim)
-        self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim) # TODO
+        self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim)
 
     def __msg_func_with_edge_info(self, edges):
         return { 'm': torch.cat([ edges.src['h'], edges.data['w'] ], dim=1) }
@@ -182,6 +182,7 @@ class QGINConv(nn.Module):
             graph.ndata['h'] = feat
             graph.update_all(aggregate_fn, reducer)
             rst = (1 + self.eps) * feat + graph.ndata['neigh']
+            # TODO Colin we can avoid compression by padding zeros to feat here
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             # activation

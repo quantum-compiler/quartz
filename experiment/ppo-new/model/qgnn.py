@@ -36,7 +36,8 @@ class QConv(nn.Module):
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
-        tmp = self.linear1(nodes.mailbox['m']) # TODO Colin is it necessary?
+        # NOTE: "Pooling aggregator" of GraphSAGE is defined as a Linear and an activation
+        tmp = self.linear1(nodes.mailbox['m'])
         if self.aggregator == 'sum':
             h = torch.sum(tmp, dim=1)
         elif self.aggregator == 'mean':

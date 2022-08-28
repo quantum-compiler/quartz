@@ -115,17 +115,17 @@ class QGINConv(nn.Module):
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
         # MLP: (N, input_dim + edge_info_dim) -> (N, input_dim)
-        self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim)
+        # self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim)
 
     def __msg_func_with_edge_info(self, edges):
         return { 'm': torch.cat([ edges.src['h'], edges.data['w'] ], dim=1) }
 
     def __reduce_neigh_edge_to_feat(self, nodes):
         # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
-        m: torch.Tensor = nodes.mailbox['m']
-        _m = m.view(-1, m.shape[2]) # adapt for BatchNorm1d
-        _feats: torch.Tensor = self.compress_mlp(_m)
-        feats = _feats.view(m.shape[0], m.shape[1], -1)
+        feats: torch.Tensor = nodes.mailbox['m']
+        # _m = m.view(-1, m.shape[2]) # adapt for BatchNorm1d
+        # _feats: torch.Tensor = self.compress_mlp(_m)
+        # feats = _feats.view(m.shape[0], m.shape[1], -1)
         if self._aggregator_type == 'sum':
             neigh_feat = torch.sum(feats, dim=1)
         elif self._aggregator_type == 'mean':
@@ -175,12 +175,13 @@ class QGINConv(nn.Module):
                 graph.edata['_edge_weight'] = edge_weight
                 aggregate_fn = fn.u_mul_e('h', '_edge_weight', 'm')
 
-            # feat_src, feat_dst = expand_as_pair(feat, graph)
-            # graph.srcdata['h'] = feat_src
-            # graph.update_all(aggregate_fn, reducer)
-            # rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             graph.ndata['h'] = feat
             graph.update_all(aggregate_fn, reducer)
+            _size_to_pad: int = graph.ndata['neigh'].shape[-1] - feat.shape[-1]
+            # feat = F.pad(feat, (0, _size_to_pad))
+            feat = torch.cat([feat, torch.zeros(
+                feat.shape[0], _size_to_pad
+            ).to(feat.device)], dim=-1)
             rst = (1 + self.eps) * feat + graph.ndata['neigh']
             # TODO Colin we can avoid compression by padding zeros to feat here
             if self.apply_func is not None:
@@ -258,6 +259,7 @@ class QGIN(nn.Module):
 
         for layer in range(self.num_layers):
             mlp_input_dim = input_dim if layer == 0 else hidden_dim
+            mlp_input_dim += 3
             mlp_output_dim = hidden_dim if layer < self.num_layers - 1 else output_dim
             mlp = MLP(num_mlp_layers, mlp_input_dim, hidden_dim, mlp_output_dim)
             self.ginlayers.append(QGINConv(

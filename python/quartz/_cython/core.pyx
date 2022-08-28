@@ -607,6 +607,8 @@ def ToBackendType(tp_str: str) -> BackendType:
         return BackendType.IBM_Q127_EAGLE
     elif tp_str == "IBM_Q27_FALCON":
         return BackendType.IBM_Q27_FALCON
+    elif tp_str == "IBM_Q65_HUMMINGBIRD":
+        return BackendType.IBM_Q65_HUMMINGBIRD
     else:
         raise NotImplementedError
 
@@ -621,6 +623,8 @@ def FromBackendType(tp: BackendType) -> str:
         return "IBM_Q127_EAGLE"
     elif tp == BackendType.IBM_Q27_FALCON:
         return "IBM_Q27_FALCON"
+    elif tp == BackendType.IBM_Q65_HUMMINGBIRD:
+        return "IBM_Q65_HUMMINGBIRD"
     else:
         raise NotImplementedError
 

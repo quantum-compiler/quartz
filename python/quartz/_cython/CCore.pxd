@@ -146,7 +146,8 @@ cdef extern from "supported_devices/supported_devices.h" namespace "quartz":
         IBM_Q20_TOKYO,
         Q5_TEST,
         IBM_Q127_EAGLE,
-        IBM_Q27_FALCON
+        IBM_Q27_FALCON,
+        IBM_Q65_HUMMINGBIRD
 
 
 cdef extern from "tasograph/tasograph.h" namespace "quartz":

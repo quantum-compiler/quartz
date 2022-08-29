@@ -70,26 +70,6 @@ build/*
 **/wandb
 **/.mypy_cache
 
-experiment/pretrain/dataset
-experiment/pretrain/pretrain_dataset*
-experiment/pretrain/outputs
-experiment/dqn/outputs/
-
-experiment/ppo/PPO_logs
-# experiment/ppo/PPO_preTrained
-experiment/ppo/pretrain/dataset
-experiment/ppo/pretrain/outputs
-experiment/ppo/pretrain/config/config.yaml
-experiment/ppo/pretrain/pretrain_dataset_g9
-experiment/ppo/pretrain/pretrain_dataset_g99
-experiment/ppo/ppo_multi_step/PPO_logs
-experiment/ppo/ppo_multi_step/PPO_preTrained
-experiment/ppo/fine-tune/PPO_logs
-experiment/ppo/fine-tune/PPO_preTrained
-experiment/ppo/fine-tune/PPO_circs
-
-experiment/a2c/*txt
-
 experiment/ppo-new/outputs
 experiment/**/log*
 experiment/**/*.log

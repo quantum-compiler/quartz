@@ -16,6 +16,7 @@ defaults = [
     {"c": "base"}
 ]
 
+
 @dataclass
 class Config:
     # this is unfortunately verbose due to @dataclass limitations

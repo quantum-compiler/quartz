@@ -6,12 +6,14 @@ import sys
 import os
 
 
-def optimize(context: quartz.QuartzContext,
-             init_circ: quartz.PyGraph,
-             circ_name: str,
-             upper_limit: float = 1.05,
-             print_message: bool = True,
-             timeout: int = 1) -> tuple[int, quartz.PyGraph]:
+def optimize(
+    context: quartz.QuartzContext,
+    init_circ: quartz.PyGraph,
+    circ_name: str,
+    upper_limit: float = 1.05,
+    print_message: bool = True,
+    timeout: int = 1,
+) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.t_count, init_circ.to_qasm_str())]
     hash_set = set([init_circ.hash()])
     best_circ: quartz.PyGraph = init_circ
@@ -23,8 +25,7 @@ def optimize(context: quartz.QuartzContext,
 
     while candidate != []:
         _, circ_qasm_str = heapq.heappop(candidate)
-        circ = quartz.PyGraph.from_qasm_str(context=context,
-                                            qasm_str=circ_qasm_str)
+        circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
         all_nodes = circ.all_nodes()
         for xfer in context.get_xfers():
             for node in all_nodes:
@@ -38,9 +39,9 @@ def optimize(context: quartz.QuartzContext,
                         f"[{circ_name} (w/o rotation merging)] best t count: {best_t_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
                     )
 
-                new_circ = circ.apply_xfer(xfer=xfer,
-                                           node=node,
-                                           eliminate_rotation=True)
+                new_circ = circ.apply_xfer(
+                    xfer=xfer, node=node, eliminate_rotation=True
+                )
 
                 if new_circ == None:
                     continue
@@ -52,8 +53,7 @@ def optimize(context: quartz.QuartzContext,
 
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
-                    heapq.heappush(candidate,
-                                   (new_cnt, new_circ.to_qasm_str()))
+                    heapq.heappush(candidate, (new_cnt, new_circ.to_qasm_str()))
 
                     if new_cnt < best_t_cnt:
                         best_t_cnt = new_cnt
@@ -63,7 +63,7 @@ def optimize(context: quartz.QuartzContext,
 
 
 if __name__ == '__main__':
-    assert (len(sys.argv) > 2)
+    assert len(sys.argv) > 2
 
     circ_name = sys.argv[1]
     output_dir = sys.argv[2]
@@ -72,10 +72,11 @@ if __name__ == '__main__':
         gate_set=['h', 'cx', 'x', 't', 'tdg'],
         filename='../../T_TDG_complete_ECC_set.json',
         no_increase=False,
-        include_nop=True)
+        include_nop=True,
+    )
     circ = quartz.PyGraph.from_qasm(
-        context=context,
-        filename=f"../../circuit/t_tdg_circs/{circ_name}.qasm")
+        context=context, filename=f"../../circuit/t_tdg_circs/{circ_name}.qasm"
+    )
 
     best_t_cnt, best_circ = optimize(context, circ, circ_name)
 

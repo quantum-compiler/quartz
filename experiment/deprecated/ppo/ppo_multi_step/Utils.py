@@ -4,12 +4,11 @@ import torch.nn.functional as F
 
 def masked_softmax(logits, mask):
     mask = torch.ones_like(mask, dtype=torch.bool) ^ mask
-    logits[mask] -= 1.0e+10
+    logits[mask] -= 1.0e10
     return F.softmax(logits, dim=-1)
 
 
-def get_trajectory(ppo_agent, context, init_state, max_seq_len,
-                   invalid_reward):
+def get_trajectory(ppo_agent, context, init_state, max_seq_len, invalid_reward):
     graph = init_state
 
     done = False
@@ -34,7 +33,8 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
 
             next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
                 xfer=context.get_xfer_from_id(id=xfer),
-                node=graph.get_node_from_id(id=node))
+                node=graph.get_node_from_id(id=node),
+            )
 
             # Invalid xfer
             if next_graph == None:
@@ -60,10 +60,10 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
                 # Get new node_range
                 node_range = torch.tensor(next_nodes, dtype=torch.int64)
                 if context.get_xfer_from_id(id=xfer).dst_gate_count != 0:
-                    src_node_ids, _, edge_ids = next_graph.to_dgl_graph(
-                    ).in_edges(node_range, form='all')
-                    mask = next_graph.to_dgl_graph(
-                    ).edata['reversed'][edge_ids] == 0
+                    src_node_ids, _, edge_ids = next_graph.to_dgl_graph().in_edges(
+                        node_range, form='all'
+                    )
+                    mask = next_graph.to_dgl_graph().edata['reversed'][edge_ids] == 0
                     node_range = torch.cat((node_range, src_node_ids[mask]))
 
             trajectory_reward += reward
@@ -80,7 +80,8 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
             reward = torch.tensor(reward, dtype=torch.float)
             ppo_agent.buffer.rewards.append(reward)
             ppo_agent.buffer.is_terminals.append(
-                torch.tensor(t == max_seq_len - 1, dtype=torch.bool))
+                torch.tensor(t == max_seq_len - 1, dtype=torch.bool)
+            )
             ppo_agent.buffer.next_graphs.append(next_graph)
             ppo_agent.buffer.next_nodes.append(node_range)
             ppo_agent.buffer.is_start_point.append(t == 0)
@@ -91,10 +92,14 @@ def get_trajectory(ppo_agent, context, init_state, max_seq_len,
             trajectory_len = t
             break
 
-    trajectory_best_gate_count = min(graph.gate_count,
-                                     trajectory_best_gate_count)
+    trajectory_best_gate_count = min(graph.gate_count, trajectory_best_gate_count)
 
     if trajectory_len == 0:
         trajectory_len = max_seq_len
 
-    return trajectory_reward, trajectory_best_gate_count, trajectory_len, intermediate_graphs
+    return (
+        trajectory_reward,
+        trajectory_best_gate_count,
+        trajectory_len,
+        intermediate_graphs,
+    )

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "dagnode.h"
-#include "daghyperedge.h"
-#include "../utils/utils.h"
 #include "../gate/gate.h"
 #include "../math/vector.h"
+#include "../utils/utils.h"
+#include "daghyperedge.h"
+#include "dagnode.h"
 
 #include <istream>
 #include <string>
@@ -14,7 +14,7 @@ namespace quartz {
 class Context;
 
 class DAG {
- public:
+public:
   DAG(int num_qubits, int num_input_parameters);
   DAG(const DAG &other); // clone a DAG
   [[nodiscard]] std::unique_ptr<DAG> clone() const;
@@ -30,8 +30,7 @@ class DAG {
 
   // Generate all possible parameter gates at the beginning.
   // TODO: Currently we only support |max_recursion_depth == 1|.
-  void generate_parameter_gates(Context *ctx,
-                                int max_recursion_depth = 1);
+  void generate_parameter_gates(Context *ctx, int max_recursion_depth = 1);
 
   // Return the total number of gates removed.
   // The time complexity is O((number of gates removed) *
@@ -41,11 +40,10 @@ class DAG {
   // Evaluate the output distribution given input distribution and
   // input parameters. Also output all parameter values (including input
   // and internal parameters) when |parameter_values| is not nullptr.
-  bool
-  evaluate(const Vector &input_dis,
-           const std::vector<ParamType> &input_parameters,
-           Vector &output_dis,
-           std::vector<ParamType> *parameter_values = nullptr) const;
+  bool evaluate(const Vector &input_dis,
+                const std::vector<ParamType> &input_parameters,
+                Vector &output_dis,
+                std::vector<ParamType> *parameter_values = nullptr) const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;
@@ -58,8 +56,8 @@ class DAG {
   // Returns a pair. The first component denotes the input parameters
   // already used in this DAG. The second component denotes the input
   // parameters used in each of the parameters in this DAG.
-  [[nodiscard]] std::pair<InputParamMaskType,
-                          std::vector<InputParamMaskType>> get_input_param_mask() const;
+  [[nodiscard]] std::pair<InputParamMaskType, std::vector<InputParamMaskType>>
+  get_input_param_mask() const;
   DAGHashType hash(Context *ctx);
   // Evaluate the output distribution 2^|num_qubits| times, with the i-th
   // time the input distribution being a vector with only the i-th entry
@@ -68,7 +66,7 @@ class DAG {
   [[nodiscard]] bool hash_value_valid() const;
   [[nodiscard]] DAGHashType cached_hash_value() const;
   [[nodiscard]] std::vector<DAGHashType> other_hash_values() const;
-  [[nodiscard]] std::vector<std::pair<DAGHashType, PhaseShiftIdType> >
+  [[nodiscard]] std::vector<std::pair<DAGHashType, PhaseShiftIdType>>
   other_hash_values_with_phase_shift_id() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
@@ -89,8 +87,7 @@ class DAG {
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
-  static std::unique_ptr<DAG> read_json(Context *ctx,
-                                        std::istream &fin);
+  static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
 
   // Returns true iff the DAG is already under the canonical
   // representation.
@@ -141,28 +138,25 @@ class DAG {
 
   static bool same_gate(DAGHyperEdge *edge1, DAGHyperEdge *edge2);
 
- private:
-  void clone_from(const DAG &other,
-                  const std::vector<int> &qubit_permutation,
+private:
+  void clone_from(const DAG &other, const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
 
   // A helper function used by |DAGHashType hash(Context *ctx)|.
   static void generate_hash_values(
       Context *ctx, const ComplexType &hash_value,
       const PhaseShiftIdType &phase_shift_id,
-      const std::vector<ParamType> &param_values,
-      DAGHashType *main_hash,
-      std::vector<std::pair<DAGHashType, PhaseShiftIdType> >
-      *other_hash);
+      const std::vector<ParamType> &param_values, DAGHashType *main_hash,
+      std::vector<std::pair<DAGHashType, PhaseShiftIdType>> *other_hash);
 
- public:
-  std::vector<std::unique_ptr<DAGNode> > nodes;
-  std::vector<std::unique_ptr<DAGHyperEdge> > edges;
+public:
+  std::vector<std::unique_ptr<DAGNode>> nodes;
+  std::vector<std::unique_ptr<DAGHyperEdge>> edges;
   // The gates' information is owned by edges.
   std::vector<DAGNode *> outputs;
   std::vector<DAGNode *> parameters;
 
- private:
+private:
   int num_qubits, num_input_parameters;
   DAGHashType hash_value_;
   // For both floating-point error tolerance
@@ -177,14 +171,13 @@ class DAG {
   //   get_num_total_parameters()):
   //       shifted by e^(-i * ((p - get_num_total_parameters())-th
   //       parameter))
-  std::vector<std::pair<DAGHashType, PhaseShiftIdType> >
-      other_hash_values_;
+  std::vector<std::pair<DAGHashType, PhaseShiftIdType>> other_hash_values_;
   ComplexType original_fingerprint_;
   bool hash_value_valid_;
 };
 
 class UniquePtrDAGComparator {
- public:
+public:
   bool operator()(const std::unique_ptr<DAG> &dag1,
                   const std::unique_ptr<DAG> &dag2) const {
     if (!dag1 || !dag2) {

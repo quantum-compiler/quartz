@@ -6,8 +6,10 @@ import torch.nn.functional as F
 """MLP is stolen with modification from DGL example for GIN"""
 # https://github.com/dmlc/dgl/blob/7cd531c4d67f8de5c597ae5ad589e6acae36a4c3/examples/pytorch/gin/gin.py
 
+
 class MLP(nn.Module):
     """MLP with linear output"""
+
     def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
         """MLP layers construction
         Paramters

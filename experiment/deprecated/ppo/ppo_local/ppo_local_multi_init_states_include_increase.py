@@ -57,9 +57,11 @@ invalid_reward = -1
 
 # quartz initialization
 
-context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
-                               filename='../../bfs_verified_simplified.json',
-                               no_increase=False)
+context = quartz.QuartzContext(
+    gate_set=['h', 'cx', 't', 'tdg'],
+    filename='../../bfs_verified_simplified.json',
+    no_increase=False,
+)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(
@@ -99,8 +101,7 @@ current_num_files = next(os.walk(log_dir))[2]
 run_num = len(current_num_files)
 
 #### create new log file for each run
-log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(
-    run_num) + ".csv"
+log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(run_num) + ".csv"
 
 print("current logging run number for " + experiment_name + " : ", run_num)
 print("logging at : " + log_f_name)
@@ -116,7 +117,8 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 
 checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(
-    experiment_name, random_seed, run_num)
+    experiment_name, random_seed, run_num
+)
 print("save checkpoint path : " + checkpoint_path)
 
 ############# print all hyperparameters #############
@@ -154,9 +156,22 @@ print(
 log_f = open(log_f_name, "w+")
 
 # initialize a PPO agent
-ppo_agent = PPO(num_gate_type, context, 128, 256, 128, xfer_dim,
-                lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                eps_clip, log_f, device)
+ppo_agent = PPO(
+    num_gate_type,
+    context,
+    128,
+    256,
+    128,
+    xfer_dim,
+    lr_graph_embedding,
+    lr_actor,
+    lr_critic,
+    gamma,
+    K_epochs,
+    eps_clip,
+    log_f,
+    device,
+)
 # ppo_agent.load(
 #     'PPO_preTrained/rl_ppo_local_multi_init_states_include_increase/PPO_rl_ppo_local_multi_init_states_include_increase_0_0.pth'
 # )
@@ -194,11 +209,11 @@ for i_episode in tqdm(range(episodes)):
     for i in range(batch_size):
 
         init_graph = ep_init_graphs[i % len(ep_init_graphs)]
-        total_possible_reward += (init_graph.gate_count -
-                                  ground_truth_minimum) * 4
+        total_possible_reward += (init_graph.gate_count - ground_truth_minimum) * 4
 
         t_reward, t_best_gate_cnt, t_seq_len, intermediate_graphs = get_trajectory(
-            ppo_agent, context, init_graph, max_seq_len, invalid_reward)
+            ppo_agent, context, init_graph, max_seq_len, invalid_reward
+        )
 
         current_ep_reward += t_reward
         best_gate_cnt = min(best_gate_cnt, t_best_gate_cnt)
@@ -245,17 +260,19 @@ for i_episode in tqdm(range(episodes)):
     print(message)
     log_f.flush()
 
-    wandb.log({
-        'episode': i_episode,
-        'batch_size': ep_batch_size,
-        'rewrad_realization_rate': reward_realization_rate,
-        'avg_reward': avg_reward,
-        'avg_seq_len': avg_seq_len,
-        'ep_best': ep_best_gate_cnt,
-        'ep_best_reward': ep_best_reward,
-        'best': best_gate_cnt,
-        'sampled_new_state_num': new_init_num
-    })
+    wandb.log(
+        {
+            'episode': i_episode,
+            'batch_size': ep_batch_size,
+            'rewrad_realization_rate': reward_realization_rate,
+            'avg_reward': avg_reward,
+            'avg_seq_len': avg_seq_len,
+            'ep_best': ep_best_gate_cnt,
+            'ep_best_reward': ep_best_reward,
+            'best': best_gate_cnt,
+            'sampled_new_state_num': new_init_num,
+        }
+    )
 
     # save model weights
     if i_episode % save_model_freq == 0 and i_episode != 0:
@@ -265,8 +282,7 @@ for i_episode in tqdm(range(episodes)):
         print("saving model at : " + checkpoint_path)
         ppo_agent.save(checkpoint_path)
         print("model saved")
-        print("Elapsed Time  : ",
-              datetime.now().replace(microsecond=0) - start_time)
+        print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
         print(
             "--------------------------------------------------------------------------------------------"
         )

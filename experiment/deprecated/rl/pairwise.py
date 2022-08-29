@@ -3,9 +3,15 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from transformers import TrainingArguments, Trainer
-from transformers import BertTokenizer, BertForSequenceClassification, BertModel, BertPreTrainedModel
+from transformers import (
+    BertTokenizer,
+    BertForSequenceClassification,
+    BertModel,
+    BertPreTrainedModel,
+)
 from transformers.models.bert.modeling_bert import BertEncoder, BertPooler
 from transformers.modeling_outputs import SequenceClassifierOutput
+
 
 class BertPairwise(BertPreTrainedModel):
     def __init__(self, config):
@@ -15,7 +21,7 @@ class BertPairwise(BertPreTrainedModel):
 
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = nn.Linear(config.hidden_size*2, config.num_labels)
+        self.classifier = nn.Linear(config.hidden_size * 2, config.num_labels)
 
         self.init_weights()
 
@@ -33,15 +39,17 @@ class BertPairwise(BertPreTrainedModel):
         return_dict=None,
     ):
 
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        
-        split = int(input_ids.shape[-1]/2)
-        #print(input_ids.shape)
-        #print(split)
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        split = int(input_ids.shape[-1] / 2)
+        # print(input_ids.shape)
+        # print(split)
         input1_ids = input_ids[:, :split]
         input2_ids = input_ids[:, split:]
-        
-        #print(f"input2{input2_ids.shape}")
+
+        # print(f"input2{input2_ids.shape}")
 
         outputs = self.bert(
             input1_ids,
@@ -54,7 +62,7 @@ class BertPairwise(BertPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        
+
         outputs2 = self.bert(
             input2_ids,
             attention_mask=attention_mask,
@@ -67,8 +75,7 @@ class BertPairwise(BertPreTrainedModel):
             return_dict=return_dict,
         )
 
-        pooled_output = torch.cat([outputs[1],outputs2[1]],dim=-1)
-        
+        pooled_output = torch.cat([outputs[1], outputs2[1]], dim=-1)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)

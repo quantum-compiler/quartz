@@ -5,12 +5,12 @@
 #include <iomanip>
 
 namespace quartz {
-int Dataset::num_hash_values() const { return (int) dataset.size(); }
+int Dataset::num_hash_values() const { return (int)dataset.size(); }
 
 int Dataset::num_total_dags() const {
   int ret = 0;
   for (const auto &it : dataset) {
-    ret += (int) it.second.size();
+    ret += (int)it.second.size();
   }
   return ret;
 }
@@ -80,13 +80,11 @@ int Dataset::remove_singletons(Context *ctx) {
     bool found_possible_equivalence = false;
     for (auto &hash_value : dag->other_hash_values()) {
       auto find_other = dataset.find(hash_value);
-      if (find_other != dataset.end() &&
-          !find_other->second.empty()) {
+      if (find_other != dataset.end() && !find_other->second.empty()) {
         found_possible_equivalence = true;
         break;
       }
-      assert(hash_value ==
-          it_hash_value + 1); // Only deal with this case...
+      assert(hash_value == it_hash_value + 1); // Only deal with this case...
     }
     // ...so that we know for sure that only DAGs with hash value equal
     // to |it_hash_value - 1| can have other_hash_values() containing
@@ -110,10 +108,9 @@ int Dataset::remove_singletons(Context *ctx) {
 
 int Dataset::normalize_to_canonical_representations(Context *ctx) {
   int num_removed = 0;
-  std::vector<std::unique_ptr<DAG> > dags_to_insert_afterwards;
+  std::vector<std::unique_ptr<DAG>> dags_to_insert_afterwards;
   auto dag_already_exists =
-      [](const DAG &dag,
-         const std::vector<std::unique_ptr<DAG> > &new_dags) {
+      [](const DAG &dag, const std::vector<std::unique_ptr<DAG>> &new_dags) {
         for (auto &other_dag : new_dags) {
           if (dag.fully_equivalent(*other_dag)) {
             return true;
@@ -126,7 +123,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
     auto &current_hash_value = item.first;
     auto &dags = item.second;
     auto size_before = dags.size();
-    std::vector<std::unique_ptr<DAG> > new_dags;
+    std::vector<std::unique_ptr<DAG>> new_dags;
     std::unique_ptr<DAG> new_dag;
 
     for (auto &dag : dags) {
@@ -162,7 +159,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
         }
       }
       auto size_after = dags.size();
-      num_removed += (int) (size_before - size_after);
+      num_removed += (int)(size_before - size_after);
     }
   }
   for (auto &dag : dags_to_insert_afterwards) {
@@ -185,9 +182,8 @@ bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
 void Dataset::clear() {
   // Caveat here: if only dataset.clear() is called, the behavior will be
   // different with a brand new Dataset.
-  dataset = std::unordered_map<DAGHashType,
-                               std::vector<std::unique_ptr<
-                                   DAG> > >();
+  dataset =
+      std::unordered_map<DAGHashType, std::vector<std::unique_ptr<DAG>>>();
 }
 
 } // namespace quartz

@@ -15,6 +15,8 @@ from model.basis import *
 # https://docs.dgl.ai/en/0.8.x/_modules/dgl/nn/pytorch/conv/ginconv.html#GINConv
 
 """Torch Module for Graph Isomorphism Network layer"""
+
+
 class QGINConv(nn.Module):
     r"""Graph Isomorphism Network layer from `How Powerful are Graph
     Neural Networks? <https://arxiv.org/pdf/1810.00826.pdf>`__
@@ -93,6 +95,7 @@ class QGINConv(nn.Module):
             [2.5011, 0.0000, 0.0089, 2.0541, 0.8262, 0.0000, 0.0000, 0.1371, 0.0000,
              0.0000]], grad_fn=<ReluBackward0>)
     """
+
     def __init__(
         self,
         input_dim: int,
@@ -100,15 +103,14 @@ class QGINConv(nn.Module):
         aggregator_type='sum',
         init_eps=0,
         learn_eps=False,
-        activation=None
+        activation=None,
     ):
         super(QGINConv, self).__init__()
         self.apply_func = apply_func
         self._aggregator_type = aggregator_type
         self.activation = activation
         if aggregator_type not in ('sum', 'max', 'mean'):
-            raise KeyError(
-                'Aggregator type {} not recognized.'.format(aggregator_type))
+            raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
         # to specify whether eps is trainable or not.
         if learn_eps:
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
@@ -116,7 +118,7 @@ class QGINConv(nn.Module):
             self.register_buffer('eps', th.FloatTensor([init_eps]))
 
     def __msg_func_with_edge_info(self, edges):
-        return { 'm': torch.cat([ edges.src['h'], edges.data['w'] ], dim=1) }
+        return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def __reduce_neigh_edge_to_feat(self, nodes):
         # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
@@ -127,7 +129,7 @@ class QGINConv(nn.Module):
             neigh_feat = torch.mean(msgs, dim=1)
         elif self._aggregator_type == 'max':
             neigh_feat = torch.max(msgs, dim=1).values
-        return { 'neigh': neigh_feat }
+        return {'neigh': neigh_feat}
 
     def forward(self, graph: dgl.DGLGraph, feat: torch.Tensor, edge_weight=None):
         r"""
@@ -173,9 +175,9 @@ class QGINConv(nn.Module):
             graph.update_all(aggregate_fn, reducer)
             _size_to_pad: int = graph.ndata['neigh'].shape[-1] - feat.shape[-1]
             # feat = F.pad(feat, (0, _size_to_pad))
-            feat = torch.cat([feat, torch.zeros(
-                feat.shape[0], _size_to_pad
-            ).to(feat.device)], dim=-1)
+            feat = torch.cat(
+                [feat, torch.zeros(feat.shape[0], _size_to_pad).to(feat.device)], dim=-1
+            )
             rst = (1 + self.eps) * feat + graph.ndata['neigh']
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
@@ -195,8 +197,10 @@ https://openreview.net/forum?id=ryGs6iA5Km
 Author's implementation: https://github.com/weihua916/powerful-gnns
 """
 
+
 class ApplyNodeFunc(nn.Module):
     """Update the node feature h with MLP, BN and ReLU."""
+
     def __init__(self, mlp):
         super(ApplyNodeFunc, self).__init__()
         self.mlp = mlp
@@ -208,13 +212,22 @@ class ApplyNodeFunc(nn.Module):
         h = F.leaky_relu(h)
         return h
 
+
 class QGIN(nn.Module):
     """QGIN model"""
+
     def __init__(
-        self, num_layers: int, num_mlp_layers: int,
-        num_gate_types: int, gate_type_embed_dim: int, hidden_dim: int, output_dim: int,
-        learn_eps: bool, neighbor_pooling_type: str,
-        graph_pooling_type: str = 'none', final_dropout: float = 0.,
+        self,
+        num_layers: int,
+        num_mlp_layers: int,
+        num_gate_types: int,
+        gate_type_embed_dim: int,
+        hidden_dim: int,
+        output_dim: int,
+        learn_eps: bool,
+        neighbor_pooling_type: str,
+        graph_pooling_type: str = 'none',
+        final_dropout: float = 0.0,
     ):
         """model parameters setting
         Paramters
@@ -255,11 +268,17 @@ class QGIN(nn.Module):
             mlp_input_dim += 3
             mlp_output_dim = hidden_dim if layer < self.num_layers - 1 else output_dim
             mlp = MLP(num_mlp_layers, mlp_input_dim, hidden_dim, mlp_output_dim)
-            self.ginlayers.append(QGINConv(
-                mlp_input_dim, ApplyNodeFunc(mlp), neighbor_pooling_type, 0, self.learn_eps,
-            ))
+            self.ginlayers.append(
+                QGINConv(
+                    mlp_input_dim,
+                    ApplyNodeFunc(mlp),
+                    neighbor_pooling_type,
+                    0,
+                    self.learn_eps,
+                )
+            )
             # NOTE: ApplyNodeFunc already has BN and Activation
-        
+
         self.global_pool: bool = False
         if graph_pooling_type != 'none':
             self.global_pool = True
@@ -277,20 +296,21 @@ class QGIN(nn.Module):
             self.linears_prediction = torch.nn.ModuleList()
             for layer in range(num_layers):
                 in_dim = hidden_dim if layer < self.num_layers - 1 else output_dim
-                self.linears_prediction.append(
-                    nn.Linear(in_dim, output_dim)
-                )
+                self.linears_prediction.append(nn.Linear(in_dim, output_dim))
             self.output_dim = output_dim
 
     def forward(self, g: dgl.DGLGraph):
         # Use embedding layer to generate init features for nodes in the graph
         h = self.gate_type_embedding(g.ndata['gate_type'])
         # Create edge info
-        g.edata['w'] = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1),
-        ], dim=1)
+        g.edata['w'] = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
 
         # list of hidden representation at each layer (including input)
         hidden_rep: List[torch.Tensor] = []
@@ -298,7 +318,7 @@ class QGIN(nn.Module):
         for i in range(self.num_layers):
             h = self.ginlayers[i](g, h)
             hidden_rep.append(h)
-        
+
         if self.global_pool:
             # num_graphs = len(g.batch_num_nodes())
             feat_over_layer = cast(torch.Tensor, 0)
@@ -307,8 +327,7 @@ class QGIN(nn.Module):
             for i, h in enumerate(hidden_rep):
                 pooled_h = self.pool(g, h)
                 feat_over_layer += self.drop(self.linears_prediction[i](pooled_h))
-            
+
             return hidden_rep[-1], feat_over_layer
         else:
             return hidden_rep[-1]
-

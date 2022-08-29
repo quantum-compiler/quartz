@@ -14,7 +14,7 @@ from transformers import TransfoXLConfig, TransfoXLModel
 
 device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
+if torch.cuda.is_available():
     device = torch.device('cuda:0')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
@@ -27,7 +27,7 @@ gate_type_num = 29
 
 def masked_softmax(logits, mask):
     mask = torch.ones_like(mask, dtype=torch.bool) ^ mask
-    logits[mask] -= 1.0e+10
+    logits[mask] -= 1.0e10
     return F.softmax(logits, dim=-1)
 
 
@@ -40,13 +40,17 @@ class ActorCritic(nn.Module):
 
         self.actor = nn.Sequential(
             QGNN(6, gate_type_num, hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, num_outputs))
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, num_outputs),
+        )
 
         self.critic = nn.Sequential(
             QGNN(6, gate_type_num, hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, 1))
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, 1),
+        )
 
     def forward(self, g, context):
         dgl_g = g.to_dgl_graph().to(device)
@@ -61,8 +65,9 @@ class ActorCritic(nn.Module):
         node_entropy = node_dist.entropy()
 
         mask = torch.zeros((context.num_xfers), dtype=torch.bool).to(device)
-        available_xfers = g.available_xfers(context=context,
-                                            node=g.get_node_from_id(id=node))
+        available_xfers = g.available_xfers(
+            context=context, node=g.get_node_from_id(id=node)
+        )
         mask[available_xfers] = True
         xfer_logit = self.actor(dgl_g)
         xfer_probs = masked_softmax(xfer_logit[node], mask)
@@ -75,8 +80,15 @@ class ActorCritic(nn.Module):
         value = node_qs[node]
         print(f'value: {value}')
 
-        return node.item(), node_log_prob, node_entropy, xfer.item(
-        ), xfer_log_prob, xfer_entropy, value
+        return (
+            node.item(),
+            node_log_prob,
+            node_entropy,
+            xfer.item(),
+            xfer_log_prob,
+            xfer_entropy,
+            value,
+        )
 
     # The q-value of a state
     # used as the v-value in action selection policy
@@ -87,8 +99,16 @@ class ActorCritic(nn.Module):
         return torch.dot(node_qs, node_prob).mean()
 
 
-def get_trajectory(device, max_seq_len, model, invalid_reward, init_state,
-                   context, gate_count_upper_limit, best_gate_count):
+def get_trajectory(
+    device,
+    max_seq_len,
+    model,
+    invalid_reward,
+    init_state,
+    context,
+    gate_count_upper_limit,
+    best_gate_count,
+):
     node_log_probs = []
     xfer_log_probs = []
     values = []
@@ -103,12 +123,20 @@ def get_trajectory(device, max_seq_len, model, invalid_reward, init_state,
 
     for seq_cnt in range(max_seq_len):
         if not done:
-            node, node_log_prob, node_entropy, xfer, xfer_log_prob, xfer_entropy, value = model(
-                graph, context)
+            (
+                node,
+                node_log_prob,
+                node_entropy,
+                xfer,
+                xfer_log_prob,
+                xfer_entropy,
+                value,
+            ) = model(graph, context)
             print(f'{node}, {xfer}')
             next_graph = graph.apply_xfer(
                 xfer=context.get_xfer_from_id(id=xfer),
-                node=graph.get_node_from_id(id=node))
+                node=graph.get_node_from_id(id=node),
+            )
 
             if next_graph == None:
                 reward = invalid_reward
@@ -120,15 +148,13 @@ def get_trajectory(device, max_seq_len, model, invalid_reward, init_state,
                 if next_gate_cnt > gate_count_upper_limit:
                     done = True
                 if reward > 0:
-                    print(
-                        f'positive reward! {graph.gate_count} -> {next_gate_cnt}'
-                    )
+                    print(f'positive reward! {graph.gate_count} -> {next_gate_cnt}')
                 if next_gate_cnt < best_gate_count:
                     best_gate_count = next_gate_cnt
             seq_len = seq_cnt + 1
 
             reward = torch.tensor(reward)
-            entropy += (node_entropy + xfer_entropy)
+            entropy += node_entropy + xfer_entropy
 
         else:
             break
@@ -157,8 +183,16 @@ def get_trajectory(device, max_seq_len, model, invalid_reward, init_state,
     masks = torch.tensor(masks).to(device)
     qs = compute_qs(next_value, rewards, masks)
 
-    return qs, values, node_log_probs, xfer_log_probs, entropy, seq_len, rewards.sum(
-    ).cpu().item(), best_gate_count
+    return (
+        qs,
+        values,
+        node_log_probs,
+        xfer_log_probs,
+        entropy,
+        seq_len,
+        rewards.sum().cpu().item(),
+        best_gate_count,
+    )
 
 
 def compute_qs(next_value, rewards, masks, gamma=0.99):
@@ -171,14 +205,16 @@ def compute_qs(next_value, rewards, masks, gamma=0.99):
     return torch.tensor(qs).to(device)
 
 
-def a2c(hidden_size,
-        context,
-        init_graph,
-        episodes=20000,
-        lr=1e-3,
-        max_seq_len=5,
-        invalid_reward=-1,
-        batch_size=100):
+def a2c(
+    hidden_size,
+    context,
+    init_graph,
+    episodes=20000,
+    lr=1e-3,
+    max_seq_len=5,
+    invalid_reward=-1,
+    batch_size=100,
+):
 
     num_actions = context.num_xfers
     best_gate_count = init_graph.gate_count
@@ -202,9 +238,25 @@ def a2c(hidden_size,
 
         # rollout trajectory
         for i in range(batch_size):
-            qs_, values_, node_log_probs_, xfer_log_probs_, entropy_, seq_len_, total_rewards_, best_gate_count = get_trajectory(
-                device, max_seq_len, model, invalid_reward, init_graph,
-                context, gate_count_upper_limit, best_gate_count)
+            (
+                qs_,
+                values_,
+                node_log_probs_,
+                xfer_log_probs_,
+                entropy_,
+                seq_len_,
+                total_rewards_,
+                best_gate_count,
+            ) = get_trajectory(
+                device,
+                max_seq_len,
+                model,
+                invalid_reward,
+                init_graph,
+                context,
+                gate_count_upper_limit,
+                best_gate_count,
+            )
 
             node_log_probs = torch.cat((node_log_probs, node_log_probs_))
             xfer_log_probs = torch.cat((xfer_log_probs, xfer_log_probs_))
@@ -248,19 +300,23 @@ def a2c(hidden_size,
 
 
 experiment_name = "rl_a2c_rewrite_" + "1_step_from_56"
-context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
-                               filename='../bfs_verified_simplified.json',
-                               no_increase=True)
+context = quartz.QuartzContext(
+    gate_set=['h', 'cx', 't', 'tdg'],
+    filename='../bfs_verified_simplified.json',
+    no_increase=True,
+)
 parser = quartz.PyQASMParser(context=context)
 # init_dag = parser.load_qasm(
 #     filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_dag = parser.load_qasm(filename="near_56.qasm")
 init_graph = quartz.PyGraph(context=context, dag=init_dag)
 
-a2c(hidden_size=64,
+a2c(
+    hidden_size=64,
     context=context,
     init_graph=init_graph,
     episodes=200000,
     batch_size=1,
     lr=2e-3,
-    max_seq_len=20)
+    max_seq_len=20,
+)

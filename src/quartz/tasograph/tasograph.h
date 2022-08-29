@@ -201,17 +201,12 @@ public:
                                        RuleParser *rule_parser,
                                        bool ignore_toffoli = false);
   std::shared_ptr<Graph>
-  optimize_legacy(float alpha,
-                  int budget,
-                  bool print_subst,
-                  Context *ctx,
+  optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
-                  bool use_simulated_annealing,
-                  bool enable_early_stop,
+                  bool use_simulated_annealing, bool enable_early_stop,
                   bool use_rotation_merging_in_searching,
-                  GateType target_rotation,
-                  std::string circuit_name = "",
-           int timeout = 86400 /*1 day*/);
+                  GateType target_rotation, std::string circuit_name = "",
+                  int timeout = 86400 /*1 day*/);
 
   /**
    * Optimize this circuit.
@@ -226,13 +221,12 @@ public:
    * @param timeout Timeout in seconds.
    * @return The optimized circuit.
    */
-  std::shared_ptr<Graph> optimize(Context *ctx,
-                                  const std::string &equiv_file_name,
-                                  const std::string &circuit_name,
-                                  bool print_message,
-                                  std::function<float(Graph *)> cost_function = nullptr,
-                                  double cost_upper_bound = -1 /*default = current cost * 1.05*/,
-                                  int timeout = 3600 /*1 hour*/);
+  std::shared_ptr<Graph>
+  optimize(Context *ctx, const std::string &equiv_file_name,
+           const std::string &circuit_name, bool print_message,
+           std::function<float(Graph *)> cost_function = nullptr,
+           double cost_upper_bound = -1 /*default = current cost * 1.05*/,
+           int timeout = 3600 /*1 hour*/);
   /**
    * Optimize this circuit.
    * @param xfers The circuit transformations.
@@ -245,13 +239,12 @@ public:
    * @param timeout Timeout in seconds.
    * @return The optimized circuit.
    */
-  std::shared_ptr<Graph> optimize(const std::vector<GraphXfer *> &xfers,
-                                  double cost_upper_bound,
-                                  const std::string &circuit_name,
-                                  const std::string &log_file_name,
-                                  bool print_message,
-                                  std::function<float(Graph *)> cost_function = nullptr,
-                                  int timeout = 3600 /*1 hour*/);
+  std::shared_ptr<Graph>
+  optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
+           const std::string &circuit_name, const std::string &log_file_name,
+           bool print_message,
+           std::function<float(Graph *)> cost_function = nullptr,
+           int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result, bool print_id) const;

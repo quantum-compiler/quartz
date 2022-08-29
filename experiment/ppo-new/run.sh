@@ -12,7 +12,7 @@ if [ -f "~/colin/.proxy" ]; then
 elif [ -f "~/proxy" ]; then
     echo "Find ~/proxy . Set proxy."
     source ~/proxy
-else 
+else
     echo "Proxy not found."
 fi
 
@@ -32,4 +32,3 @@ python ppo.py c=nam_ft c.resume=true c.ckpt_path=pt_iter_115.pt c.ddp_port=23373
 #        2>&1 | tee ftlog/cx_rm_gf2^9_mult.log
 
 sleep 10
-

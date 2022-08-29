@@ -6,38 +6,46 @@ from qiskit.quantum_info import Operator
 
 import os
 import sys
+
 sys.path.append(os.path.join(os.getcwd(), '..'))
 import qtz
 
 from icecream import ic
 
 qtz.init_quartz_context(
-    ['h', 'cx', 'x', 'rz', 'add',],
+    [
+        'h',
+        'cx',
+        'x',
+        'rz',
+        'add',
+    ],
     '../../ecc_set/nam_ecc.json',
     False,
     True,
 )
 ic(qtz.quartz_context.num_xfers)
 
+
 def check_sv_eq(qc_x: QuantumCircuit, qc_y: QuantumCircuit) -> bool:
-    return Statevector.from_instruction(qc_x).equiv(
-        Statevector.from_instruction(qc_y)
-    )
+    return Statevector.from_instruction(qc_x).equiv(Statevector.from_instruction(qc_y))
+
 
 def check_sv_eq_from_path(path_x: str, path_y: str) -> bool:
     qc_x = QuantumCircuit.from_qasm_file(path_x)
     qc_y = QuantumCircuit.from_qasm_file(path_y)
     return check_sv_eq(qc_x, qc_y)
 
+
 def check_op_eq(qc_x: QuantumCircuit, qc_y: QuantumCircuit) -> bool:
-    return Operator(qc_x).equiv(
-       Operator(qc_y)
-    )
+    return Operator(qc_x).equiv(Operator(qc_y))
+
 
 def check_op_eq_from_path(path_x: str, path_y: str) -> bool:
     qc_x = QuantumCircuit.from_qasm_file(path_x)
     qc_y = QuantumCircuit.from_qasm_file(path_y)
     return check_op_eq(qc_x, qc_y)
+
 
 if __name__ == '__main__':
     import sys
@@ -74,7 +82,9 @@ if __name__ == '__main__':
             last_action: Tuple[int, int] = (0, 0)
             for qc_file in tqdm(qc_files, desc=f'{seq_dir}'):
                 # 0_36_-2_28_78.qasm: i_step, cost, reward, action_node, action_xfer
-                i_step, cost, reward, action_node, action_xfer = filename_to_info(qc_file)
+                i_step, cost, reward, action_node, action_xfer = filename_to_info(
+                    qc_file
+                )
                 full_qc_path = os.path.join(seq_dir, qc_file)
                 if last_qc_path is not None:
                     sv_eq = check_sv_eq_from_path(last_qc_path, full_qc_path)

@@ -4,27 +4,30 @@ from typing import List
 
 from omegaconf import MISSING, OmegaConf  # Do not confuse with dataclass.MISSING
 
+
 @dataclass
 class WandbConfig:
     en: bool = True
     offline: bool = False
     entity: str = 'quartz'
     project: str = 'PPO'
-    
+
     @staticmethod
     def new_project(proj: str) -> WandbConfig:
         config = WandbConfig()
         config.project = proj
         return config
 
+
 @dataclass
 class InputGraph:
     name: str
     path: str
 
+
 @dataclass
 class BaseConfig:
-    
+
     mode: str = 'train'
     resume: bool = False
     ckpt_path: str = 'outputs/2022-07-28/15-47-54/ckpts/iter_2.pt'
@@ -32,40 +35,52 @@ class BaseConfig:
     load_best_info: bool = False
     best_info_dir: str = 'outputs/2022-06-26/08-45-11/sync_dir'
 
-    gpus: List[int] = field(default_factory=lambda: [
-        0, 1, 2, 3, 
-    ])
+    gpus: List[int] = field(
+        default_factory=lambda: [
+            0,
+            1,
+            2,
+            3,
+        ]
+    )
     ddp_port: int = 23333
     omp_num_threads: int = 4
 
     seed: int = 98765
     wandb: WandbConfig = WandbConfig()
-    
+
     # quartz
-    gate_set: List[str] = field(default_factory=lambda: [
-        'h', 'cx', 't', 'tdg',
-    ])
+    gate_set: List[str] = field(
+        default_factory=lambda: [
+            'h',
+            'cx',
+            't',
+            'tdg',
+        ]
+    )
     ecc_file: str = '../ecc_set/t_tdg_ecc.json'
     no_increase: bool = False
     include_nop: bool = True
     num_gate_types: int = 29
-    input_graphs: List[InputGraph] = field(default_factory=lambda:[
-        InputGraph(
-            'barenco_tof_3',
-            '../t_tdg_circs/barenco_tof_3.qasm',
-        ),
-    ])
-    
+    input_graphs: List[InputGraph] = field(
+        default_factory=lambda: [
+            InputGraph(
+                'barenco_tof_3',
+                '../t_tdg_circs/barenco_tof_3.qasm',
+            ),
+        ]
+    )
+
     # network
-    gnn_type: str = 'QGNN' # 'QGNN' or 'QGIN'
+    gnn_type: str = 'QGNN'  # 'QGNN' or 'QGIN'
     gate_type_embed_dim: int = 16
     gnn_num_layers: int = 6
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
     gin_num_mlp_layers: int = 2
     gin_learn_eps: bool = False
-    gin_neighbor_pooling_type: str = 'sum' # 'mean', 'max'
-    gin_graph_pooling_type: str = 'none' # 'sum', 'mean', 'max'
+    gin_neighbor_pooling_type: str = 'sum'  # 'mean', 'max'
+    gin_graph_pooling_type: str = 'none'  # 'sum', 'mean', 'max'
     actor_hidden_size: int = 256
     critic_hidden_size: int = 128
 
@@ -77,7 +92,7 @@ class BaseConfig:
     hit_rate: float = 0.9
 
     # multiprocessing
-    mp_start_method: str = 'spawn' # fork
+    mp_start_method: str = 'spawn'  # fork
     obs_per_agent: int = 0
 
     # exp collection
@@ -96,8 +111,8 @@ class BaseConfig:
     subgraph_opt: bool = True
     # training
     max_iterations: int = int(1e8)
-    num_eps_per_iter: int = 128 # 30
-    mini_batch_size: int = 3840 # per DDP process; < num_eps_per_iter * len_episode
+    num_eps_per_iter: int = 128  # 30
+    mini_batch_size: int = 3840  # per DDP process; < num_eps_per_iter * len_episode
     k_epochs: int = 25
     lr_gnn: float = 3e-4
     lr_actor: float = 3e-4
@@ -108,8 +123,8 @@ class BaseConfig:
 
     # logging
     output_full_seq: bool = False
-    full_seq_path: str = '' # for read in
-    
+    full_seq_path: str = ''  # for read in
+
 
 @dataclass
 class TestConfig(BaseConfig):
@@ -118,9 +133,10 @@ class TestConfig(BaseConfig):
     mode: str = 'test'
     resume: bool = True
     budget: int = int(1e8)
-    input_graphs: List[InputGraph] = field(default_factory=lambda:[])
+    input_graphs: List[InputGraph] = field(default_factory=lambda: [])
     input_graph_dir: str = '../nam_circs'
-    
+
+
 @dataclass
 class ConvertConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)

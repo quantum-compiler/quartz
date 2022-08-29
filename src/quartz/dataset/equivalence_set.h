@@ -7,14 +7,14 @@
 #include <list>
 #include <map>
 #include <set>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace quartz {
 class EquivalenceSet;
 
 class EquivalenceClass {
- public:
+public:
   // Returns all DAGs in this equivalence class.
   [[nodiscard]] std::vector<DAG *> get_all_dags() const;
 
@@ -25,10 +25,10 @@ class EquivalenceClass {
 
   // Extract all DAGs in this equivalence class, and make this class
   // empty.
-  std::vector<std::unique_ptr<DAG> > extract();
+  std::vector<std::unique_ptr<DAG>> extract();
 
   // Replace |dags_| with |dags|.
-  void set_dags(std::vector<std::unique_ptr<DAG> > dags);
+  void set_dags(std::vector<std::unique_ptr<DAG>> dags);
 
   // The first DAG is the representative.
   DAG *get_representative();
@@ -48,8 +48,7 @@ class EquivalenceClass {
   // appear at last in some topological order of the DAG.
   // Return the number of circuits removed.
   int remove_common_first_or_last_gates(
-      Context *ctx,
-      std::unordered_set<DAGHashType> &hash_values_to_remove);
+      Context *ctx, std::unordered_set<DAGHashType> &hash_values_to_remove);
 
   // Return the number of circuits modified.
   int remove_unused_internal_parameters(Context *ctx);
@@ -67,12 +66,12 @@ class EquivalenceClass {
   static bool less_than(const EquivalenceClass &ecc1,
                         const EquivalenceClass &ecc2);
 
- private:
-  std::vector<std::unique_ptr<DAG> > dags_;
+private:
+  std::vector<std::unique_ptr<DAG>> dags_;
 };
 
 class UniquePtrEquivalenceClassComparator {
- public:
+public:
   bool operator()(const std::unique_ptr<EquivalenceClass> &ecc1,
                   const std::unique_ptr<EquivalenceClass> &ecc2) const {
     if (!ecc1 || !ecc2) {
@@ -85,7 +84,7 @@ class UniquePtrEquivalenceClassComparator {
 
 // This class stores all equivalence classes.
 class EquivalenceSet {
- public:
+public:
   // |new_representatives| is for Generator::generate().
   // It will be pushed back all representatives previously not in
   // the equivalence set.
@@ -102,8 +101,7 @@ class EquivalenceSet {
   bool simplify(Context *ctx,
                 bool normalize_to_minimal_circuit_representation = true,
                 bool common_subcircuit_pruning = true,
-                bool other_simplification = true,
-                bool verbose = false);
+                bool other_simplification = true, bool verbose = false);
 
   // Sort the circuits in each equivalence class by DAG::less_than().
   void sort();
@@ -151,7 +149,7 @@ class EquivalenceSet {
 
   [[nodiscard]] std::string get_class_id(int num_class) const;
 
-  [[nodiscard]] std::vector<std::vector<DAG *> >
+  [[nodiscard]] std::vector<std::vector<DAG *>>
   get_all_equivalence_sets() const;
 
   [[nodiscard]] std::vector<EquivalenceClass *>
@@ -170,20 +168,20 @@ class EquivalenceSet {
   // If the whole equivalence set contains a DAG fully equivalent to
   // |dag|, return the equivalence class(es) containing it. Otherwise, return
   // an empty vector.
-  [[nodiscard]] std::vector<EquivalenceClass *> get_containing_class(Context *ctx,
-                                                                     DAG *dag) const;
+  [[nodiscard]] std::vector<EquivalenceClass *>
+  get_containing_class(Context *ctx, DAG *dag) const;
 
- private:
+private:
   void set_possible_class(const DAGHashType &hash_value,
                           EquivalenceClass *equiv_class);
   void remove_possible_class(const DAGHashType &hash_value,
                              EquivalenceClass *equiv_class);
 
-  std::vector<std::unique_ptr<EquivalenceClass> > classes_;
+  std::vector<std::unique_ptr<EquivalenceClass>> classes_;
 
   // A map from the hash value to all equivalence classes with at least
   // one DAG of the hash value.
-  std::unordered_map<DAGHashType, std::set<EquivalenceClass *> >
+  std::unordered_map<DAGHashType, std::set<EquivalenceClass *>>
       possible_classes_;
 };
 

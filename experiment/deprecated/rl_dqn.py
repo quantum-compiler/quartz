@@ -18,7 +18,7 @@ gate_type_num = 26
 # set device to cpu or cuda
 device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
+if torch.cuda.is_available():
     device = torch.device('cuda:0')
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
 else:
@@ -39,8 +39,8 @@ class QConv(nn.Module):
         nn.init.xavier_normal_(self.linear2.weight, gain=gain)
 
     def message_func(self, edges):
-        #print(f'node h {edges.src["h"].shape}')
-        #print(f'node w {edges.data["w"].shape}')
+        # print(f'node h {edges.src["h"].shape}')
+        # print(f'node w {edges.data["w"].shape}')
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
@@ -53,7 +53,7 @@ class QConv(nn.Module):
 
     def forward(self, g, h):
         g.ndata['h'] = h
-        #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
+        # g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
         g.update_all(self.message_func, self.reduce_func)
         h_N = g.ndata['h_N']
         h_total = torch.cat([h, h_N], dim=1)
@@ -82,15 +82,17 @@ class QGNN(nn.Module):
         self.embedding = nn.Embedding(in_feats, in_feats)
 
     def forward(self, g):
-        #print(g.ndata['gate_type'])
-        #print(self.embedding)
+        # print(g.ndata['gate_type'])
+        # print(self.embedding)
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-                      dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h = self.conv1(g, g.ndata['h'])
         h = self.conv2(g, h)
@@ -125,16 +127,18 @@ class QGNN(nn.Module):
 
 
 class QAgent:
-    def __init__(self,
-                 *,
-                 lr,
-                 lr_decay_interval,
-                 lr_decay_rate,
-                 gamma,
-                 a_size,
-                 context,
-                 f=None,
-                 pretrained_model=None):
+    def __init__(
+        self,
+        *,
+        lr,
+        lr_decay_interval,
+        lr_decay_rate,
+        gamma,
+        a_size,
+        context,
+        f=None,
+        pretrained_model=None,
+    ):
         torch.manual_seed(42)
         if pretrained_model != None:
             self.q_net = copy.deepcopy(pretrained_model).to(device)
@@ -145,7 +149,8 @@ class QAgent:
         self.loss_fn = torch.nn.MSELoss().to(device)
         self.optimizer = torch.optim.Adam(self.q_net.parameters(), lr=lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(
-            self.optimizer, lr_decay_interval, lr_decay_rate)
+            self.optimizer, lr_decay_interval, lr_decay_rate
+        )
         self.a_size = a_size
         self.gamma = gamma
         self.context = context
@@ -157,15 +162,17 @@ class QAgent:
         if random.random() < e:
             node = np.random.randint(0, dgl_g.num_nodes())
             A = np.random.randint(0, a_size)
-            xfers = g.available_xfers(context=self.context,
-                                      node=g.get_node_from_id(id=node))
+            xfers = g.available_xfers(
+                context=self.context, node=g.get_node_from_id(id=node)
+            )
             if xfers != []:
                 A = random.choice(xfers)
                 self.print_log(f'randomly select node {node} and xfer {A}')
             else:
                 A = np.random.randint(0, a_size)
                 self.print_log(
-                    f'randomly select node {node} and xfer {A} (unavailable)')
+                    f'randomly select node {node} and xfer {A} (unavailable)'
+                )
             # self.print_log(f'randomly select node {node} and xfer {A}')
             A = torch.tensor(A)
             node = torch.tensor(node)
@@ -251,8 +258,9 @@ class QAgent:
                 target_r = target_r.to(device)
             target_rs.append(target_r)
 
-        loss = self.loss_fn(torch.stack(pred_rs),
-                            torch.stack(target_rs).clone().detach())
+        loss = self.loss_fn(
+            torch.stack(pred_rs), torch.stack(target_rs).clone().detach()
+        )
         self.print_log(torch.stack(pred_rs))
         self.print_log(torch.stack(target_rs))
         self.print_log(loss)
@@ -332,27 +340,29 @@ class QData:
 #################### RL training ####################
 
 
-def train(*,
-          lr,
-          lr_decay_interval,
-          lr_decay_rate,
-          gamma,
-          a_size,
-          replay_times,
-          episodes,
-          epsilon,
-          epsilon_decay,
-          train_epoch,
-          context,
-          init_graph,
-          max_seq_len,
-          batch_size,
-          target_update_interval=1,
-          log_fn='',
-          pretrained_model=None,
-          pos_data_init=False,
-          pos_data_sampling=False,
-          **kwargs):
+def train(
+    *,
+    lr,
+    lr_decay_interval,
+    lr_decay_rate,
+    gamma,
+    a_size,
+    replay_times,
+    episodes,
+    epsilon,
+    epsilon_decay,
+    train_epoch,
+    context,
+    init_graph,
+    max_seq_len,
+    batch_size,
+    target_update_interval=1,
+    log_fn='',
+    pretrained_model=None,
+    pos_data_init=False,
+    pos_data_sampling=False,
+    **kwargs,
+):
 
     # Prepare for log
     if log_fn != '':
@@ -367,22 +377,26 @@ def train(*,
             print(s, file=f)
 
     if pretrained_model == None:
-        agent = QAgent(lr=lr,
-                       lr_decay_interval=lr_decay_interval,
-                       lr_decay_rate=lr_decay_rate,
-                       gamma=gamma,
-                       a_size=a_size,
-                       context=context,
-                       f=f)
+        agent = QAgent(
+            lr=lr,
+            lr_decay_interval=lr_decay_interval,
+            lr_decay_rate=lr_decay_rate,
+            gamma=gamma,
+            a_size=a_size,
+            context=context,
+            f=f,
+        )
     else:
-        agent = QAgent(lr=lr,
-                       lr_decay_interval=lr_decay_interval,
-                       lr_decay_rate=lr_decay_rate,
-                       gamma=gamma,
-                       a_size=a_size,
-                       context=context,
-                       f=f,
-                       pretrained_model=pretrained_model)
+        agent = QAgent(
+            lr=lr,
+            lr_decay_interval=lr_decay_interval,
+            lr_decay_rate=lr_decay_rate,
+            gamma=gamma,
+            a_size=a_size,
+            context=context,
+            f=f,
+            pretrained_model=pretrained_model,
+        )
     data = QData()
     pos_data = PosRewardData()
     pos_data.load_data()
@@ -392,8 +406,7 @@ def train(*,
 
     if pos_data_sampling:
         assert 'pos_data_sampling_rate' in kwargs
-        pos_sampling_times = int(kwargs['pos_data_sampling_rate'] *
-                                 replay_times)
+        pos_sampling_times = int(kwargs['pos_data_sampling_rate'] * replay_times)
 
     average_seq_lens = []
     correct_cnts = []
@@ -419,8 +432,9 @@ def train(*,
                 count += 1
                 node, A = agent.select_a(g, dgl_g, epsilon)
                 # print(A)
-                new_g = g.apply_xfer(xfer=context.get_xfer_from_id(id=A),
-                                     node=g.all_nodes()[node])
+                new_g = g.apply_xfer(
+                    xfer=context.get_xfer_from_id(id=A), node=g.all_nodes()[node]
+                )
 
                 if new_g == None:
                     end = True
@@ -430,8 +444,9 @@ def train(*,
                 else:
                     reward = g.gate_count - new_g.gate_count
 
-                    data.add_data((dgl_g, node, A, torch.tensor(reward),
-                                   new_g.to_dgl_graph()))
+                    data.add_data(
+                        (dgl_g, node, A, torch.tensor(reward), new_g.to_dgl_graph())
+                    )
 
                     g = new_g
                     rewards += reward
@@ -489,12 +504,11 @@ if __name__ == '__main__':
     experiment_name = "rl_dqn_" + "debug"
 
     quartz_context = quartz.QuartzContext(
-        gate_set=['h', 'cx', 't', 'tdg'],
-        filename='../bfs_verified_simplified.json')
+        gate_set=['h', 'cx', 't', 'tdg'], filename='../bfs_verified_simplified.json'
+    )
     parser = quartz.PyQASMParser(context=quartz_context)
 
-    init_dag = parser.load_qasm(
-        filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+    init_dag = parser.load_qasm(filename="barenco_tof_3_opt_path/subst_history_39.qasm")
     init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
     init_dgl_graph = init_graph.to_dgl_graph()
 
@@ -535,7 +549,8 @@ if __name__ == '__main__':
         valid_xfer_dict=valid_xfer_dict,
         pos_data_init=False,
         pos_data_sampling=False,
-        pos_data_sampling_rate=0.1)
+        pos_data_sampling_rate=0.1,
+    )
 
     fig, ax = plt.subplots()
     ax.plot(seq_lens)

@@ -28,16 +28,14 @@ import quartz
 sys.path.append(os.path.join(os.getcwd(), '..'))
 from pretrain.pretrain import PretrainNet
 
+
 def topk_2d(
     x: torch.Tensor, k: int, as_tuple: bool = False
 ) -> Tuple[torch.Tensor, torch.tensor | Tuple[torch.tensor, torch.tensor]]:
     x_f = x.flatten()
     v_topk, i_f_topk = torch.topk(x_f, k)
     i_f_topk = i_f_topk.tolist()
-    i_topk = [
-        (i_f // x.shape[1], i_f % x.shape[1])
-        for i_f in i_f_topk
-    ]
+    i_topk = [(i_f // x.shape[1], i_f % x.shape[1]) for i_f in i_f_topk]
     if not as_tuple:
         i_topk = torch.tensor(i_topk, device=x.device)
     else:
@@ -48,9 +46,10 @@ def topk_2d(
         )
     return v_topk, i_topk
 
+
 class SpecialMinHeap:
-    def __init__(self, max_size = math.inf):
-        self.arr= []
+    def __init__(self, max_size=math.inf):
+        self.arr = []
         self.inserted_hash = set()
         self.max_size = max_size
 
@@ -79,7 +78,7 @@ class SpecialMinHeap:
         graph_list = list(graph_list)
         # generate sample distribution
         sample_counts = torch.tensor(num_gate_reduced_list)
-        sample_counts = sample_counts - sample_counts.min() # [0, 0, 1, 2, ...]
+        sample_counts = sample_counts - sample_counts.min()  # [0, 0, 1, 2, ...]
         sample_counts = sample_counts * 10 + 1
         sampled = random.sample(self.arr, k=k, counts=sample_counts.tolist())
         return sampled
@@ -116,6 +115,7 @@ class QConv(nn.Module):
         h_relu = F.relu(h_linear)
         return h_relu
 
+
 class QGNN(nn.Module):
     def __init__(self, in_feats, h_feats, num_classes, inter_dim):
         super(QGNN, self).__init__()
@@ -134,11 +134,14 @@ class QGNN(nn.Module):
 
     def forward(self, g):
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ], dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h = self.conv1(g, g.ndata['h'])
         h = self.conv2(g, h)
@@ -150,44 +153,60 @@ class QGNN(nn.Module):
         h = self.linear2(h)
         return h
 
+
 Experience = namedtuple(
     'Experience',
-    field_names=['state', 'action_node', 'action_xfer', 'reward', 'next_state', 'game_over'],
+    field_names=[
+        'state',
+        'action_node',
+        'action_xfer',
+        'reward',
+        'next_state',
+        'game_over',
+    ],
 )
 
-class ReplayBuffer:
 
-    def __init__(self, capacity: int = 100, device: str = 'cpu', prioritized: bool = False):
+class ReplayBuffer:
+    def __init__(
+        self, capacity: int = 100, device: str = 'cpu', prioritized: bool = False
+    ):
         self.capacity = capacity
         self.device = device
         self.prioritized = prioritized
         self.buffer = deque(maxlen=capacity)
         self.prios = torch.Tensor([]).to(device)
         self.max_prio = torch.Tensor([1e5]).to(device)
-    
+
     def __len__(self) -> int:
         return len(self.buffer)
-    
+
     def to(self, device: str):
         self.device = device
         self.prios = self.prios.to(device)
         self.max_prio = self.max_prio.to(device)
-    
+
     def append(self, exp: Experience, prio: torch.tensor = None) -> None:
         self.buffer.append(exp)
         if self.prioritized:
             """manually append priority"""
             if prio is None:
                 prio = self.max_prio
-            prio = prio.reshape(1,).to(self.device)
+            prio = prio.reshape(
+                1,
+            ).to(self.device)
             self.prios = torch.cat([self.prios, prio])
             if self.prios.shape[0] > self.capacity:
                 self.prios = self.prios[1:]
 
-    def update_prios(self, indices: List[int] | torch.Tensor, prios: torch.Tensor) -> None:
+    def update_prios(
+        self, indices: List[int] | torch.Tensor, prios: torch.Tensor
+    ) -> None:
         self.prios[indices] = prios
-    
-    def sample(self, sample_size: int = 100) -> Tuple[List[Experience], torch.Tensor, torch.Tensor, torch.tensor]:
+
+    def sample(
+        self, sample_size: int = 100
+    ) -> Tuple[List[Experience], torch.Tensor, torch.Tensor, torch.tensor]:
         sample_size = min(sample_size, len(self.buffer))
         if self.prioritized:
             sum_prios = self.prios.sum()
@@ -197,52 +216,55 @@ class ReplayBuffer:
             exps = [self.buffer[idx] for idx in indices_list]
             return exps, indices, normed_prios[indices], self.prios.min() / sum_prios
         else:
-            indices = torch.multinomial(torch.ones(len(self)), sample_size, replacement=False)
+            indices = torch.multinomial(
+                torch.ones(len(self)), sample_size, replacement=False
+            )
             indices_list = indices.tolist()
             exps = [self.buffer[idx] for idx in indices_list]
             return exps, indices, None, None
-    
+
     def __str__(self):
         return self.buffer.__str__()
 
-class InitStateBuffer:
 
+class InitStateBuffer:
     def __init__(self, capacity: int = 100, init_state: quartz.PyGraph = None):
         self.capacity = capacity
         assert init_state is not None
         self.init_state = init_state
         self.q = deque(maxlen=capacity)
-    
+
     def append(self, item):
         self.q.append(item)
-    
+
     def __len__(self):
         return len(self.q) + 1
-    
+
     def sample(self) -> quartz.PyGraph:
         idx = np.random.choice(len(self))
         if idx == len(self.q):
             return self.init_state
         else:
             return self.q[idx]
-    
+
     def __str__(self):
         return self.q.__str__() + f'\ninit_state: {self.init_state}'
-    
-class DummyDataset(torch.utils.data.Dataset):
 
+
+class DummyDataset(torch.utils.data.Dataset):
     def __init__(self, size: int = 1):
         self.size = size
-    
+
     def __getitem__(self, idx):
         return idx
 
     def __len__(self):
         return self.size
 
-class Environment:
 
-    def __init__(self,
+class Environment:
+    def __init__(
+        self,
         init_graph: quartz.PyGraph,
         quartz_context: quartz.QuartzContext,
         max_steps_per_episode: int = 100,
@@ -258,39 +280,41 @@ class Environment:
         self.nop_policy = nop_policy
         self.game_over_when_better = game_over_when_better
         self.max_additional_gates = max_additional_gates
-        
+
         self.state = None
         self.cur_step = 0
-        self.exp_seq = [ self._get_firtst_exp() ]
+        self.exp_seq = [self._get_firtst_exp()]
 
         self.reset()
 
     def reset(self):
         self.state: quartz.PyGraph = self.init_graph
         self.cur_step = 0
-        self.exp_seq = [ self._get_firtst_exp() ]
+        self.exp_seq = [self._get_firtst_exp()]
 
     def set_init_state(self, graph: quartz.PyGraph):
         self.init_graph = graph
         self.state = graph
         self.cur_step = 0
-        self.exp_seq = [ self._get_firtst_exp() ]
+        self.exp_seq = [self._get_firtst_exp()]
 
     def _get_firtst_exp(self) -> Experience:
         return Experience(
-            None, 0, 0, 0, self.init_graph, False,
+            None,
+            0,
+            0,
+            0,
+            self.init_graph,
+            False,
         )
 
     def get_action_space(self) -> Tuple[List[int], List[int]]:
-        return (
-            list(range(self.state.gate_count)),
-            list(range(self.num_xfers))
-        )
-    
+        return (list(range(self.state.gate_count)), list(range(self.num_xfers)))
+
     def available_xfers(self, action_node: int) -> int:
         xfers = self.state.available_xfers(
             context=self.quartz_context,
-            node=self.state.get_node_from_id(id=action_node)
+            node=self.state.get_node_from_id(id=action_node),
         )
         return xfers
 
@@ -302,52 +326,62 @@ class Environment:
         )
         if next_state is None:
             game_over = True
-            this_step_reward = -2 # TODO  neg reward when the xfer is invalid
+            this_step_reward = -2  # TODO  neg reward when the xfer is invalid
         else:
             game_over = False
             this_step_reward = cur_state.gate_count - next_state.gate_count
-            if self.cur_step + 1 >= self.max_steps_per_episode or \
-                next_state.gate_count > self.input_init_graph.gate_count + self.max_additional_gates:
+            if (
+                self.cur_step + 1 >= self.max_steps_per_episode
+                or next_state.gate_count
+                > self.input_init_graph.gate_count + self.max_additional_gates
+            ):
                 game_over = True
-        
+
         # handle NOP
         if self.quartz_context.xfer_id_is_nop(xfer_id=action_xfer):
-            game_over = (self.nop_policy[0] == 's')
+            game_over = self.nop_policy[0] == 's'
             this_step_reward = self.nop_policy[1]
-        
+
         if self.game_over_when_better and this_step_reward > 0:
-            game_over = True # TODO  only reduce gate count once in each episode
+            game_over = True  # TODO  only reduce gate count once in each episode
             # TODO  note this case: 58 -> 80 -> 78
 
         self.cur_step += 1
         self.state = next_state
-        
-        exp = Experience(cur_state, action_node, action_xfer, this_step_reward, next_state, game_over)
-        self.exp_seq.append(exp);
+
+        exp = Experience(
+            cur_state, action_node, action_xfer, this_step_reward, next_state, game_over
+        )
+        self.exp_seq.append(exp)
         return exp
-    
+
     def back_step(self):
         self.state = self.exp_seq[-1].state
         self.cur_step -= 1
         self.exp_seq.pop()
 
-class Agent:
 
-    def __init__(self,
+class Agent:
+    def __init__(
+        self,
         env: Environment,
         device: torch.device,
     ):
         self.env = env
         self.device = device
 
-        self.choices = [ ('s', 0) ]
+        self.choices = [('s', 0)]
 
     def to(self, device: str):
         self.device = device
 
     @torch.no_grad()
     def _get_action(
-        self, q_net: nn.Module, eps: float, topk: int = 1, append_choice: bool = True,
+        self,
+        q_net: nn.Module,
+        eps: float,
+        topk: int = 1,
+        append_choice: bool = True,
     ) -> Tuple[torch.tensor]:
         if np.random.random() < (1 - eps):
             # greedy
@@ -357,7 +391,7 @@ class Agent:
             topk_q_values, topk_actions = topk_2d(q_values, topk, as_tuple=False)
             # only append the first q_value; should not be used when topk > 1
             if append_choice:
-                self.choices.append( ('q', eps, topk_q_values[0].item()) )
+                self.choices.append(('q', eps, topk_q_values[0].item()))
             # return values will be added into data buffer, which latter feeds the dataset
             # they cannot be CUDA tensors, or CUDA error will occur in collate_fn
             return topk_actions, topk_q_values
@@ -372,21 +406,21 @@ class Agent:
                 if len(av_xfers) > 0:
                     xfer_space = av_xfers
             xfer = np.random.choice(xfer_space)
-            self.choices.append( ('r', eps, 0) )
-            return torch.tensor([ [node, xfer] ]), torch.Tensor([0])
+            self.choices.append(('r', eps, 0))
+            return torch.tensor([[node, xfer]]), torch.Tensor([0])
 
     def play_step(self, q_net: nn.Module, eps: float) -> Experience:
-        action, _ = self._get_action(q_net, eps) # [ [node, xfer] ]
-        exp = self.env.act(action[0, 0].item(), action[0, 1].item())        
+        action, _ = self._get_action(q_net, eps)  # [ [node, xfer] ]
+        exp = self.env.act(action[0, 0].item(), action[0, 1].item())
         return exp
 
     def clear_choices(self):
-        self.choices = [ ('s', 0, 0) ]
+        self.choices = [('s', 0, 0)]
 
 
 class DQNMod(pl.LightningModule):
-
-    def __init__(self,
+    def __init__(
+        self,
         mode: str = 'unknown',
         test_topk: int = 3,
         output_dir: str = 'output_dir',
@@ -451,10 +485,22 @@ class DQNMod(pl.LightningModule):
         init_graph = quartz.PyGraph(context=quartz_context, dag=init_dag)
         self.init_graph = init_graph
 
-        self.q_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
-        self.target_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
+        self.q_net = QGNN(
+            self.hparams.gate_type_num,
+            self.hparams.qgnn_h_feats,
+            quartz_context.num_xfers,
+            self.hparams.qgnn_inter_dim,
+        )
+        self.target_net = QGNN(
+            self.hparams.gate_type_num,
+            self.hparams.qgnn_h_feats,
+            quartz_context.num_xfers,
+            self.hparams.qgnn_inter_dim,
+        )
         self.target_net.load_state_dict(self.q_net.state_dict())
-        self.loss_fn = nn.MSELoss(reduction='none' if self.hparams.prioritized_buffer else 'mean')
+        self.loss_fn = nn.MSELoss(
+            reduction='none' if self.hparams.prioritized_buffer else 'mean'
+        )
 
         self.env = Environment(
             init_graph=init_graph,
@@ -466,17 +512,26 @@ class DQNMod(pl.LightningModule):
         )
         # we will set device for agent in on_after_batch_transfer latter
         self.agent = Agent(self.env, self.device)
-        self.buffer = ReplayBuffer(replaybuf_size, self.device, self.hparams.prioritized_buffer)
-        self.init_state_buffer = InitStateBuffer(capacity=init_state_buf_size, init_state=init_graph)
+        self.buffer = ReplayBuffer(
+            replaybuf_size, self.device, self.hparams.prioritized_buffer
+        )
+        self.init_state_buffer = InitStateBuffer(
+            capacity=init_state_buf_size, init_state=init_graph
+        )
         self.best_graph = init_graph
-        self.episode_best_gc = 0x7fffffff
+        self.episode_best_gc = 0x7FFFFFFF
 
         self.eps = eps_init
         self.prio_beta = prio_init_beta
         self.episode_reward = 0
         self.total_reward = 0
         self.num_out_graphs = 0
-        self.pretrained_q_net = QGNN(self.hparams.gate_type_num, self.hparams.qgnn_h_feats, quartz_context.num_xfers, self.hparams.qgnn_inter_dim)
+        self.pretrained_q_net = QGNN(
+            self.hparams.gate_type_num,
+            self.hparams.qgnn_h_feats,
+            quartz_context.num_xfers,
+            self.hparams.qgnn_inter_dim,
+        )
 
         self.load_pretrained_weight()
         if mode != 'test':
@@ -490,7 +545,7 @@ class DQNMod(pl.LightningModule):
             self.pretrained_q_net = pretrained_net.q_net
             self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
             self.target_net.load_state_dict(self.q_net.state_dict())
-    
+
     def _restore_pretrained_weight(self):
         if self.pretrained_q_net is not None:
             self.q_net.load_state_dict(self.pretrained_q_net.state_dict())
@@ -524,7 +579,7 @@ class DQNMod(pl.LightningModule):
             qasm_str = exp.next_state.to_qasm_str()
             with open(out_path, 'w') as f:
                 print(qasm_str, file=f)
-    
+
     def save_ckpt(self, name: str):
         self.trainer.save_checkpoint(
             filepath=os.path.join(self.hparams.output_dir, f'{name}.ckpt')
@@ -539,7 +594,7 @@ class DQNMod(pl.LightningModule):
             """fill init state buffer"""
             self.init_state_buffer.append(exp.next_state)
 
-        """maintain the best graph info"""        
+        """maintain the best graph info"""
         if exp.next_state and exp.next_state.gate_count < self.episode_best_gc:
             self.episode_best_gc = exp.next_state.gate_count
             if exp.next_state.gate_count < self.best_graph.gate_count:
@@ -553,10 +608,13 @@ class DQNMod(pl.LightningModule):
                     print(info)
                     self.best_graph = exp.next_state
                     self._output_seq()
-                    self.save_ckpt(f'best_{exp.next_state.gate_count}_step_{self.global_step}')
+                    self.save_ckpt(
+                        f'best_{exp.next_state.gate_count}_step_{self.global_step}'
+                    )
                     wandb.alert(
                         title='Better graph is found!',
-                        text=info, level=wandb.AlertLevel.INFO,
+                        text=info,
+                        level=wandb.AlertLevel.INFO,
                         wait_duration=0,
                     )
             # end if
@@ -564,7 +622,7 @@ class DQNMod(pl.LightningModule):
 
         if exp.game_over:
             """reset env"""
-            self.episode_best_gc = 0x7fffffff
+            self.episode_best_gc = 0x7FFFFFFF
             if self.hparams.sample_init:
                 # sample a init state
                 init_state = self.init_state_buffer.sample()
@@ -572,9 +630,9 @@ class DQNMod(pl.LightningModule):
             elif self.hparams.restart_from_best:
                 # start from the best graph
                 self.env.set_init_state(self.best_graph)
-            else: # default setting: just return to the init state
+            else:  # default setting: just return to the init state
                 self.env.reset()
-            
+
             self.agent.clear_choices()
 
             # below are deprecated
@@ -590,7 +648,7 @@ class DQNMod(pl.LightningModule):
 
     def agent_episode(self, eps: float) -> Tuple[Experience, int, float]:
         acc_reward = 0
-        self.episode_best_gc = 0x7fffffff
+        self.episode_best_gc = 0x7FFFFFFF
         while True:
             exp, env_cur_step = self.agent_step(eps)
             acc_reward += exp.reward
@@ -607,19 +665,22 @@ class DQNMod(pl.LightningModule):
         """
         for i in tqdm(range(steps), desc='Populating the buffer'):
             self.agent_step(1.0)
-    
+
     def _compute_loss(self) -> torch.Tensor:
-        exps, indices, normed_prios, min_normed_prio = \
-            self.buffer.sample(self.hparams.batch_size)
+        exps, indices, normed_prios, min_normed_prio = self.buffer.sample(
+            self.hparams.batch_size
+        )
         """prepare batched data"""
-        states, action_nodes, action_xfers, \
-            rewards, next_states, game_overs = zip(*exps)
+        states, action_nodes, action_xfers, rewards, next_states, game_overs = zip(
+            *exps
+        )
         b_state = dgl.batch([state.to_dgl_graph() for state in states]).to(self.device)
-        b_next_state = dgl.batch([
-            state.to_dgl_graph()
-            if state is not None else dgl.DGLGraph()
-            for state in next_states
-        ]).to(self.device)
+        b_next_state = dgl.batch(
+            [
+                state.to_dgl_graph() if state is not None else dgl.DGLGraph()
+                for state in next_states
+            ]
+        ).to(self.device)
         cur_num_nodes = b_state.batch_num_nodes().tolist()
         next_num_nodes = b_next_state.batch_num_nodes().tolist()
         rewards = torch.Tensor(rewards).to(self.device)
@@ -659,7 +720,9 @@ class DQNMod(pl.LightningModule):
                     # Ref: https://arxiv.org/pdf/1509.06461.pdf
                     max_q, opt_action = topk_2d(next_q_values_qnet[r_next, :], k=1)
                     opt_action = opt_action[0]
-                    target_next_q = next_q_values_tnet[r_next, :][opt_action[0], opt_action[1]]
+                    target_next_q = next_q_values_tnet[r_next, :][
+                        opt_action[0], opt_action[1]
+                    ]
                 else:
                     target_next_q = torch.max(next_max_q_values_tnet[r_next])
             target_next_q_values.append(target_next_q)
@@ -686,18 +749,20 @@ class DQNMod(pl.LightningModule):
             self.buffer.update_prios(indices, prios)
         else:
             loss = self.loss_fn(acted_pred_q_values, target_q_values)
-        
-        self.log_dict({
-            f'mean_batch_reward': rewards.mean(),
-            f'mean_target_next_max_Q': target_next_q_values.mean(),
-            f'mean_target_max_Q': target_q_values.mean(),
-            f'mean_pred_Q': acted_pred_q_values.mean(),
 
-            f'max_batch_reward': rewards.max(),
-            f'max_target_next_max_Q': target_next_q_values.max(),
-            f'max_target_max_Q': target_q_values.max(),
-            f'max_pred_Q': acted_pred_q_values.max(),
-        }, on_step=True)
+        self.log_dict(
+            {
+                f'mean_batch_reward': rewards.mean(),
+                f'mean_target_next_max_Q': target_next_q_values.mean(),
+                f'mean_target_max_Q': target_q_values.mean(),
+                f'mean_pred_Q': acted_pred_q_values.mean(),
+                f'max_batch_reward': rewards.max(),
+                f'max_target_next_max_Q': target_next_q_values.max(),
+                f'max_target_max_Q': target_q_values.max(),
+                f'max_pred_Q': acted_pred_q_values.max(),
+            },
+            on_step=True,
+        )
 
         return loss
 
@@ -711,37 +776,46 @@ class DQNMod(pl.LightningModule):
         """
         """sample a batch of data from the buffer to update the network"""
         # schedule prio_beta
-        self.prio_beta = self.hparams.prio_init_beta + \
-            (1.0 - self.hparams.prio_init_beta) * self.global_step / 1e5
+        self.prio_beta = (
+            self.hparams.prio_init_beta
+            + (1.0 - self.hparams.prio_init_beta) * self.global_step / 1e5
+        )
         loss = self._compute_loss()
 
         """play an episode"""
-        self.eps = max(
-            self.eps - self.hparams.eps_decay,
-            self.hparams.eps_min
-        )
+        self.eps = max(self.eps - self.hparams.eps_decay, self.hparams.eps_min)
         # if self.hparams.agent_episode:
         if self.global_step % self.hparams.agent_play_interval == 0:
             last_exp, tot_steps, acc_reward = self.agent_episode(self.eps)
-            self.log_dict({
-                f'eps': self.eps,
-                f'episode_steps': tot_steps,
-                f'episode_reward': acc_reward,
-                f'prio_beta': self.prio_beta,
-                f'lr': self.optimizers().param_groups[0]['lr'],
-            }, on_step=True)
-        
-        if self.global_step and self.global_step % self.hparams.target_update_interval == 0:
+            self.log_dict(
+                {
+                    f'eps': self.eps,
+                    f'episode_steps': tot_steps,
+                    f'episode_reward': acc_reward,
+                    f'prio_beta': self.prio_beta,
+                    f'lr': self.optimizers().param_groups[0]['lr'],
+                },
+                on_step=True,
+            )
+
+        if (
+            self.global_step
+            and self.global_step % self.hparams.target_update_interval == 0
+        ):
             self.target_net.load_state_dict(self.q_net.state_dict())
-        
+
         self.log(f'train_loss', loss)
-        self.log_dict({
-            f'best_gc': self.best_graph.gate_count,
-            f'init':    self.env.init_graph.gate_count,
-            f'|buf|':   len(self.buffer.buffer),
-        }, on_step=True, prog_bar=True)
+        self.log_dict(
+            {
+                f'best_gc': self.best_graph.gate_count,
+                f'init': self.env.init_graph.gate_count,
+                f'|buf|': len(self.buffer.buffer),
+            },
+            on_step=True,
+            prog_bar=True,
+        )
         return loss
-    
+
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             params=self.q_net.parameters(),
@@ -759,12 +833,12 @@ class DQNMod(pl.LightningModule):
                 'lr_scheduler': {
                     'scheduler': scheduler,
                     'monitor': 'train_loss',
-                    'strict': False, # consider resuming from checkpoint
-                }
+                    'strict': False,  # consider resuming from checkpoint
+                },
             }
         else:
             return optimizer
-    
+
     def train_dataloader(self) -> torch.utils.data.DataLoader:
         dataset = DummyDataset(size=self.hparams.target_update_interval)
         dataloader = torch.utils.data.DataLoader(
@@ -780,19 +854,17 @@ class DQNMod(pl.LightningModule):
             batch_size=1,
         )
         return dataloader
-    
+
     def beam_search(self):
         assert self.env.state == self.init_graph
 
         cur_graph = self.init_graph
         cur_hash = cur_graph.hash()
-        q = [ (cur_graph, 0, 0, cur_hash) ]
+        q = [(cur_graph, 0, 0, cur_hash)]
         visited = set()
         visited.add(cur_hash)
-        hash_2_graph = {} # hash -> graph
-        hash_2_exp = {
-            cur_hash: (None, 0, 0, 0)
-        }
+        hash_2_graph = {}  # hash -> graph
+        hash_2_exp = {cur_hash: (None, 0, 0, 0)}
 
         best_graph, best_gc, best_hash = cur_graph, cur_graph.gate_count, cur_hash
         print(f'Start BFS')
@@ -807,7 +879,11 @@ class DQNMod(pl.LightningModule):
                 hash_2_graph[cur_hash] = cur_graph
                 if cur_graph.gate_count < best_gc:
                     pbar.update(best_gc - cur_graph.gate_count)
-                    best_graph, best_gc, best_hash = cur_graph, cur_graph.gate_count, cur_hash
+                    best_graph, best_gc, best_hash = (
+                        cur_graph,
+                        cur_graph.gate_count,
+                        cur_hash,
+                    )
                     print(
                         f'Better graph with gc {best_gc} is found!'
                         f' Q: {hash_2_exp[cur_hash][3]}'
@@ -815,11 +891,13 @@ class DQNMod(pl.LightningModule):
 
                 if cur_depth >= self.hparams.episode_length:
                     continue
-                
+
                 cur_dgl_graph: dgl.DGLGraph = cur_graph.to_dgl_graph().to(self.device)
                 # (num_nodes, num_actions)
                 q_values = self.q_net(cur_dgl_graph)
-                topk_q_values, topk_actions = topk_2d(q_values, self.hparams.test_topk, as_tuple=False)
+                topk_q_values, topk_actions = topk_2d(
+                    q_values, self.hparams.test_topk, as_tuple=False
+                )
                 for q_value, action in zip(topk_q_values, topk_actions):
                     action_node = action[0].item()
                     action_xfer = action[1].item()
@@ -831,17 +909,26 @@ class DQNMod(pl.LightningModule):
                         next_hash = next_graph.hash()
                         if next_hash not in visited:
                             visited.add(next_hash)
-                            hash_2_exp[next_hash] = (cur_hash, action_node, action_xfer, q_value)
-                            heapq.heappush(q, (next_graph, -q_value, cur_depth + 1, next_hash))
+                            hash_2_exp[next_hash] = (
+                                cur_hash,
+                                action_node,
+                                action_xfer,
+                                q_value,
+                            )
+                            heapq.heappush(
+                                q, (next_graph, -q_value, cur_depth + 1, next_hash)
+                            )
                             if next_graph.gate_count < cur_graph.gate_count:
                                 pass
-                
-                pbar.set_postfix({
-                    'cur_gate_cnt': cur_graph.gate_count,
-                    'best_gate_cnt': best_gc,
-                    '|q|': len(q),
-                    '|visited|': len(visited),
-                })
+
+                pbar.set_postfix(
+                    {
+                        'cur_gate_cnt': cur_graph.gate_count,
+                        'best_gate_cnt': best_gc,
+                        '|q|': len(q),
+                        '|visited|': len(visited),
+                    }
+                )
                 pbar.refresh()
                 # end for
             # end while
@@ -860,7 +947,9 @@ class DQNMod(pl.LightningModule):
             cur_graph = hash_2_graph[cur_hash]
             to_cur_exp = hash_2_exp[cur_hash]
             pre_hash, action_node, action_xfer, q_value = to_cur_exp
-            out_name = f'{cur_graph.gate_count}_{action_node}_{action_xfer}_{q_value:.3f}.qasm'
+            out_name = (
+                f'{cur_graph.gate_count}_{action_node}_{action_xfer}_{q_value:.3f}.qasm'
+            )
             out_qasm = cur_graph.to_qasm_str()
             output_list = [(out_name, out_qasm)] + output_list
             cur_hash = pre_hash
@@ -884,12 +973,13 @@ def seed_all(seed: int):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+
 def init_wandb(
     enable: bool = True,
     offline: bool = False,
     project: str = 'Quartz-DQN',
     task: str = 'train',
-    entity: str = ''
+    entity: str = '',
 ):
     if enable is False:
         return None
@@ -901,14 +991,17 @@ def init_wandb(
     )
     return wandb_logger
 
+
 def train(cfg):
     wandb_logger = init_wandb(
-        enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='train', entity=cfg.wandb.entity
+        enable=cfg.wandb.en,
+        offline=cfg.wandb.offline,
+        task='train',
+        entity=cfg.wandb.entity,
     )
     ckpt_callback_list = [
         ModelCheckpoint(
-            monitor='train_loss', # TODO  other values?
+            monitor='train_loss',  # TODO  other values?
             dirpath=output_dir,
             filename='{epoch}-{train_loss:.2f}-best',
             save_top_k=3,
@@ -936,10 +1029,13 @@ def train(cfg):
         ckpt_path = cfg.ckpt_path
     trainer.fit(dqnmod, ckpt_path=ckpt_path)
 
+
 def test(cfg):
     wandb_logger = init_wandb(
-        enable=cfg.wandb.en, offline=cfg.wandb.offline,
-        task='test', entity=cfg.wandb.entity
+        enable=cfg.wandb.en,
+        offline=cfg.wandb.offline,
+        task='test',
+        entity=cfg.wandb.entity,
     )
     trainer = pl.Trainer(
         gpus=cfg.gpus,
@@ -953,8 +1049,10 @@ def test(cfg):
         print(f'Warning: Test from scratch!', file=sys.stderr)
     trainer.test(dqnmod, ckpt_path=ckpt_path)
 
+
 # global vars
 dqnmod: DQNMod = None
+
 
 @hydra.main(config_path='config', config_name='config')
 def main(cfg):
@@ -962,8 +1060,8 @@ def main(cfg):
     global dqnmod
     global output_dir
 
-    output_dir = os.path.abspath(os.curdir) # get hydra output dir
-    os.chdir(hydra.utils.get_original_cwd()) # set working dir to the original one
+    output_dir = os.path.abspath(os.curdir)  # get hydra output dir
+    os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
 
     seed_all(cfg.seed)
 
@@ -972,13 +1070,12 @@ def main(cfg):
 
     with open(cfg.init_graph_path) as f:
         init_graph_qasm_str = f.read()
-    
+
     dqnmod = DQNMod(
         mode=cfg.mode,
         test_topk=cfg.test_topk,
         output_dir=output_dir,
         pretrained_weight_path=cfg.pretrained_weight if cfg.load_pretrained else None,
-
         init_graph_qasm_str=init_graph_qasm_str,
         gate_set=cfg.gate_set,
         ecc_file=cfg.ecc_file,
@@ -988,7 +1085,6 @@ def main(cfg):
         gamma=cfg.gamma,
         episode_length=cfg.episode_length,
         max_additional_gates=cfg.max_additional_gates,
-
         lr=cfg.lr,
         scheduler=cfg.scheduler,
         batch_size=cfg.batch_size,
@@ -1000,13 +1096,11 @@ def main(cfg):
         prio_alpha=cfg.prio_alpha,
         prio_init_beta=cfg.prio_init_beta,
         double_dqn=cfg.double_dqn,
-        
         agent_episode=cfg.agent_episode,
         strict_better=cfg.strict_better,
         restart_from_best=cfg.restart_from_best,
         sample_init=cfg.sample_init,
         init_state_buf_size=cfg.init_state_buf_size,
-
         qgnn_h_feats=cfg.qgnn_h_feats,
         qgnn_inter_dim=cfg.qgnn_inter_dim,
     )
@@ -1019,6 +1113,7 @@ def main(cfg):
         test(cfg)
     else:
         raise ValueError(f'Invalid mode: {cfg.mode}')
+
 
 if __name__ == '__main__':
     main()

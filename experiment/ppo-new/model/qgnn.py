@@ -7,8 +7,12 @@ import dgl
 
 class QConv(nn.Module):
     def __init__(
-        self, in_feat: int, inter_dim: int, out_feat: int,
-        aggregator_type: str = 'sum', normalize: bool = False,
+        self,
+        in_feat: int,
+        inter_dim: int,
+        out_feat: int,
+        aggregator_type: str = 'sum',
+        normalize: bool = False,
     ):
         super(QConv, self).__init__()
         self.aggregator = nn.Sequential(
@@ -61,8 +65,12 @@ class QConv(nn.Module):
 
 class QGNN(nn.Module):
     def __init__(
-        self, num_layers: int, num_gate_types: int,
-        gate_type_embed_dim: int, h_feats: int, inter_dim: int,
+        self,
+        num_layers: int,
+        num_gate_types: int,
+        gate_type_embed_dim: int,
+        h_feats: int,
+        inter_dim: int,
     ) -> None:
         """
         output_dim = h_feats
@@ -78,11 +86,14 @@ class QGNN(nn.Module):
 
     def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ], dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h: torch.Tensor = g.ndata['h']
         for i in range(len(self.convs)):

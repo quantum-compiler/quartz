@@ -89,19 +89,32 @@ class Nodes:
         return n
 
     def get_node(self, node_id: int) -> Node:
-        assert (node_id < self.node_cnt)
+        assert node_id < self.node_cnt
         return self.node_list[node_id]
 
 
 class MCTS:
-    def __init__(self, context: quartz.QuartzContext,
-                 init_circ: quartz.PyGraph, C: float, k: int, budget: int,
-                 max_step_length: int, gamma: float, device):
+    def __init__(
+        self,
+        context: quartz.QuartzContext,
+        init_circ: quartz.PyGraph,
+        C: float,
+        k: int,
+        budget: int,
+        max_step_length: int,
+        gamma: float,
+        device,
+    ):
         self.context = context
-        self.model = ActorCritic(total_num_gates, graph_embed_dim,
-                                 actor_hidden_dim, critic_hidden_dim,
-                                 self.context.num_xfers, hit_rate,
-                                 device).to(device)
+        self.model = ActorCritic(
+            total_num_gates,
+            graph_embed_dim,
+            actor_hidden_dim,
+            critic_hidden_dim,
+            self.context.num_xfers,
+            hit_rate,
+            device,
+        ).to(device)
         self.model.load_ckpt(ckpt_path)
         self.Nodes: Nodes = Nodes()
         self.root: Node = self.Nodes.create_node(init_circ, 0)
@@ -130,15 +143,15 @@ class MCTS:
             children_visit_cnts.append(child_node.get_visit_cnt())
             children_values.append(child_node.get_value())
 
-        children_values: torch.Tensor = torch.tensor(children_values,
-                                                     dtype=torch.float)
-        children_visit_cnts: torch.Tensor = torch.tensor(children_visit_cnts,
-                                                         dtype=torch.float)
-        visit_cnt: torch.Tensor = torch.tensor(node.get_visit_cnt(),
-                                               dtype=torch.float)
+        children_values: torch.Tensor = torch.tensor(children_values, dtype=torch.float)
+        children_visit_cnts: torch.Tensor = torch.tensor(
+            children_visit_cnts, dtype=torch.float
+        )
+        visit_cnt: torch.Tensor = torch.tensor(node.get_visit_cnt(), dtype=torch.float)
 
         UCB: torch.Tensor = children_values + visit_cnt.log().div(
-            children_visit_cnts).sqrt().mul(self.C)
+            children_visit_cnts
+        ).sqrt().mul(self.C)
         max_idx: int = UCB.argmax().item()
 
         return children_nodes[max_idx]
@@ -156,13 +169,15 @@ class MCTS:
     def expansion(self, node: Node) -> Node:
         circ = node.get_circ()
         nodes, xfers = self.model.get_nodes_and_xfers_deterministic(
-            self.context, circ, self.k)
+            self.context, circ, self.k
+        )
         first_child: Node = None
         for n_id, x_id in zip(nodes, xfers):
             new_circ, _ = circ.apply_xfer_with_local_state_tracking(
                 node=circ.get_node_from_id(id=n_id),
                 xfer=self.context.get_xfer_from_id(id=x_id),
-                eliminate_rotation=self.context.has_parameterized_gate())
+                eliminate_rotation=self.context.has_parameterized_gate(),
+            )
             new_node = self.Nodes.create_node(new_circ, node.get_id())
             node.add_child(new_node.get_id())
             if first_child == None:
@@ -172,7 +187,7 @@ class MCTS:
 
     def simulation(self, node: Node) -> float:
         # run 1 trajectory from the node's circuit
-        assert (node.get_circ() is not None)
+        assert node.get_circ() is not None
         is_nop: bool = False
         circ = node.get_circ()
         for step in range(self.max_step_length):
@@ -185,7 +200,8 @@ class MCTS:
             new_circ, _ = circ.apply_xfer_with_local_state_tracking(
                 node=circ.get_node_from_id(id=n_id),
                 xfer=self.context.get_xfer_from_id(id=x_id),
-                eliminate_rotation=self.context.has_parameterized_gate())
+                eliminate_rotation=self.context.has_parameterized_gate(),
+            )
 
             if new_circ.gate_count < self.best_gate_cnt:
                 self.best_gate_cnt = new_circ.gate_count
@@ -223,12 +239,21 @@ class MCTS:
 
 
 if __name__ == '__main__':
-    context = quartz.QuartzContext(gate_set=gate_set,
-                                   filename=ECC_fn,
-                                   no_increase=no_increase,
-                                   include_nop=include_nop)
-    init_circ = quartz.PyGraph.from_qasm(context=context,
-                                         filename=circ_qasm_path)
-    mcts_agent = MCTS(context, init_circ, MCTS_C, MCTS_K, MCTS_budget,
-                      MCTS_max_step_len, MCTS_gamma, device)
+    context = quartz.QuartzContext(
+        gate_set=gate_set,
+        filename=ECC_fn,
+        no_increase=no_increase,
+        include_nop=include_nop,
+    )
+    init_circ = quartz.PyGraph.from_qasm(context=context, filename=circ_qasm_path)
+    mcts_agent = MCTS(
+        context,
+        init_circ,
+        MCTS_C,
+        MCTS_K,
+        MCTS_budget,
+        MCTS_max_step_len,
+        MCTS_gamma,
+        device,
+    )
     mcts_agent.run()

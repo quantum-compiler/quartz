@@ -21,43 +21,38 @@ def neg(a):
 
 # quantum gates
 
+
 def x(use_z3=True):
-    return [[(0, 0), (1, 0)],
-            [(1, 0), (0, 0)]]
+    return [[(0, 0), (1, 0)], [(1, 0), (0, 0)]]
 
 
 def y(use_z3=True):
-    return [[(0, 0), (0, -1)],
-            [(0, 1), (0, 0)]]
+    return [[(0, 0), (0, -1)], [(0, 1), (0, 0)]]
 
 
 def rx(theta, use_z3=True):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, 0), (0, -sin_theta)],
-            [(0, -sin_theta), (cos_theta, 0)]]
+    return [[(cos_theta, 0), (0, -sin_theta)], [(0, -sin_theta), (cos_theta, 0)]]
 
 
 def ry(theta, use_z3=True):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, 0), (-sin_theta, 0)],
-            [(sin_theta, 0), (cos_theta, 0)]]
+    return [[(cos_theta, 0), (-sin_theta, 0)], [(sin_theta, 0), (cos_theta, 0)]]
 
 
 def rz(theta, use_z3=True):
     # e ^ {i * theta} = cos theta + i sin theta
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, -sin_theta), (0, 0)],
-            [(0, 0), (cos_theta, sin_theta)]]
+    return [[(cos_theta, -sin_theta), (0, 0)], [(0, 0), (cos_theta, sin_theta)]]
 
 
 def u1(theta, use_z3=True):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(1, 0), (0, 0)],
-            [(0, 0), (cos_theta, sin_theta)]]
+    return [[(1, 0), (0, 0)], [(0, 0), (cos_theta, sin_theta)]]
 
 
 def u2(phi, l, use_z3=True):
@@ -66,15 +61,30 @@ def u2(phi, l, use_z3=True):
     cos_phi, sin_phi = phi
     cos_l, sin_l = l
     if use_z3:
-        return [[(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
-                [(1 / z3.Sqrt(2) * cos_phi, 1 / z3.Sqrt(2) * sin_phi),
-                 (1 / z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
-                  1 / z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
+        return [
+            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
+            [
+                (1 / z3.Sqrt(2) * cos_phi, 1 / z3.Sqrt(2) * sin_phi),
+                (
+                    1 / z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
+                    1 / z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi),
+                ),
+            ],
+        ]
     else:
-        return [[(1 / math.sqrt(2), 0), (-1 / math.sqrt(2) * cos_l, -1 / math.sqrt(2) * sin_l)],
-                [(1 / math.sqrt(2) * cos_phi, 1 / math.sqrt(2) * sin_phi),
-                 (1 / math.sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
-                  1 / math.sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi))]]
+        return [
+            [
+                (1 / math.sqrt(2), 0),
+                (-1 / math.sqrt(2) * cos_l, -1 / math.sqrt(2) * sin_l),
+            ],
+            [
+                (1 / math.sqrt(2) * cos_phi, 1 / math.sqrt(2) * sin_phi),
+                (
+                    1 / math.sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
+                    1 / math.sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi),
+                ),
+            ],
+        ]
 
 
 def u3(theta, phi, l, use_z3=True):
@@ -84,25 +94,38 @@ def u3(theta, phi, l, use_z3=True):
     cos_theta, sin_theta = theta
     cos_phi, sin_phi = phi
     cos_l, sin_l = l
-    return [[(cos_theta, 0), (-sin_theta * cos_l, -sin_theta * sin_l)],
-            [(sin_theta * cos_phi, sin_theta * sin_phi),
-             (cos_theta * (cos_phi * cos_l - sin_phi * sin_l), cos_theta * (sin_phi * cos_l + sin_l * cos_phi))]]
+    return [
+        [(cos_theta, 0), (-sin_theta * cos_l, -sin_theta * sin_l)],
+        [
+            (sin_theta * cos_phi, sin_theta * sin_phi),
+            (
+                cos_theta * (cos_phi * cos_l - sin_phi * sin_l),
+                cos_theta * (sin_phi * cos_l + sin_l * cos_phi),
+            ),
+        ],
+    ]
 
 
 def cx(use_z3=True):
-    return [[(1, 0), (0, 0), (0, 0), (0, 0)],
-            [(0, 0), (0, 0), (0, 0), (1, 0)],
-            [(0, 0), (0, 0), (1, 0), (0, 0)],
-            [(0, 0), (1, 0), (0, 0), (0, 0)]]
+    return [
+        [(1, 0), (0, 0), (0, 0), (0, 0)],
+        [(0, 0), (0, 0), (0, 0), (1, 0)],
+        [(0, 0), (0, 0), (1, 0), (0, 0)],
+        [(0, 0), (1, 0), (0, 0), (0, 0)],
+    ]
 
 
 def h(use_z3=True):
     if use_z3:
-        return [[(1 / z3.Sqrt(2), 0), (1 / z3.Sqrt(2), 0)],
-                [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2), 0)]]
+        return [
+            [(1 / z3.Sqrt(2), 0), (1 / z3.Sqrt(2), 0)],
+            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2), 0)],
+        ]
     else:
-        return [[(1 / math.sqrt(2), 0), (1 / math.sqrt(2), 0)],
-                [(1 / math.sqrt(2), 0), (-1 / math.sqrt(2), 0)]]
+        return [
+            [(1 / math.sqrt(2), 0), (1 / math.sqrt(2), 0)],
+            [(1 / math.sqrt(2), 0), (-1 / math.sqrt(2), 0)],
+        ]
 
 
 def s(use_z3=True):
@@ -122,9 +145,9 @@ def t(use_z3=True):
 
 def tdg(use_z3=True):
     if use_z3:
-        return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, - z3.Sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, -z3.Sqrt(2) / 2)]]
     else:
-        return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, - math.sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, -math.sqrt(2) / 2)]]
 
 
 def z(use_z3=True):
@@ -134,36 +157,48 @@ def z(use_z3=True):
 def p(phi, use_z3=True):
     assert len(phi) == 2
     cos_phi, sin_phi = phi
-    return [[(1, 0), (0, 0)],
-            [(0, 0), (cos_phi, sin_phi)]]
+    return [[(1, 0), (0, 0)], [(0, 0), (cos_phi, sin_phi)]]
 
 
 def pdg(phi, use_z3=True):
     assert len(phi) == 2
     cos_phi, sin_phi = phi
-    return [[(1, 0), (0, 0)],
-            [(0, 0), (cos_phi, -sin_phi)]]
+    return [[(1, 0), (0, 0)], [(0, 0), (cos_phi, -sin_phi)]]
 
 
 def rx1(use_z3=True):
     if use_z3:
-        return [[(z3.Sqrt(2) / 2, 0), (0, -z3.Sqrt(2) / 2)], [(0, -z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)]]
+        return [
+            [(z3.Sqrt(2) / 2, 0), (0, -z3.Sqrt(2) / 2)],
+            [(0, -z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)],
+        ]
     else:
-        return [[(math.Sqrt(2) / 2, 0), (0, -math.Sqrt(2) / 2)], [(0, -math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)]]
+        return [
+            [(math.Sqrt(2) / 2, 0), (0, -math.Sqrt(2) / 2)],
+            [(0, -math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)],
+        ]
 
 
 def rx3(use_z3=True):
     if use_z3:
-        return [[(z3.Sqrt(2) / 2, 0), (0, z3.Sqrt(2) / 2)], [(0, z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)]]
+        return [
+            [(z3.Sqrt(2) / 2, 0), (0, z3.Sqrt(2) / 2)],
+            [(0, z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)],
+        ]
     else:
-        return [[(math.Sqrt(2) / 2, 0), (0, math.Sqrt(2) / 2)], [(0, math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)]]
+        return [
+            [(math.Sqrt(2) / 2, 0), (0, math.Sqrt(2) / 2)],
+            [(0, math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)],
+        ]
 
 
 def cz(use_z3=True):
-    return [[(1, 0), (0, 0), (0, 0), (0, 0)],
-            [(0, 0), (1, 0), (0, 0), (0, 0)],
-            [(0, 0), (0, 0), (1, 0), (0, 0)],
-            [(0, 0), (0, 0), (0, 0), (-1, 0)]]
+    return [
+        [(1, 0), (0, 0), (0, 0), (0, 0)],
+        [(0, 0), (1, 0), (0, 0), (0, 0)],
+        [(0, 0), (0, 0), (1, 0), (0, 0)],
+        [(0, 0), (0, 0), (0, 0), (-1, 0)],
+    ]
 
 
 # functions exposed to verifier

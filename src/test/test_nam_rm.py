@@ -8,13 +8,15 @@ import wandb
 wandb.init(project='nam_rm')
 
 
-def optimize(context: quartz.QuartzContext,
-             init_circ: quartz.PyGraph,
-             circ_name: str,
-             upper_limit: float = 1.05,
-             print_message: bool = True,
-             max_candidate_len: int = 1_000_000,
-             timeout: int = 86400) -> tuple[int, quartz.PyGraph]:
+def optimize(
+    context: quartz.QuartzContext,
+    init_circ: quartz.PyGraph,
+    circ_name: str,
+    upper_limit: float = 1.05,
+    print_message: bool = True,
+    max_candidate_len: int = 1_000_000,
+    timeout: int = 86400,
+) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.gate_count, init_circ.to_qasm_str())]
     hash_set = set([init_circ.hash()])
     best_circ: quartz.PyGraph = init_circ
@@ -29,11 +31,10 @@ def optimize(context: quartz.QuartzContext,
             print(
                 f"[{circ_name} (rotation merging)] candidate queue shrink from {len(candidate)} to {len(candidate) // 2}"
             )
-            candidate = candidate[:len(candidate) // 2]
+            candidate = candidate[: len(candidate) // 2]
 
         _, circ_qasm_str = heapq.heappop(candidate)
-        circ = quartz.PyGraph.from_qasm_str(context=context,
-                                            qasm_str=circ_qasm_str)
+        circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
         all_nodes = circ.all_nodes()
         for xfer in context.get_xfers():
             for node in all_nodes:
@@ -43,17 +44,16 @@ def optimize(context: quartz.QuartzContext,
 
                 invoke_cnt += 1
                 if print_message and invoke_cnt % 100_000_000 == 0:
-                    wandb.log({
-                        'invoke_cnt': invoke_cnt,
-                        'best_gate_cnt': best_gate_cnt
-                    })
+                    wandb.log(
+                        {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
+                    )
                     print(
                         f"[{circ_name} (rotation merging)] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
                     )
 
-                new_circ = circ.apply_xfer(xfer=xfer,
-                                           node=node,
-                                           eliminate_rotation=True)
+                new_circ = circ.apply_xfer(
+                    xfer=xfer, node=node, eliminate_rotation=True
+                )
 
                 if new_circ == None:
                     continue
@@ -64,16 +64,14 @@ def optimize(context: quartz.QuartzContext,
                     continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
-                    heapq.heappush(candidate,
-                                   (new_cnt, new_circ.to_qasm_str()))
+                    heapq.heappush(candidate, (new_cnt, new_circ.to_qasm_str()))
 
                     if new_cnt < best_gate_cnt:
                         best_gate_cnt = new_cnt
                         best_circ = new_circ
-                        wandb.log({
-                            'invoke_cnt': invoke_cnt,
-                            'best_gate_cnt': best_gate_cnt
-                        })
+                        wandb.log(
+                            {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
+                        )
                         print(
                             f"[{circ_name} (rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
                         )
@@ -82,18 +80,20 @@ def optimize(context: quartz.QuartzContext,
 
 
 if __name__ == '__main__':
-    assert (len(sys.argv) > 2)
+    assert len(sys.argv) > 2
 
     circ_name = sys.argv[1]
     output_dir = sys.argv[2]
 
-    context = quartz.QuartzContext(gate_set=['h', 'cx', 'x', 'rz', 'add'],
-                                   filename='../../Nam_complete_ECC_set.json',
-                                   no_increase=False,
-                                   include_nop=True)
+    context = quartz.QuartzContext(
+        gate_set=['h', 'cx', 'x', 'rz', 'add'],
+        filename='../../Nam_complete_ECC_set.json',
+        no_increase=False,
+        include_nop=True,
+    )
     circ = quartz.PyGraph.from_qasm(
-        context=context,
-        filename=f"../../circuit/nam_rm_circs/{circ_name}.qasm")
+        context=context, filename=f"../../circuit/nam_rm_circs/{circ_name}.qasm"
+    )
 
     best_gate_cnt, best_circ = optimize(context, circ, circ_name)
 

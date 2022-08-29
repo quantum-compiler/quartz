@@ -10,12 +10,14 @@ bool graph_cmp(std::shared_ptr<Graph> a, std::shared_ptr<Graph> b) {
 }
 
 int main() {
-//   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-//                GateType::cx, GateType::x, GateType::rz, GateType::add});
+  //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
+  //                GateType::cx, GateType::x, GateType::rz, GateType::add});
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::x, GateType::rz, GateType::add});
 
-    auto graph = Graph::from_qasm_file(&ctx, "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
+  auto graph = Graph::from_qasm_file(
+      &ctx,
+      "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
@@ -29,14 +31,14 @@ int main() {
   std::vector<GraphXfer *> xfers;
   for (auto eqcs : ecc) {
     for (auto circ_0 : eqcs) {
-        for(auto circ_1 : eqcs){
-            if(circ_0 != circ_1){
-                auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_0, circ_1, false);
-                if (xfer != nullptr){
-                    xfers.push_back(xfer);
-                }
-            }
+      for (auto circ_1 : eqcs) {
+        if (circ_0 != circ_1) {
+          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_0, circ_1, false);
+          if (xfer != nullptr) {
+            xfers.push_back(xfer);
+          }
         }
+      }
     }
   }
   std::cout << "number of xfers: " << xfers.size() << std::endl;

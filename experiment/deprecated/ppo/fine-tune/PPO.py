@@ -65,11 +65,27 @@ class RolloutBuffer:
 
 
 class PPO:
-    def __init__(self, num_gate_type, context, gnn_layers, graph_embed_size,
-                 actor_hidden_size, critic_hidden_size, action_dim,
-                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                 eps_clip, entropy_coefficient, mini_batch_size,
-                 log_file_handle, device_get_trajectory, device_update):
+    def __init__(
+        self,
+        num_gate_type,
+        context,
+        gnn_layers,
+        graph_embed_size,
+        actor_hidden_size,
+        critic_hidden_size,
+        action_dim,
+        lr_graph_embedding,
+        lr_actor,
+        lr_critic,
+        gamma,
+        K_epochs,
+        eps_clip,
+        entropy_coefficient,
+        mini_batch_size,
+        log_file_handle,
+        device_get_trajectory,
+        device_update,
+    ):
 
         self.gamma = gamma
         self.eps_clip = eps_clip
@@ -81,32 +97,36 @@ class PPO:
 
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(gnn_layers, num_gate_type, graph_embed_size,
-                                  actor_hidden_size, critic_hidden_size,
-                                  action_dim,
-                                  self.device_update).to(self.device_update)
-        self.optimizer = torch.optim.Adam([{
-            'params':
-            self.policy.graph_embedding.parameters(),
-            'lr':
-            lr_graph_embedding
-        }, {
-            'params':
-            self.policy.actor.parameters(),
-            'lr':
-            lr_actor
-        }, {
-            'params':
-            self.policy.critic.parameters(),
-            'lr':
-            lr_critic
-        }])
+        self.policy = ActorCritic(
+            gnn_layers,
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+            self.device_update,
+        ).to(self.device_update)
+        self.optimizer = torch.optim.Adam(
+            [
+                {
+                    'params': self.policy.graph_embedding.parameters(),
+                    'lr': lr_graph_embedding,
+                },
+                {'params': self.policy.actor.parameters(), 'lr': lr_actor},
+                {'params': self.policy.critic.parameters(), 'lr': lr_critic},
+            ]
+        )
         wandb.watch(self.policy, log='all', log_freq=10)
 
         self.policy_old = ActorCritic(
-            gnn_layers, num_gate_type, graph_embed_size, actor_hidden_size,
-            critic_hidden_size, action_dim,
-            self.device_get_trajectory).to(self.device_get_trajectory)
+            gnn_layers,
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+            self.device_get_trajectory,
+        ).to(self.device_get_trajectory)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -120,7 +140,8 @@ class PPO:
         # No gradient needed
         with torch.no_grad():
             node, xfer, xfer_logprob, mask = self.policy_old.act(
-                self.context, graph, node_range)
+                self.context, graph, node_range
+            )
 
         self.buffer.graphs.append(graph)
         self.buffer.nodes.append(node)
@@ -133,7 +154,8 @@ class PPO:
     def select_actions(self, graphs: list[PyGraph]):
         with torch.no_grad():
             nodes, values, xfers, xfer_logprobs, masks = self.policy_old.act_batch(
-                self.context, graphs)
+                self.context, graphs
+            )
 
         return nodes, values, xfers, xfer_logprobs, masks
 
@@ -153,15 +175,25 @@ class PPO:
 
         next_node_lists = self.buffer.next_nodes
 
-        old_xfer_logprobs = torch.squeeze(
-            torch.stack(self.buffer.xfer_logprobs,
-                        dim=0)).detach().to(self.device_update)
+        old_xfer_logprobs = (
+            torch.squeeze(torch.stack(self.buffer.xfer_logprobs, dim=0))
+            .detach()
+            .to(self.device_update)
+        )
 
         for _ in range(self.K_epochs):
             values, next_values, xfer_logprobs, xfer_entropys = self.policy.evaluate(
-                batched_dgl_gs, self.buffer.nodes, self.buffer.xfers,
-                batched_dgl_next_gs, next_node_lists, self.buffer.is_nops,
-                self.buffer.is_terminals, masks, node_nums, next_node_nums)
+                batched_dgl_gs,
+                self.buffer.nodes,
+                self.buffer.xfers,
+                batched_dgl_next_gs,
+                next_node_lists,
+                self.buffer.is_nops,
+                self.buffer.is_terminals,
+                masks,
+                node_nums,
+                next_node_nums,
+            )
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(xfer_logprobs - old_xfer_logprobs.detach())
@@ -171,23 +203,29 @@ class PPO:
             rewards = torch.stack(self.buffer.rewards).to(self.device_update)
             advantages = rewards + next_values * self.gamma - values
             surr1 = ratios * advantages.clone().detach()
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 +
-                                self.eps_clip) * advantages.clone().detach()
+            surr2 = (
+                torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip)
+                * advantages.clone().detach()
+            )
 
             actor_loss = -torch.min(surr1, surr2).mean()
             critic_loss = advantages.pow(2).mean()
             xfer_entropy = xfer_entropys.mean()
 
-            wandb.log({
-                'actor_loss': actor_loss,
-                'critic_loss': critic_loss,
-                'xfer_entropy': xfer_entropy
-            })
+            wandb.log(
+                {
+                    'actor_loss': actor_loss,
+                    'critic_loss': critic_loss,
+                    'xfer_entropy': xfer_entropy,
+                }
+            )
 
             # final loss of clipped objective PPO
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
-            loss = actor_loss + 0.5 * critic_loss - self.entropy_cofficient * xfer_entropy
+            loss = (
+                actor_loss + 0.5 * critic_loss - self.entropy_cofficient * xfer_entropy
+            )
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -228,8 +266,7 @@ class PPO:
             if self.buffer.is_terminals[i]:
                 self.log_file_handle.write('terminated\n')
                 self.log_file_handle.write(f'{masks[i].nonzero()}\n')
-                self.log_file_handle.write(
-                    f'trajectory reward: {cumulated_reward}\n')
+                self.log_file_handle.write(f'trajectory reward: {cumulated_reward}\n')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -245,39 +282,41 @@ class PPO:
             dp_num = len(buffer.graphs)
             mbs = self.mini_batch_size
             for i in range(0, dp_num, mbs):
-                gs = buffer.graphs[i:i + mbs]
+                gs = buffer.graphs[i : i + mbs]
                 dgl_gs = [g.to_dgl_graph() for g in gs]
                 batched_dgl_gs = dgl.batch(dgl_gs).to(self.device_update)
                 node_nums = batched_dgl_gs.batch_num_nodes().tolist()
 
-                next_gs = buffer.next_graphs[i:i + mbs]
+                next_gs = buffer.next_graphs[i : i + mbs]
                 dgl_next_gs = [g.to_dgl_graph() for g in next_gs]
-                batched_dgl_next_gs = dgl.batch(dgl_next_gs).to(
-                    self.device_update)
+                batched_dgl_next_gs = dgl.batch(dgl_next_gs).to(self.device_update)
                 next_node_nums = batched_dgl_next_gs.batch_num_nodes().tolist()
 
-                yield batched_dgl_gs, buffer.nodes[i:i + mbs], buffer.xfers[
-                    i:i + mbs], batched_dgl_next_gs, buffer.next_nodes[
-                        i:i +
-                        mbs], buffer.is_nops[i:i + mbs], buffer.is_terminals[
-                            i:i +
-                            mbs], torch.stack(buffer.masks[i:i + mbs]).to(
-                                self.device_update), node_nums, next_node_nums
+                yield batched_dgl_gs, buffer.nodes[i : i + mbs], buffer.xfers[
+                    i : i + mbs
+                ], batched_dgl_next_gs, buffer.next_nodes[i : i + mbs], buffer.is_nops[
+                    i : i + mbs
+                ], buffer.is_terminals[
+                    i : i + mbs
+                ], torch.stack(
+                    buffer.masks[i : i + mbs]
+                ).to(
+                    self.device_update
+                ), node_nums, next_node_nums
 
         def log_prob_generator(buffer: RolloutBuffer):
             dp_num = len(buffer.graphs)
             mbs = self.mini_batch_size
             for i in range(0, dp_num, mbs):
                 yield torch.squeeze(
-                    torch.stack(buffer.xfer_logprobs[i:i + mbs],
-                                dim=0)).detach().to(self.device_update)
+                    torch.stack(buffer.xfer_logprobs[i : i + mbs], dim=0)
+                ).detach().to(self.device_update)
 
         def reward_generator(buffer: RolloutBuffer):
             dp_num = len(buffer.graphs)
             mbs = self.mini_batch_size
             for i in range(0, dp_num, mbs):
-                yield torch.stack(buffer.rewards[i:i + mbs]).to(
-                    self.device_update)
+                yield torch.stack(buffer.rewards[i : i + mbs]).to(self.device_update)
 
         advantage_0 = []
         for _ in range(self.K_epochs):
@@ -293,11 +332,16 @@ class PPO:
             ###############################################
 
             for i, (eva_data, old_log_probs, rewards) in enumerate(
-                    zip(eva_gen, log_prob_gen, reward_gen)):
+                zip(eva_gen, log_prob_gen, reward_gen)
+            ):
                 # start = time.time()
 
-                values, next_values, xfer_logprobs, xfer_entropys = self.policy.evaluate(
-                    *eva_data)
+                (
+                    values,
+                    next_values,
+                    xfer_logprobs,
+                    xfer_entropys,
+                ) = self.policy.evaluate(*eva_data)
 
                 # t_0 = time.time()
                 # print(f'evaluate time: {t_0 - start}')
@@ -317,24 +361,31 @@ class PPO:
                 #     1 + self.eps_clip) * advantages.clone().detach()
 
                 surr1 = ratios * advantage_0[i].clone().detach()
-                surr2 = torch.clamp(
-                    ratios, 1 - self.eps_clip,
-                    1 + self.eps_clip) * advantage_0[i].clone().detach()
+                surr2 = (
+                    torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip)
+                    * advantage_0[i].clone().detach()
+                )
 
                 actor_loss = -torch.min(surr1, surr2).sum() / dp_num
                 critic_loss = advantages.pow(2).sum() / dp_num
                 xfer_entropy = xfer_entropys.sum() / dp_num
 
-                wandb.log({
-                    'actor_loss': actor_loss,
-                    'critic_loss': critic_loss,
-                    'xfer_entropy': xfer_entropy
-                })
+                wandb.log(
+                    {
+                        'actor_loss': actor_loss,
+                        'critic_loss': critic_loss,
+                        'xfer_entropy': xfer_entropy,
+                    }
+                )
 
                 # final loss of clipped objective PPO
                 # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
                 #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
-                loss = actor_loss + 0.5 * critic_loss - self.entropy_cofficient * xfer_entropy
+                loss = (
+                    actor_loss
+                    + 0.5 * critic_loss
+                    - self.entropy_cofficient * xfer_entropy
+                )
 
                 # take gradient step
                 loss.backward()
@@ -381,8 +432,7 @@ class PPO:
             if self.buffer.is_terminals[i]:
                 self.log_file_handle.write('terminated\n')
                 # self.log_file_handle.write(f'{masks[i].nonzero()}\n')
-                self.log_file_handle.write(
-                    f'trajectory reward: {cumulated_reward}\n')
+                self.log_file_handle.write(f'trajectory reward: {cumulated_reward}\n')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -395,8 +445,8 @@ class PPO:
 
     def load(self, checkpoint_path):
         self.policy_old.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )
         self.policy.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )

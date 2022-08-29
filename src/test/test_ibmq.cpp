@@ -71,31 +71,31 @@ int main(int argc, char **argv) {
               << " on IBMQ gate set."
               << " Gate count after optimization: "
               << graph_before_search->gate_count() << ", "
-              << "Circuit depth: " << graph_before_search->circuit_depth() << ", "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                  .count() /
-                  1000.0
+              << "Circuit depth: " << graph_before_search->circuit_depth()
+              << ", "
+              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                     end - start)
+                         .count() /
+                     1000.0
               << " seconds." << std::endl;
 
     return 0;
   }
 
   // Optimization
-  auto graph_after_search = graph_before_search->optimize(&dst_ctx,
-                                                          eqset_fn,
-                                                          fn, /*print_message=*/
-                                                          true);
+  auto graph_after_search =
+      graph_before_search->optimize(&dst_ctx, eqset_fn, fn, /*print_message=*/
+                                    true);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
             << " on IBMQ gate set."
             << " Gate count after optimization: "
             << graph_after_search->gate_count() << ", "
             << "Circuit depth: " << graph_after_search->circuit_depth() << ", "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - start)
-                .count() /
-                1000.0
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - start)
+                       .count() /
+                   1000.0
             << " seconds." << std::endl;
 
   graph_after_search->to_qasm(output_fn, false, false);

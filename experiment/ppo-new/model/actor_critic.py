@@ -10,6 +10,7 @@ from model.basis import *
 from model.qgnn import *
 from model.qgin import *
 
+
 class ActorCritic(nn.Module):
     def __init__(
         self,
@@ -21,8 +22,8 @@ class ActorCritic(nn.Module):
         gnn_output_dim: int = 32,
         gin_num_mlp_layers: int = 2,
         gin_learn_eps: bool = False,
-        gin_neighbor_pooling_type: str = 'sum', # sum', 'mean', 'max'
-        gin_graph_pooling_type: str = None, # 'sum', 'mean', 'max'
+        gin_neighbor_pooling_type: str = 'sum',  # sum', 'mean', 'max'
+        gin_graph_pooling_type: str = None,  # 'sum', 'mean', 'max'
         actor_hidden_size: int = 32,
         critic_hidden_size: int = 32,
         action_dim: int = 32,
@@ -34,7 +35,7 @@ class ActorCritic(nn.Module):
         """
         Args:
             num_gate_types: serve as the input dim of GNN (imput dim of feature of each node)
-            
+
         """
         super().__init__()
         """init the network with existed modules"""
@@ -46,13 +47,16 @@ class ActorCritic(nn.Module):
             self.critic = critic
             self.device = device
             return
-        
+
         self.gnn_num_layers = gnn_num_layers
         self.device = device
         if gnn_type.lower() == 'QGNN'.lower():
             self.gnn = QGNN(
-                gnn_num_layers, num_gate_types, gate_type_embed_dim,
-                gnn_hidden_dim, gnn_hidden_dim
+                gnn_num_layers,
+                num_gate_types,
+                gate_type_embed_dim,
+                gnn_hidden_dim,
+                gnn_hidden_dim,
             )
             gnn_output_dim = gnn_hidden_dim
         elif gnn_type.lower() == 'QGIN'.lower():
@@ -72,7 +76,7 @@ class ActorCritic(nn.Module):
 
         self.actor = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
         self.critic = MLP(2, gnn_output_dim, critic_hidden_size, 1)
-    
+
     def ddp_model(self) -> ActorCritic:
         """make ddp verison instances for each sub-model"""
         _ddp_model = ActorCritic(
@@ -82,7 +86,7 @@ class ActorCritic(nn.Module):
             critic=DDP(self.critic, device_ids=[self.device]),
         )
         return _ddp_model
-    
+
     def forward(self, x: torch.Tensor | dgl.DGLGraph, callee: str) -> torch.Tensor:
         if callee == self.gnn_name():
             """
@@ -108,15 +112,15 @@ class ActorCritic(nn.Module):
             return self.critic(x)
         else:
             raise NotImplementedError(f'Unexpected callee name: {callee}')
-    
+
     @staticmethod
     def gnn_name() -> str:
         return 'gnn'
-    
+
     @staticmethod
     def actor_name() -> str:
         return 'actor'
-    
+
     @staticmethod
     def critic_name() -> str:
         return 'critic'

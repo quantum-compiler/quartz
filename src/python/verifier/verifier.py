@@ -347,23 +347,25 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
         solver.add(z3.And(equation_list))
         solver.add(z3.ForAll([cosL, sinL], z3.Implies(
             angle(cosL, sinL), z3.Not(z3.And(matrix_equal_list)))))
+        result = solver.check()
+        assert result != z3.unknown
+        return result == z3.unsat
     else:
-        vec = input_distribution(num_qubits, equation_list)
+        # Phase factor is never provided in generator now
+        assert phase_shift_id is None
+
         num_parameters = max(
             dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
-        params = create_parameters(num_parameters, equation_list)
-        output_vec1, all_parameters = evaluate(dag1, vec, params)
-        output_vec2 = evaluate(dag2, vec, params)[0]
-        if phase_shift_id is not None:
-            # Phase factor is provided in generator
-            # We shift dag1 here
-            output_vec1 = phase_shift_by_id(
-                output_vec1, dag1, phase_shift_id, all_parameters)
-        else:
-            # Figure out the phase factor here
-            assert len(parameters_for_fingerprint) >= num_parameters
-            goal_phase_factor = complex(*dag1_meta[meta_index_original_fingerprint]) / complex(
-                *dag2_meta[meta_index_original_fingerprint])
+        # Figure out the phase factor here
+        assert len(parameters_for_fingerprint) >= num_parameters
+        goal_phase_factor = complex(*dag1_meta[meta_index_original_fingerprint]) / complex(
+            *dag2_meta[meta_index_original_fingerprint])
+        if num_parameters > 0:
+            # Construct the input vector as variables
+            vec = input_distribution(num_qubits, equation_list)
+            params = create_parameters(num_parameters, equation_list)
+            output_vec1, all_parameters = evaluate(dag1, vec, params)
+            output_vec2 = evaluate(dag2, vec, params)[0]
             equations = z3.And(equation_list)
             result = search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, params,
                                                               parameters_for_fingerprint, num_parameters,
@@ -371,13 +373,27 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
                                                               current_param_id=0, current_phase_factor_symbolic=(1, 0),
                                                               current_phase_factor_for_fingerprint=0)
             if not result:
-                print(f'Cannot find equivalence for dags:\n{dag1}\n{dag2}')
+                print(f'Cannot find equivalence for dags (vector approach):\n{dag1}\n{dag2}')
             return result
-        solver.add(z3.And(equation_list))
-        solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2))))
-    result = solver.check()
-    assert result != z3.unknown
-    return result == z3.unsat
+        else:
+            # Compare the matrices directly
+            output_vec1 = []
+            output_vec2 = []
+            for S in range(1 << num_qubits):
+                # Construct a vector with only the S-th place being 1
+                vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
+                output_vec1_S = evaluate(dag1, vec_S, [])[0]
+                output_vec2_S = evaluate(dag2, vec_S, [])[0]
+                output_vec1 += output_vec1_S
+                output_vec2 += output_vec2_S
+            result = search_phase_factor_to_check_equivalence(dag1, dag2, [], output_vec1, output_vec2, do_not_invoke_smt_solver, [],
+                                                              parameters_for_fingerprint, num_parameters,
+                                                              goal_phase_factor,
+                                                              current_param_id=0, current_phase_factor_symbolic=(1, 0),
+                                                              current_phase_factor_for_fingerprint=0)
+            if not result:
+                print(f'Cannot find equivalence for dags (matrix approach):\n{dag1}\n{dag2}')
+            return result
 
 
 def load_json(file_name):

@@ -67,10 +67,3 @@ build/*
 
 # others
 .DS_Store
-**/wandb
-**/.mypy_cache
-
-experiment/ppo-new/outputs
-experiment/**/log*
-experiment/**/*.log
-experiment/**/*.pt

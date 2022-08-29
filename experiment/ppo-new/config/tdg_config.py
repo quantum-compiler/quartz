@@ -6,7 +6,7 @@ class TdgConfig(BaseConfig):
     gate_set: List[str] = field(default_factory=lambda: [
         'h', 'cx', 't', 'tdg',
     ])
-    ecc_file: str = '../ecc_set/t_tdg.json.ecc'
+    ecc_file: str = '../ecc_set/t_tdg_ecc.json'
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',

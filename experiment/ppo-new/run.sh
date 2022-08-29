@@ -28,7 +28,7 @@ python ppo.py c=nam_ft c.resume=true c.ckpt_path=pt_iter_115.pt c.ddp_port=23373
 # python ppo.py c=nam_ft c.resume=true c.ckpt_path=cx_tdg_iter_80.pt c.ddp_port=23343 \
 #        'c.input_graphs=[{ name: "gf2^9_mult", path: "../t_tdg_rm_circs/gf2^9_mult.qasm" }]' \
 #        c.mini_batch_size=350 c.k_epochs=10 \
-#        'c.gate_set=[ "h", "cx", "t", "tdg", "x" ]' c.ecc_file=../ecc_set/t_tdg.json.ecc c.cost_type=cx_count \
+#        'c.gate_set=[ "h", "cx", "t", "tdg", "x" ]' c.ecc_file=../ecc_set/t_tdg_ecc.json c.cost_type=cx_count \
 #        2>&1 | tee ftlog/cx_rm_gf2^9_mult.log
 
 sleep 10

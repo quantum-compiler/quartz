@@ -13,7 +13,7 @@ from icecream import ic
 
 qtz.init_quartz_context(
     ['h', 'cx', 'x', 'rz', 'add',],
-    '../../ecc_set/nam.json.ecc',
+    '../../ecc_set/nam_ecc.json',
     False,
     True,
 )

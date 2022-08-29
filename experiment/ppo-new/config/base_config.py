@@ -45,7 +45,7 @@ class BaseConfig:
     gate_set: List[str] = field(default_factory=lambda: [
         'h', 'cx', 't', 'tdg',
     ])
-    ecc_file: str = '../ecc_set/t_tdg.json.ecc'
+    ecc_file: str = '../ecc_set/t_tdg_ecc.json'
     no_increase: bool = False
     include_nop: bool = True
     num_gate_types: int = 29

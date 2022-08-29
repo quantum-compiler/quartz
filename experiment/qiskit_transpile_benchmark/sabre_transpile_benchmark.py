@@ -147,6 +147,8 @@ def run_benchmark(qasm_file_name, device_name):
 
 def main():
     # parameters
+    # gf2^E5_mult_after_heavy.qasm, barenco_tof_10_before.qasm, csla_mux_3_after_heavy.qasm
+    # IBM_Q20_Tokyo, IBM_Q27_Falcon
     benchmark_runs = 32
     qasm_file_name = "gf2^E5_mult_after_heavy.qasm"
     device_name = "IBM_Q20_Tokyo"

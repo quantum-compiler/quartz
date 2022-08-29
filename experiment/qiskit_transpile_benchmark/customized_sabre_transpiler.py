@@ -102,7 +102,10 @@ def sabre_pass_manager(pass_manager_config: PassManagerConfig) -> PassManager:
     assert layout_method == "sabre"
     _improve_layout = SabreLayout(coupling_map, max_iterations=4, seed=seed_transpiler)
 
-    # 2. sabre swap for routing
+    # 2. apply layout
+    _embed = [FullAncillaAllocation(coupling_map), EnlargeWithAncilla(), ApplyLayout()]
+
+    # 3. sabre swap for routing
     assert routing_method == "sabre"
     _swap = [BarrierBeforeFinalMeasurements()]
     _swap += [SabreSwap(coupling_map, heuristic="decay", seed=seed_transpiler)]
@@ -111,6 +114,7 @@ def sabre_pass_manager(pass_manager_config: PassManagerConfig) -> PassManager:
     pm1 = PassManager()
     if coupling_map or initial_layout:
         pm1.append(_improve_layout)
+        pm1.append(_embed)
         pm1.append(_swap)
 
     return pm1

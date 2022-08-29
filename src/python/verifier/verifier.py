@@ -247,20 +247,28 @@ def search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1,
         if abs(difference) > kPhaseFactorEpsilon:
             return False
         if do_not_invoke_smt_solver:
-            # Generate a random test to verify it.
             dag1_meta = dag1[0]
             dag2_meta = dag2[0]
             num_qubits = dag1_meta[meta_index_num_qubits]
-            vec = random_input_distribution(num_qubits)
             num_parameters = max(
                 dag1_meta[meta_index_num_input_parameters], dag2_meta[meta_index_num_input_parameters])
+            if num_parameters == 0:
+                return True
+            # Generate a random test to verify it.
+            vec = random_input_distribution(num_qubits)
             params = random_parameters(num_parameters)
             output_vec1 = evaluate(dag1, vec, params, use_z3=False)[0]
             output_vec2 = evaluate(dag2, vec, params, use_z3=False)[0]
+            current_phase_factor = [z3.simplify(z3.substitute(phase_factor_component,
+                                                              [(parameters_symbolic[i], z3.RealVal(params[i])) for i in
+                                                               range(num_parameters)])) for phase_factor_component in
+                                    current_phase_factor_symbolic]
+            output_vec2_shifted = phase_shift(output_vec2, current_phase_factor)
             for i in range(1 << num_qubits):
                 a = output_vec1[i]
-                b = output_vec2[i]
-                if abs(complex(*a) - complex(*b)) > kPhaseFactorEpsilon:
+                b = output_vec2_shifted[i]
+                diff_a_b = (a[0] - b[0], a[1] - b[1])
+                if z3.simplify(z3.Sqrt(diff_a_b[0]**2 + diff_a_b[1]**2) > kPhaseFactorEpsilon):
                     return False
             return True
         # Found a possible phase factor
@@ -370,7 +378,7 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
             result = search_phase_factor_to_check_equivalence(dag1, dag2, equations, output_vec1, output_vec2, do_not_invoke_smt_solver, params,
                                                               parameters_for_fingerprint, num_parameters,
                                                               goal_phase_factor,
-                                                              current_param_id=0, current_phase_factor_symbolic=(1, 0),
+                                                              current_param_id=0, current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
                                                               current_phase_factor_for_fingerprint=0)
             if not result:
                 print(f'Cannot find equivalence for dags (vector approach):\n{dag1}\n{dag2}')
@@ -389,7 +397,7 @@ def equivalent(dag1, dag2, parameters_for_fingerprint, do_not_invoke_smt_solver=
             result = search_phase_factor_to_check_equivalence(dag1, dag2, [], output_vec1, output_vec2, do_not_invoke_smt_solver, [],
                                                               parameters_for_fingerprint, num_parameters,
                                                               goal_phase_factor,
-                                                              current_param_id=0, current_phase_factor_symbolic=(1, 0),
+                                                              current_param_id=0, current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
                                                               current_phase_factor_for_fingerprint=0)
             if not result:
                 print(f'Cannot find equivalence for dags (matrix approach):\n{dag1}\n{dag2}')

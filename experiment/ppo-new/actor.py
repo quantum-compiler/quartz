@@ -180,6 +180,7 @@ class PPOAgent:
         self.invalid_reward = invalid_reward
         self.limit_total_gate_count = limit_total_gate_count
         self.subgraph_opt = subgraph_opt
+
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
         self.softmax_temp_en = softmax_temp_en
@@ -332,6 +333,7 @@ class PPOAgent:
 
             info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
         # end for
+
         return info_dict
     
     def output_opt_path(
@@ -416,6 +418,7 @@ class PPOAgent:
         """convert graph and maintain infos in graph_buffer"""
         state_dgl_list: List[dgl.DGLGraph] = []
         next_state_dgl_list: List[dgl.DGLGraph] = []
+
         for buffer_id, obs_res in zip(init_buffer_ids, s_exp_lists):
             """for each observer's results (several episodes)"""
             graph_buffer = self.graph_buffers[buffer_id]

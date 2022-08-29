@@ -33,4 +33,3 @@ python ppo.py c=nam_ft c.resume=true c.ckpt_path=pt_iter_115.pt c.ddp_port=23373
 
 sleep 10
 
-

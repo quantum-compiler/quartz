@@ -482,6 +482,23 @@ int DAG::get_num_internal_parameters() const {
 
 int DAG::get_num_gates() const { return (int) edges.size(); }
 
+int DAG::get_circuit_depth() const {
+  std::vector<int> depth(get_num_qubits(), 0);
+  for (auto &edge : edges) {
+    if (edge->gate->is_quantum_gate()) {
+      int max_previous_depth = 0;
+      for (auto &input_node : edge->input_nodes) {
+        max_previous_depth =
+            std::max(max_previous_depth, depth[input_node->index]);
+      }
+      for (auto &input_node : edge->input_nodes) {
+        depth[input_node->index] = max_previous_depth + 1;
+      }
+    }
+  }
+  return *std::max_element(depth.begin(), depth.end());
+}
+
 bool DAG::qubit_used(int qubit_index) const {
   return outputs[qubit_index] != nodes[qubit_index].get();
 }

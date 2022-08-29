@@ -49,7 +49,6 @@ class BaseConfig:
     no_increase: bool = False
     include_nop: bool = True
     num_gate_types: int = 29
-    
     input_graphs: List[InputGraph] = field(default_factory=lambda:[
         InputGraph(
             'barenco_tof_3',
@@ -95,7 +94,6 @@ class BaseConfig:
     agent_collect: bool = True
     agent_batch_size: int = 128
     subgraph_opt: bool = True
-
     # training
     max_iterations: int = int(1e8)
     num_eps_per_iter: int = 128 # 30
@@ -112,6 +110,7 @@ class BaseConfig:
     output_full_seq: bool = False
     full_seq_path: str = '' # for read in
     
+
 @dataclass
 class TestConfig(BaseConfig):
     wandb: WandbConfig = WandbConfig(False)

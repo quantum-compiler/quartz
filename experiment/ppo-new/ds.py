@@ -311,6 +311,7 @@ class GraphBuffer:
         self.all_graphs: Dict[quartz.PyGraph, AllGraphDictValue] = {
             self.original_graph: AllGraphDictValue(0, self.original_cost, None, Action(0, 0)),
         }
+
     
     def __len__(self) -> int:
         return len(self.hashset)
@@ -336,7 +337,6 @@ class GraphBuffer:
                 i_loop += 1
             gc.collect()
             printfl(f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).')
-
             if vmem_used_perct() > 95.0:
                 raise MemoryError(f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.')
 

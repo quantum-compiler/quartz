@@ -124,7 +124,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         bool equal(const Graph &) const
         void rotation_merging(GateType)
         int circuit_depth() const
-        
+
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":
     cdef cppclass EquivalenceSet:
@@ -132,6 +132,7 @@ cdef extern from "dataset/equivalence_set.h" namespace "quartz":
         int num_equivalence_classes() const
         bool load_json(Context *, const string)
         vector[vector[DAG_ptr]] get_all_equivalence_sets() except +
+
 
 cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:

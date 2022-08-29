@@ -114,24 +114,19 @@ class QGINConv(nn.Module):
             self.eps = th.nn.Parameter(th.FloatTensor([init_eps]))
         else:
             self.register_buffer('eps', th.FloatTensor([init_eps]))
-        # MLP: (N, input_dim + edge_info_dim) -> (N, input_dim)
-        # self.compress_mlp = MLP(1, input_dim + 3, input_dim, input_dim)
 
     def __msg_func_with_edge_info(self, edges):
         return { 'm': torch.cat([ edges.src['h'], edges.data['w'] ], dim=1) }
 
     def __reduce_neigh_edge_to_feat(self, nodes):
         # nodes.mailbox['m']: (num_nodes, num_neighbors, msg_dim)
-        feats: torch.Tensor = nodes.mailbox['m']
-        # _m = m.view(-1, m.shape[2]) # adapt for BatchNorm1d
-        # _feats: torch.Tensor = self.compress_mlp(_m)
-        # feats = _feats.view(m.shape[0], m.shape[1], -1)
+        msgs: torch.Tensor = nodes.mailbox['m']
         if self._aggregator_type == 'sum':
-            neigh_feat = torch.sum(feats, dim=1)
+            neigh_feat = torch.sum(msgs, dim=1)
         elif self._aggregator_type == 'mean':
-            neigh_feat = torch.mean(feats, dim=1)
+            neigh_feat = torch.mean(msgs, dim=1)
         elif self._aggregator_type == 'max':
-            neigh_feat = torch.max(feats, dim=1).values
+            neigh_feat = torch.max(msgs, dim=1).values
         return { 'neigh': neigh_feat }
 
     def forward(self, graph: dgl.DGLGraph, feat: torch.Tensor, edge_weight=None):
@@ -164,7 +159,6 @@ class QGINConv(nn.Module):
             If ``apply_func`` is None, :math:`D_{out}` should be the same
             as input dimensionality.
         """
-        # _reducer = getattr(fn, self._aggregator_type)
         reducer = self.__reduce_neigh_edge_to_feat
         with graph.local_scope():
             """We incorporate edge info here by cat"""
@@ -183,7 +177,6 @@ class QGINConv(nn.Module):
                 feat.shape[0], _size_to_pad
             ).to(feat.device)], dim=-1)
             rst = (1 + self.eps) * feat + graph.ndata['neigh']
-            # TODO Colin we can avoid compression by padding zeros to feat here
             if self.apply_func is not None:
                 rst = self.apply_func(rst)
             # activation

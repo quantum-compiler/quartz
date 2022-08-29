@@ -86,6 +86,7 @@ class BaseConfig:
     nop_stop: bool = True
     invalid_reward: float = -1.0
     max_cost_ratio: float = 1.2
+    limit_total_gate_count: bool = False
     batch_inference: bool = True
     dyn_eps_len: bool = True
     max_eps_len: int = 300

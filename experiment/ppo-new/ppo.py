@@ -155,6 +155,7 @@ class PPOMod:
             device=self.device,
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
+            limit_total_gate_count=self.cfg.limit_total_gate_count,
             cost_type=CostType.from_str(self.cfg.cost_type),
             ac_net=self.ac_net_old,
             input_graphs=self.input_graphs,

@@ -155,6 +155,7 @@ class PPOAgent:
         device: torch.device,
         batch_inference: bool,
         invalid_reward: float,
+        limit_total_gate_count: bool,
         cost_type: CostType,
         ac_net: ActorCritic,
         input_graphs: List[Dict[str, str]],
@@ -177,6 +178,7 @@ class PPOAgent:
         self.min_eps_len = min_eps_len
         self.cost_type = cost_type
         self.invalid_reward = invalid_reward
+        self.limit_total_gate_count = limit_total_gate_count
         self.subgraph_opt = subgraph_opt
         """networks related"""
         self.ac_net = ac_net # NOTE: just a ref
@@ -706,8 +708,10 @@ class PPOAgent:
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
                     game_over = (graph_cost > original_costs[i_eps] * max_cost_ratio)
-                        # or (graph.gate_count > original_graph_list[i_eps].gate_count * max_cost_ratio)
-                    # TODO Colin add configs like limit the gate count even though the cost doesn't consider gate count
+                    if self.limit_total_gate_count:
+                        game_over |= (graph.gate_count > original_graph_list[i_eps].gate_count * max_cost_ratio)
+                        # NOTE: limit the gate count according to the original graph
+                        # (the one inputted by file) rather than the starting graph
                 if i_step - last_eps_end >= max_eps_len_for_all:
                     game_over = True # exceed len limit
                 

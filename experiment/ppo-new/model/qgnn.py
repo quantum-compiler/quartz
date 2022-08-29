@@ -8,10 +8,10 @@ import dgl
 class QConv(nn.Module):
     def __init__(
         self, in_feat: int, inter_dim: int, out_feat: int,
-        aggregator: str = 'sum', normalize: bool = False,
+        aggregator_type: str = 'sum', normalize: bool = False,
     ):
         super(QConv, self).__init__()
-        self.linear1 = nn.Sequential(
+        self.aggregator = nn.Sequential(
             nn.Linear(in_feat + 3, inter_dim),
             nn.ReLU(),
         )
@@ -20,7 +20,7 @@ class QConv(nn.Module):
             nn.ReLU(),
         )
         self.apply(self._init_weights)
-        self.aggregator: str = aggregator
+        self.aggregator_type: str = aggregator_type
         self.normalize: bool = normalize
 
     def _init_weights(self, module):
@@ -37,13 +37,13 @@ class QConv(nn.Module):
 
     def reduce_func(self, nodes):
         # NOTE: "Pooling aggregator" of GraphSAGE is defined as a Linear and an activation
-        tmp = self.linear1(nodes.mailbox['m'])
-        if self.aggregator == 'sum':
+        tmp = self.aggregator(nodes.mailbox['m'])
+        if self.aggregator_type == 'sum':
             h = torch.sum(tmp, dim=1)
-        elif self.aggregator == 'mean':
+        elif self.aggregator_type == 'mean':
             h = torch.mean(tmp, dim=1)
-        elif self.aggregator == 'max':
-            h = torch.max(tmp, dim=1)[0]
+        elif self.aggregator_type == 'max':
+            h = torch.max(tmp, dim=1).values
         else:
             raise NotImplementedError
         return {'h_N': h}

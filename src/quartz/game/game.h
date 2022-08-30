@@ -260,8 +260,27 @@ namespace quartz {
             assert(is_circuit_finished(graph));
             assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count);
             assert(execution_history.size() == swaps_inserted + executed_logical_gate_count);
-            assert(check_execution_history(graph, device, execution_history) == ExecutionHistoryStatus::VALID);
-            return original_gate_count + int(SWAPCOST) * swaps_inserted;
+            assert(check_execution_history(graph, device, execution_history, false) == ExecutionHistoryStatus::VALID);
+            // scan through the execution history to determine cost of each swap
+            std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
+            int swap_with_cost = 0;
+            for (ExecutionHistory eh_item : execution_history) {
+                if (eh_item.gate_type == GateType::swap) {
+                    // only swaps with at least one logical input used have non-zero cost
+                    int _logical0 = eh_item.logical0;
+                    int _logical1 = eh_item.logical1;
+                    if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) swap_with_cost += 1;
+                } else {
+                    // set target logical qubit as used
+                    int _logical0 = eh_item.logical0;
+                    int _logical1 = eh_item.logical1;
+                    is_qubit_used[_logical0] = true;
+                    is_qubit_used[_logical1] = true;
+                }
+            }
+            assert(swap_with_cost <= swaps_inserted);
+
+            return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
 
         void save_execution_history_to_file(const std::string& eh_file_name,

@@ -348,7 +348,8 @@ namespace quartz {
 
     ExecutionHistoryStatus check_execution_history(const Graph &graph,
                                                    const std::shared_ptr<DeviceTopologyGraph> &device,
-                                                   const std::vector<ExecutionHistory> &execution_history_list) {
+                                                   const std::vector<ExecutionHistory> &execution_history_list,
+                                                   bool check_gate_count = true) {
         // check whether an execution history is valid on device
         int executed_gate_count = 0;
         for (const auto &execution_history: execution_history_list) {
@@ -372,7 +373,7 @@ namespace quartz {
                 }
             }
         }
-        assert(executed_gate_count == graph.gate_count());
+        if (check_gate_count) assert(executed_gate_count == graph.gate_count());
         return ExecutionHistoryStatus::VALID;
     }
 

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <utility>
 #include "../tasograph/tasograph.h"
+#include "../sabre/sabre_swap.h"
 
 namespace quartz {
     class State {
@@ -340,5 +341,27 @@ namespace quartz {
             }
         }
         return removed_gate_cnt;
+    }
+
+    void find_initial_mapping(Graph& graph, const std::shared_ptr<DeviceTopologyGraph>& device,
+                             int quota) {
+        // STEP 1: find a good initial mapping
+        QubitMappingTable best_mapping;
+        int best_mapping_cost = 1000000;
+        for (int i = 0; i < quota; ++i) {
+            // initialize mapping
+            graph.init_physical_mapping(InitialMappingType::SABRE, device, 5, true, 0.5);
+            auto execution_history = sabre_swap(graph, device, true, 0.5);
+            int current_cost = execution_cost(execution_history);
+            // update best
+            if (current_cost < best_mapping_cost) {
+                best_mapping = graph.qubit_mapping_table;
+                best_mapping_cost = current_cost;
+            }
+        }
+
+        // STEP 2: propagate the mapping
+        graph.qubit_mapping_table = best_mapping;
+        graph.propagate_mapping();
     }
 }

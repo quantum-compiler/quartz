@@ -1,12 +1,13 @@
-from typing import Callable, Tuple, List, Any
-import quartz
-from utils import masked_softmax
+import math
+from typing import Any, Callable, List, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import math
+from utils import masked_softmax
+
+import quartz
 
 
 class QConv(nn.Module):
@@ -23,8 +24,8 @@ class QConv(nn.Module):
         nn.init.xavier_normal_(self.linear2.weight, gain=gain)
 
     def message_func(self, edges):
-        #print(f'node h {edges.src["h"].shape}')
-        #print(f'node w {edges.data["w"].shape}')
+        # print(f'node h {edges.src["h"].shape}')
+        # print(f'node w {edges.data["w"].shape}')
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
@@ -37,7 +38,7 @@ class QConv(nn.Module):
 
     def forward(self, g, h):
         g.ndata['h'] = h
-        #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
+        # g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
         g.update_all(self.message_func, self.reduce_func)
         h_N = g.ndata['h_N']
         h_total = torch.cat([h, h_N], dim=1)
@@ -60,15 +61,17 @@ class QGNN(nn.Module):
         self.convs: nn.Module = nn.ModuleList(convs)
 
     def forward(self, g):
-        #print(g.ndata['gate_type'])
-        #print(self.embedding)
+        # print(g.ndata['gate_type'])
+        # print(self.embedding)
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-                      dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h = self.conv_0(g, g.ndata['h'])
         for i in range(len(self.convs)):
@@ -77,18 +80,30 @@ class QGNN(nn.Module):
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, num_gate_type: int, graph_embed_size: int,
-                 actor_hidden_size: int, critic_hidden_size: int,
-                 action_dim: int, hit_rate: float, device) -> None:
+    def __init__(
+        self,
+        num_gate_type: int,
+        graph_embed_size: int,
+        actor_hidden_size: int,
+        critic_hidden_size: int,
+        action_dim: int,
+        hit_rate: float,
+        device,
+    ) -> None:
         super().__init__()
-        self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size,
-                                    graph_embed_size)
+        self.graph_embedding = QGNN(
+            6, num_gate_type, graph_embed_size, graph_embed_size
+        )
         self.actor = nn.Sequential(
-            nn.Linear(graph_embed_size, actor_hidden_size), nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim))
+            nn.Linear(graph_embed_size, actor_hidden_size),
+            nn.ReLU(),
+            nn.Linear(actor_hidden_size, action_dim),
+        )
         self.critic = nn.Sequential(
-            nn.Linear(graph_embed_size, critic_hidden_size), nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1))
+            nn.Linear(graph_embed_size, critic_hidden_size),
+            nn.ReLU(),
+            nn.Linear(critic_hidden_size, 1),
+        )
 
         self.action_dim = action_dim
         self.hit_rate = hit_rate
@@ -96,22 +111,23 @@ class ActorCritic(nn.Module):
 
     def load_ckpt(self, ckpt_path: str) -> None:
         ckpt = torch.load(ckpt_path)
-        model_state_dict = ckpt['model_state_dict']
-        self.load_state_dict(model_state_dict)
+        # model_state_dict = ckpt['model_state_dict']
+        # self.load_state_dict(model_state_dict)
+        self.load_state_dict(ckpt)
 
     def get_nodes_and_xfers_deterministic(
-            self, context: quartz.QuartzContext, circ: quartz.PyGraph,
-            k: int) -> tuple[list[int], list[int]]:
+        self, context: quartz.QuartzContext, circ: quartz.PyGraph, k: int
+    ) -> tuple[list[int], list[int]]:
         dgl_g = circ.to_dgl_graph().to(self.device)
         graph_embeds = self.graph_embedding(dgl_g)
         node_values: torch.Tensor = self.critic(graph_embeds).squeeze()
         _, node_idxs = node_values.topk(k)
 
-        masks = torch.zeros((k, self.action_dim),
-                            dtype=torch.bool).to(self.device)
+        masks = torch.zeros((k, self.action_dim), dtype=torch.bool).to(self.device)
         for i, node_idx in enumerate(node_idxs):
             available_xfers = circ.available_xfers_parallel(
-                context=context, node=circ.get_node_from_id(id=node_idx))
+                context=context, node=circ.get_node_from_id(id=node_idx)
+            )
             masks[i][available_xfers] = True
 
         xfer_logits = self.actor(graph_embeds[node_idxs])
@@ -121,22 +137,23 @@ class ActorCritic(nn.Module):
 
         return node_idxs.tolist(), xfers.tolist()
 
-    def get_node_and_xfer(self, context: quartz.QuartzContext,
-                          circ: quartz.PyGraph) -> tuple[int, int]:
+    def get_node_and_xfer(
+        self, context: quartz.QuartzContext, circ: quartz.PyGraph
+    ) -> tuple[int, int]:
         node_num = circ.gate_count
         dgl_g = circ.to_dgl_graph().to(self.device)
         graph_embeds = self.graph_embedding(dgl_g)
         node_values: torch.Tensor = self.critic(graph_embeds).squeeze()
 
-        temperature = 1 / math.log(
-            (node_num - 1) / (1 - self.hit_rate) * self.hit_rate)
+        temperature = 1 / math.log((node_num - 1) / (1 - self.hit_rate) * self.hit_rate)
         node_probs = F.softmax(node_values / temperature, dim=-1)
         node_dist = Categorical(probs=node_probs)
         node = node_dist.sample()
 
         mask = torch.zeros((self.action_dim), dtype=torch.bool).to(self.device)
         available_xfers = circ.available_xfers_parallel(
-            context=context, node=circ.get_node_from_id(id=node))
+            context=context, node=circ.get_node_from_id(id=node)
+        )
         mask[available_xfers] = True
 
         xfer_logits = self.actor(graph_embeds[node])

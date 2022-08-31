@@ -78,10 +78,9 @@ int main(int argc, char **argv) {
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
-  auto graph_after_search = graph_before_search->optimize(&dst_ctx,
-                                                          eqset_fn,
-                                                          input_fn, /*print_message=*/
-                                                          true);
+  auto graph_after_search = graph_before_search->optimize(
+      &dst_ctx, eqset_fn, input_fn, /*print_message=*/
+      true);
   std::cout << "gate count after optimization: "
             << graph_after_search->total_cost() << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);

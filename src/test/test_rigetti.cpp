@@ -77,11 +77,12 @@ int main(int argc, char **argv) {
               << " on Rigetti gate set."
               << " Gate count after optimization: "
               << graph_before_search->gate_count() << ", "
-              << "Circuit depth: " << graph_before_search->circuit_depth() << ", "
-              << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                  .count() /
-                  1000.0
+              << "Circuit depth: " << graph_before_search->circuit_depth()
+              << ", "
+              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                     end - start)
+                         .count() /
+                     1000.0
               << " seconds." << std::endl;
     return 0;
   }
@@ -92,10 +93,10 @@ int main(int argc, char **argv) {
   auto union_ctx_0 = union_contexts(&cz_ctx, &dst_ctx);
   auto graph_before_h_cz_merge = new_graph->context_shift(
       &dst_ctx, &cz_ctx, &union_ctx_0, &cx_2_cz, false);
-  auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(&union_ctx_0,
-                                                                  "../H_CZ_2_2_complete_ECC_set_modified.json",
-                                                                  fn, /*print_message=*/
-                                                                  true);
+  auto graph_after_h_cz_merge = graph_before_h_cz_merge->optimize(
+      &union_ctx_0, "../H_CZ_2_2_complete_ECC_set_modified.json",
+      fn, /*print_message=*/
+      true);
   //   graph_after_h_cz_merge->to_qasm(
   //       "circuit/voqc-benchmarks/after_h_cz_merge.qasm", false, false);
 
@@ -109,20 +110,19 @@ int main(int argc, char **argv) {
       &cz_ctx, &rigetti_ctx, &union_ctx_1, &rules, false);
 
   // Optimization
-  auto graph_after_search = graph_rigetti->optimize(&union_ctx_1,
-                                                    eqset_fn,
-                                                    fn, /*print_message=*/
-                                                    true);
+  auto graph_after_search =
+      graph_rigetti->optimize(&union_ctx_1, eqset_fn, fn, /*print_message=*/
+                              true);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
             << " on Rigetti gate set."
             << " Gate count after optimization: "
             << graph_after_search->gate_count() << ", "
             << "Circuit depth: " << graph_after_search->circuit_depth() << ", "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - start)
-                .count() /
-                1000.0
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - start)
+                       .count() /
+                   1000.0
             << " seconds." << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);
 }

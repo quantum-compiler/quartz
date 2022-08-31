@@ -24,10 +24,10 @@ conda env create --name quartz --file env.yml
 conda activate quartz
 ```
 
-* Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`. 
+* Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`.
 ```shell
-mkdir build; 
-cd build; 
+mkdir build;
+cd build;
 cmake ..
 make install
 ```
@@ -48,7 +48,7 @@ python setup.py build_ext --inplace install
 
 Note that if you changed the install directory in the last step, you have to modified `include_dirs` and `library_dirs` in `setup.py`.
 
-* To use `quartz` library in python, you should make sure the directory where you install `quartz` runtime library, that is `libquartz_runtime.so`, is in python's searching directories. 
+* To use `quartz` library in python, you should make sure the directory where you install `quartz` runtime library, that is `libquartz_runtime.so`, is in python's searching directories.
 
 You can add:
 

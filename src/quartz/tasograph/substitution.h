@@ -6,8 +6,8 @@
 #include "../gate/gate_utils.h"
 #include "assert.h"
 #include "tasograph.h"
-#include <queue>
 #include <ostream>
+#include <queue>
 
 namespace quartz {
 
@@ -59,7 +59,7 @@ public:
 };
 
 class GraphCompare {
- public:
+public:
   GraphCompare() {
     cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -69,7 +69,8 @@ class GraphCompare {
                   const std::shared_ptr<Graph> &rhs) {
     return cost_function_(lhs.get()) > cost_function_(rhs.get());
   }
- private:
+
+private:
   std::function<float(Graph *)> cost_function_;
 };
 
@@ -92,12 +93,11 @@ public:
   bool create_new_operator(const OpX *opx, Op &op);
   int num_src_op();
   int num_dst_op();
-  std::string to_str(std::vector<OpX *> const & v) const;
+  std::string to_str(std::vector<OpX *> const &v) const;
   std::string src_str() const;
   std::string dst_str() const;
   // TODO: not implemented
-//   std::string to_qasm(std::vector<OpX *> const &v) const;
-
+  //   std::string to_qasm(std::vector<OpX *> const &v) const;
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,

@@ -1,4 +1,5 @@
 import sys
+
 from natsort import natsorted
 
 
@@ -21,7 +22,7 @@ def extract_results(filename):
             flag = True
             pos = line.find('.qasm')
             pos2 = line.rfind(' ', 0, pos)
-            key = line[pos2 + 1:pos]
+            key = line[pos2 + 1 : pos]
         else:
             flag = False
         if flag:
@@ -30,18 +31,18 @@ def extract_results(filename):
             pos4 = line.find(':', pos2)
             pos5 = line.find(',', pos4)
             pos3 = line.find('s', pos2 if pos5 == -1 else pos5)
-            val = int(line[pos + 2:pos2])
+            val = int(line[pos + 2 : pos2])
             result[key] = val
             tot_gate += val
             gate_product *= val
             if pos4 == -1:
-                tot_time += float(line[pos2 + 2:pos3])
+                tot_time += float(line[pos2 + 2 : pos3])
             else:
-                val = int(line[pos4 + 2:pos5])
+                val = int(line[pos4 + 2 : pos5])
                 result_depth[key] = val
                 tot_depth += val
                 depth_product *= val
-                tot_time += float(line[pos5 + 2:pos3])
+                tot_time += float(line[pos5 + 2 : pos3])
         # if len(data) >= 2 and data[1] == 'Timeout.':
         #     key = data[0].split('.')[0]
         #     val = data[-1]
@@ -56,7 +57,7 @@ def extract_results(filename):
         print('Circuit depth:')
         for k, v in natsorted(result_depth.items()):
             print(k.ljust(15), v)
-        assert(len(result_depth) == len(result))
+        assert len(result_depth) == len(result)
     print('tot_gate =', tot_gate)
     print('num_circuits =', len(result))
     print('geomean_gatecount =', gate_product ** (1 / len(result)))

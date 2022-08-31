@@ -1,7 +1,8 @@
-from typing import cast, List
+from typing import List, cast
+
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 """MLP is stolen with modification from DGL example for GIN"""
 # https://github.com/dmlc/dgl/blob/7cd531c4d67f8de5c597ae5ad589e6acae36a4c3/examples/pytorch/gin/gin.py

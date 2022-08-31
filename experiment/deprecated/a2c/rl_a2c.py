@@ -1,14 +1,16 @@
 import math
 import random
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.distributions import Categorical
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+import torch.optim as optim
 from gnn import QGNN
+from torch.distributions import Categorical
+from tqdm import tqdm
+
 import quartz
 
 

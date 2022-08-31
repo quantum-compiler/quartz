@@ -1,22 +1,23 @@
 # this file is under mypy's checking
 """data structures"""
 from __future__ import annotations
-from dataclasses import dataclass, fields
+
+import gc
 import heapq
-from typing import Dict, Iterator, Set, List, Tuple, Any, TypeVar, cast
+import itertools
 import math
 import random
-import itertools
-import gc
 import sys
+from dataclasses import dataclass, fields
+from typing import Any, Dict, Iterator, List, Set, Tuple, TypeVar, cast
 
-import torch
 import dgl  # type: ignore
-
-from utils import *
-import quartz  # type: ignore
 import qtz
+import torch
 from IPython import embed  # type: ignore
+from utils import *
+
+import quartz  # type: ignore
 
 
 @dataclass

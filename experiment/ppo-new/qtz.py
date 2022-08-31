@@ -1,6 +1,6 @@
-from typing import Callable, Set, Tuple, List, Dict, Any
-import quartz  # type: ignore
+from typing import Any, Callable, Dict, List, Set, Tuple
 
+import quartz  # type: ignore
 
 """global vars"""
 quartz_context: quartz.QuartzContext

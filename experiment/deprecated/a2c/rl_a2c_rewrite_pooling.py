@@ -1,17 +1,19 @@
 import math
 import random
+from collections import deque
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.distributions import Categorical
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+import torch.optim as optim
 from gnn import QGNN
-import quartz
+from torch.distributions import Categorical
+from tqdm import tqdm
 from transformers import TransfoXLConfig, TransfoXLModel
-from collections import deque
+
+import quartz
 
 device = torch.device('cpu')
 

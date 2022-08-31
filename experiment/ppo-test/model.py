@@ -1,12 +1,13 @@
-from typing import Callable, Tuple, List, Any
-import quartz
-from utils import masked_softmax
+import math
+from typing import Any, Callable, List, Tuple
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-import math
+from utils import masked_softmax
+
+import quartz
 
 
 class QConv(nn.Module):

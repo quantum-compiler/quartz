@@ -1,14 +1,16 @@
-import quartz
-import time
-import os
 import heapq
-from concurrent.futures import ProcessPoolExecutor
 import json
-from qiskit.quantum_info import Statevector
-from qiskit import QuantumCircuit
 import math
+import os
+import time
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 from functools import partial
+
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
+
+import quartz
 
 
 def check(graph):

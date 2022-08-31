@@ -1,17 +1,19 @@
-from prompt_toolkit import PromptSession
-import quartz
-import torch
-import os
-from datetime import datetime
-import numpy as np
-import time
-from tqdm import tqdm
-import wandb
-import random
-from PPO import PPO
-from torch.distributions import Categorical
-from Utils import get_trajectory
 import math
+import os
+import random
+import time
+from datetime import datetime
+
+import numpy as np
+import torch
+import wandb
+from PPO import PPO
+from prompt_toolkit import PromptSession
+from torch.distributions import Categorical
+from tqdm import tqdm
+from Utils import get_trajectory
+
+import quartz
 
 wandb.init(project='ppo_multi_step')
 os.environ['OMP_SCHEDULE'] = 'dynamic'

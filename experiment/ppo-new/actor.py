@@ -1,34 +1,32 @@
 # this file is under mypy's checking
 from __future__ import annotations
-import os
-from typing import Tuple, List, Dict, Any
-import threading
+
 import copy
 import itertools
-import math
 import json
+import math
+import os
+import threading
+from typing import Any, Dict, List, Tuple
 
+import dgl  # type: ignore
 import qtz
-
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import Categorical
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
+import torch.nn as nn
+import torch.nn.functional as F
+import wandb
+from ds import *
+from icecream import ic  # type: ignore
+from IPython import embed  # type: ignore
+from model.actor_critic import ActorCritic
+from omegaconf.dictconfig import DictConfig
+from torch.distributions import Categorical
 from torch.futures import Future
-import dgl  # type: ignore
+from utils import *
 
 # import quartz # type: ignore
-
-import wandb
-from omegaconf.dictconfig import DictConfig
-
-from ds import *
-from utils import *
-from model.actor_critic import ActorCritic
-from IPython import embed  # type: ignore
-from icecream import ic  # type: ignore
 
 
 class Observer:

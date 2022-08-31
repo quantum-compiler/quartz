@@ -1,9 +1,10 @@
-from fileinput import filename
-import quartz
-import time
 import heapq
-import sys
 import os
+import sys
+import time
+from fileinput import filename
+
+import quartz
 
 
 def optimize(

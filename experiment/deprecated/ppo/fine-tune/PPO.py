@@ -1,11 +1,13 @@
-from quartz import PyGraph
+import random
+import time
+
+import dgl
 import torch
 import torch.nn as nn
-import dgl
-import time
 import wandb
 from ActorCritic import ActorCritic
-import random
+
+from quartz import PyGraph
 
 
 class RolloutBuffer:

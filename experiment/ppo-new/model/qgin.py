@@ -1,15 +1,14 @@
-from typing import cast, List
-import torch
-import torch as th
-from torch import nn
-import torch.nn.functional as F
+from typing import List, cast
 
 import dgl
 import dgl.function as fn
+import torch
+import torch as th
+import torch.nn.functional as F
+from dgl.nn.pytorch.glob import AvgPooling, MaxPooling, SumPooling
 from dgl.utils import expand_as_pair
-from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
-
 from model.basis import *
+from torch import nn
 
 """QGINConv is stolen with modification from DGL source code for dgl.nn.pytorch.conv.ginconv"""
 # https://docs.dgl.ai/en/0.8.x/_modules/dgl/nn/pytorch/conv/ginconv.html#GINConv

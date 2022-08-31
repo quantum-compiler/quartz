@@ -1,35 +1,35 @@
 from __future__ import annotations
-from dataclasses import dataclass, fields
-import sys
-import psutil  # type: ignore
+
+import copy
+import datetime
+import itertools
 import random
-from typing import Tuple, List, Any
-import warnings
-from collections import deque, namedtuple
-from functools import partial
+import sys
 import threading
 import time
-import datetime
-import copy
-import itertools
+import warnings
+from collections import deque, namedtuple
+from dataclasses import dataclass, fields
 from enum import Enum
+from functools import partial
+from typing import Any, List, Tuple
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.distributions import Categorical
-import torch.multiprocessing as mp
-import torch.distributed.rpc as rpc
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.futures import Future
 import dgl  # type: ignore
 import numpy as np
-import quartz  # type: ignore
-
+import psutil  # type: ignore
+import torch
+import torch.distributed as dist
+import torch.distributed.rpc as rpc
+import torch.multiprocessing as mp
+import torch.nn as nn
+import torch.nn.functional as F
 from ds import *
-
 from IPython import embed  # type: ignore
+from torch.distributions import Categorical
+from torch.futures import Future
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+import quartz  # type: ignore
 
 
 def seed_all(seed: int) -> None:

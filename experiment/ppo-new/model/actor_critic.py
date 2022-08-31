@@ -1,14 +1,15 @@
 from __future__ import annotations
-from typing import Callable, Tuple, List, Any
+
+from typing import Any, Callable, List, Tuple
+
+import dgl
 import torch
 import torch.nn as nn
-from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.nn.functional as F
-import dgl
-
 from model.basis import *
-from model.qgnn import *
 from model.qgin import *
+from model.qgnn import *
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 class ActorCritic(nn.Module):

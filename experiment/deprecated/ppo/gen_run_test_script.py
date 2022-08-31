@@ -1,5 +1,5 @@
 import os
-from os.path import join, isfile
+from os.path import isfile, join
 
 qasm_path = os.getcwd() + '/../t_tdg_h_cx_toffoli_flip_dataset/'
 qasm_fns = [

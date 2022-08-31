@@ -1,8 +1,8 @@
-import qiskit
 import numpy as np
+import qiskit
+from verifier.gates import compute
 
 from .utils import *
-from verifier.gates import compute
 
 
 def build_circuit(dag):

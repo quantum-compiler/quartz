@@ -1,8 +1,9 @@
 import os
 import sys
 import sysconfig
-from setuptools import find_packages
 from pathlib import Path
+
+from setuptools import find_packages
 
 # need to use distutils.core for correct placement of cython dll
 if "--inplace" in sys.argv:

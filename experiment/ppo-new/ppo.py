@@ -1,39 +1,36 @@
 # this file is under mypy's checking
 from __future__ import annotations
-import os
-from typing import List, Dict, cast, OrderedDict
-import warnings
-from functools import partial
-import time
+
 import copy
 import math
-from numpy import str0
-from tqdm import tqdm  # type: ignore
-from natsort import natsorted
-
-import qtz
-
-import torch
-from torch.distributions import Categorical
-import torch.multiprocessing as mp
-import torch.distributed as dist
-import torch.distributed.rpc as rpc
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-# import quartz # type: ignore
+import os
+import time
+import warnings
+from functools import partial
+from typing import Dict, List, OrderedDict, cast
 
 import hydra
+import qtz
+import torch
+import torch.distributed as dist
+import torch.distributed.rpc as rpc
+import torch.multiprocessing as mp
 import wandb
-
+from actor import PPOAgent
 from config.config import *
 from ds import *
-from utils import *
-from model.actor_critic import ActorCritic
-from actor import PPOAgent
-from tester import Tester
-
-from IPython import embed  # type: ignore
 from icecream import ic  # type: ignore
+from IPython import embed  # type: ignore
+from model.actor_critic import ActorCritic
+from natsort import natsorted
+from numpy import str0
+from tester import Tester
+from torch.distributions import Categorical
+from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm import tqdm  # type: ignore
+from utils import *
+
+# import quartz # type: ignore
 
 
 class PPOMod:

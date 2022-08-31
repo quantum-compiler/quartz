@@ -1,8 +1,7 @@
 import json
 import random
-from dgl import save_graphs, load_graphs
 
-from dgl import save_graphs, load_graphs
+from dgl import load_graphs, save_graphs
 
 
 class PosRewardData:

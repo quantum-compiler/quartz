@@ -1,6 +1,6 @@
 import os
-import sys
 import re
+import sys
 
 path = r'./Arithmetic_and_Toffoli'
 path2 = r'./qasm_output'

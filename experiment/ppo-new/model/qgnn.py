@@ -1,8 +1,9 @@
 from typing import List
+
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 
 
 class QConv(nn.Module):

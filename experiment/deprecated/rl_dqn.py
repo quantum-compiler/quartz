@@ -1,16 +1,18 @@
+import copy
+import json
+import random
+from collections import deque
+
+import dgl
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import copy
-import random
-from collections import deque
-from tqdm import tqdm
 from pos_data import PosRewardData
-import dgl
+from tqdm import tqdm
+
 import quartz
-import json
-import matplotlib.pyplot as plt
 
 # Constant
 gate_type_num = 26

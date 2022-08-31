@@ -1,23 +1,27 @@
 # distutils: language = c++
 
+from CCore cimport (
+    DAG,
+    Context,
+    DAG_ptr,
+    Edge,
+    EquivalenceSet,
+    Gate,
+    GateType,
+    Graph,
+    GraphXfer,
+    Op,
+    QASMParser,
+)
 from cython.operator cimport dereference as deref
+from libcpp cimport bool
+from libcpp.memory cimport make_shared, shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
-from libcpp.memory cimport shared_ptr, make_shared
-from libcpp cimport bool
-from CCore cimport GateType
-from CCore cimport Gate
-from CCore cimport DAG
-from CCore cimport DAG_ptr
-from CCore cimport GraphXfer
-from CCore cimport Graph
-from CCore cimport Op
-from CCore cimport Context
-from CCore cimport EquivalenceSet
-from CCore cimport QASMParser
-from CCore cimport Edge
-from enum import Enum
+
 import ctypes
+from enum import Enum
+
 import dgl
 import torch
 
@@ -335,6 +339,7 @@ cdef class QuartzContext:
         return num
 
 from functools import partial
+
 
 cdef class PyNode:
     cdef Op node

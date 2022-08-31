@@ -1,19 +1,20 @@
-from math import gamma
-import sys
-import os
 import json
+import os
 import random
+import sys
+from math import gamma
+
+import dgl
 import hydra
 import numpy as np
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.strategies import DDPStrategy
-import dgl
 from gnn import QGNN
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 from tqdm import tqdm
 from transformers import TransfoXLConfig, TransfoXLModel
 

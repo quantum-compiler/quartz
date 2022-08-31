@@ -1,15 +1,12 @@
+import os
+import sys
 from typing import List, Tuple, cast
 
 from qiskit import QuantumCircuit
-from qiskit.quantum_info import Statevector
-from qiskit.quantum_info import Operator
-
-import os
-import sys
+from qiskit.quantum_info import Operator, Statevector
 
 sys.path.append(os.path.join(os.getcwd(), '..'))
 import qtz
-
 from icecream import ic
 
 qtz.init_quartz_context(
@@ -61,6 +58,7 @@ if __name__ == '__main__':
         ic(check_op_eq_from_path(file_x, file_y))
     else:
         import os
+
         from natsort import natsorted
         from tqdm import tqdm
 

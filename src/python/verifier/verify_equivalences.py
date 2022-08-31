@@ -1,6 +1,7 @@
-from verifier import *
-import sys
 import ast
+import sys
+
+from verifier import *
 
 sys.path.append("..")
 

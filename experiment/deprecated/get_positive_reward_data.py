@@ -1,13 +1,15 @@
-import quartz
-import time
-import heapq
-from concurrent.futures import ProcessPoolExecutor
 import copy
+import heapq
 import json
-from dgl import save_graphs, load_graphs
-from qiskit.quantum_info import Statevector
-from qiskit import QuantumCircuit
+import time
+from concurrent.futures import ProcessPoolExecutor
+
+from dgl import load_graphs, save_graphs
 from pos_data import PosRewardData
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
+
+import quartz
 
 
 def check(graph):

@@ -1,6 +1,6 @@
-import z3
 import math
 
+import z3
 
 # parameter gates
 

@@ -1,17 +1,19 @@
-import quartz
-import torch
-from gnn import QGNN
 import os
-from datetime import datetime
-import torch.nn as nn
-from torch.distributions import Categorical
-import torch.nn.functional as F
-import numpy as np
-import dgl
-import time
-from tqdm import tqdm
 import sys
+import time
+from datetime import datetime
+
+import dgl
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from gnn import QGNN
 from qiskit import QuantumCircuit
+from torch.distributions import Categorical
+from tqdm import tqdm
+
+import quartz
 
 # set device to cpu or cuda
 device = torch.device('cpu')

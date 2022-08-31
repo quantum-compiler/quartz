@@ -1,13 +1,15 @@
-import torch
-from GNN import QGNN
 import os
 from datetime import datetime
-import torch.nn as nn
-from torch.distributions import Categorical
-from quartz import PyGraph, QuartzContext
-import torch.nn.functional as F
+
 import dgl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from GNN import QGNN
+from torch.distributions import Categorical
 from Utils import masked_softmax
+
+from quartz import PyGraph, QuartzContext
 
 
 class ActorCritic(nn.Module):

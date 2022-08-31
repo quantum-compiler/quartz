@@ -1,11 +1,11 @@
 # distutils: language=c++
 
-from libcpp.vector cimport vector
-from libcpp cimport bool
 from libc.stdint cimport uint32_t
-from libcpp.string cimport string
+from libcpp cimport bool
 from libcpp.memory cimport shared_ptr
 from libcpp.pair cimport pair
+from libcpp.string cimport string
+from libcpp.vector cimport vector
 
 ctypedef float ParamType
 

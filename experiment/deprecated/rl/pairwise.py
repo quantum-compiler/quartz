@@ -2,15 +2,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
-from transformers import TrainingArguments, Trainer
 from transformers import (
-    BertTokenizer,
     BertForSequenceClassification,
     BertModel,
     BertPreTrainedModel,
+    BertTokenizer,
+    Trainer,
+    TrainingArguments,
 )
-from transformers.models.bert.modeling_bert import BertEncoder, BertPooler
 from transformers.modeling_outputs import SequenceClassifierOutput
+from transformers.models.bert.modeling_bert import BertEncoder, BertPooler
 
 
 class BertPairwise(BertPreTrainedModel):

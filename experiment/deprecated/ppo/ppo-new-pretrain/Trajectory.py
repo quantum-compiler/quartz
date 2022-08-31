@@ -1,8 +1,10 @@
-from PPO import PPO, RolloutBuffer
-from quartz import QuartzContext, PyGraph
-import torch
-import time
 import random
+import time
+
+import torch
+from PPO import PPO, RolloutBuffer
+
+from quartz import PyGraph, QuartzContext
 
 
 class Trajectory:

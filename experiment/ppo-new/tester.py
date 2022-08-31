@@ -1,20 +1,19 @@
 # this file is under mypy's checking
 from __future__ import annotations
-import torch
-from torch.distributions import Categorical
 
-import os
 import heapq
-from tqdm import tqdm  # type: ignore
+import os
+
 import hydra
-import wandb
-
 import qtz
-
+import torch
+import wandb
 from config.config import *
 from ds import *
-from utils import *
 from model.actor_critic import ActorCritic
+from torch.distributions import Categorical
+from tqdm import tqdm  # type: ignore
+from utils import *
 
 
 @dataclass

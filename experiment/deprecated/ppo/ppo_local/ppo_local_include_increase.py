@@ -1,14 +1,16 @@
-import torch
 import os
-from datetime import datetime
-import quartz
-import numpy as np
-import time
-from tqdm import tqdm
-import wandb
 import random
+import time
+from datetime import datetime
+
+import numpy as np
+import torch
+import wandb
 from PPO import PPO
+from tqdm import tqdm
 from Utils import get_trajectory
+
+import quartz
 
 wandb.init(project='ppo_local_include_increase')
 

@@ -6,14 +6,13 @@ is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
-import multiprocessing as mp
 import math
-import z3
-from gates import get_matrix, compute
-from gates import add, neg  # for searching phase factors
-
-import sys
+import multiprocessing as mp
 import os
+import sys
+
+import z3
+from gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))

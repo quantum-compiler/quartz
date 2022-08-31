@@ -1,9 +1,11 @@
-import quartz
-import time
 import heapq
-import sys
 import os
+import sys
+import time
+
 import wandb
+
+import quartz
 
 wandb.init(project='nam_worm')
 

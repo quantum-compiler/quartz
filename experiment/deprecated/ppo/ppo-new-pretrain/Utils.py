@@ -1,6 +1,7 @@
+import time
+
 import torch
 import torch.nn.functional as F
-import time
 
 
 def masked_softmax(logits, mask):

@@ -1,17 +1,19 @@
-import quartz
-import time
-import os
+import argparse
 import heapq
 import json
-from qiskit.quantum_info import Statevector
-from qiskit import QuantumCircuit
 import math
+import os
+import time
 from collections import deque
 from functools import partial
+
 import multiprocess as mp
-from tqdm import tqdm
-import argparse
 from IPython import embed
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
+from tqdm import tqdm
+
+import quartz
 
 
 def check(graph):

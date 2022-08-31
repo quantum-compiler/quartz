@@ -1,6 +1,7 @@
-import quartz
-from model import ActorCritic
 import torch
+from model import ActorCritic
+
+import quartz
 
 # Global config
 total_num_gates = 29

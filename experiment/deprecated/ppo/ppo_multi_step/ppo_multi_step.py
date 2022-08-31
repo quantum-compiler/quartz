@@ -1,18 +1,20 @@
-import quartz
-import torch
+import copy
+import json
+import math
 import os
-from datetime import datetime
-import numpy as np
-import time
-from tqdm import tqdm
-import wandb
 import random
+import time
+from datetime import datetime
+
+import numpy as np
+import torch
+import wandb
 from PPO import PPO
 from torch.distributions import Categorical
+from tqdm import tqdm
 from Trajectory import get_trajectory_batch
-import math
-import json
-import copy
+
+import quartz
 
 wandb.init(project='ppo_multi_step')
 os.environ['OMP_SCHEDULE'] = 'dynamic'

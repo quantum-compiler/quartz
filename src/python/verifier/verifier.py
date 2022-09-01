@@ -110,8 +110,8 @@ def apply_matrix(vec, mat, qubit_indices):
 
 def input_distribution(num_qubits, equation_list):
     vec_size = 1 << num_qubits
-    real_part = z3.RealVector('r', vec_size)
-    imag_part = z3.RealVector('i', vec_size)
+    real_part = z3.RealVector("r", vec_size)
+    imag_part = z3.RealVector("i", vec_size)
     # A quantum state requires the sum of modulus of all numbers to be 1.
     sum_modulus = sum([x * x for x in real_part]) + sum([x * x for x in imag_part])
     equation_list.append(sum_modulus == 1)
@@ -136,8 +136,8 @@ def angle(c, s):
 
 
 def create_parameters(num_parameters, equation_list):
-    param_cos = z3.RealVector('c', num_parameters)
-    param_sin = z3.RealVector('s', num_parameters)
+    param_cos = z3.RealVector("c", num_parameters)
+    param_sin = z3.RealVector("s", num_parameters)
     for i in range(num_parameters):
         equation_list.append(angle(param_cos[i], param_sin[i]))
     return list(zip(param_cos, param_sin))
@@ -170,20 +170,20 @@ def evaluate(dag, input_dis, input_parameters, use_z3=True):
         parameter_values = []
         qubit_indices = []
         for input in gate[2]:
-            if input.startswith('P'):
+            if input.startswith("P"):
                 # parameter input
                 parameter_values.append(parameters[int(input[1:])])
             else:
-                assert input.startswith('Q')
+                assert input.startswith("Q")
                 # qubit input
                 qubit_indices.append(int(input[1:]))
-        if gate[1][0].startswith('P'):
+        if gate[1][0].startswith("P"):
             # parameter gate
             assert len(gate[1]) == 1
             parameter_index = int(gate[1][0][1:])
             parameters[parameter_index] = compute(gate[0], *parameter_values)
         else:
-            assert gate[1][0].startswith('Q')
+            assert gate[1][0].startswith("Q")
             # quantum gate
             if use_z3:
                 output_dis = apply_matrix(
@@ -311,22 +311,40 @@ def search_phase_factor_to_check_equivalence(
         if abs(difference) > kPhaseFactorEpsilon:
             return False
         if do_not_invoke_smt_solver:
-            # Generate a random test to verify it.
             dag1_meta = dag1[0]
             dag2_meta = dag2[0]
             num_qubits = dag1_meta[meta_index_num_qubits]
-            vec = random_input_distribution(num_qubits)
             num_parameters = max(
                 dag1_meta[meta_index_num_input_parameters],
                 dag2_meta[meta_index_num_input_parameters],
             )
+            if num_parameters == 0:
+                return True
+            # Generate a random test to verify it.
+            vec = random_input_distribution(num_qubits)
             params = random_parameters(num_parameters)
             output_vec1 = evaluate(dag1, vec, params, use_z3=False)[0]
             output_vec2 = evaluate(dag2, vec, params, use_z3=False)[0]
+            current_phase_factor = [
+                z3.simplify(
+                    z3.substitute(
+                        phase_factor_component,
+                        [
+                            (parameters_symbolic[i], z3.RealVal(params[i]))
+                            for i in range(num_parameters)
+                        ],
+                    )
+                )
+                for phase_factor_component in current_phase_factor_symbolic
+            ]
+            output_vec2_shifted = phase_shift(output_vec2, current_phase_factor)
             for i in range(1 << num_qubits):
                 a = output_vec1[i]
-                b = output_vec2[i]
-                if abs(complex(*a) - complex(*b)) > kPhaseFactorEpsilon:
+                b = output_vec2_shifted[i]
+                diff_a_b = (a[0] - b[0], a[1] - b[1])
+                if z3.simplify(
+                    z3.Sqrt(diff_a_b[0] ** 2 + diff_a_b[1] ** 2) > kPhaseFactorEpsilon
+                ):
                     return False
             return True
         # Found a possible phase factor
@@ -339,14 +357,14 @@ def search_phase_factor_to_check_equivalence(
         result = solver.check()
         if result != z3.unsat:
             print(
-                f'z3 returns {result} for the following equivalence which passed random testing:'
+                f"z3 returns {result} for the following equivalence which passed random testing:"
             )
-            print(f'Phase factor for fingerprint is {phase_factor_for_fingerprint}')
-            print(f'Goal phase factor is {goal_phase_factor}')
-            print(f'Symbolic phase factor is {current_phase_factor_symbolic}')
-            print(f'Dags are {dag1} and {dag2}')
+            print(f"Phase factor for fingerprint is {phase_factor_for_fingerprint}")
+            print(f"Goal phase factor is {goal_phase_factor}")
+            print(f"Symbolic phase factor is {current_phase_factor_symbolic}")
+            print(f"Dags are {dag1} and {dag2}")
             if result == z3.sat:
-                print(f'Solver found {solver.model()}')
+                print(f"Solver found {solver.model()}")
         return result == z3.unsat
 
     # Search for the parameter |current_param_id|
@@ -386,7 +404,7 @@ def search_phase_factor_to_check_equivalence(
                     ),
                 )
             else:
-                raise Exception(f'Unsupported phase factor coefficient {coeff}')
+                raise Exception(f"Unsupported phase factor coefficient {coeff}")
         if search_phase_factor_to_check_equivalence(
             dag1,
             dag2,
@@ -431,8 +449,8 @@ def equivalent(
             dag2_meta[meta_index_num_input_parameters],
         )
         params = create_parameters(num_parameters, equation_list)
-        cosL = z3.Real('cosL')
-        sinL = z3.Real('sinL')
+        cosL = z3.Real("cosL")
+        sinL = z3.Real("sinL")
         matrix_equal_list = []
         for S in range(1 << num_qubits):
             # Construct a vector with only the S-th place being 1
@@ -448,27 +466,28 @@ def equivalent(
                 z3.Implies(angle(cosL, sinL), z3.Not(z3.And(matrix_equal_list))),
             )
         )
+        result = solver.check()
+        assert result != z3.unknown
+        return result == z3.unsat
     else:
-        vec = input_distribution(num_qubits, equation_list)
+        # Phase factor is never provided in generator now
+        assert phase_shift_id is None
+
         num_parameters = max(
             dag1_meta[meta_index_num_input_parameters],
             dag2_meta[meta_index_num_input_parameters],
         )
-        params = create_parameters(num_parameters, equation_list)
-        output_vec1, all_parameters = evaluate(dag1, vec, params)
-        output_vec2 = evaluate(dag2, vec, params)[0]
-        if phase_shift_id is not None:
-            # Phase factor is provided in generator
-            # We shift dag1 here
-            output_vec1 = phase_shift_by_id(
-                output_vec1, dag1, phase_shift_id, all_parameters
-            )
-        else:
-            # Figure out the phase factor here
-            assert len(parameters_for_fingerprint) >= num_parameters
-            goal_phase_factor = complex(
-                *dag1_meta[meta_index_original_fingerprint]
-            ) / complex(*dag2_meta[meta_index_original_fingerprint])
+        # Figure out the phase factor here
+        assert len(parameters_for_fingerprint) >= num_parameters
+        goal_phase_factor = complex(
+            *dag1_meta[meta_index_original_fingerprint]
+        ) / complex(*dag2_meta[meta_index_original_fingerprint])
+        if num_parameters > 0:
+            # Construct the input vector as variables
+            vec = input_distribution(num_qubits, equation_list)
+            params = create_parameters(num_parameters, equation_list)
+            output_vec1, all_parameters = evaluate(dag1, vec, params)
+            output_vec2 = evaluate(dag2, vec, params)[0]
             equations = z3.And(equation_list)
             result = search_phase_factor_to_check_equivalence(
                 dag1,
@@ -482,17 +501,45 @@ def equivalent(
                 num_parameters,
                 goal_phase_factor,
                 current_param_id=0,
-                current_phase_factor_symbolic=(1, 0),
+                current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
                 current_phase_factor_for_fingerprint=0,
             )
             if not result:
-                print(f'Cannot find equivalence for dags:\n{dag1}\n{dag2}')
+                print(
+                    f"Cannot find equivalence for dags (vector approach):\n{dag1}\n{dag2}"
+                )
             return result
-        solver.add(z3.And(equation_list))
-        solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2))))
-    result = solver.check()
-    assert result != z3.unknown
-    return result == z3.unsat
+        else:
+            # Compare the matrices directly
+            output_vec1 = []
+            output_vec2 = []
+            for S in range(1 << num_qubits):
+                # Construct a vector with only the S-th place being 1
+                vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
+                output_vec1_S = evaluate(dag1, vec_S, [])[0]
+                output_vec2_S = evaluate(dag2, vec_S, [])[0]
+                output_vec1 += output_vec1_S
+                output_vec2 += output_vec2_S
+            result = search_phase_factor_to_check_equivalence(
+                dag1,
+                dag2,
+                [],
+                output_vec1,
+                output_vec2,
+                do_not_invoke_smt_solver,
+                [],
+                parameters_for_fingerprint,
+                num_parameters,
+                goal_phase_factor,
+                current_param_id=0,
+                current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
+                current_phase_factor_for_fingerprint=0,
+            )
+            if not result:
+                print(
+                    f"Cannot find equivalence for dags (matrix approach):\n{dag1}\n{dag2}"
+                )
+            return result
 
 
 def load_json(file_name):
@@ -506,7 +553,7 @@ def load_json(file_name):
 def dump_json(data, file_name):
     import json
 
-    with open(file_name, 'w') as f:
+    with open(file_name, "w") as f:
         json.dump(data, f)
 
 
@@ -528,7 +575,7 @@ def find_equivalences_helper(
     total_equivalence_found = 0
     different_dags_with_same_hash = []
     if verbose:
-        print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+        print(f"Verifying {len(dags)} DAGs with hash value {hashtag}...")
     # global find_equivalence_helper_called
     # global find_equivalence_helper_called_bar
     # global total_circuits_verified
@@ -548,7 +595,7 @@ def find_equivalences_helper(
                 do_not_invoke_smt_solver,
                 check_phase_shift_in_smt_solver,
             ):
-                current_tag = hashtag + '_' + str(i)
+                current_tag = hashtag + "_" + str(i)
                 assert current_tag in output_dict.keys()
                 output_dict[current_tag].append(dag)
                 total_equivalence_found += 1
@@ -557,7 +604,7 @@ def find_equivalences_helper(
             # dag is not equivalent do any of different_dags_with_same_hash
             different_dags_with_same_hash.append(dag)
             # Insert |dag| eagerly
-            current_tag = hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+            current_tag = hashtag + "_" + str(len(different_dags_with_same_hash) - 1)
             output_dict[current_tag] = [dag]
     return hashtag, output_dict, equivalent_called, total_equivalence_found
 
@@ -587,7 +634,7 @@ def find_equivalences(
     t_start = time.monotonic()
     num_different_dags_with_same_hash = {}
     print(
-        f'Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values...'
+        f"Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values..."
     )
 
     if False:
@@ -598,7 +645,7 @@ def find_equivalences(
             num_potential_equivalences += len(dags) - 1
             different_dags_with_same_hash = []
             if verbose:
-                print(f'Verifying {len(dags)} DAGs with hash value {hashtag}...')
+                print(f"Verifying {len(dags)} DAGs with hash value {hashtag}...")
             for dag in dags:
                 equivalence_found = False
                 for i in range(len(different_dags_with_same_hash)):
@@ -611,7 +658,7 @@ def find_equivalences(
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
                     ):
-                        current_tag = hashtag + '_' + str(i)
+                        current_tag = hashtag + "_" + str(i)
                         assert current_tag in output_dict.keys()
                         output_dict[current_tag].append(dag)
                         equivalence_found = True
@@ -621,7 +668,7 @@ def find_equivalences(
                     different_dags_with_same_hash.append(dag)
                     # Insert |dag| eagerly
                     current_tag = (
-                        hashtag + '_' + str(len(different_dags_with_same_hash) - 1)
+                        hashtag + "_" + str(len(different_dags_with_same_hash) - 1)
                     )
                     output_dict[current_tag] = [dag]
             num_different_dags_with_same_hash[hashtag] = len(
@@ -636,10 +683,10 @@ def find_equivalences(
         # first process hashtags with only 1 DAG
         for hashtag, dags in data.items():
             if len(dags) == 1:
-                output_dict[hashtag + '_0'] = [dags[0]]
+                output_dict[hashtag + "_0"] = [dags[0]]
                 num_different_dags_with_same_hash[hashtag] = 1
         print(
-            f'Processed {len(output_dict)} hash values that had only 1 DAG, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more DAGs...'
+            f"Processed {len(output_dict)} hash values that had only 1 DAG, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more DAGs..."
         )
         # now process hashtags with >1 DAGs
         with mp.Pool() as pool:
@@ -674,7 +721,7 @@ def find_equivalences(
         equivalent_called_2 = 0
         num_equivalences_under_phase_shift = 0
         possible_num_equivalences_under_phase_shift = 0
-        print('Start checking equivalence with different hash...')
+        print("Start checking equivalence with different hash...")
         for hashtag, dags in output_dict.items():
             from collections import defaultdict
 
@@ -699,11 +746,11 @@ def find_equivalences(
                         other_hashtags[item[0]][item[1]] = other_hashtags[item[0]].get(
                             item[1], []
                         ) + [dag]
-            assert hashtag.split('_')[0] not in other_hashtags
+            assert hashtag.split("_")[0] not in other_hashtags
             if len(other_hashtags) == 0:
                 print(
-                    f'Warning: other hash values unspecified for hash value {hashtag}.'
-                    f' Cannot guarantee there are no missing equivalences.'
+                    f"Warning: other hash values unspecified for hash value {hashtag}."
+                    f" Cannot guarantee there are no missing equivalences."
                 )
             possible_equivalent_dags = []
             for other_hashtag, phase_shift_ids in other_hashtags.items():
@@ -713,7 +760,7 @@ def find_equivalences(
                 assert other_hashtag in num_different_dags_with_same_hash.keys()
                 i_range = num_different_dags_with_same_hash[other_hashtag]
                 for i in range(i_range):
-                    other_hashtag_full = other_hashtag + '_' + str(i)
+                    other_hashtag_full = other_hashtag + "_" + str(i)
                     possible_equivalent_dags.append(
                         (
                             output_dict[other_hashtag_full][0],
@@ -723,8 +770,8 @@ def find_equivalences(
                     )
             if verbose and len(possible_equivalent_dags) > 0:
                 print(
-                    f'Verifying {len(possible_equivalent_dags)} possible missing equivalences'
-                    f' with hash value {hashtag} and {len(other_hashtags)} other hash values...'
+                    f"Verifying {len(possible_equivalent_dags)} possible missing equivalences"
+                    f" with hash value {hashtag} and {len(other_hashtags)} other hash values..."
                 )
             for item in possible_equivalent_dags:
                 other_dag = item[0]
@@ -796,18 +843,18 @@ def find_equivalences(
                     hashtags_in_more_equivalences.update(other_hashtag_full)
                     if verbose:
                         print(
-                            f'Equivalence with hash value {hashtag} and {other_hashtag_full}'
-                            f' with phase shift id = {phase_shift_id_when_equivalence_verified}:\n'
-                            f'{dag_when_equivalence_verified}\n'
-                            f'{other_dag}'
+                            f"Equivalence with hash value {hashtag} and {other_hashtag_full}"
+                            f" with phase shift id = {phase_shift_id_when_equivalence_verified}:\n"
+                            f"{dag_when_equivalence_verified}\n"
+                            f"{other_dag}"
                         )
         output_dict = [more_equivalences, output_dict]
         if print_basic_info:
             print(
-                f'Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences'
-                f' with different hash,'
-                f' including {num_equivalences_under_phase_shift} out of'
-                f' {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift.'
+                f"Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences"
+                f" with different hash,"
+                f" including {num_equivalences_under_phase_shift} out of"
+                f" {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift."
             )
     else:
         # Add a placeholder here
@@ -822,13 +869,13 @@ def find_equivalences(
     t_end = time.monotonic()
     if print_basic_info:
         print(
-            f'{total_equivalence_found} equivalences found in {t_end - t_start} seconds'
-            f' (solver invoked {equivalent_called} times for {num_dags} DAGs'
-            f' with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),'
-            f' output {len(output_dict[1])} equivalence classes.'
+            f"{total_equivalence_found} equivalences found in {t_end - t_start} seconds"
+            f" (solver invoked {equivalent_called} times for {num_dags} DAGs"
+            f" with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),"
+            f" output {len(output_dict[1])} equivalence classes."
         )
     t_start = time.monotonic()
     dump_json(output_dict, output_file)
     t_end = time.monotonic()
     if print_basic_info:
-        print(f'Json saved in {t_end - t_start} seconds.')
+        print(f"Json saved in {t_end - t_start} seconds.")

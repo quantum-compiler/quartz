@@ -2169,10 +2169,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
   }
   if (!fail) {
-    auto new_graph = xfer->create_new_graph(this);
-    if (new_graph->has_loop()) {
-      fail = true;
-    }
+    fail = !_loop_check_after_mapping(xfer);
   }
   while (!opx_op_dq.empty()) {
     auto opx_op_pair = opx_op_dq.back();
@@ -2322,6 +2319,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   if (!fail) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
+      std::cout << "loop" << std::endl;
       new_graph.reset();
       fail = true;
     }
@@ -2707,4 +2705,51 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
 
 // TODO
 bool Graph::equal(const Graph &other) const { return true; }
+
+bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const{
+    std::unordered_set<Pos, PosHash> mapped_input_pos;
+    std::unordered_set<Pos, PosHash> mapped_output_pos;
+    std::queue<Pos> q;
+    std::unordered_set<Pos, PosHash> visited;
+    // Get all input positions
+    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend(); ++it) {
+        if(it->second.first.ptr->tp != GateType::input_qubit && it->second.first.ptr->tp != GateType::input_param) {
+            mapped_input_pos.insert(Pos(it->second.first, it->second.second));
+        }
+    }
+
+    // Get all output positions and initialize the queue
+    for (auto it = xfer->mappedOutputs.cbegin(); it != xfer->mappedOutputs.cend(); ++it) {
+        Pos output_pos = Pos(it->first.op->mapOp, it->first.idx);
+        mapped_output_pos.insert(output_pos);
+        q.push(output_pos);
+        visited.insert(output_pos);
+    }
+
+    while(!q.empty()){
+        auto pos = q.front();
+        q.pop();
+        if(outEdges.find(pos.op) == outEdges.end()){
+            continue;
+        }
+        auto out_edges = outEdges.find(pos.op)->second;
+        for (auto e_it = out_edges.cbegin(); e_it != out_edges.cend(); ++e_it) {
+            if(e_it->srcIdx == pos.idx){
+                Op next_op = e_it->dstOp;
+                int num_qubits = next_op.ptr->get_num_qubits();
+                for(int i = 0; i < num_qubits; ++i){
+                    Pos next_pos = Pos(next_op, i);
+                    if(visited.find(next_pos) == visited.end()){
+                        if(mapped_input_pos.find(next_pos) != mapped_input_pos.end()){
+                            return false;
+                        }
+                        q.push(next_pos);
+                        visited.insert(next_pos);
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
 }; // namespace quartz

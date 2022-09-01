@@ -17,7 +17,7 @@ int main() {
 
   auto graph = Graph::from_qasm_file(
       &ctx,
-      "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
+      "../experiment/nam_circs/mod5_4.qasm");
 
   EquivalenceSet eqs;
   // Load equivalent dags from file

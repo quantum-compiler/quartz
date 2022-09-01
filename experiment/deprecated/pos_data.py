@@ -1,8 +1,7 @@
 import json
 import random
-from dgl import save_graphs, load_graphs
 
-from dgl import save_graphs, load_graphs
+from dgl import load_graphs, save_graphs
 
 
 class PosRewardData:
@@ -17,8 +16,16 @@ class PosRewardData:
         self.data_cnt = 0
         self.maxlen = maxlen
 
-    def add_data(self, from_graph, from_graph_hash, node_id, xfer_id, reward,
-                 to_graph, to_graph_hash):
+    def add_data(
+        self,
+        from_graph,
+        from_graph_hash,
+        node_id,
+        xfer_id,
+        reward,
+        to_graph,
+        to_graph_hash,
+    ):
         if self.data_cnt < self.maxlen:
             self.from_graphs.append(from_graph)
             self.from_graph_hashes.append(from_graph_hash)
@@ -59,17 +66,30 @@ class PosRewardData:
     def all_data(self):
         data = []
         for i in range(self.data_cnt):
-            data.append((self.from_graphs[i], self.from_graph_hashes[i],
-                         self.node_ids[i], self.xfer_ids[i], self.rewards[i],
-                         self.to_graphs[i], self.to_graph_hashes[i]))
+            data.append(
+                (
+                    self.from_graphs[i],
+                    self.from_graph_hashes[i],
+                    self.node_ids[i],
+                    self.xfer_ids[i],
+                    self.rewards[i],
+                    self.to_graphs[i],
+                    self.to_graph_hashes[i],
+                )
+            )
         return data
 
     def sample(self):
         idx = random.choice(list(range(self.data_cnt)))
-        return (self.from_graphs[idx], self.from_graph_hashes[idx],
-                self.node_ids[idx], self.xfer_ids[idx], self.rewards[idx],
-                self.to_graphs[idx], self.to_graph_hashes[idx])
-
+        return (
+            self.from_graphs[idx],
+            self.from_graph_hashes[idx],
+            self.node_ids[idx],
+            self.xfer_ids[idx],
+            self.rewards[idx],
+            self.to_graphs[idx],
+            self.to_graph_hashes[idx],
+        )
 
 
 # p = PosRewardData()

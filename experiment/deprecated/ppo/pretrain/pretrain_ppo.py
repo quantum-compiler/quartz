@@ -1,19 +1,20 @@
-from math import gamma
-import sys
-import os
 import json
+import os
 import random
+import sys
+from math import gamma
+
+import dgl
 import hydra
 import numpy as np
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.strategies import DDPStrategy
-import dgl
 from gnn import QGNN
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 from tqdm import tqdm
 from transformers import TransfoXLConfig, TransfoXLModel
 
@@ -57,11 +58,9 @@ class QGNNPretrainDM(pl.LightningDataModule):
 
         # load graphs and rewards
         with open(os.path.join(dataset_dir, graph_file)) as f:
-            hash2graphs: dict = json.load(
-                f)  # hash -> (graph_qasm, gate_count)
+            hash2graphs: dict = json.load(f)  # hash -> (graph_qasm, gate_count)
         with open(os.path.join(dataset_dir, reward_file)) as f:
-            rewards: dict = json.load(
-                f)  # hash -> { node_id: { xfer_id: reward } }
+            rewards: dict = json.load(f)  # hash -> { node_id: { xfer_id: reward } }
 
         split_file_path = os.path.join(dataset_dir, split_file)
 
@@ -74,8 +73,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
             num_test = int(0.2 * len(graph_keys))
             self.split_info = {
                 'train': graph_keys[:num_train],
-                'val': graph_keys[num_train:num_train + num_val],
-                'test': graph_keys[num_train + num_val:],
+                'val': graph_keys[num_train : num_train + num_val],
+                'test': graph_keys[num_train + num_val :],
             }
             with open(split_file_path, 'w') as f:
                 json.dump(self.split_info, fp=f, indent=2)
@@ -86,7 +85,8 @@ class QGNNPretrainDM(pl.LightningDataModule):
             with open(split_file_path) as f:
                 self.split_info = json.load(f)
             graphs_in_split_info = sum(
-                [len(hashes) for mode, hashes in self.split_info.items()])
+                [len(hashes) for mode, hashes in self.split_info.items()]
+            )
             if graphs_in_split_info != len(rewards):
                 gen_save_split()
 
@@ -176,8 +176,7 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         self.max_gate_count = max_gate_count
         self.use_max_gate_count = use_max_gate_count
         self.gamma = gamma
-        self.graph_hash_list = [(*hash2graphs[g_hash], g_hash)
-                                for g_hash in hashes]
+        self.graph_hash_list = [(*hash2graphs[g_hash], g_hash) for g_hash in hashes]
 
     def __len__(self):
         return len(self.graph_hash_list)
@@ -187,8 +186,9 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
         Return: (dgl_graph, value_vec, mask_vec)
         """
         pygraph, reward_dict, gate_count, g_hash = self.graph_hash_list[idx]
-        gate_count_to_use = \
+        gate_count_to_use = (
             self.max_gate_count if self.use_max_gate_count else gate_count
+        )
         # { node_id: { xfer_id: reward } }
         # (num_nodes, num_xfers)
         value_vec = torch.zeros(gate_count_to_use)
@@ -201,7 +201,7 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
             rewards = []
             for (xfer_id, reward) in xfers.items():
                 if isinstance(reward, list):
-                    reward = [pair[0] * self.gamma**pair[1] for pair in reward]
+                    reward = [pair[0] * self.gamma ** pair[1] for pair in reward]
                     reward = max(reward)
                 rewards.append(reward)
             node_value = max(rewards)
@@ -211,7 +211,7 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
             mask_vec[node_id] = node_value > 0
             zero_value_vec[node_id] = node_value == 0
             neg_value_vec[node_id] = False  # node_value < 0
-            num_pos_values += (node_value > 0)
+            num_pos_values += node_value > 0
 
         # TODO  num_pos_rewards should have a min value
         num_pos_rewards = max(num_pos_values, 10)
@@ -223,11 +223,12 @@ class QGNNPretrainDS(torch.utils.data.Dataset):
 
         # use part of the zero or negative rewards
         # we select them randomly here so they are different for each epochs
-        zero_value_indices = zero_value_indices[torch.randperm(
-            zero_value_indices.shape[0]
-        )[:num_pos_rewards]]  # (num_pos_rewards, 1)
-        neg_value_indices = neg_value_indices[torch.randperm(
-            neg_value_indices.shape[0])[:num_pos_rewards]]
+        zero_value_indices = zero_value_indices[
+            torch.randperm(zero_value_indices.shape[0])[:num_pos_rewards]
+        ]  # (num_pos_rewards, 1)
+        neg_value_indices = neg_value_indices[
+            torch.randperm(neg_value_indices.shape[0])[:num_pos_rewards]
+        ]
         # set mask to select
         mask_vec[zero_value_indices[:, 0]] = True
         mask_vec[neg_value_indices[:, 0]] = True
@@ -242,9 +243,12 @@ class PretrainNet(pl.LightningModule):
 
         gate_type_num = 29
 
-        self.q_net = nn.Sequential(QGNN(6, gate_type_num, 256, 256),
-                                   nn.Linear(256, 128), nn.ReLU(),
-                                   nn.Linear(128, 1))
+        self.q_net = nn.Sequential(
+            QGNN(6, gate_type_num, 256, 256),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
 
         self.loss_fn = nn.MSELoss(reduction='sum')
 
@@ -272,31 +276,39 @@ class PretrainNet(pl.LightningModule):
             selected_indices = masks[r].nonzero()
             selected_values = node_values[selected_indices[:, 0]]
 
-            self.log(f'{mode}_num_nodes_{i_batch}',
-                     float(n_nodes),
-                     on_step=True)
-            self.log(f'{mode}_num_unmasked_label_{i_batch}',
-                     float(selected_indices.shape[0]),
-                     on_step=True)
-            self.log(f'{mode}_pos_label_{i_batch}',
-                     float((selected_values > 0).sum()),
-                     on_step=True)
-            self.log(f'{mode}_zero_label_{i_batch}',
-                     float((selected_values == 0).sum()),
-                     on_step=True)
-            self.log(f'{mode}_neg_label_{i_batch}',
-                     float((selected_values < 0).sum()),
-                     on_step=True)
+            self.log(f'{mode}_num_nodes_{i_batch}', float(n_nodes), on_step=True)
+            self.log(
+                f'{mode}_num_unmasked_label_{i_batch}',
+                float(selected_indices.shape[0]),
+                on_step=True,
+            )
+            self.log(
+                f'{mode}_pos_label_{i_batch}',
+                float((selected_values > 0).sum()),
+                on_step=True,
+            )
+            self.log(
+                f'{mode}_zero_label_{i_batch}',
+                float((selected_values == 0).sum()),
+                on_step=True,
+            )
+            self.log(
+                f'{mode}_neg_label_{i_batch}',
+                float((selected_values < 0).sum()),
+                on_step=True,
+            )
 
-            self.log(f'{mode}_max_value_{i_batch}',
-                     torch.max(selected_values),
-                     on_step=True)
-            self.log(f'{mode}_min_value_{i_batch}',
-                     torch.min(selected_values),
-                     on_step=True)
-            self.log(f'{mode}_mean_value_{i_batch}',
-                     torch.mean(selected_values),
-                     on_step=True)
+            self.log(
+                f'{mode}_max_value_{i_batch}', torch.max(selected_values), on_step=True
+            )
+            self.log(
+                f'{mode}_min_value_{i_batch}', torch.min(selected_values), on_step=True
+            )
+            self.log(
+                f'{mode}_mean_value_{i_batch}',
+                torch.mean(selected_values),
+                on_step=True,
+            )
 
             r_start = r_end
 
@@ -394,10 +406,12 @@ def train(cfg):
 
 
 def test(cfg):
-    wandb_logger = init_wandb(enable=cfg.wandb.en,
-                              offline=cfg.wandb.offline,
-                              task='test',
-                              entity=cfg.wandb.entity)
+    wandb_logger = init_wandb(
+        enable=cfg.wandb.en,
+        offline=cfg.wandb.offline,
+        task='test',
+        entity=cfg.wandb.entity,
+    )
     trainer = pl.Trainer(
         gpus=cfg.gpus,
         logger=wandb_logger,
@@ -419,8 +433,7 @@ def main(cfg):
     global quartz_context
 
     output_dir = os.path.abspath(os.curdir)  # get hydra output dir
-    os.chdir(
-        hydra.utils.get_original_cwd())  # set working dir to the original one
+    os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
     seed_all(cfg.seed)
 
     # only use this context to convert qasm to graphs

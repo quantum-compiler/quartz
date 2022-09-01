@@ -1,24 +1,26 @@
 import math
 import random
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.distributions import Categorical
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+import torch.optim as optim
 from gnn import QGNN
+from torch.distributions import Categorical
+from tqdm import tqdm
+
 import quartz
 
 
 def masked_softmax(logits, mask):
     """
-        This method will return valid probability distribution for the particular instance if its corresponding row
-        in the `mask` matrix is not a zero vector. Otherwise, a uniform distribution will be returned.
-        This is just a technical workaround that allows `Categorical` class usage.
-        If probs doesn't sum to one there will be an exception during sampling.
-        """
+    This method will return valid probability distribution for the particular instance if its corresponding row
+    in the `mask` matrix is not a zero vector. Otherwise, a uniform distribution will be returned.
+    This is just a technical workaround that allows `Categorical` class usage.
+    If probs doesn't sum to one there will be an exception during sampling.
+    """
     # if mask is not None:
     #     # print(logits)
     #     # print(mask)
@@ -41,7 +43,7 @@ def masked_softmax(logits, mask):
     # else:
     #     return F.softmax(logits, dim=-1)
     mask = torch.ones_like(mask, dtype=torch.bool) ^ mask
-    logits[mask] -= 1.0e+10
+    logits[mask] -= 1.0e10
     return F.softmax(logits)
 
 
@@ -51,13 +53,17 @@ class ActorCritic(nn.Module):
 
         self.critic = nn.Sequential(
             QGNN(gate_type_num, hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, 1))
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, 1),
+        )
 
         self.actor = nn.Sequential(
             QGNN(gate_type_num, hidden_size, hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
-            nn.Linear(hidden_size, num_outputs))
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, num_outputs),
+        )
 
     def forward(self, dgl_g):
         value = self.critic(dgl_g)
@@ -68,8 +74,16 @@ class ActorCritic(nn.Module):
         return logits, value
 
 
-def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
-                   init_state, context, best_gate_count):
+def get_trajectory(
+    device,
+    max_seq_len,
+    num_actions,
+    model,
+    invalid_reward,
+    init_state,
+    context,
+    best_gate_count,
+):
     log_probs = []
     values = []
     rewards = []
@@ -87,7 +101,8 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
             logits, value = model(dgl_graph)
             node = random.randint(0, dgl_graph.num_nodes() - 1)
             available_xfers = graph.available_xfers(
-                context=context, node=graph.get_node_from_id(id=node))
+                context=context, node=graph.get_node_from_id(id=node)
+            )
             mask = torch.zeros((num_actions), dtype=torch.bool).to(device)
             mask[available_xfers] = True
             probs = masked_softmax(logits[node], mask)
@@ -117,7 +132,8 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
             print(f'{node}, {xfer}')
             next_graph = graph.apply_xfer(
                 xfer=context.get_xfer_from_id(id=xfer),
-                node=graph.get_node_from_id(id=node))
+                node=graph.get_node_from_id(id=node),
+            )
 
             if next_graph == None:
                 reward = invalid_reward
@@ -168,8 +184,16 @@ def get_trajectory(device, max_seq_len, num_actions, model, invalid_reward,
     masks = torch.tensor(masks).to(device)
     qs = compute_qs(next_value, rewards, masks)
 
-    return qs, values, log_probs, masks, entropy, seq_len, rewards.sum().cpu(
-    ).item(), best_gate_count
+    return (
+        qs,
+        values,
+        log_probs,
+        masks,
+        entropy,
+        seq_len,
+        rewards.sum().cpu().item(),
+        best_gate_count,
+    )
 
 
 def compute_qs(next_value, rewards, masks, gamma=0.99):
@@ -182,14 +206,16 @@ def compute_qs(next_value, rewards, masks, gamma=0.99):
     return torch.tensor(qs).to(device)
 
 
-def a2c(hidden_size,
-        context,
-        init_graph,
-        episodes=20000,
-        lr=1e-3,
-        max_seq_len=5,
-        invalid_reward=-10,
-        batch_size=100):
+def a2c(
+    hidden_size,
+    context,
+    init_graph,
+    episodes=20000,
+    lr=1e-3,
+    max_seq_len=5,
+    invalid_reward=-10,
+    batch_size=100,
+):
 
     num_actions = context.num_xfers
     best_gate_count = init_graph.gate_count
@@ -212,9 +238,25 @@ def a2c(hidden_size,
 
         # rollout trajectory
         for i in range(batch_size):
-            qs_, values_, log_probs_, masks_, entropy_, seq_len_, total_rewards_, best_gate_count = get_trajectory(
-                device, max_seq_len, num_actions, model, invalid_reward,
-                init_graph, context, best_gate_count)
+            (
+                qs_,
+                values_,
+                log_probs_,
+                masks_,
+                entropy_,
+                seq_len_,
+                total_rewards_,
+                best_gate_count,
+            ) = get_trajectory(
+                device,
+                max_seq_len,
+                num_actions,
+                model,
+                invalid_reward,
+                init_graph,
+                context,
+                best_gate_count,
+            )
 
             log_probs = torch.cat((log_probs, log_probs_))
             values = torch.cat((values, values_))
@@ -270,18 +312,12 @@ gate_type_num = 26
 
 experiment_name = "rl_a2c_" + "pos_data_init_sample"
 
-context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg'],
-                               filename='../bfs_verified_simplified.json')
+context = quartz.QuartzContext(
+    gate_set=['h', 'cx', 't', 'tdg'], filename='../bfs_verified_simplified.json'
+)
 parser = quartz.PyQASMParser(context=context)
 
-init_dag = parser.load_qasm(
-    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+init_dag = parser.load_qasm(filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_graph = quartz.PyGraph(context=context, dag=init_dag)
 
-a2c(64,
-    context,
-    init_graph,
-    episodes=200000,
-    batch_size=1,
-    lr=1e-3,
-    max_seq_len=20)
+a2c(64, context, init_graph, episodes=200000, batch_size=1, lr=1e-3, max_seq_len=20)

@@ -47,12 +47,12 @@ main:
                                     with no gradient environment:
                                         node_embeddings in each next_graph = self.ac_net.graph_embedding(mini_batch.next_state)
                                         next_node_values = self.ac_net.critic( embeddings of mini_batch.next_node )
-                                    
+
                                     advantages = mini_batch.reward + gamma * next_node_values - action_node_values
                                     compute actor_loss, critic_loss
                                     compute total loss
                                     optimizer.step()
-        
+
         observer process:
             sleep if there's no call
             When called by the agent (which manages it) to execute Observer.run_episode:

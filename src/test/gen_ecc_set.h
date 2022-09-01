@@ -41,20 +41,19 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   auto start2 = std::chrono::steady_clock::now();
   system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
-      "pruning_unverified.json " + file_prefix + "pruning.json")
+          "pruning_unverified.json " + file_prefix + "pruning.json")
              .c_str());
   auto end2 = std::chrono::steady_clock::now();
   verification_time += end2 - start2;
   equiv_set.clear(); // this is necessary
   equiv_set.load_json(&ctx, file_prefix + "pruning.json");
   std::cout << "Before ECC simplification: num_total_dags = "
-            << equiv_set.num_total_dags()
-            << ", num_equivalence_classes = "
+            << equiv_set.num_total_dags() << ", num_equivalence_classes = "
             << equiv_set.num_equivalence_classes() << ", #transformations "
             << file_prefix.substr(0, file_prefix.size() - 1) << " = "
             << (equiv_set.num_total_dags() -
                 equiv_set.num_equivalence_classes()) *
-                2
+                   2
             << std::endl;
   start2 = std::chrono::steady_clock::now();
   equiv_set.simplify(&ctx);
@@ -64,22 +63,22 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   std::cout << file_prefix.substr(0, file_prefix.size() - 1)
             << " generated. Running Time (s): "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                end - start)
-                .count() /
-                1000.0
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - start)
+                       .count() /
+                   1000.0
             << std::endl;
   std::cout << "Pruning Time (s): "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                end2 - start2)
-                .count() /
-                1000.0
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end2 - start2)
+                       .count() /
+                   1000.0
             << std::endl;
   std::cout << "Verification Time (s): "
-            << (double) std::chrono::duration_cast<std::chrono::milliseconds>(
-                verification_time)
-                .count() /
-                1000.0
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   verification_time)
+                       .count() /
+                   1000.0
             << std::endl;
   std::cout << "Num_total_dags = " << equiv_set.num_total_dags()
             << ", num_equivalence_classes = "
@@ -89,7 +88,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
             << file_prefix.substr(0, file_prefix.size() - 1) << " = "
             << (equiv_set.num_total_dags() -
                 equiv_set.num_equivalence_classes()) *
-                2
+                   2
             << std::endl;
 }
-}
+} // namespace quartz

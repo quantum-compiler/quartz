@@ -17,8 +17,8 @@ class QConv(nn.Module):
         nn.init.xavier_normal_(self.linear2.weight, gain=gain)
 
     def message_func(self, edges):
-        #print(f'node h {edges.src["h"].shape}')
-        #print(f'node w {edges.data["w"].shape}')
+        # print(f'node h {edges.src["h"].shape}')
+        # print(f'node w {edges.data["w"].shape}')
         return {'m': torch.cat([edges.src['h'], edges.data['w']], dim=1)}
 
     def reduce_func(self, nodes):
@@ -31,7 +31,7 @@ class QConv(nn.Module):
 
     def forward(self, g, h):
         g.ndata['h'] = h
-        #g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
+        # g.edata['w'] = w #self.embed(torch.unsqueeze(w,1))
         g.update_all(self.message_func, self.reduce_func)
         h_N = g.ndata['h_N']
         h_total = torch.cat([h, h_N], dim=1)
@@ -54,15 +54,17 @@ class QGNN(nn.Module):
         self.convs = nn.ModuleList(self.convs)
 
     def forward(self, g):
-        #print(g.ndata['gate_type'])
-        #print(self.embedding)
+        # print(g.ndata['gate_type'])
+        # print(self.embedding)
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ],
-                      dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h = self.conv_0(g, g.ndata['h'])
         for i in range(len(self.convs)):

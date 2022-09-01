@@ -1,22 +1,24 @@
-import quartz
-import torch
-from gnn import QGNN
 import os
-from datetime import datetime
-import torch.nn as nn
-from torch.distributions import Categorical
-import torch.nn.functional as F
-import numpy as np
-import dgl
-import time
-from tqdm import tqdm
 import sys
+import time
+from datetime import datetime
+
+import dgl
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from gnn import QGNN
 from qiskit import QuantumCircuit
+from torch.distributions import Categorical
+from tqdm import tqdm
+
+import quartz
 
 # set device to cpu or cuda
 device = torch.device('cpu')
 
-if (torch.cuda.is_available()):
+if torch.cuda.is_available():
     device = torch.device('cuda:0')
     torch.cuda.empty_cache()
     print("Device set to : " + str(torch.cuda.get_device_name(device)))
@@ -30,7 +32,7 @@ else:
 
 def masked_softmax(logits, mask):
     mask = torch.ones_like(mask, dtype=torch.bool) ^ mask
-    logits[mask] -= 1.0e+10
+    logits[mask] -= 1.0e10
     return F.softmax(logits, dim=-1)
 
 
@@ -53,20 +55,31 @@ class RolloutBuffer:
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, num_gate_type, graph_embed_size, actor_hidden_size,
-                 critic_hidden_size, action_dim):
+    def __init__(
+        self,
+        num_gate_type,
+        graph_embed_size,
+        actor_hidden_size,
+        critic_hidden_size,
+        action_dim,
+    ):
         super(ActorCritic, self).__init__()
 
-        self.graph_embedding = QGNN(6, num_gate_type, graph_embed_size,
-                                    graph_embed_size)
+        self.graph_embedding = QGNN(
+            6, num_gate_type, graph_embed_size, graph_embed_size
+        )
 
         self.actor = nn.Sequential(
-            nn.Linear(graph_embed_size, actor_hidden_size), nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim))
+            nn.Linear(graph_embed_size, actor_hidden_size),
+            nn.ReLU(),
+            nn.Linear(actor_hidden_size, action_dim),
+        )
 
         self.critic = nn.Sequential(
-            nn.Linear(graph_embed_size, critic_hidden_size), nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1))
+            nn.Linear(graph_embed_size, critic_hidden_size),
+            nn.ReLU(),
+            nn.Linear(critic_hidden_size, 1),
+        )
 
     def forward(self):
         raise NotImplementedError
@@ -83,8 +96,9 @@ class ActorCritic(nn.Module):
         node = node_dist.sample()
 
         mask = torch.zeros((context.num_xfers), dtype=torch.bool).to(device)
-        available_xfers = g.available_xfers(context=context,
-                                            node=g.get_node_from_id(id=node))
+        available_xfers = g.available_xfers(
+            context=context, node=g.get_node_from_id(id=node)
+        )
         mask[available_xfers] = True
         xfer_logits = self.actor(graph_embed[node])
         xfer_probs = masked_softmax(xfer_logits, mask)
@@ -99,10 +113,22 @@ class ActorCritic(nn.Module):
 
 
 class PPO:
-    def __init__(self, num_gate_type, context, graph_embed_size,
-                 actor_hidden_size, critic_hidden_size, action_dim,
-                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                 eps_clip, log_file_handle):
+    def __init__(
+        self,
+        num_gate_type,
+        context,
+        graph_embed_size,
+        actor_hidden_size,
+        critic_hidden_size,
+        action_dim,
+        lr_graph_embedding,
+        lr_actor,
+        lr_critic,
+        gamma,
+        K_epochs,
+        eps_clip,
+        log_file_handle,
+    ):
 
         self.gamma = gamma
         self.eps_clip = eps_clip
@@ -110,13 +136,21 @@ class PPO:
 
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(num_gate_type, graph_embed_size,
-                                  actor_hidden_size, critic_hidden_size,
-                                  action_dim).to(device)
+        self.policy = ActorCritic(
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+        ).to(device)
 
-        self.policy_old = ActorCritic(num_gate_type, graph_embed_size,
-                                      actor_hidden_size, critic_hidden_size,
-                                      action_dim).to(device)
+        self.policy_old = ActorCritic(
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+        ).to(device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -143,11 +177,11 @@ class PPO:
 
     def load(self, checkpoint_path):
         self.policy_old.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )
         self.policy.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )
 
 
 ################################### Training ###################################
@@ -168,7 +202,8 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward, log_f):
             node, xfer = ppo_agent.select_action(graph)
             next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
                 xfer=context.get_xfer_from_id(id=xfer),
-                node=graph.get_node_from_id(id=node))
+                node=graph.get_node_from_id(id=node),
+            )
 
             if next_graph == None:
                 reward = invalid_reward
@@ -193,8 +228,7 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward, log_f):
             trajectory_reward += reward
             reward = torch.tensor(reward, dtype=torch.float)
             ppo_agent.buffer.rewards.append(reward)
-            ppo_agent.buffer.is_terminals.append(
-                torch.tensor(done, dtype=torch.bool))
+            ppo_agent.buffer.is_terminals.append(torch.tensor(done, dtype=torch.bool))
             ppo_agent.buffer.next_graphs.append(next_graph)
             ppo_agent.buffer.next_nodes.append(next_nodes)
             graph = next_graph
@@ -202,8 +236,7 @@ def get_trajectory(ppo_agent, init_state, max_seq_len, invalid_reward, log_f):
             trajectory_len = t
             break
 
-    trajectory_best_gate_count = min(graph.gate_count,
-                                     trajectory_best_gate_count)
+    trajectory_best_gate_count = min(graph.gate_count, trajectory_best_gate_count)
 
     return trajectory_reward, trajectory_best_gate_count, trajectory_len, graph
 
@@ -236,8 +269,7 @@ if __name__ == '__main__':
     run_num = len(current_num_files)
 
     #### create new log file for each run
-    log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(
-        run_num) + ".csv"
+    log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(run_num) + ".csv"
 
     print("current logging run number for " + experiment_name + " : ", run_num)
     print("logging at : " + log_f_name)
@@ -260,7 +292,7 @@ if __name__ == '__main__':
     #####################################################
 
     # quartz initialization
-    assert (len(sys.argv) > 1)
+    assert len(sys.argv) > 1
     qasm_fn = sys.argv[1]
 
     print(
@@ -273,7 +305,8 @@ if __name__ == '__main__':
     context = quartz.QuartzContext(
         gate_set=['h', 'cx', 't', 'tdg', 'x'],
         filename='../../bfs_verified_simplified.json',
-        no_increase=False)
+        no_increase=False,
+    )
     num_gate_type = 29
     parser = quartz.PyQASMParser(context=context)
     # init_dag = parser.load_qasm(
@@ -326,19 +359,21 @@ if __name__ == '__main__':
     log_running_episodes = 0
 
     # initialize a PPO agent
-    ppo_agent = PPO(num_gate_type,
-                    context,
-                    128,
-                    256,
-                    128,
-                    xfer_dim,
-                    lr_graph_embedding,
-                    lr_actor,
-                    lr_critic,
-                    gamma,
-                    K_epochs,
-                    eps_clip,
-                    log_file_handle=log_f)
+    ppo_agent = PPO(
+        num_gate_type,
+        context,
+        128,
+        256,
+        128,
+        xfer_dim,
+        lr_graph_embedding,
+        lr_actor,
+        lr_critic,
+        gamma,
+        K_epochs,
+        eps_clip,
+        log_file_handle=log_f,
+    )
     ppo_agent.load(
         'PPO_preTrained/rl_ppo_local_multi_init_states_with_increase/PPO_rl_ppo_local_multi_init_states_with_increase_0_6.pth'
     )
@@ -362,7 +397,8 @@ if __name__ == '__main__':
     for i in tqdm_bar:
         log_f.write(f'trajectory {i}\n')
         t_reward, t_best_gate_cnt, t_seq_len, last_graph = get_trajectory(
-            ppo_agent, init_graph, max_seq_len, invalid_reward, log_f)
+            ppo_agent, init_graph, max_seq_len, invalid_reward, log_f
+        )
 
         current_ep_reward += t_reward
         if best_gate_cnt > t_best_gate_cnt:

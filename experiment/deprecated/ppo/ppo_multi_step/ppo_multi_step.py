@@ -1,18 +1,20 @@
-import quartz
-import torch
+import copy
+import json
+import math
 import os
-from datetime import datetime
-import numpy as np
-import time
-from tqdm import tqdm
-import wandb
 import random
+import time
+from datetime import datetime
+
+import numpy as np
+import torch
+import wandb
 from PPO import PPO
 from torch.distributions import Categorical
+from tqdm import tqdm
 from Trajectory import get_trajectory_batch
-import math
-import json
-import copy
+
+import quartz
 
 wandb.init(project='ppo_multi_step')
 os.environ['OMP_SCHEDULE'] = 'dynamic'
@@ -58,7 +60,8 @@ invalid_reward = -1
 context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg', 'x'],
     filename='../../../bfs_verified_simplified.json',
-    no_increase=False)
+    no_increase=False,
+)
 num_gate_type = 29
 parser = quartz.PyQASMParser(context=context)
 xfer_dim = context.num_xfers
@@ -82,8 +85,7 @@ for circ_name in circ_names:
         init_circ = quartz.PyGraph(context=context, dag=init_dag)
     else:
         init_dag = parser.load_qasm(
-            filename=
-            f"../../t_tdg_h_cx_toffoli_flip_dataset/{circ_name}_after_toffoli_flip.qasm"
+            filename=f"../../t_tdg_h_cx_toffoli_flip_dataset/{circ_name}_after_toffoli_flip.qasm"
         )
         init_circ = quartz.PyGraph(context=context, dag=init_dag)
 
@@ -119,8 +121,7 @@ current_num_files = next(os.walk(log_dir))[2]
 run_num = len(current_num_files)
 
 #### create new log file for each run
-log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(
-    run_num) + ".csv"
+log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(run_num) + ".csv"
 
 print("current logging run number for " + experiment_name + " : ", run_num)
 print("logging at : " + log_f_name)
@@ -136,7 +137,8 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 
 checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(
-    experiment_name, random_seed, run_num)
+    experiment_name, random_seed, run_num
+)
 print("save checkpoint path : " + checkpoint_path)
 
 ############# print all hyperparameters #############
@@ -177,9 +179,24 @@ print(
 log_f = open(log_f_name, "w+")
 
 # initialize a PPO agent
-ppo_agent = PPO(num_gate_type, context, gnn_layers, 128, 256, 128, xfer_dim,
-                lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                eps_clip, entropy_coefficient, log_f, device)
+ppo_agent = PPO(
+    num_gate_type,
+    context,
+    gnn_layers,
+    128,
+    256,
+    128,
+    xfer_dim,
+    lr_graph_embedding,
+    lr_actor,
+    lr_critic,
+    gamma,
+    K_epochs,
+    eps_clip,
+    entropy_coefficient,
+    log_f,
+    device,
+)
 # ppo_agent.load(
 #     'PPO_preTrained/rl_ppo_local_multi_init_states_include_increase/PPO_rl_ppo_local_multi_init_states_include_increase_0_0.pth'
 # )
@@ -242,7 +259,8 @@ for i_episode in tqdm(range(episodes)):
         circ_best_possible_cnt = circ_info[circ_name]['best_possible']
         circ = circ_dataset[circ_name]['init_circ']
         sampled_init_circs.append(
-            (circ_name, circ, circ_gate_cnt, circ_best_possible_cnt))
+            (circ_name, circ, circ_gate_cnt, circ_best_possible_cnt)
+        )
 
     # Sample the rest
     for i in range(batch_size - len(circ_names)):
@@ -250,16 +268,22 @@ for i_episode in tqdm(range(episodes)):
         sampled_gate_cnt_idx = samplers[sampled_circ_name][1].sample().item()
         sampled_gate_cnt = samplers[sampled_circ_name][0][sampled_gate_cnt_idx]
         sampled_circ = random.choice(
-            circ_dataset[sampled_circ_name]['circs'][sampled_gate_cnt])
+            circ_dataset[sampled_circ_name]['circs'][sampled_gate_cnt]
+        )
         sampled_circ_gate_cnt = sampled_gate_cnt
-        sampled_circ_best_possible_cnt = circ_info[sampled_circ_name][
-            'best_possible']
+        sampled_circ_best_possible_cnt = circ_info[sampled_circ_name]['best_possible']
         sampled_init_circs.append(
-            (sampled_circ_name, sampled_circ, sampled_circ_gate_cnt,
-             sampled_circ_best_possible_cnt))
+            (
+                sampled_circ_name,
+                sampled_circ,
+                sampled_circ_gate_cnt,
+                sampled_circ_best_possible_cnt,
+            )
+        )
 
     intermediate_circs, trajectory_infos = get_trajectory_batch(
-        ppo_agent, context, sampled_init_circs, max_seq_len, invalid_reward)
+        ppo_agent, context, sampled_init_circs, max_seq_len, invalid_reward
+    )
 
     t_0 = time.time()
     print(f'get trajectory time: {t_0 - start}')
@@ -288,14 +312,14 @@ for i_episode in tqdm(range(episodes)):
                 if circ.gate_count not in circ_dataset[circ_name]['circs']:
                     circ_dataset[circ_name]['circs'][circ.gate_count] = [circ]
                 else:
-                    circ_dataset[circ_name]['circs'][circ.gate_count].append(
-                        circ)
+                    circ_dataset[circ_name]['circs'][circ.gate_count].append(circ)
 
     # Update best
     for circ_name in trajectory_infos:
         circ_dataset[circ_name]['best'] = min(
             trajectory_infos[circ_name]['best_gate_cnt'],
-            circ_dataset[circ_name]['best'])
+            circ_dataset[circ_name]['best'],
+        )
 
     # Wandb log & print & log
     for circ_name, info in trajectory_infos.items():
@@ -313,8 +337,7 @@ for i_episode in tqdm(range(episodes)):
         info_dict[f'{circ_name}_best'] = circ_dataset[circ_name]['best']
 
         message += f"init state count: {circ_dataset[circ_name]['num']}\n"
-        info_dict[f'{circ_name}_init_state_cnt'] = circ_dataset[circ_name][
-            'num']
+        info_dict[f'{circ_name}_init_state_cnt'] = circ_dataset[circ_name]['num']
         message += '\n'
 
         wandb.log(info_dict)
@@ -330,8 +353,7 @@ for i_episode in tqdm(range(episodes)):
         print("saving model at : " + checkpoint_path)
         ppo_agent.save(checkpoint_path)
         print("model saved")
-        print("Elapsed Time  : ",
-              datetime.now().replace(microsecond=0) - start_time)
+        print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
         print(
             "--------------------------------------------------------------------------------------------"
         )

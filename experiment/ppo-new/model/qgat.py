@@ -1,7 +1,7 @@
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 from dgl.nn.pytorch import GATConv
 
 
@@ -22,11 +22,10 @@ class GATLayer(nn.Module):
 
     def edge_attention(self, edges):
         """
-            Concat source and target node representations and edge features
-            to compute attention coefficients for each edge.
+        Concat source and target node representations and edge features
+        to compute attention coefficients for each edge.
         """
-        z2 = torch.cat([edges.src['z'], edges.data['w'], edges.dst['z']],
-                       dim=1)
+        z2 = torch.cat([edges.src['z'], edges.data['w'], edges.dst['z']], dim=1)
         a = self.attn_fc(z2)
         return {'e': F.leaky_relu(a, negative_slope=0.2)}
 
@@ -54,12 +53,14 @@ class GATLayer(nn.Module):
 
 
 class MultiHeadGATLayer(nn.Module):
-    def __init__(self,
-                 in_dim: int,
-                 out_dim: int,
-                 edge_dim: int,
-                 num_heads: int,
-                 merge: str = 'cat'):
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        edge_dim: int,
+        num_heads: int,
+        merge: str = 'cat',
+    ):
         super(MultiHeadGATLayer, self).__init__()
         self.heads = nn.ModuleList()
         for i in range(num_heads):
@@ -67,9 +68,7 @@ class MultiHeadGATLayer(nn.Module):
         self.merge = merge
 
     def forward(self, g: dgl.DGLGraph, h: torch.Tensor):
-        head_outs: list[torch.Tensor] = [
-            attn_head(g, h) for attn_head in self.heads
-        ]
+        head_outs: list[torch.Tensor] = [attn_head(g, h) for attn_head in self.heads]
         if self.merge == 'cat':
             # concat on the output feature dimension (dim=1)
             return torch.cat(head_outs, dim=1)
@@ -79,14 +78,16 @@ class MultiHeadGATLayer(nn.Module):
 
 
 class QGAT(nn.Module):
-    def __init__(self,
-                 num_layers: int,
-                 num_gate_types: int,
-                 in_dim: int,
-                 hidden_dim: int,
-                 out_dim: int,
-                 num_heads: int,
-                 add_self_loop: bool = True):
+    def __init__(
+        self,
+        num_layers: int,
+        num_gate_types: int,
+        in_dim: int,
+        hidden_dim: int,
+        out_dim: int,
+        num_heads: int,
+        add_self_loop: bool = True,
+    ):
         super(QGAT, self).__init__()
         self.add_self_loop: bool = add_self_loop
         self.embedding = nn.Embedding(num_gate_types, in_dim)
@@ -95,13 +96,12 @@ class QGAT(nn.Module):
         self.convs.append(MultiHeadGATLayer(in_dim, hidden_dim, 3, num_heads))
         for i in range(num_layers - 2):
             self.convs.append(
-                MultiHeadGATLayer(hidden_dim * num_heads, hidden_dim, 3,
-                                  num_heads))
+                MultiHeadGATLayer(hidden_dim * num_heads, hidden_dim, 3, num_heads)
+            )
         # Be aware that the input dimension is hidden_dim*num_heads since
         # multiple head outputs are concatenated together. Also, only
         # one attention head in the output layer.
-        self.convs.append(
-            MultiHeadGATLayer(hidden_dim * num_heads, out_dim, 3, 1))
+        self.convs.append(MultiHeadGATLayer(hidden_dim * num_heads, out_dim, 3, 1))
 
     def forward(self, g: dgl.DGLGraph):
         graph: dgl.DGLGraph
@@ -110,12 +110,14 @@ class QGAT(nn.Module):
         else:
             graph = g
         h: torch.Tensor = self.embedding(graph.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(graph.edata['src_idx'], 1),
-            torch.unsqueeze(graph.edata['dst_idx'], 1),
-            torch.unsqueeze(graph.edata['reversed'], 1)
-        ],
-                      dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(graph.edata['src_idx'], 1),
+                torch.unsqueeze(graph.edata['dst_idx'], 1),
+                torch.unsqueeze(graph.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         graph.edata['w'] = w
         graph.ndata['z'] = h
 

@@ -1,10 +1,12 @@
-from quartz import PyGraph
+import time
+
+import dgl
 import torch
 import torch.nn as nn
-import dgl
-import time
 import wandb
 from ActorCritic import ActorCritic
+
+from quartz import PyGraph
 
 
 class RolloutBuffer:
@@ -40,10 +42,25 @@ class RolloutBuffer:
 
 
 class PPO:
-    def __init__(self, num_gate_type, context, gnn_layers, graph_embed_size,
-                 actor_hidden_size, critic_hidden_size, action_dim,
-                 lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                 eps_clip, entropy_coefficient, log_file_handle, device):
+    def __init__(
+        self,
+        num_gate_type,
+        context,
+        gnn_layers,
+        graph_embed_size,
+        actor_hidden_size,
+        critic_hidden_size,
+        action_dim,
+        lr_graph_embedding,
+        lr_actor,
+        lr_critic,
+        gamma,
+        K_epochs,
+        eps_clip,
+        entropy_coefficient,
+        log_file_handle,
+        device,
+    ):
 
         self.gamma = gamma
         self.eps_clip = eps_clip
@@ -53,32 +70,36 @@ class PPO:
 
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(gnn_layers, num_gate_type, graph_embed_size,
-                                  actor_hidden_size, critic_hidden_size,
-                                  action_dim, self.device).to(self.device)
-        self.optimizer = torch.optim.Adam([{
-            'params':
-            self.policy.graph_embedding.parameters(),
-            'lr':
-            lr_graph_embedding
-        }, {
-            'params':
-            self.policy.actor.parameters(),
-            'lr':
-            lr_actor
-        }, {
-            'params':
-            self.policy.critic.parameters(),
-            'lr':
-            lr_critic
-        }])
+        self.policy = ActorCritic(
+            gnn_layers,
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+            self.device,
+        ).to(self.device)
+        self.optimizer = torch.optim.Adam(
+            [
+                {
+                    'params': self.policy.graph_embedding.parameters(),
+                    'lr': lr_graph_embedding,
+                },
+                {'params': self.policy.actor.parameters(), 'lr': lr_actor},
+                {'params': self.policy.critic.parameters(), 'lr': lr_critic},
+            ]
+        )
         wandb.watch(self.policy, log='all', log_freq=10)
 
-        self.policy_old = ActorCritic(gnn_layers, num_gate_type,
-                                      graph_embed_size, actor_hidden_size,
-                                      critic_hidden_size, action_dim,
-                                      torch.device('cuda:0')).to(
-                                          torch.device('cuda:0'))
+        self.policy_old = ActorCritic(
+            gnn_layers,
+            num_gate_type,
+            graph_embed_size,
+            actor_hidden_size,
+            critic_hidden_size,
+            action_dim,
+            torch.device('cuda:0'),
+        ).to(torch.device('cuda:0'))
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()
@@ -92,7 +113,8 @@ class PPO:
         # No gradient needed
         with torch.no_grad():
             node, xfer, xfer_logprob, mask = self.policy_old.act(
-                self.context, graph, node_range)
+                self.context, graph, node_range
+            )
 
         self.buffer.graphs.append(graph)
         self.buffer.nodes.append(node)
@@ -102,11 +124,11 @@ class PPO:
 
         return node.item(), xfer.item()
 
-    def select_actions(self, graphs: list[PyGraph],
-                       node_ranges: list[list[int]]):
+    def select_actions(self, graphs: list[PyGraph], node_ranges: list[list[int]]):
         with torch.no_grad():
             nodes, xfers, xfer_logprobs, masks = self.policy_old.act_batch(
-                self.context, graphs, node_ranges)
+                self.context, graphs, node_ranges
+            )
 
         return nodes, xfers, xfer_logprobs, masks
 
@@ -121,17 +143,19 @@ class PPO:
 
         node_nums = batched_dgl_gs.batch_num_nodes().tolist()
 
-        old_xfer_logprobs = torch.squeeze(
-            torch.stack(self.buffer.xfer_logprobs,
-                        dim=0)).detach().to(self.device)
+        old_xfer_logprobs = (
+            torch.squeeze(torch.stack(self.buffer.xfer_logprobs, dim=0))
+            .detach()
+            .to(self.device)
+        )
 
         for _ in range(self.K_epochs):
             # Evaluating old actions and values
             # Entropy is not needed when using old policy
             # But needed in current policy
             values, xfer_logprobs, xfer_entropys = self.policy.evaluate(
-                batched_dgl_gs, self.buffer.nodes, self.buffer.xfers, masks,
-                node_nums)
+                batched_dgl_gs, self.buffer.nodes, self.buffer.xfers, masks, node_nums
+            )
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(xfer_logprobs - old_xfer_logprobs.detach())
@@ -140,10 +164,11 @@ class PPO:
             rewards = []
             discounted_reward = torch.tensor(0)
             for idx, reward, is_nop, is_terminal in zip(
-                    reversed(range(len(self.buffer.nodes))),
-                    reversed(self.buffer.rewards),
-                    reversed(self.buffer.is_nops),
-                    reversed(self.buffer.is_terminals)):
+                reversed(range(len(self.buffer.nodes))),
+                reversed(self.buffer.rewards),
+                reversed(self.buffer.is_nops),
+                reversed(self.buffer.is_terminals),
+            ):
                 if is_nop:
                     discounted_reward = torch.tensor(0)
                 elif self.buffer.next_nodes[idx] == []:
@@ -161,23 +186,29 @@ class PPO:
             # Finding Surrogate Loss
             advantages = rewards - values
             surr1 = ratios * advantages.clone().detach()
-            surr2 = torch.clamp(ratios, 1 - self.eps_clip, 1 +
-                                self.eps_clip) * advantages.clone().detach()
+            surr2 = (
+                torch.clamp(ratios, 1 - self.eps_clip, 1 + self.eps_clip)
+                * advantages.clone().detach()
+            )
 
             actor_loss = -torch.min(surr1, surr2).mean()
             critic_loss = advantages.pow(2).mean()
             xfer_entropy = xfer_entropys.mean()
 
-            wandb.log({
-                'actor_loss': actor_loss,
-                'critic_loss': critic_loss,
-                'xfer_entropy': xfer_entropy
-            })
+            wandb.log(
+                {
+                    'actor_loss': actor_loss,
+                    'critic_loss': critic_loss,
+                    'xfer_entropy': xfer_entropy,
+                }
+            )
 
             # final loss of clipped objective PPO
             # loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(
             #     state_values, rewards) - 0.01 * (node_entropy + xfer_entropy)
-            loss = actor_loss + 0.5 * critic_loss - self.entropy_cofficient * xfer_entropy
+            loss = (
+                actor_loss + 0.5 * critic_loss - self.entropy_cofficient * xfer_entropy
+            )
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -220,8 +251,7 @@ class PPO:
             if self.buffer.is_terminals[i]:
                 self.log_file_handle.write('terminated\n')
                 self.log_file_handle.write(f'{masks[i].nonzero()}\n')
-                self.log_file_handle.write(
-                    f'trajectory reward: {cumulated_reward}\n')
+                self.log_file_handle.write(f'trajectory reward: {cumulated_reward}\n')
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
@@ -234,8 +264,8 @@ class PPO:
 
     def load(self, checkpoint_path):
         self.policy_old.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )
         self.policy.load_state_dict(
-            torch.load(checkpoint_path,
-                       map_location=lambda storage, loc: storage))
+            torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        )

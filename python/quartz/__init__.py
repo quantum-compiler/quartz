@@ -1,2 +1,3 @@
-from .core import *
 import qiskit
+
+from .core import *

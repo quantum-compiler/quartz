@@ -1,33 +1,48 @@
-import torch
-from GNN import QGNN
-import os
-from datetime import datetime
-import torch.nn as nn
-from torch.distributions import Categorical
-from quartz import PyGraph, QuartzContext
-import torch.nn.functional as F
-import dgl
-from Utils import masked_softmax, temperature_softmax
-import time
-from IPython import embed
 import math
+import os
+import time
+from datetime import datetime
+
+import dgl
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from GNN import QGNN
+from IPython import embed
+from torch.distributions import Categorical
+from Utils import masked_softmax, temperature_softmax
+
+from quartz import PyGraph, QuartzContext
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, gnn_layers, num_gate_type, graph_embed_size,
-                 actor_hidden_size, critic_hidden_size, action_dim, device):
+    def __init__(
+        self,
+        gnn_layers,
+        num_gate_type,
+        graph_embed_size,
+        actor_hidden_size,
+        critic_hidden_size,
+        action_dim,
+        device,
+    ):
         super(ActorCritic, self).__init__()
 
-        self.graph_embedding = QGNN(gnn_layers, num_gate_type,
-                                    graph_embed_size, graph_embed_size)
+        self.graph_embedding = QGNN(
+            gnn_layers, num_gate_type, graph_embed_size, graph_embed_size
+        )
 
         self.actor = nn.Sequential(
-            nn.Linear(graph_embed_size, actor_hidden_size), nn.ReLU(),
-            nn.Linear(actor_hidden_size, action_dim))
+            nn.Linear(graph_embed_size, actor_hidden_size),
+            nn.ReLU(),
+            nn.Linear(actor_hidden_size, action_dim),
+        )
 
         self.critic = nn.Sequential(
-            nn.Linear(graph_embed_size, critic_hidden_size), nn.ReLU(),
-            nn.Linear(critic_hidden_size, 1))
+            nn.Linear(graph_embed_size, critic_hidden_size),
+            nn.ReLU(),
+            nn.Linear(critic_hidden_size, 1),
+        )
 
         def _weight_init(m):
             if isinstance(m, nn.Linear):
@@ -51,11 +66,13 @@ class ActorCritic(nn.Module):
         node_vs = self.critic(graph_embed).squeeze()
 
         if node_range == []:
-            node_mask = torch.ones((dgl_g.number_of_nodes()),
-                                   dtype=torch.bool).to(self.device)
+            node_mask = torch.ones((dgl_g.number_of_nodes()), dtype=torch.bool).to(
+                self.device
+            )
         else:
-            node_mask = torch.zeros((dgl_g.number_of_nodes()),
-                                    dtype=torch.bool).to(self.device)
+            node_mask = torch.zeros((dgl_g.number_of_nodes()), dtype=torch.bool).to(
+                self.device
+            )
             node_mask[node_range] = True
 
         node_prob = F.softmax(node_vs, dim=-1)
@@ -69,10 +86,10 @@ class ActorCritic(nn.Module):
         #         f'node: {node}, node value: {node_vs[node]}, max: {node_vs.max()}'
         #     )
 
-        mask = torch.zeros((context.num_xfers),
-                           dtype=torch.bool).to(self.device)
+        mask = torch.zeros((context.num_xfers), dtype=torch.bool).to(self.device)
         available_xfers = g.available_xfers_parallel(
-            context=context, node=g.get_node_from_id(id=node))
+            context=context, node=g.get_node_from_id(id=node)
+        )
         mask[available_xfers] = True
         xfer_logits = self.actor(graph_embed[node])
         xfer_probs = masked_softmax(xfer_logits, mask)
@@ -110,8 +127,7 @@ class ActorCritic(nn.Module):
             # TODO: this rate should be a hyper parameter
             hit_rate = 0.9
             # Assume values of all nodes except one are 0
-            temperature = 1 / math.log(
-                (node_nums[i] - 1) / (1 - hit_rate) * hit_rate)
+            temperature = 1 / math.log((node_nums[i] - 1) / (1 - hit_rate) * hit_rate)
 
             # node_probs = F.softmax(node_vs, dim=-1)
             node_probs = temperature_softmax(node_vs, temperature)
@@ -124,7 +140,8 @@ class ActorCritic(nn.Module):
 
             mask = torch.zeros(self.action_dim, dtype=torch.bool)
             available_xfers = graphs[i].available_xfers_parallel(
-                context=context, node=graphs[i].get_node_from_id(id=node))
+                context=context, node=graphs[i].get_node_from_id(id=node)
+            )
             mask[available_xfers] = True
             masks.append(mask)
 
@@ -147,9 +164,19 @@ class ActorCritic(nn.Module):
             values = self.critic(graph_embed).squeeze()
         return values[nodes].max()
 
-    def evaluate(self, batched_dgl_gs, nodes, xfers, batched_dgl_next_gs,
-                 next_node_lists, is_nops, is_terminals, masks, node_nums,
-                 next_node_nums):
+    def evaluate(
+        self,
+        batched_dgl_gs,
+        nodes,
+        xfers,
+        batched_dgl_next_gs,
+        next_node_lists,
+        is_nops,
+        is_terminals,
+        masks,
+        node_nums,
+        next_node_nums,
+    ):
 
         batched_dgl_gs = batched_dgl_gs.to(self.device)
         # start = time.time()
@@ -175,7 +202,8 @@ class ActorCritic(nn.Module):
         xfer_probs = masked_softmax(xfer_logits, masks)
         xfer_dists = Categorical(xfer_probs)
         xfer_logprobs = xfer_dists.log_prob(
-            torch.tensor(xfers, dtype=torch.int).to(self.device))
+            torch.tensor(xfers, dtype=torch.int).to(self.device)
+        )
         xfer_entropys = xfer_dists.entropy()
         # t_2 = time.time()
         # print(f'get xfer time: {t_2 - t_1}')
@@ -183,8 +211,7 @@ class ActorCritic(nn.Module):
         # Get next node values
         with torch.no_grad():
             batched_dgl_next_gs = batched_dgl_next_gs.to(self.device)
-            batched_next_graph_embeds = self.graph_embedding(
-                batched_dgl_next_gs)
+            batched_next_graph_embeds = self.graph_embedding(batched_dgl_next_gs)
             batched_next_node_vs = self.critic(batched_next_graph_embeds)
 
         # Split

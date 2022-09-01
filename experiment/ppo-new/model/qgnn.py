@@ -1,17 +1,22 @@
 from typing import List
+
+import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 
 
 class QConv(nn.Module):
     def __init__(
-        self, in_feat: int, inter_dim: int, out_feat: int,
-        aggregator: str = 'sum', normalize: bool = False,
+        self,
+        in_feat: int,
+        inter_dim: int,
+        out_feat: int,
+        aggregator_type: str = 'sum',
+        normalize: bool = False,
     ):
         super(QConv, self).__init__()
-        self.linear1 = nn.Sequential(
+        self.aggregator = nn.Sequential(
             nn.Linear(in_feat + 3, inter_dim),
             nn.ReLU(),
         )
@@ -20,7 +25,7 @@ class QConv(nn.Module):
             nn.ReLU(),
         )
         self.apply(self._init_weights)
-        self.aggregator: str = aggregator
+        self.aggregator_type: str = aggregator_type
         self.normalize: bool = normalize
 
     def _init_weights(self, module):
@@ -37,13 +42,13 @@ class QConv(nn.Module):
 
     def reduce_func(self, nodes):
         # NOTE: "Pooling aggregator" of GraphSAGE is defined as a Linear and an activation
-        tmp = self.linear1(nodes.mailbox['m'])
-        if self.aggregator == 'sum':
+        tmp = self.aggregator(nodes.mailbox['m'])
+        if self.aggregator_type == 'sum':
             h = torch.sum(tmp, dim=1)
-        elif self.aggregator == 'mean':
+        elif self.aggregator_type == 'mean':
             h = torch.mean(tmp, dim=1)
-        elif self.aggregator == 'max':
-            h = torch.max(tmp, dim=1)[0]
+        elif self.aggregator_type == 'max':
+            h = torch.max(tmp, dim=1).values
         else:
             raise NotImplementedError
         return {'h_N': h}
@@ -61,8 +66,12 @@ class QConv(nn.Module):
 
 class QGNN(nn.Module):
     def __init__(
-        self, num_layers: int, num_gate_types: int,
-        gate_type_embed_dim: int, h_feats: int, inter_dim: int,
+        self,
+        num_layers: int,
+        num_gate_types: int,
+        gate_type_embed_dim: int,
+        h_feats: int,
+        inter_dim: int,
     ) -> None:
         """
         output_dim = h_feats
@@ -78,11 +87,14 @@ class QGNN(nn.Module):
 
     def forward(self, g: dgl.DGLGraph) -> torch.Tensor:
         g.ndata['h'] = self.embedding(g.ndata['gate_type'])
-        w = torch.cat([
-            torch.unsqueeze(g.edata['src_idx'], 1),
-            torch.unsqueeze(g.edata['dst_idx'], 1),
-            torch.unsqueeze(g.edata['reversed'], 1)
-        ], dim=1)
+        w = torch.cat(
+            [
+                torch.unsqueeze(g.edata['src_idx'], 1),
+                torch.unsqueeze(g.edata['dst_idx'], 1),
+                torch.unsqueeze(g.edata['reversed'], 1),
+            ],
+            dim=1,
+        )
         g.edata['w'] = w
         h: torch.Tensor = g.ndata['h']
         for i in range(len(self.convs)):

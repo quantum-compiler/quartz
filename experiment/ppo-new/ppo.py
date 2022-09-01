@@ -1,44 +1,40 @@
 # this file is under mypy's checking
 from __future__ import annotations
-import os
-from typing import List, Dict, cast, OrderedDict
-import warnings
-from functools import partial
-import time
+
 import copy
 import math
-from numpy import str0
-from tqdm import tqdm # type: ignore
-from natsort import natsorted
-
-import qtz
-
-import torch
-from torch.distributions import Categorical
-import torch.multiprocessing as mp
-import torch.distributed as dist
-import torch.distributed.rpc as rpc
-from torch.nn.parallel import DistributedDataParallel as DDP
-# import quartz # type: ignore
+import os
+import time
+import warnings
+from functools import partial
+from typing import Dict, List, OrderedDict, cast
 
 import hydra
+import qtz
+import torch
+import torch.distributed as dist
+import torch.distributed.rpc as rpc
+import torch.multiprocessing as mp
 import wandb
-
+from actor import PPOAgent
 from config.config import *
 from ds import *
-from utils import *
+from icecream import ic  # type: ignore
+from IPython import embed  # type: ignore
 from model.actor_critic import ActorCritic
-from actor import PPOAgent
+from natsort import natsorted
+from numpy import str0
 from tester import Tester
+from torch.distributions import Categorical
+from torch.nn.parallel import DistributedDataParallel as DDP
+from tqdm import tqdm  # type: ignore
+from utils import *
 
-from IPython import embed # type: ignore
-from icecream import ic # type: ignore
+# import quartz # type: ignore
+
 
 class PPOMod:
-    
-    def __init__(
-        self, cfg: BaseConfig, output_dir: str
-    ) -> None:
+    def __init__(self, cfg: BaseConfig, output_dir: str) -> None:
         self.cfg: BaseConfig = cfg
         self.output_dir = output_dir
         self.wandb_mode = 'online'
@@ -61,11 +57,13 @@ class PPOMod:
         self.input_graphs: List[Dict[str, str]] = []
         for input_graph in cfg.input_graphs:
             with open(input_graph.path) as f:
-                self.input_graphs.append({
-                    'name': input_graph.name,
-                    'qasm': f.read(),
-                })
-        
+                self.input_graphs.append(
+                    {
+                        'name': input_graph.name,
+                        'qasm': f.read(),
+                    }
+                )
+
     def print_cfg(self) -> None:
         print('================ Configs ================')
         print(OmegaConf.to_yaml(self.cfg))
@@ -73,17 +71,17 @@ class PPOMod:
         #     print(f'{k} : {v}')
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
-    
+
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
         seed_all(self.cfg.seed + rank)
         """init Quartz for each process"""
         self.init_quartz_context_func()
-        
+
         """set num of OMP threads to avoid blasting the machine"""
         if self.cfg.omp_num_threads != 0:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
         # otherwise we don't limit it
-        
+
         """RPC and DDP initialization"""
         # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
         self.rank = rank
@@ -93,18 +91,21 @@ class PPOMod:
             init_method=f'tcp://localhost:{self.cfg.ddp_port + 1}',
             rpc_timeout=0,
         )
-        
+
         if rank < ddp_processes:
             """init agent processes"""
             agent_name = get_agent_name(rank)
             rpc.init_rpc(
-                name=agent_name, rank=rank, world_size=tot_processes,
+                name=agent_name,
+                rank=rank,
+                world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
             dist.init_process_group(
                 backend='nccl',
                 init_method=f'tcp://localhost:{self.cfg.ddp_port}',
-                rank=rank, world_size=ddp_processes,
+                rank=rank,
+                world_size=ddp_processes,
             )
             self.train()
         else:
@@ -114,13 +115,17 @@ class PPOMod:
             obs_in_agent_rank = obs_rank % self.cfg.obs_per_agent
             obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
             rpc.init_rpc(
-                name=obs_name, rank=rank, world_size=tot_processes,
+                name=obs_name,
+                rank=rank,
+                world_size=tot_processes,
                 rpc_backend_options=rpc_backend_options,
             )
         # block until all rpcs finish
         rpc.shutdown()
 
-    def _make_actor_critic(self, ) -> ActorCritic:
+    def _make_actor_critic(
+        self,
+    ) -> ActorCritic:
         return ActorCritic(
             gnn_type=self.cfg.gnn_type,
             num_gate_types=self.cfg.num_gate_types,
@@ -137,7 +142,7 @@ class PPOMod:
             action_dim=qtz.quartz_context.num_xfers,
             device=self.device,
         ).to(self.device)
-    
+
     def train(self) -> None:
         """init agent and network"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
@@ -146,7 +151,9 @@ class PPOMod:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
         torch.cuda.set_device(self.device)
         self.ac_net: ActorCritic = self._make_actor_critic()
-        self.ac_net = cast(ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net))
+        self.ac_net = cast(
+            ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
+        )
         self.ac_net_old = copy.deepcopy(self.ac_net)
         self.agent = PPOAgent(
             agent_id=self.rank,
@@ -155,6 +162,7 @@ class PPOMod:
             device=self.device,
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
+            limit_total_gate_count=self.cfg.limit_total_gate_count,
             cost_type=CostType.from_str(self.cfg.cost_type),
             ac_net=self.ac_net_old,
             input_graphs=self.input_graphs,
@@ -168,34 +176,36 @@ class PPOMod:
             output_dir=self.output_dir,
         )
         """use a holder class for convenience but split the model into 3 modules
-        to avoid issue with BN + DDP 
+        to avoid issue with BN + DDP
         (https://github.com/pytorch/pytorch/issues/66504)
         """
         self.ddp_ac_net = self.ac_net.ddp_model()
         self.ddp_ac_net.eval()
-        self.optimizer = torch.optim.Adam([
-            {
-                'params': self.ddp_ac_net.gnn.parameters(),
-                'lr': self.cfg.lr_gnn,
-            },
-            {
-                'params': self.ddp_ac_net.actor.parameters(),
-                'lr': self.cfg.lr_actor,
-            },
-            {
-                'params': self.ddp_ac_net.critic.parameters(),
-                'lr': self.cfg.lr_critic,
-            }
-        ])
+        self.optimizer = torch.optim.Adam(
+            [
+                {
+                    'params': self.ddp_ac_net.gnn.parameters(),
+                    'lr': self.cfg.lr_gnn,
+                },
+                {
+                    'params': self.ddp_ac_net.actor.parameters(),
+                    'lr': self.cfg.lr_actor,
+                },
+                {
+                    'params': self.ddp_ac_net.critic.parameters(),
+                    'lr': self.cfg.lr_critic,
+                },
+            ]
+        )
         if self.rank == 0:
             wandb.init(
                 project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
                 mode=self.wandb_mode,
-                config=self.cfg, # type: ignore
+                config=self.cfg,  # type: ignore
             )
         printfl(f'rank {self.rank} / {self.ddp_processes} on {self.device} initialized')
-        
+
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter: int = 0
         self.tot_exps_collected: int = 0
@@ -206,7 +216,9 @@ class PPOMod:
         limited_time_budget: bool = len(self.cfg.time_budget) > 0
         if limited_time_budget:
             sec_budget: float = hms_to_sec(self.cfg.time_budget)
-            printfl(f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.')
+            printfl(
+                f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.'
+            )
         self.start_time_sec = time.time()
         while self.i_iter < max_iterations:
             self.train_iter()
@@ -217,9 +229,11 @@ class PPOMod:
             self.i_iter += 1
             used_sec = time.time() - self.start_time_sec
             if limited_time_budget and used_sec > sec_budget:
-                printfl(f'rank {self.rank}: Run out of time budget {used_sec} sec / {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...')
+                printfl(
+                    f'rank {self.rank}: Run out of time budget {used_sec} sec / {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...'
+                )
                 break
-        
+
     def train_iter(self) -> None:
         """collect batched data in dgl or tensor format"""
         s_time_collect = get_time_ns()
@@ -228,14 +242,26 @@ class PPOMod:
         # printfl(f'Agent {self.rank} : start collecting data for iter {self.i_iter}')
         if self.cfg.agent_collect is True:
             exp_list = self.agent.collect_data_by_self(
-                self.cfg.num_eps_per_iter // self.ddp_processes, self.cfg.agent_batch_size,
-                self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample
+                self.cfg.num_eps_per_iter // self.ddp_processes,
+                self.cfg.agent_batch_size,
+                self.cfg.max_cost_ratio,
+                self.cfg.nop_stop,
+                self.cfg.greedy_sample,
             )
-        else: # use observers to collect data
-            collect_fn = partial(self.agent.collect_data, self.cfg.max_cost_ratio, self.cfg.nop_stop, self.cfg.greedy_sample)
+        else:  # use observers to collect data
+            collect_fn = partial(
+                self.agent.collect_data,
+                self.cfg.max_cost_ratio,
+                self.cfg.nop_stop,
+                self.cfg.greedy_sample,
+            )
             exp_list = collect_fn()
             # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-            for i in range(self.cfg.num_eps_per_iter // (self.ddp_processes * self.cfg.obs_per_agent) - 1):
+            for i in range(
+                self.cfg.num_eps_per_iter
+                // (self.ddp_processes * self.cfg.obs_per_agent)
+                - 1
+            ):
                 exp_list += collect_fn()
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
@@ -246,58 +272,79 @@ class PPOMod:
         if self.rank == 0:
             other_info_dict = self.agent.other_info_dict()
             collect_info = {
-                **other_info_dict, # type: ignore
+                **other_info_dict,  # type: ignore
                 'iter': self.i_iter,
                 'num_exps': len(exp_list),
-                'tot_exps_collected_all_rank': self.tot_exps_collected * self.ddp_processes,
+                'tot_exps_collected_all_rank': self.tot_exps_collected
+                * self.ddp_processes,
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
-            logprintfl(f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .')
+            logprintfl(
+                f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .'
+            )
             for k, v in collect_info.items():
                 printfl(f'    {k} : {v}')
             wandb.log(collect_info)
             pbar = tqdm(
-                total=self.cfg.k_epochs * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
+                total=self.cfg.k_epochs
+                * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
                 desc=f'Iter {self.i_iter}',
                 bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
             )
-            
+
         """evaluate, compute loss, and update (DDP)"""
         """compute values of next nodes using un-updated network to get advantages"""
         all_target_values: List[float] = []
         all_advs: List[float] = []
         with torch.no_grad():
             for i_step, exps in enumerate(
-                    ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
-                ):
+                ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
+            ):
                 # (num_next_graphs, )
                 next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
                 """get embeds"""
                 # (batch_next_graphs_nodes, embed_dim)
-                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.next_state, ActorCritic.gnn_name())
-                next_graph_embeds_list: List[torch.Tensor] = torch.split(b_next_graph_embeds, next_num_nodes.tolist())
+                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(
+                    exps.next_state, ActorCritic.gnn_name()
+                )
+                next_graph_embeds_list: List[torch.Tensor] = torch.split(
+                    b_next_graph_embeds, next_num_nodes.tolist()
+                )
                 """select embeds"""
                 # ( sum(num_next_nodes), embed_dim )
-                next_node_embeds: torch.Tensor = torch.cat([
-                    graph_embed[next_node_ids]
-                    for (next_node_ids, graph_embed) in zip(exps.next_nodes, next_graph_embeds_list)
-                ])
+                next_node_embeds: torch.Tensor = torch.cat(
+                    [
+                        graph_embed[next_node_ids]
+                        for (next_node_ids, graph_embed) in zip(
+                            exps.next_nodes, next_graph_embeds_list
+                        )
+                    ]
+                )
                 """evaluate"""
                 # ( sum(num_next_nodes), )
-                next_node_values: torch.Tensor = self.ddp_ac_net(next_node_embeds, ActorCritic.critic_name()).squeeze()
+                next_node_values: torch.Tensor = self.ddp_ac_net(
+                    next_node_embeds, ActorCritic.critic_name()
+                ).squeeze()
                 num_next_nodes = list(map(len, exps.next_nodes))
-                next_node_values_list: List[torch.Tensor] = torch.split(next_node_values, num_next_nodes)
+                next_node_values_list: List[torch.Tensor] = torch.split(
+                    next_node_values, num_next_nodes
+                )
                 """get max next value for each graph"""
                 max_next_values_list: List[torch.Tensor] = []
                 for i in range(len(exps)):
                     max_next_value: torch.Tensor
                     # invalid xfer, gate count exceeds limit, NOP
-                    if next_node_values_list[i].shape[0] == 0 or \
-                        exps.game_over[i] or \
-                        qtz.is_nop(int(exps.action[i, 1])) and self.cfg.nop_stop:
+                    if (
+                        next_node_values_list[i].shape[0] == 0
+                        or exps.game_over[i]
+                        or qtz.is_nop(int(exps.action[i, 1]))
+                        and self.cfg.nop_stop
+                    ):
                         max_next_value = torch.zeros(1).to(self.device)
                     else:
-                        max_next_value, _ = torch.max(next_node_values_list[i], dim=0, keepdim=True)
+                        max_next_value, _ = torch.max(
+                            next_node_values_list[i], dim=0, keepdim=True
+                        )
                     max_next_values_list.append(max_next_value)
                 max_next_values = torch.cat(max_next_values_list)
                 target_values = exps.reward + self.cfg.gamma * max_next_values
@@ -305,30 +352,38 @@ class PPOMod:
                 all_target_values += target_values.tolist()
                 all_advs += advs.tolist()
             # end for
-            train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs) # type: ignore
+            train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)  # type: ignore
         # end with
         """update the network for K epochs"""
         self.ddp_ac_net.train()
         for k_epoch in range(self.cfg.k_epochs):
             train_exp_list.shuffle()
             for i_step, exps in enumerate(
-                ExperienceListIterator(train_exp_list, self.cfg.mini_batch_size, self.device)
+                ExperienceListIterator(
+                    train_exp_list, self.cfg.mini_batch_size, self.device
+                )
             ):
                 assert isinstance(exps, TrainBatchExp)
                 self.optimizer.zero_grad()
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
                 # (batch_num_nodes, embed_dim)
-                b_graph_embeds: torch.Tensor = self.ddp_ac_net(exps.state, ActorCritic.gnn_name())
-                nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device) # type: ignore
+                b_graph_embeds: torch.Tensor = self.ddp_ac_net(
+                    exps.state, ActorCritic.gnn_name()
+                )
+                nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device)  # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset
                 selected_node_embeds = b_graph_embeds[selected_nodes]
                 # NOTE: this is the "new value" updated with the network's updates
-                selected_node_values: torch.Tensor = self.ddp_ac_net(selected_node_embeds, ActorCritic.critic_name()).squeeze()
+                selected_node_values: torch.Tensor = self.ddp_ac_net(
+                    selected_node_embeds, ActorCritic.critic_name()
+                ).squeeze()
                 """get xfer dist by Actor"""
                 # (batch_num_graphs, action_dim)
-                xfer_logits: torch.Tensor = self.ddp_ac_net(selected_node_embeds, ActorCritic.actor_name())
+                xfer_logits: torch.Tensor = self.ddp_ac_net(
+                    selected_node_embeds, ActorCritic.actor_name()
+                )
                 softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer)
                 # (batch_num_graphs, )
@@ -338,20 +393,27 @@ class PPOMod:
                 # prob ratio = (pi_theta / pi_theta__old)
                 ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
                 surr1 = ratios * exps.advantages
-                surr2 = torch.clamp(
-                    ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip
-                ) * exps.advantages # NOTE: use fixed advantages
-                actor_loss = - torch.mean(torch.min(surr1, surr2))
+                surr2 = (
+                    torch.clamp(ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip)
+                    * exps.advantages
+                )  # NOTE: use fixed advantages
+                actor_loss = -torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.mean((exps.target_values - selected_node_values) ** 2)
+                critic_loss = torch.mean(
+                    (exps.target_values - selected_node_values) ** 2
+                )
                 xfer_entropy = torch.mean(xfer_entropys)
                 """compute overall loss"""
-                loss = actor_loss + 0.5 * critic_loss - self.cfg.entropy_coeff * xfer_entropy
+                loss = (
+                    actor_loss
+                    + 0.5 * critic_loss
+                    - self.cfg.entropy_coeff * xfer_entropy
+                )
                 """update"""
                 loss.backward()
                 for param in self.ddp_ac_net.parameters():
                     param.grad.data.clamp_(-1, 1)
-                self.optimizer.step() # confirm
+                self.optimizer.step()  # confirm
                 """logging"""
                 if self.rank == 0:
                     pbar.update(1)
@@ -361,42 +423,51 @@ class PPOMod:
                         'xfer_entropy': float(xfer_entropy),
                         'loss': float(loss),
                     }
-                    pbar.set_postfix({
-                        **log_dict,
-                    })
+                    pbar.set_postfix(
+                        {
+                            **log_dict,
+                        }
+                    )
                     pbar.refresh()
-                    wandb.log({
-                        'actor_loss': actor_loss,
-                        'critic_loss': critic_loss,
-                        'xfer_entropy': xfer_entropy,
-                        'loss': loss,
-                    })
+                    wandb.log(
+                        {
+                            'actor_loss': actor_loss,
+                            'critic_loss': critic_loss,
+                            'xfer_entropy': xfer_entropy,
+                            'loss': loss,
+                        }
+                    )
             # end for i_step
             # exps = None
             # torch.cuda.empty_cache()
         # end for k_epochs
         self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
-        
+
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO(not going to do) save top-k model
         ckpt_dir = os.path.join(self.output_dir, 'ckpts')
         os.makedirs(ckpt_dir, exist_ok=True)
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
         if not only_rank_zero or self.rank == 0:
-            torch.save({
-                'i_iter': self.i_iter,
-                'model_state_dict': self.ac_net.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                # 'loss': LOSS,
-            }, ckpt_path)
+            torch.save(
+                {
+                    'i_iter': self.i_iter,
+                    'model_state_dict': self.ac_net.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    # 'loss': LOSS,
+                },
+                ckpt_path,
+            )
             printfl(f'saved "{ckpt_path}"!')
-        
+
     def load_ckpt(self, ckpt_path: str) -> None:
         """load model and optimizer"""
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
         self.i_iter = int(ckpt['i_iter']) + 1
-        model_state_dict = cast(OrderedDict[str, torch.Tensor], ckpt['model_state_dict'])
+        model_state_dict = cast(
+            OrderedDict[str, torch.Tensor], ckpt['model_state_dict']
+        )
         if self.cfg.load_non_ddp_ckpt:
             self.ac_net.load_state_dict(model_state_dict)
             self.ac_net_old.load_state_dict(model_state_dict)
@@ -423,7 +494,7 @@ class PPOMod:
                 self.agent.load_best_info(
                     os.path.join(self.cfg.best_info_dir, info_file)
                 )
-    
+
     def init_ddp_processes(self, rank: int, world_size: int) -> None:
         seed_all(self.cfg.seed)
         """init Quartz and other things"""
@@ -436,7 +507,8 @@ class PPOMod:
         dist.init_process_group(
             backend='nccl',
             init_method=f'tcp://localhost:{self.cfg.ddp_port}',
-            rank=rank, world_size=world_size,
+            rank=rank,
+            world_size=world_size,
         )
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
@@ -458,10 +530,10 @@ class PPOMod:
             else:
                 self.ddp_ac_net.load_state_dict(model_state_dict)
             printfl(f'rank {rank} resumed from "{ckpt_path}"!')
-        
+
         tester = Tester(
             cost_type=CostType.from_str(self.cfg.cost_type),
-            ac_net=self.ac_net, # type: ignore
+            ac_net=self.ac_net,  # type: ignore
             device=self.device,
             output_dir=self.output_dir,
             rank=rank,
@@ -471,13 +543,17 @@ class PPOMod:
         if len(self.cfg.input_graphs) > 0:
             input_graphs = self.cfg.input_graphs
         else:
-            files: List[str] = cast(List[str], natsorted(os.listdir(self.cfg.input_graph_dir)))
+            files: List[str] = cast(
+                List[str], natsorted(os.listdir(self.cfg.input_graph_dir))
+            )
             for file in files:
                 qasm_path = os.path.join(self.cfg.input_graph_dir, file)
                 name = file.split('.')[0]
                 input_graphs.append(InputGraph(name, qasm_path))
         n_graph_each_rank = math.ceil(len(input_graphs) / world_size)
-        input_graphs = input_graphs[n_graph_each_rank * rank : n_graph_each_rank * (rank + 1)]
+        input_graphs = input_graphs[
+            n_graph_each_rank * rank : n_graph_each_rank * (rank + 1)
+        ]
 
         info_list: List[str] = []
         for input_graph in input_graphs:
@@ -485,7 +561,13 @@ class PPOMod:
                 qasm_str = f.read()
             graph = qtz.qasm_to_graph(qasm_str)
             printfl(f'rank {rank} Testing {input_graph.name}...')
-            best_cost, best_time = tester.beam_search(graph, self.cfg.topk, self.cfg.max_eps_len, input_graph.name, self.cfg.budget)
+            best_cost, best_time = tester.beam_search(
+                graph,
+                self.cfg.topk,
+                self.cfg.max_eps_len,
+                input_graph.name,
+                self.cfg.budget,
+            )
             info = f'{input_graph.name} : {best_cost}  {best_time} seconds ({sec_to_hms(best_time)})'
             printfl(f'rank {rank} Test Result: {info}')
             info_list.append(info)
@@ -508,7 +590,9 @@ class PPOMod:
             if self.cfg.ckpt_output_path == '':
                 ckpt_fname = os.path.basename(ckpt_path)
                 os.makedirs(self.cfg.ckpt_output_dir, exist_ok=True)
-                out_path = os.path.join(self.cfg.ckpt_output_dir, f'converted_{ckpt_fname}')
+                out_path = os.path.join(
+                    self.cfg.ckpt_output_dir, f'converted_{ckpt_fname}'
+                )
             else:
                 out_path = self.cfg.ckpt_output_path
             if os.path.exists(out_path):
@@ -523,14 +607,14 @@ class PPOMod:
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
-    output_dir = os.path.abspath(os.curdir) # get hydra output dir
-    os.chdir(hydra.utils.get_original_cwd()) # set working dir to the original one
-    
+    output_dir = os.path.abspath(os.curdir)  # get hydra output dir
+    os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
+
     cfg: BaseConfig = config.c
     warnings.simplefilter('ignore')
-    
+
     ppo_mod = PPOMod(cfg, output_dir)
-    
+
     ddp_processes = 1
     if len(cfg.gpus) > 1:
         ddp_processes = len(cfg.gpus)
@@ -541,14 +625,17 @@ def main(config: Config) -> None:
         print(f'spawning {tot_processes} processes...')
         mp.spawn(
             fn=ppo_mod.init_process,
-            args=(ddp_processes, obs_processes,),
+            args=(
+                ddp_processes,
+                obs_processes,
+            ),
             nprocs=tot_processes,
             join=True,
         )
     elif cfg.mode == 'test':
         mp.spawn(
             fn=ppo_mod.test,
-            args=(ddp_processes, ),
+            args=(ddp_processes,),
             nprocs=ddp_processes,
             join=True,
         )
@@ -561,6 +648,7 @@ def main(config: Config) -> None:
         )
     else:
         raise NotImplementedError(f'Unexpected mode {cfg.mode}')
-    
+
+
 if __name__ == '__main__':
     main()

@@ -53,14 +53,15 @@ int main(int argc, char **argv) {
 
   // Optimization
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
-  auto graph_after_search = graph_before_search->optimize(
-      1.02, 0, false, &dst_ctx, eqset_fn, simulated_annealing, early_stop,
-      /*rotation_merging_in_searching*/ false, GateType::rz, fn);
+  auto graph_after_search =
+      graph_before_search->optimize(&dst_ctx, eqset_fn, fn, /*print_message=*/
+                                    true);
   auto end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
-            << " on Nam's gate set." << std::endl
-            << "Gate count after optimization: "
-            << graph_after_search->total_cost() << ", "
+            << " on Nam's gate set."
+            << " Gate count after optimization: "
+            << graph_after_search->gate_count() << ", "
+            << "Circuit depth: " << graph_after_search->circuit_depth() << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /

@@ -1,22 +1,27 @@
-import quartz
-import time
-import os
 import heapq
-from concurrent.futures import ProcessPoolExecutor
 import json
-from qiskit.quantum_info import Statevector
-from qiskit import QuantumCircuit
 import math
+import os
+import time
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 from functools import partial
+
+from qiskit import QuantumCircuit
+from qiskit.quantum_info import Statevector
+
+import quartz
+
 
 def check(graph):
     graph.to_qasm(filename='check.qasm')
     qc_origin = QuantumCircuit.from_qasm_file(
-        'barenco_tof_3_opt_path/subst_history_39.qasm')
+        'barenco_tof_3_opt_path/subst_history_39.qasm'
+    )
     qc_optimized = QuantumCircuit.from_qasm_file('check.qasm')
     return Statevector.from_instruction(qc_origin).equiv(
-        Statevector.from_instruction(qc_optimized))
+        Statevector.from_instruction(qc_optimized)
+    )
 
 
 def get_graph_from_hash(context, h):
@@ -44,7 +49,7 @@ class DataBuffer:
         self.gate_count_map = {}
 
         self.gate_count_map[init_hash] = init_value
-        self.path_map[init_hash] = {} # stores predecessors
+        self.path_map[init_hash] = {}  # stores predecessors
 
         self.origin_value = init_value
         self.gamma = gamma
@@ -53,14 +58,14 @@ class DataBuffer:
         # may introduce loops; it's the caller's responsibility to handle it
         graph_hash = graph.hash()
         pre_graph_hash = pre_graph.hash()
-        
+
         # clean  impossible of no_increase=True
         # graph_gate_cnt = graph.gate_count
         # pre_graph_gate_cnt = pre_graph.gate_count
         # if pre_graph_gate_cnt < graph_gate_cnt:
         #     print(f'!!! in update_path: {pre_graph_gate_cnt} < {graph_gate_cnt}')
         #     assert(False)
-        
+
         if graph_hash not in self.path_map:
             self.path_map[graph_hash] = {pre_graph_hash: (node_id, xfer_id)}
         else:
@@ -75,7 +80,7 @@ class DataBuffer:
         pre_graph_gate_cnt = pre_graph.gate_count
         # TODO  if exists? min?
         old_graph_gate_cnt = self.gate_count_map.get(graph_hash, None)
-        assert(old_graph_gate_cnt is None or old_graph_gate_cnt == graph_gate_cnt)
+        assert old_graph_gate_cnt is None or old_graph_gate_cnt == graph_gate_cnt
         self.gate_count_map[graph_hash] = graph_gate_cnt
 
         # update reward in this connected component by BFS
@@ -91,20 +96,24 @@ class DataBuffer:
                 if g_hash not in self.reward_map:
                     self.reward_map[g_hash] = {}
                     self.reward_map[g_hash][node_id] = {}
-                    self.reward_map[g_hash][node_id][
-                        xfer_id] = reward * math.pow(self.gamma, depth)
+                    self.reward_map[g_hash][node_id][xfer_id] = reward * math.pow(
+                        self.gamma, depth
+                    )
                 elif node_id not in self.reward_map[g_hash]:
                     self.reward_map[g_hash][node_id] = {}
-                    self.reward_map[g_hash][node_id][
-                        xfer_id] = reward * math.pow(self.gamma, depth)
+                    self.reward_map[g_hash][node_id][xfer_id] = reward * math.pow(
+                        self.gamma, depth
+                    )
                 elif xfer_id not in self.reward_map[g_hash][node_id]:
-                    self.reward_map[g_hash][node_id][
-                        xfer_id] = reward * math.pow(self.gamma, depth)
+                    self.reward_map[g_hash][node_id][xfer_id] = reward * math.pow(
+                        self.gamma, depth
+                    )
                 else:
                     self.reward_map[g_hash][node_id][xfer_id] = max(
                         reward * math.pow(self.gamma, depth),
-                        self.reward_map[g_hash][node_id][xfer_id])
-                
+                        self.reward_map[g_hash][node_id][xfer_id],
+                    )
+
                 # TODO  considering contiguous reduction
                 # if reward of g_hash is not better, then stop find predecessors!
                 # g_hash, node_id, xfer_id, depth, succ_gc, succ_reward = q.popleft()
@@ -113,7 +122,7 @@ class DataBuffer:
 
                 pre_dict = self.path_map[g_hash]
                 for pre_hash in pre_dict:
-                    assert(self.gate_count_map[pre_hash] >= pre_graph_gate_cnt)
+                    assert self.gate_count_map[pre_hash] >= pre_graph_gate_cnt
                     if self.gate_count_map[pre_hash] > pre_graph_gate_cnt:
                         # TODO  global or local?
                         # print(f'!!! in update_reward: {self.gate_count_map[pre_hash]} > {pre_graph_gate_cnt}')
@@ -132,13 +141,14 @@ class DataBuffer:
         with open('dataset/path.json', 'w') as f:
             json.dump(self.path_map, f)
 
+
 quartz_context = quartz.QuartzContext(
     gate_set=['h', 'cx', 't', 'tdg'],
     filename='../bfs_verified_simplified.json',
-    no_increase=True)
+    no_increase=True,
+)
 parser = quartz.PyQASMParser(context=quartz_context)
-my_dag = parser.load_qasm(
-    filename="barenco_tof_3_opt_path/subst_history_39.qasm")
+my_dag = parser.load_qasm(filename="barenco_tof_3_opt_path/subst_history_39.qasm")
 init_graph = quartz.PyGraph(context=quartz_context, dag=my_dag)
 
 candidate_hq = []
@@ -152,7 +162,7 @@ best_gate_cnt = init_graph.gate_count
 max_gate_cnt = 64
 budget = 5_000_000
 buffer = DataBuffer(init_graph, 0.9)
-save_graph(init_graph) # TODO  check IO optimization
+save_graph(init_graph)  # TODO  check IO optimization
 start = time.time()
 
 while len(candidate_hq) > 0 and budget > 0:
@@ -161,14 +171,18 @@ while len(candidate_hq) > 0 and budget > 0:
     all_nodes = first_graph.all_nodes()
     first_cnt = first_graph.gate_count
     # TODO  recompute? first_cnt, first_hash = heapq.heappop(candidate_hq)
-    assert(popped_cnt == first_cnt)
-    print(f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}')
-    
+    assert popped_cnt == first_cnt
+    print(
+        f'popped a graph with gate count: {first_cnt} , num of nodes: {len(all_nodes)}'
+    )
+
     def available_xfers(i):
         return first_graph.available_xfers(context=quartz_context, node=all_nodes[i])
 
     with ProcessPoolExecutor(max_workers=32) as executor:
-        results = executor.map(available_xfers, list(range(len(all_nodes))), chunksize=2)
+        results = executor.map(
+            available_xfers, list(range(len(all_nodes))), chunksize=2
+        )
         appliable_xfers_nodes = list(results)
 
     for i in range(len(all_nodes)):
@@ -176,7 +190,8 @@ while len(candidate_hq) > 0 and budget > 0:
         appliable_xfers = appliable_xfers_nodes[i]
         for xfer in appliable_xfers:
             new_graph = first_graph.apply_xfer(
-                xfer=quartz_context.get_xfer_from_id(id=xfer), node=node)
+                xfer=quartz_context.get_xfer_from_id(id=xfer), node=node
+            )
             new_hash = new_graph.hash()
             buffer.update_path(first_graph, i, xfer, new_graph)
             buffer.update_reward(first_graph, i, xfer, new_graph)
@@ -184,7 +199,7 @@ while len(candidate_hq) > 0 and budget > 0:
                 new_cnt = new_graph.gate_count
                 visited_hash_set.add(new_hash)
                 heapq.heappush(candidate_hq, (new_cnt, new_hash))
-                save_graph(new_graph) # TODO  check IO optimization
+                save_graph(new_graph)  # TODO  check IO optimization
                 if new_cnt < best_gate_cnt:
                     best_graph = new_graph
                     best_gate_cnt = new_cnt

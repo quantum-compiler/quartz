@@ -1,23 +1,27 @@
 # distutils: language = c++
 
+from CCore cimport (
+    DAG,
+    Context,
+    DAG_ptr,
+    Edge,
+    EquivalenceSet,
+    Gate,
+    GateType,
+    Graph,
+    GraphXfer,
+    Op,
+    QASMParser,
+)
 from cython.operator cimport dereference as deref
+from libcpp cimport bool
+from libcpp.memory cimport make_shared, shared_ptr
 from libcpp.string cimport string
 from libcpp.vector cimport vector
-from libcpp.memory cimport shared_ptr, make_shared
-from libcpp cimport bool
-from CCore cimport GateType
-from CCore cimport Gate
-from CCore cimport DAG
-from CCore cimport DAG_ptr
-from CCore cimport GraphXfer
-from CCore cimport Graph
-from CCore cimport Op
-from CCore cimport Context
-from CCore cimport EquivalenceSet
-from CCore cimport QASMParser
-from CCore cimport Edge
-from enum import Enum
+
 import ctypes
+from enum import Enum
+
 import dgl
 import torch
 
@@ -49,8 +53,8 @@ def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "u3" :return GateType.u3
     if gate_type_str == "ccz" :return GateType.ccz
     if gate_type_str == "cz" :return GateType.cz
-    if gate_type_str == "input_qubit" :return GateType.input_qubit        
-    if gate_type_str == "input_param" :return GateType.input_param        
+    if gate_type_str == "input_qubit" :return GateType.input_qubit
+    if gate_type_str == "input_param" :return GateType.input_param
 
 cdef class PyQASMParser:
     cdef QASMParser *parser
@@ -67,7 +71,7 @@ cdef class PyQASMParser:
         success = self.parser.load_qasm(filename_bytes, dag.dag)
         assert(success, "Failed to load qasm file!")
         return dag
-    
+
     def load_qasm_str(self, str qasm_str) -> PyDAG:
         dag = PyDAG()
         qasm_str_bytes = qasm_str.encode('utf-8')
@@ -124,14 +128,14 @@ cdef class PyGate:
     @property
     def num_parameters(self):
         return self.gate.num_parameters
-    
+
     @staticmethod
     def rebuild(GateType _type, int _num_qubits, int _num_params):
         gate = PyGate()
         inner_gate = new Gate(_type, _num_qubits, _num_params)
         gate.set_this(inner_gate)
         return gate
-    
+
     def __reduce__(self):
         return (self.__class__.rebuild, (self.tp, self.num_qubits, self.num_parameters))
 
@@ -155,19 +159,19 @@ cdef class PyDAG:
     @property
     def num_qubits(self):
         return self.dag.get_num_qubits()
-    
+
     @property
     def num_input_parameters(self):
         return self.dag.get_num_input_parameters()
-    
+
     @property
     def num_total_parameters(self):
-        return self.dag.get_num_total_parameters() 
+        return self.dag.get_num_total_parameters()
 
     @property
     def num_internal_parameters(self):
-        return self.dag.get_num_internal_parameters() 
-    
+        return self.dag.get_num_internal_parameters()
+
     @property
     def num_gates(self):
         return self.dag.get_num_gates()
@@ -195,12 +199,12 @@ cdef class PyXfer:
         if self.is_nop:
             self.graphXfer = NULL
         return self
-    
+
     # TODO: raise exception if NULL or NOP
     @property
     def src_gate_count(self):
         return self.graphXfer.num_src_op()
-    
+
     # TODO: raise exception if NULL or NOP
     @property
     def dst_gate_count(self):
@@ -326,7 +330,7 @@ cdef class QuartzContext:
     @property
     def num_equivalence_classes(self):
         return self.eqs.num_equivalence_classes()
-    
+
     @property
     def num_xfers(self):
         num = self.v_xfers.size()
@@ -335,6 +339,7 @@ cdef class QuartzContext:
         return num
 
 from functools import partial
+
 
 cdef class PyNode:
     cdef Op node
@@ -347,7 +352,7 @@ cdef class PyNode:
 
     def __dealloc__(self):
         pass
-    
+
     @property
     def node_guid(self):
         return self.node.guid
@@ -376,7 +381,7 @@ cdef class PyGraph:
     property nodes:
         def __get__(self):
             return self._nodes
-        
+
         def __set__(self, nodes):
             self._nodes = nodes
 
@@ -434,7 +439,7 @@ cdef class PyGraph:
         if context.include_nop:
             result.push_back(context.num_xfers - 1)
         return result
-                    
+
     # TODO: use node_id directly instead of using PyNode
     def apply_xfer(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False) -> PyGraph:
         if xfer.is_nop:
@@ -454,7 +459,7 @@ cdef class PyGraph:
             return None, []
         else:
             return PyGraph().set_this(ret.first), ret.second
-    
+
     def all_nodes(self):
         return self.nodes
 
@@ -498,7 +503,7 @@ cdef class PyGraph:
         dst_id = []
         src_idx = []
         dst_idx = []
-        
+
         for e in edges:
             src_id.append(e[0])
             dst_id.append(e[1])
@@ -537,7 +542,7 @@ cdef class PyGraph:
     def to_qasm(self, *, str filename):
         fn_bytes = filename.encode('utf-8')
         deref(self.graph).to_qasm(fn_bytes, False, False)
-    
+
     def to_qasm_str(self, *) -> str:
         cdef string s = deref(self.graph).to_qasm(False, False)
         return s.decode('utf-8')
@@ -562,7 +567,7 @@ cdef class PyGraph:
 
     def __lt__(self, other):
         return self.gate_count < other.gate_count
-    
+
     def __le__(self, other):
         return self.gate_count <= other.gate_count
 

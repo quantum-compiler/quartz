@@ -1,19 +1,21 @@
-import quartz
-from quartz.core import PyGraph
-import torch
-import os
-from datetime import datetime
-import numpy as np
-import time
-from tqdm import tqdm
-import wandb
-import random
-from PPO import PPO
-from torch.distributions import Categorical
-from Trajectory import get_trajectory_batch, get_trajectory_beam
-import math
-import json
 import copy
+import json
+import math
+import os
+import random
+import time
+from datetime import datetime
+
+import numpy as np
+import torch
+import wandb
+from PPO import PPO
+from quartz.core import PyGraph
+from torch.distributions import Categorical
+from tqdm import tqdm
+from Trajectory import get_trajectory_batch, get_trajectory_beam
+
+import quartz
 
 wandb.init(project='ppo_fine_tune', mode='online')
 
@@ -63,9 +65,11 @@ invalid_reward = -1
 
 # quartz initialization
 
-context = quartz.QuartzContext(gate_set=['h', 'cx', 't', 'tdg', 'x'],
-                               filename='../../ecc_set/t_tdg.json.ecc',
-                               no_increase=False)
+context = quartz.QuartzContext(
+    gate_set=['h', 'cx', 't', 'tdg', 'x'],
+    filename='../../ecc_set/t_tdg.json.ecc',
+    no_increase=False,
+)
 # context = quartz.QuartzContext(gate_set=['h', 'cx', 'x', 'rz', 'add'],
 #                                filename='../../../Nam_complete_ECC_set.json',
 #                                no_increase=False)
@@ -77,7 +81,7 @@ global circ_info
 global circ_dataset
 global circ_names
 
-circ_names = ['barenco_tof_3']  #, 'mod5_4']
+circ_names = ['barenco_tof_3']  # , 'mod5_4']
 # circ_names = ['mod5_4']  # , 'mod5_4']
 # circ_names = ['qcla_mod_7']
 # circ_names = ['csla_mux_3']
@@ -95,11 +99,9 @@ for circ_name in circ_names:
     circ_dataset[circ_name] = {}
 
     if circ_name == 'barenco_tof_3':
-        init_circ = PyGraph.from_qasm(context=context,
-                                      filename="../../near_56.qasm")
+        init_circ = PyGraph.from_qasm(context=context, filename="../../near_56.qasm")
     elif circ_name == "all":
-        init_circ = PyGraph.from_qasm(context=context,
-                                      filename="../../all.qasm")
+        init_circ = PyGraph.from_qasm(context=context, filename="../../all.qasm")
     else:
         # init_dag = parser.load_qasm(
         #     # filename=
@@ -108,7 +110,8 @@ for circ_name in circ_names:
         #     f"../../t_tdg_h_x_cx_rm/{circ_name}.t_tdg.rotation_merging.qasm")
         # init_circ = quartz.PyGraph(context=context, dag=init_dag)
         init_circ = PyGraph.from_qasm(
-            context=context, filename=f"../../t_tdg_circs/{circ_name}.qasm")
+            context=context, filename=f"../../t_tdg_circs/{circ_name}.qasm"
+        )
 
     circ_dataset[circ_name]['init_circ'] = init_circ
     circ_dataset[circ_name]['circs'] = {}
@@ -136,8 +139,7 @@ current_num_files = next(os.walk(log_dir))[2]
 run_num = len(current_num_files)
 
 #### create new log file for each run
-log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(
-    run_num) + ".csv"
+log_f_name = log_dir + '/PPO_' + experiment_name + "_log_" + str(run_num) + ".csv"
 
 print("current logging run number for " + experiment_name + " : ", run_num)
 print("logging at : " + log_f_name)
@@ -153,7 +155,8 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 
 checkpoint_path = directory + "PPO_{}_{}_{}.pth".format(
-    experiment_name, random_seed, run_num)
+    experiment_name, random_seed, run_num
+)
 print("save checkpoint path : " + checkpoint_path)
 
 ################### save circuits ###################
@@ -211,10 +214,26 @@ print(
 log_f = open(log_f_name, "w+")
 
 # initialize a PPO agent
-ppo_agent = PPO(num_gate_type, context, gnn_layers, 128, 256, 128, xfer_dim,
-                lr_graph_embedding, lr_actor, lr_critic, gamma, K_epochs,
-                eps_clip, entropy_coefficient, mini_batch_size, log_f,
-                device_get_trajectory, device_update)
+ppo_agent = PPO(
+    num_gate_type,
+    context,
+    gnn_layers,
+    128,
+    256,
+    128,
+    xfer_dim,
+    lr_graph_embedding,
+    lr_actor,
+    lr_critic,
+    gamma,
+    K_epochs,
+    eps_clip,
+    entropy_coefficient,
+    mini_batch_size,
+    log_f,
+    device_get_trajectory,
+    device_update,
+)
 # ppo_agent.load('pretrained_model.pth')
 
 # track total training time
@@ -287,13 +306,16 @@ for i_episode in tqdm(range(episodes)):
         sampled_gate_cnt_idx = samplers[sampled_circ_name][1].sample().item()
         sampled_gate_cnt = samplers[sampled_circ_name][0][sampled_gate_cnt_idx]
         sampled_circ = random.choice(
-            circ_dataset[sampled_circ_name]['circs'][sampled_gate_cnt])
+            circ_dataset[sampled_circ_name]['circs'][sampled_gate_cnt]
+        )
         sampled_circ_gate_cnt = sampled_gate_cnt
         sampled_init_circs.append(
-            (sampled_circ_name, sampled_circ, sampled_circ_gate_cnt))
+            (sampled_circ_name, sampled_circ, sampled_circ_gate_cnt)
+        )
 
     intermediate_circs, trajectory_infos = get_trajectory_beam(
-        ppo_agent, context, sampled_init_circs, max_seq_len, invalid_reward, 2)
+        ppo_agent, context, sampled_init_circs, max_seq_len, invalid_reward, 2
+    )
 
     t_0 = time.time()
     print(f'get trajectory time: {t_0 - start}')
@@ -314,17 +336,20 @@ for i_episode in tqdm(range(episodes)):
                 if circ.gate_count not in circ_dataset[circ_name]['circs']:
                     circ_dataset[circ_name]['circs'][circ.gate_count] = [circ]
                 else:
-                    circ_dataset[circ_name]['circs'][circ.gate_count].append(
-                        circ)
+                    circ_dataset[circ_name]['circs'][circ.gate_count].append(circ)
 
     # Update best
     for circ_name in trajectory_infos:
-        if trajectory_infos[circ_name]['best_gate_cnt'] < circ_dataset[
-                circ_name]['best']:
+        if (
+            trajectory_infos[circ_name]['best_gate_cnt']
+            < circ_dataset[circ_name]['best']
+        ):
             circ_dataset[circ_name]['best'] = trajectory_infos[circ_name][
-                'best_gate_cnt']
+                'best_gate_cnt'
+            ]
             circ_dataset[circ_name]['best_circ'] = trajectory_infos[circ_name][
-                'best_circ']
+                'best_circ'
+            ]
             circ_path = f"{circ_directory}{circ_name}_best.qasm"
             circ_dataset[circ_name]['best_circ'].to_qasm(filename=circ_path)
 
@@ -332,9 +357,7 @@ for i_episode in tqdm(range(episodes)):
     for circ_name, info in trajectory_infos.items():
         info_dict = {}
 
-        useless_keys = [
-            'reward', 'possible_reward', 'seq_len', 'num', 'best_circ'
-        ]
+        useless_keys = ['reward', 'possible_reward', 'seq_len', 'num', 'best_circ']
 
         message = f'circ_name: {circ_name}\n'
         for key_name, value in info.items():
@@ -346,8 +369,7 @@ for i_episode in tqdm(range(episodes)):
         info_dict[f'{circ_name}_best'] = circ_dataset[circ_name]['best']
 
         message += f"init state count: {circ_dataset[circ_name]['num']}\n"
-        info_dict[f'{circ_name}_init_state_cnt'] = circ_dataset[circ_name][
-            'num']
+        info_dict[f'{circ_name}_init_state_cnt'] = circ_dataset[circ_name]['num']
         message += '\n'
 
         wandb.log(info_dict)
@@ -363,8 +385,7 @@ for i_episode in tqdm(range(episodes)):
         print("saving model at : " + checkpoint_path)
         ppo_agent.save(checkpoint_path)
         print("model saved")
-        print("Elapsed Time  : ",
-              datetime.now().replace(microsecond=0) - start_time)
+        print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
         print(
             "--------------------------------------------------------------------------------------------"
         )

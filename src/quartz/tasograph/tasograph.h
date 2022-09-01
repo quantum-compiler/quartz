@@ -47,6 +47,13 @@ public:
       return ptr < b.ptr;
     return false;
   }
+  inline bool operator>(const Op &b) const {
+    if (guid != b.guid)
+      return guid > b.guid;
+    if (ptr != b.ptr)
+      return ptr > b.ptr;
+    return false;
+  }
   Op &operator=(const Op &op) {
     guid = op.guid;
     ptr = op.ptr;
@@ -171,6 +178,7 @@ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const DAG *dag);
   Graph(const Graph &graph);
+  [[nodiscard]] std::unique_ptr<DAG> to_dag() const;
   void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
@@ -193,15 +201,50 @@ public:
                                        RuleParser *rule_parser,
                                        bool ignore_toffoli = false);
   std::shared_ptr<Graph>
-  optimize(float alpha, int budget, bool print_subst, Context *ctx,
-           const std::string &equiv_file_name, bool use_simulated_annealing,
-           bool enable_early_stop, bool use_rotation_merging_in_searching,
-           GateType target_rotation, std::string circuit_name = "",
-           int timeout = 86400 /*1 day*/);
-  std::shared_ptr<Graph> optimize(std::vector<GraphXfer *> xfers,
-                                  double gate_count_upper_bound,
-                                  std::string circuit_name, bool print_message,
-                                  int timeout = 86400 /*1 day*/);
+  optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
+                  const std::string &equiv_file_name,
+                  bool use_simulated_annealing, bool enable_early_stop,
+                  bool use_rotation_merging_in_searching,
+                  GateType target_rotation, std::string circuit_name = "",
+                  int timeout = 86400 /*1 day*/);
+
+  /**
+   * Optimize this circuit.
+   * @param ctx The context variable.
+   * @param equiv_file_name The ECC set file name.
+   * @param circuit_name The circuit name shown in the log.
+   * @param print_message To output the log or not. The log will be outputted
+   * to a file with name combined by the ECC set file name and the circuit
+   * file name.
+   * @param cost_function The cost function for the search.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
+  std::shared_ptr<Graph>
+  optimize(Context *ctx, const std::string &equiv_file_name,
+           const std::string &circuit_name, bool print_message,
+           std::function<float(Graph *)> cost_function = nullptr,
+           double cost_upper_bound = -1 /*default = current cost * 1.05*/,
+           int timeout = 3600 /*1 hour*/);
+  /**
+   * Optimize this circuit.
+   * @param xfers The circuit transformations.
+   * @param cost_upper_bound The maximum cost of the circuits to be searched.
+   * @param circuit_name The circuit name shown in the log.
+   * @param log_file_name The file name to output the log. If empty, the log
+   * will be outputted to the screen.
+   * @param print_message To output the log or not.
+   * @param cost_function The cost function for the search.
+   * @param timeout Timeout in seconds.
+   * @return The optimized circuit.
+   */
+  std::shared_ptr<Graph>
+  optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
+           const std::string &circuit_name, const std::string &log_file_name,
+           bool print_message,
+           std::function<float(Graph *)> cost_function = nullptr,
+           int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result, bool print_id) const;

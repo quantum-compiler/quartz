@@ -1,8 +1,9 @@
 import os
 import sys
 import sysconfig
-from setuptools import find_packages
 from pathlib import Path
+
+from setuptools import find_packages
 
 # need to use distutils.core for correct placement of cython dll
 if "--inplace" in sys.argv:
@@ -18,6 +19,7 @@ def config_cython():
     sys_cflags = sysconfig.get_config_var("CFLAGS")
     try:
         from Cython.Build import cythonize
+
         ret = []
         path = "quartz/_cython"
         for fn in os.listdir(path):
@@ -25,13 +27,23 @@ def config_cython():
                 continue
             ret.append(
                 Extension(
-                    "quartz.%s" % fn[:-4], ["%s/%s" % (path, fn)],
-                    include_dirs=["../src/quartz/", "/usr/local/include/", os.path.join(user_home_path, "usr_local/include")],
+                    "quartz.%s" % fn[:-4],
+                    ["%s/%s" % (path, fn)],
+                    include_dirs=[
+                        "../src/quartz/",
+                        "/usr/local/include/",
+                        os.path.join(user_home_path, "usr_local/include"),
+                    ],
                     libraries=["quartz_runtime"],
-                    library_dirs=["/usr/local/lib/", os.path.join(user_home_path, "usr_local/lib")],
+                    library_dirs=[
+                        "/usr/local/lib/",
+                        os.path.join(user_home_path, "usr_local/lib"),
+                    ],
                     extra_compile_args=["-std=c++17"],
                     extra_link_args=[],
-                    language="c++"))
+                    language="c++",
+                )
+            )
         return cythonize(
             ret,
             compiler_directives={"language_level": 3},

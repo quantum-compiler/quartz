@@ -6,8 +6,8 @@
 #include "../gate/gate_utils.h"
 #include "assert.h"
 #include "tasograph.h"
-#include <queue>
 #include <ostream>
+#include <queue>
 
 namespace quartz {
 
@@ -61,9 +61,18 @@ public:
 
 class GraphCompare {
 public:
-  bool operator()(std::shared_ptr<Graph> lhs, std::shared_ptr<Graph> rhs) {
-    return lhs->total_cost() > rhs->total_cost();
+  GraphCompare() {
+    cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
+  GraphCompare(const std::function<float(Graph *)> &cost_function)
+      : cost_function_(cost_function) {}
+  bool operator()(const std::shared_ptr<Graph> &lhs,
+                  const std::shared_ptr<Graph> &rhs) {
+    return cost_function_(lhs.get()) > cost_function_(rhs.get());
+  }
+
+private:
+  std::function<float(Graph *)> cost_function_;
 };
 
 class GraphXfer {
@@ -85,12 +94,11 @@ public:
   bool create_new_operator(const OpX *opx, Op &op);
   int num_src_op();
   int num_dst_op();
-  std::string to_str(std::vector<OpX *> const & v) const;
+  std::string to_str(std::vector<OpX *> const &v) const;
   std::string src_str() const;
   std::string dst_str() const;
   // TODO: not implemented
-//   std::string to_qasm(std::vector<OpX *> const &v) const;
-
+  //   std::string to_qasm(std::vector<OpX *> const &v) const;
 
 public:
   static GraphXfer *create_GraphXfer(Context *_context, const DAG *src_graph,

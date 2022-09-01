@@ -25,13 +25,15 @@ def extract_results(filename):
             else:
                 table3_col = 6
             records[(data[1][:-2], int(data[1][-1]), table3_col)] = data[-1]
-    message = ['Column "Original"',
-               'Algorithm 1 with only singleton removal (not shown in the submission)',
-               'Column "Representative"',
-               'Column "Common Subcircuit"',
-               '|Rn| (not shown in the submission)',
-               'Verification time (s) (not shown in the submission)',
-               'Column "Running Time (s)"']
+    message = [
+        'Column "Original"',
+        'Algorithm 1 with only singleton removal (not shown in the submission)',
+        'Column "Representative"',
+        'Column "Common Subcircuit"',
+        '|Rn| (not shown in the submission)',
+        'Verification time (s) (not shown in the submission)',
+        'Column "Running Time (s)"',
+    ]
     nam_n = set()
     for k, v in records.items():
         if k[0] == 'Nam':
@@ -59,7 +61,8 @@ def extract_results(filename):
                         v0 = v
                     elif k[2] == 3 and v0:
                         print(
-                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})')
+                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})'
+                        )
     if len(ibm_n) > 0:
         print('- IBM Gate Set:')
         for n in sorted(ibm_n):
@@ -75,7 +78,8 @@ def extract_results(filename):
                         v0 = v
                     elif k[2] == 3 and v0:
                         print(
-                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})')
+                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})'
+                        )
     if len(rigetti_n) > 0:
         print('- Rigetti Gate Set:')
         for n in sorted(rigetti_n):
@@ -91,7 +95,8 @@ def extract_results(filename):
                         v0 = v
                     elif k[2] == 3 and v0:
                         print(
-                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})')
+                            f'    - Column "Overall Reduction": {1 - int(v[0]) / int(v0[0]):.2%} ({1 - int(v[1][1:-1]) / int(v0[1][1:-1]):.2%})'
+                        )
 
 
 if __name__ == '__main__':

@@ -5,9 +5,8 @@
 
 namespace quartz {
 void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
-                             int max_num_quantum_gates,
-                             int max_num_param_gates, Dataset &dataset,
-                             bool restrict_search_space,
+                             int max_num_quantum_gates, int max_num_param_gates,
+                             Dataset &dataset, bool restrict_search_space,
                              bool unique_parameters) {
   DAG *dag = new DAG(num_qubits, max_num_input_parameters);
   // Generate all possible parameter gates at the beginning.
@@ -22,14 +21,13 @@ void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
   delete dag;
 }
 
-void Generator::generate(int num_qubits, int num_input_parameters,
-                         int max_num_quantum_gates, int max_num_param_gates,
-                         Dataset *dataset, bool verify_equivalences,
-                         EquivalenceSet *equiv_set, bool unique_parameters,
-                         bool verbose, decltype(std::chrono::steady_clock::now()
-    - std::chrono::steady_clock::now()) *record_verification_time) {
-  auto empty_dag =
-      std::make_unique<DAG>(num_qubits, num_input_parameters);
+void Generator::generate(
+    int num_qubits, int num_input_parameters, int max_num_quantum_gates,
+    int max_num_param_gates, Dataset *dataset, bool verify_equivalences,
+    EquivalenceSet *equiv_set, bool unique_parameters, bool verbose,
+    decltype(std::chrono::steady_clock::now() -
+             std::chrono::steady_clock::now()) *record_verification_time) {
+  auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
   // Generate all possible parameter gates at the beginning.
   assert(max_num_param_gates == 1);
   empty_dag->generate_parameter_gates(context);
@@ -44,18 +42,17 @@ void Generator::generate(int num_qubits, int num_input_parameters,
     context->set_representative(std::make_unique<DAG>(*empty_dag));
   }
   dataset->insert(context, std::move(empty_dag));
-  std::vector<std::vector<DAG *> > dags(1, dags_to_search);
+  std::vector<std::vector<DAG *>> dags(1, dags_to_search);
 
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().
-  std::vector<std::unique_ptr<DAG> > dag_holder;
+  std::vector<std::unique_ptr<DAG>> dag_holder;
 
-  for (int num_gates = 1; num_gates <= max_num_quantum_gates;
-       num_gates++) {
+  for (int num_gates = 1; num_gates <= max_num_quantum_gates; num_gates++) {
     if (verbose) {
       std::cout << "BFS: " << dags_to_search.size()
-                << " representative DAGs to search with "
-                << num_gates - 1 << " gates." << std::endl;
+                << " representative DAGs to search with " << num_gates - 1
+                << " gates." << std::endl;
     }
     if (!verify_equivalences) {
       assert(dataset);
@@ -66,16 +63,15 @@ void Generator::generate(int num_qubits, int num_input_parameters,
     } else {
       assert(dataset);
       assert(equiv_set);
-      bfs(dags, max_num_param_gates, *dataset, nullptr,
-          verify_equivalences, equiv_set, unique_parameters);
+      bfs(dags, max_num_param_gates, *dataset, nullptr, verify_equivalences,
+          equiv_set, unique_parameters);
       // Do not verify when |num_gates == max_num_quantum_gates|.
       // This is to make the behavior the same when
       // |verify_equivalences| is true or false.
       if (num_gates == max_num_quantum_gates) {
         break;
       }
-      bool ret =
-          dataset->save_json(context, "tmp_before_verify.json");
+      bool ret = dataset->save_json(context, "tmp_before_verify.json");
       assert(ret);
 
       decltype(std::chrono::steady_clock::now()) start;
@@ -143,8 +139,7 @@ void Generator::dfs(int gate_idx, int max_num_gates,
   static int tmp = 0;
   tmp++;
   if (tmp == (tmp & (-tmp))) {
-    std::cout << "DFS " << tmp << " " << dataset.num_hash_values()
-              << std::endl;
+    std::cout << "DFS " << tmp << " " << dataset.num_hash_values() << std::endl;
   }
 
   /*int num_unused_internal_parameter = 0;
@@ -196,13 +191,12 @@ void Generator::dfs(int gate_idx, int max_num_gates,
           parameter_indices.push_back(p);
           used_parameters[p] += 1;
           int output_param_index;
-          bool ret =
-              dag->add_gate(qubit_indices, parameter_indices,
-                            gate, &output_param_index);
+          bool ret = dag->add_gate(qubit_indices, parameter_indices, gate,
+                                   &output_param_index);
           assert(ret);
-          dfs(gate_idx + 1, max_num_gates,
-              max_remaining_param_gates - 1, dag, used_parameters,
-              dataset, restrict_search_space, unique_parameters);
+          dfs(gate_idx + 1, max_num_gates, max_remaining_param_gates - 1, dag,
+              used_parameters, dataset, restrict_search_space,
+              unique_parameters);
           ret = dag->remove_last_gate();
           assert(ret);
           used_parameters[p] -= 1;
@@ -211,11 +205,9 @@ void Generator::dfs(int gate_idx, int max_num_gates,
       } else if (gate->get_num_parameters() == 2) {
         // Case: 0-qubit operators with 2 parameters
         bool new_input_parameter_searched = false;
-        for (int p1 = 0; p1 < dag->get_num_total_parameters();
-             p1++) {
+        for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
           if (restrict_search_space) {
-            if (p1 < dag->get_num_input_parameters() &&
-                !used_parameters[p1]) {
+            if (p1 < dag->get_num_input_parameters() && !used_parameters[p1]) {
               // We should use the new (unused) input
               // parameter with smallest index as the first
               // input if there are more than one of them.
@@ -228,8 +220,7 @@ void Generator::dfs(int gate_idx, int max_num_gates,
           }
           parameter_indices.push_back(p1);
           used_parameters[p1] += 1;
-          for (int p2 = 0; p2 < dag->get_num_total_parameters();
-               p2++) {
+          for (int p2 = 0; p2 < dag->get_num_total_parameters(); p2++) {
             if (gate->is_commutative() && p1 > p2) {
               // For commutative gates, enforce p1 <= p2
               continue;
@@ -237,14 +228,12 @@ void Generator::dfs(int gate_idx, int max_num_gates,
             parameter_indices.push_back(p2);
             used_parameters[p2] += 1;
             int output_param_index;
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices,
-                              gate, &output_param_index);
+            bool ret = dag->add_gate(qubit_indices, parameter_indices, gate,
+                                     &output_param_index);
             assert(ret);
-            dfs(gate_idx + 1, max_num_gates,
-                max_remaining_param_gates - 1, dag,
-                used_parameters, dataset,
-                restrict_search_space, unique_parameters);
+            dfs(gate_idx + 1, max_num_gates, max_remaining_param_gates - 1, dag,
+                used_parameters, dataset, restrict_search_space,
+                unique_parameters);
             ret = dag->remove_last_gate();
             assert(ret);
             used_parameters[p2] -= 1;
@@ -259,51 +248,46 @@ void Generator::dfs(int gate_idx, int max_num_gates,
     } else if (gate->get_num_qubits() == 1) {
       for (int i = 0; i < dag->get_num_qubits(); i++) {
         qubit_indices.push_back(i);
-        auto search_parameters = [&](int num_remaining_parameters,
-                                     const InputParamMaskType &current_usage_mask,
-                                     auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-          if (num_remaining_parameters == 0) {
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices,
-                              gate, nullptr);
-            assert(ret);
-            dfs(gate_idx + 1, max_num_gates,
-                max_remaining_param_gates, dag, used_parameters,
-                dataset, restrict_search_space, unique_parameters);
-            ret = dag->remove_last_gate();
-            assert(ret);
-            return;
-          }
-
-          for (int p1 = 0; p1 < dag->get_num_total_parameters();
-               p1++) {
-            if (unique_parameters) {
-              if (current_usage_mask & input_param_masks[p1]) {
-                // p1 contains an already used input parameter.
-                continue;
+        auto search_parameters =
+            [&](int num_remaining_parameters,
+                const InputParamMaskType &current_usage_mask, auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+              if (num_remaining_parameters == 0) {
+                bool ret = dag->add_gate(qubit_indices, parameter_indices, gate,
+                                         nullptr);
+                assert(ret);
+                dfs(gate_idx + 1, max_num_gates, max_remaining_param_gates, dag,
+                    used_parameters, dataset, restrict_search_space,
+                    unique_parameters);
+                ret = dag->remove_last_gate();
+                assert(ret);
+                return;
               }
-              parameter_indices.push_back(p1);
-              used_parameters[p1] += 1;
-              search_parameters_ref(
-                  num_remaining_parameters - 1,
-                  current_usage_mask | input_param_masks[p1],
-                  search_parameters_ref);
-              used_parameters[p1] -= 1;
-              parameter_indices.pop_back();
-            } else {
-              parameter_indices.push_back(p1);
-              used_parameters[p1] += 1;
-              search_parameters_ref(
-                  num_remaining_parameters - 1,
-                  /*unused*/0,
-                  search_parameters_ref);
-              used_parameters[p1] -= 1;
-              parameter_indices.pop_back();
-            }
-          }
-        };
-        search_parameters(gate->get_num_parameters(),
-                          input_param_usage_mask,
+
+              for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+                if (unique_parameters) {
+                  if (current_usage_mask & input_param_masks[p1]) {
+                    // p1 contains an already used input parameter.
+                    continue;
+                  }
+                  parameter_indices.push_back(p1);
+                  used_parameters[p1] += 1;
+                  search_parameters_ref(num_remaining_parameters - 1,
+                                        current_usage_mask |
+                                            input_param_masks[p1],
+                                        search_parameters_ref);
+                  used_parameters[p1] -= 1;
+                  parameter_indices.pop_back();
+                } else {
+                  parameter_indices.push_back(p1);
+                  used_parameters[p1] += 1;
+                  search_parameters_ref(num_remaining_parameters - 1,
+                                        /*unused*/ 0, search_parameters_ref);
+                  used_parameters[p1] -= 1;
+                  parameter_indices.pop_back();
+                }
+              }
+            };
+        search_parameters(gate->get_num_parameters(), input_param_usage_mask,
                           search_parameters);
 
         qubit_indices.pop_back();
@@ -314,8 +298,7 @@ void Generator::dfs(int gate_idx, int max_num_gates,
         bool new_qubit_searched = false;
         for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
           if (restrict_search_space) {
-            if (q1 < dag->get_num_input_parameters() &&
-                !dag->qubit_used(q1)) {
+            if (q1 < dag->get_num_input_parameters() && !dag->qubit_used(q1)) {
               // We should use the new (unused) qubit with
               // smallest index as the first input if there
               // are more than one of them.
@@ -332,12 +315,11 @@ void Generator::dfs(int gate_idx, int max_num_gates,
               continue;
             qubit_indices.push_back(q2);
             bool ret =
-                dag->add_gate(qubit_indices, parameter_indices,
-                              gate, nullptr);
+                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
             assert(ret);
-            dfs(gate_idx + 1, max_num_gates,
-                max_remaining_param_gates, dag, used_parameters,
-                dataset, restrict_search_space, unique_parameters);
+            dfs(gate_idx + 1, max_num_gates, max_remaining_param_gates, dag,
+                used_parameters, dataset, restrict_search_space,
+                unique_parameters);
             ret = dag->remove_last_gate();
             assert(ret);
             qubit_indices.pop_back();
@@ -354,11 +336,10 @@ void Generator::dfs(int gate_idx, int max_num_gates,
   }
 }
 
-void Generator::bfs(const std::vector<std::vector<DAG *> > &dags,
+void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
                     int max_num_param_gates, Dataset &dataset,
                     std::vector<DAG *> *new_representatives,
-                    bool verify_equivalences,
-                    const EquivalenceSet *equiv_set,
+                    bool verify_equivalences, const EquivalenceSet *equiv_set,
                     bool unique_parameters) {
   auto try_to_add_to_result = [&](DAG *new_dag) {
     // A new DAG with |current_max_num_gates| + 1 gates.
@@ -380,8 +361,7 @@ void Generator::bfs(const std::vector<std::vector<DAG *> > &dags,
       if (verifier_.redundant(context, new_dag)) {
         return;
       }
-      bool ret =
-          dataset.insert(context, std::make_unique<DAG>(*new_dag));
+      bool ret = dataset.insert(context, std::make_unique<DAG>(*new_dag));
       // Presuming different hash values imply different DAGs.
       if (ret) {
         // The DAG's hash value is new to the dataset.
@@ -429,48 +409,40 @@ void Generator::bfs(const std::vector<std::vector<DAG *> > &dags,
             assert(gate->get_num_qubits() == 2);
             continue;
           }
-          auto
-              search_parameters = [&](int num_remaining_parameters,
-                                      const InputParamMaskType &current_usage_mask,
-                                      auto &
-                                      search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-            if (num_remaining_parameters == 0) {
-              bool ret = dag->add_gate(qubit_indices,
-                                       parameter_indices,
-                                       gate, nullptr);
-              assert(ret);
-              try_to_add_to_result(dag);
-              ret = dag->remove_last_gate();
-              assert(ret);
-              return;
-            }
-
-            for (int p1 = 0;
-                 p1 < dag->get_num_total_parameters();
-                 p1++) {
-              if (unique_parameters) {
-                if (current_usage_mask & input_param_masks[p1]) {
-                  // p1 contains an already used input parameter.
-                  continue;
+          auto search_parameters =
+              [&](int num_remaining_parameters,
+                  const InputParamMaskType &current_usage_mask, auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+                if (num_remaining_parameters == 0) {
+                  bool ret = dag->add_gate(qubit_indices, parameter_indices,
+                                           gate, nullptr);
+                  assert(ret);
+                  try_to_add_to_result(dag);
+                  ret = dag->remove_last_gate();
+                  assert(ret);
+                  return;
                 }
-                parameter_indices.push_back(p1);
-                search_parameters_ref(
-                    num_remaining_parameters - 1,
-                    current_usage_mask | input_param_masks[p1],
-                    search_parameters_ref);
-                parameter_indices.pop_back();
-              } else {
-                parameter_indices.push_back(p1);
-                search_parameters_ref(
-                    num_remaining_parameters - 1,
-                    /*unused*/0,
-                    search_parameters_ref);
-                parameter_indices.pop_back();
-              }
-            }
-          };
-          search_parameters(gate->get_num_parameters(),
-                            input_param_usage_mask,
+
+                for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+                  if (unique_parameters) {
+                    if (current_usage_mask & input_param_masks[p1]) {
+                      // p1 contains an already used input parameter.
+                      continue;
+                    }
+                    parameter_indices.push_back(p1);
+                    search_parameters_ref(num_remaining_parameters - 1,
+                                          current_usage_mask |
+                                              input_param_masks[p1],
+                                          search_parameters_ref);
+                    parameter_indices.pop_back();
+                  } else {
+                    parameter_indices.push_back(p1);
+                    search_parameters_ref(num_remaining_parameters - 1,
+                                          /*unused*/ 0, search_parameters_ref);
+                    parameter_indices.pop_back();
+                  }
+                }
+              };
+          search_parameters(gate->get_num_parameters(), input_param_usage_mask,
                             search_parameters);
         }
       }
@@ -487,18 +459,16 @@ void Generator::bfs(const std::vector<std::vector<DAG *> > &dags,
           Gate *gate = context->get_gate(idx);
           if (gate->get_num_qubits() == 2) {
             assert(gate->get_num_parameters() == 0);
-            bool ret = dag->add_gate(qubit_indices,
-                                     parameter_indices,
-                                     gate, nullptr);
+            bool ret =
+                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
             assert(ret);
             try_to_add_to_result(dag);
             ret = dag->remove_last_gate();
             assert(ret);
             if (!gate->is_commutative()) {
               std::swap(qubit_indices[0], qubit_indices[1]);
-              ret = dag->add_gate(qubit_indices,
-                                  parameter_indices,
-                                  gate, nullptr);
+              ret = dag->add_gate(qubit_indices, parameter_indices, gate,
+                                  nullptr);
               assert(ret);
               try_to_add_to_result(dag);
               ret = dag->remove_last_gate();
@@ -515,10 +485,11 @@ void Generator::bfs(const std::vector<std::vector<DAG *> > &dags,
   }
 }
 
-void Generator::dfs_parameter_gates(
-    std::unique_ptr<DAG> dag, int remaining_gates, int max_unused_params,
-    int current_unused_params, std::vector<int> &params_used_times,
-    std::vector<std::unique_ptr<DAG> > &result) {
+void Generator::dfs_parameter_gates(std::unique_ptr<DAG> dag,
+                                    int remaining_gates, int max_unused_params,
+                                    int current_unused_params,
+                                    std::vector<int> &params_used_times,
+                                    std::vector<std::unique_ptr<DAG>> &result) {
   if (remaining_gates == 0) {
     result.push_back(std::move(dag));
     return;
@@ -536,13 +507,11 @@ void Generator::dfs_parameter_gates(
           params_used_times[param_indices[0]]++;
         }
         if (current_unused_params + 1 /*new parameter*/
-            - (remaining_gates - 1) *
-                (kMaxParamInputPerParamGate - 1) >
+                - (remaining_gates - 1) * (kMaxParamInputPerParamGate - 1) >
             max_unused_params) {
           // Too many unused parameters, prune it
           // Restore |params_used_times[param_indices[1]]|
-          if (param_indices[0] >=
-              dag->get_num_input_parameters()) {
+          if (param_indices[0] >= dag->get_num_input_parameters()) {
             params_used_times[param_indices[0]]--;
             if (!params_used_times[param_indices[0]])
               current_unused_params++;
@@ -551,8 +520,8 @@ void Generator::dfs_parameter_gates(
         }
         int output_param_index;
         auto new_dag = std::make_unique<DAG>(*dag);
-        bool ret = new_dag->add_gate({}, param_indices, gate,
-                                     &output_param_index);
+        bool ret =
+            new_dag->add_gate({}, param_indices, gate, &output_param_index);
         assert(ret);
         if (output_param_index >= params_used_times.size()) {
           params_used_times.resize(output_param_index + 1);
@@ -560,8 +529,7 @@ void Generator::dfs_parameter_gates(
         params_used_times[output_param_index] = 0;
         dfs_parameter_gates(std::move(new_dag), remaining_gates - 1,
                             max_unused_params,
-                            current_unused_params +
-                                1 /*new parameter*/,
+                            current_unused_params + 1 /*new parameter*/,
                             params_used_times, result);
         assert(ret);
         if (param_indices[0] >= dag->get_num_input_parameters()) {
@@ -585,26 +553,22 @@ void Generator::dfs_parameter_gates(
         for (param_indices[1] = 0;
              param_indices[1] < dag->get_num_total_parameters();
              param_indices[1]++) {
-          if (gate->is_commutative() &&
-              param_indices[0] > param_indices[1]) {
+          if (gate->is_commutative() && param_indices[0] > param_indices[1]) {
             // For commutative gates, enforce param_indices[0]
             // <= param_indices[1]
             continue;
           }
-          if (param_indices[1] >=
-              dag->get_num_input_parameters()) {
+          if (param_indices[1] >= dag->get_num_input_parameters()) {
             if (!params_used_times[param_indices[1]])
               current_unused_params--;
             params_used_times[param_indices[1]]++;
           }
           if (current_unused_params + 1 /*new parameter*/
-              - (remaining_gates - 1) *
-                  (kMaxParamInputPerParamGate - 1) >
+                  - (remaining_gates - 1) * (kMaxParamInputPerParamGate - 1) >
               max_unused_params) {
             // Too many unused parameters, prune it
             // Restore |params_used_times[param_indices[1]]|
-            if (param_indices[1] >=
-                dag->get_num_input_parameters()) {
+            if (param_indices[1] >= dag->get_num_input_parameters()) {
               params_used_times[param_indices[1]]--;
               if (!params_used_times[param_indices[1]])
                 current_unused_params++;
@@ -613,21 +577,19 @@ void Generator::dfs_parameter_gates(
           }
           int output_param_index;
           auto new_dag = std::make_unique<DAG>(*dag);
-          bool ret = new_dag->add_gate({}, param_indices, gate,
-                                       &output_param_index);
+          bool ret =
+              new_dag->add_gate({}, param_indices, gate, &output_param_index);
           assert(ret);
           if (output_param_index >= params_used_times.size()) {
             params_used_times.resize(output_param_index + 1);
           }
           params_used_times[output_param_index] = 0;
-          dfs_parameter_gates(
-              std::move(new_dag), remaining_gates - 1,
-              max_unused_params,
-              current_unused_params + 1 /*new parameter*/,
-              params_used_times, result);
+          dfs_parameter_gates(std::move(new_dag), remaining_gates - 1,
+                              max_unused_params,
+                              current_unused_params + 1 /*new parameter*/,
+                              params_used_times, result);
           assert(ret);
-          if (param_indices[1] >=
-              dag->get_num_input_parameters()) {
+          if (param_indices[1] >= dag->get_num_input_parameters()) {
             params_used_times[param_indices[1]]--;
             if (!params_used_times[param_indices[1]])
               current_unused_params++;

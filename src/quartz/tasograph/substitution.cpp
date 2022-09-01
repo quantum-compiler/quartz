@@ -14,61 +14,60 @@ void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 
 GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(0) {}
 
-  bool GraphXfer::src_graph_connected(DAG *src_graph){
-    auto num_qubits = src_graph->get_num_qubits();
-    int input_qubit_cnt = 0;
-    std::vector<int> parent(num_qubits);
-    for(int i = 0; i < num_qubits; ++i){
-        parent[i] = i;
-    }
-    std::unordered_map<TensorX, int, TensorXHash> tensor_on_qubit;
-    for(const auto &opx : srcOps){
-        auto opx_gate = context->get_gate(opx->type);
-        auto opx_num_qubits = opx_gate->get_num_qubits();
-        if(opx_num_qubits == 0)
-            continue;
-        else{
-            for(size_t i = 0; i < opx_num_qubits; ++i){
-                if(opx->inputs[i].op == nullptr){
-                    tensor_on_qubit[opx->outputs[i]] = input_qubit_cnt++;
-                    assert(input_qubit_cnt <= num_qubits);
-                }
-                else{
-                    tensor_on_qubit[opx->outputs[i]] = tensor_on_qubit[opx->inputs[i]];
-                }
-            }
-            for(size_t i = 1; i < opx_num_qubits; ++i){
-                // Union operation
-                int ori_l = tensor_on_qubit[opx->outputs[0]], l = ori_l;
-                int ori_r = tensor_on_qubit[opx->outputs[i]], r = ori_r;
-                while(parent[l] != l) {
-                    l = parent[l];
-                }
-                parent[ori_l] = l;
-                
-                while(parent[r] != r){
-                    r = parent[r];
-                }
-                parent[ori_r] = r;
-                parent[r] = l;
-            }
-        }
-    }
-    // Find root
-    int root = 0;
-    while(parent[root] != root){
-        root = parent[root];
-    }
-    for(int i = 0; i < num_qubits; ++i){
-        int tmp = i;
-        while(parent[tmp] != tmp){
-            tmp = parent[tmp];
-        }
-        if(tmp != root)
-            return false;
-    }
-    return true;
+bool GraphXfer::src_graph_connected(DAG *src_graph) {
+  auto num_qubits = src_graph->get_num_qubits();
+  int input_qubit_cnt = 0;
+  std::vector<int> parent(num_qubits);
+  for (int i = 0; i < num_qubits; ++i) {
+    parent[i] = i;
   }
+  std::unordered_map<TensorX, int, TensorXHash> tensor_on_qubit;
+  for (const auto &opx : srcOps) {
+    auto opx_gate = context->get_gate(opx->type);
+    auto opx_num_qubits = opx_gate->get_num_qubits();
+    if (opx_num_qubits == 0)
+      continue;
+    else {
+      for (size_t i = 0; i < opx_num_qubits; ++i) {
+        if (opx->inputs[i].op == nullptr) {
+          tensor_on_qubit[opx->outputs[i]] = input_qubit_cnt++;
+          assert(input_qubit_cnt <= num_qubits);
+        } else {
+          tensor_on_qubit[opx->outputs[i]] = tensor_on_qubit[opx->inputs[i]];
+        }
+      }
+      for (size_t i = 1; i < opx_num_qubits; ++i) {
+        // Union operation
+        int ori_l = tensor_on_qubit[opx->outputs[0]], l = ori_l;
+        int ori_r = tensor_on_qubit[opx->outputs[i]], r = ori_r;
+        while (parent[l] != l) {
+          l = parent[l];
+        }
+        parent[ori_l] = l;
+
+        while (parent[r] != r) {
+          r = parent[r];
+        }
+        parent[ori_r] = r;
+        parent[r] = l;
+      }
+    }
+  }
+  // Find root
+  int root = 0;
+  while (parent[root] != root) {
+    root = parent[root];
+  }
+  for (int i = 0; i < num_qubits; ++i) {
+    int tmp = i;
+    while (parent[tmp] != tmp) {
+      tmp = parent[tmp];
+    }
+    if (tmp != root)
+      return false;
+  }
+  return true;
+}
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
                                        const DAG *dst_graph,
@@ -179,7 +178,7 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
                           dst_to_tx[dst_dag->outputs[i]]);
   }
 
-  if(!graphXfer->src_graph_connected(src_dag)){
+  if (!graphXfer->src_graph_connected(src_dag)) {
     return nullptr;
   }
 

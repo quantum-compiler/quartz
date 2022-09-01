@@ -9,13 +9,13 @@ See [instructions](INSTALL.md) to install Quartz from source code.
 
 ## Use Quartz
 
-Quartz targets the logical optimization stage in quantum circuit compilation and can be used to optimize quantum circuits for arbitrary gate sets (e.g., IBM or Regetti quantum processors). Quartz works in two steps. First, for a given gate set, the Quartz circuit generator and circuit equivalence verifier can automatically generate and verify possible circuit transformations, represented as an equivalent circuit class (ECC) set. Second, Quartz's circuit optimizer takes a quantum circuit and an ECC set as inputs and use cost-based backtracking search to discover a super-optimized quantum circuit. 
+Quartz targets the logical optimization stage in quantum circuit compilation and can be used to optimize quantum circuits for arbitrary gate sets (e.g., IBM or Regetti quantum processors). Quartz works in two steps. First, for a given gate set, the Quartz circuit generator and circuit equivalence verifier can automatically generate and verify possible circuit transformations, represented as an equivalent circuit class (ECC) set. Second, Quartz's circuit optimizer takes a quantum circuit and an ECC set as inputs and use cost-based backtracking search to discover a super-optimized quantum circuit.
 
 ### Generate and verify an ECC set
 
 To generate and verify pre-defined ECC sets, you can simply run `./gen_ecc_set.sh`.
 
-To generate an `(n,q)`-complete ECC set with `m` input parameters for some gate set, 
+To generate an `(n,q)`-complete ECC set with `m` input parameters for some gate set,
 you can change the main function in `src/test/gen_ecc_set.cpp` to the following:
 
 ```c++
@@ -155,11 +155,11 @@ Graph::optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
 Explanation for some of the parameters:
 
 - `print_subst`: Deprecated will be removed in future version.
-- `equiv_file_name`: The file name of the ECC set. 
+- `equiv_file_name`: The file name of the ECC set.
 - `use_simulated_annealing`: Use simulated annealing in searching.
 - `use_rotation_merging_in_searching`: Enable rotation merging in each iteration of the back-track searching.
 - `target_rotation`: The target rotation used if you enable rotation merging in search.
-- `circuit_name`: The name of the circuit, which will be printed with the intermediate result. 
+- `circuit_name`: The name of the circuit, which will be printed with the intermediate result.
 - `timeout`: Timeout for optimization in seconds.
 
 ## Repository Organization

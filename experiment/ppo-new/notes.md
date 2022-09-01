@@ -20,4 +20,3 @@ Tow graph convered to dgl in 0.878165 ms.
 Tow graph convered to dgl in 1.027023 ms.
 Tow qasm graph convered in 2.398593 ms.
 Tow qasm graph convered in 2.380831 ms.
-

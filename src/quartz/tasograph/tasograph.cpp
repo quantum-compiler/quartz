@@ -507,6 +507,46 @@ void Graph::remove_node(Op oldOp) {
   constant_param_values.erase(oldOp);
 }
 
+void Graph::remove_node_wo_input_output_connect(Op oldOp) {
+  assert(oldOp.ptr->tp != GateType::input_qubit);
+  int num_qubits = oldOp.ptr->get_num_qubits();
+  if (inEdges.find(oldOp) != inEdges.end()) {
+    auto in_edges = inEdges[oldOp];
+    for (auto edge : in_edges) {
+      auto src_op = edge.srcOp;
+      assert(outEdges.find(src_op) != outEdges.end());
+      auto out_edges = outEdges[src_op];
+      for (auto out_edge : out_edges) {
+        if (out_edge.dstOp == oldOp) {
+          outEdges[src_op].erase(out_edge);
+          if (outEdges[src_op].empty())
+            outEdges.erase(src_op);
+          break;
+        }
+      }
+    }
+  }
+  if (outEdges.find(oldOp) != outEdges.end()) {
+    auto out_edges = outEdges[oldOp];
+    for (auto out_edge : out_edges) {
+      auto dst_op = out_edge.dstOp;
+      assert(inEdges.find(dst_op) != inEdges.end());
+      auto in_edges = inEdges[dst_op];
+      for (auto in_edge : in_edges) {
+        if (in_edge.srcOp == oldOp) {
+          inEdges[dst_op].erase(in_edge);
+          if (inEdges[dst_op].empty())
+            inEdges.erase(dst_op);
+          break;
+        }
+      }
+    }
+  }
+  inEdges.erase(oldOp);
+  outEdges.erase(oldOp);
+  constant_param_values.erase(oldOp);
+}
+
 void Graph::remove_edge(Op srcOp, Op dstOp) {
   if (inEdges.find(dstOp) != inEdges.end()) {
     auto &edge_list = inEdges[dstOp];
@@ -2268,10 +2308,11 @@ std::vector<size_t>
 Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
   std::vector<size_t> appliable_xfer_v;
   auto xfer_v_s = xfer_v.size();
-  for (size_t i = 0; i < xfer_v_s; ++i)
+  for (size_t i = 0; i < xfer_v_s; ++i){
     if (xfer_appliable(xfer_v[i], op)) {
       appliable_xfer_v.push_back(i);
     }
+  }
   return appliable_xfer_v;
 }
 

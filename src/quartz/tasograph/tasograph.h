@@ -242,13 +242,14 @@ public:
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;
+  void remove_node(Op oldOp);
+  void remove_node_wo_input_output_connect(Op oldOp);
   std::shared_ptr<Graph> ccz_flip_t(Context *ctx);
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
 
 private:
   void replace_node(Op oldOp, Op newOp);
-  void remove_node(Op oldOp);
   void remove_edge(Op srcOp, Op dstOp);
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
                       int dst_idx);
@@ -267,14 +268,13 @@ private:
                                          size_t min_guid) const;
 
 public:
+  size_t special_op_guid;
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
   std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
 
-private:
-  size_t special_op_guid;
 };
 
 }; // namespace quartz

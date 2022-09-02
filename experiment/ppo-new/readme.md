@@ -1,5 +1,11 @@
 # PPO
 
+## Setup
+
+- Follow [INSTALL.md](../../INSTALL.md) to setup a basic environment `quartz` .
+- Activate the working environment by `conda activate quartz` .
+- Install packages required for PPO by `conda env update --file env_ppo.yml` .
+
 ## Implementation Details
 
 We use PyTorch RPC and DDP to accelerate the training process.

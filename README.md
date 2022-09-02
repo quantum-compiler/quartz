@@ -172,6 +172,8 @@ Please let us know if you encounter any bugs or have any suggestions by [submitt
 
 We welcome all contributions to Quartz from bug fixes to new features and extensions.
 
+Please follow [developer guidance](doc/dev_setup.md).
+
 Please subscribe to the Quartz users mailing list (TODO)
 
 ## Citations

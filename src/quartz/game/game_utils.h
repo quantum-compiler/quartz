@@ -323,7 +323,7 @@ namespace quartz {
             }
         }
         // delete gate from circuit
-        size_t _erase =  graph.inEdges.erase(op);
+        size_t _erase = graph.inEdges.erase(op);
         assert(_erase == 1);
         graph.outEdges.erase(op);
     }
@@ -343,8 +343,8 @@ namespace quartz {
         return removed_gate_cnt;
     }
 
-    void find_initial_mapping(Graph& graph, const std::shared_ptr<DeviceTopologyGraph>& device,
-                             int quota) {
+    void find_initial_mapping(Graph &graph, const std::shared_ptr<DeviceTopologyGraph> &device,
+                              int quota) {
         // STEP 1: find a good initial mapping
         QubitMappingTable best_mapping;
         int best_mapping_cost = 1000000;

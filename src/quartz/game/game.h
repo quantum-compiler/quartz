@@ -264,7 +264,7 @@ namespace quartz {
             // scan through the execution history to determine cost of each swap
             std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
             int swap_with_cost = 0;
-            for (ExecutionHistory eh_item : execution_history) {
+            for (ExecutionHistory eh_item: execution_history) {
                 if (eh_item.gate_type == GateType::swap) {
                     // only swaps with at least one logical input used have non-zero cost
                     int _logical0 = eh_item.logical0;
@@ -283,8 +283,8 @@ namespace quartz {
             return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
 
-        void save_execution_history_to_file(const std::string& eh_file_name,
-                                            const std::string& qasm_file_name,
+        void save_execution_history_to_file(const std::string &eh_file_name,
+                                            const std::string &qasm_file_name,
                                             bool include_swap = true) const {
             assert(is_circuit_finished(graph));
 
@@ -296,31 +296,31 @@ namespace quartz {
 
             // output initial mapping table
             eh_file << logical2physical.size() << " " << logical_qubit_num << "\n";
-            for (int idx : initial_physical2logical) {
+            for (int idx: initial_physical2logical) {
                 eh_file << idx << " ";
             }
             eh_file << "\n";
-            for (int idx : initial_logical2physical) {
+            for (int idx: initial_logical2physical) {
                 eh_file << idx << " ";
             }
             eh_file << "\n";
 
             // output execution history
             eh_file << execution_history.size() << "\n";
-            for (const ExecutionHistory& eh : execution_history) {
+            for (const ExecutionHistory &eh: execution_history) {
                 eh_file << eh.guid << " "
-                     << eh.gate_type << " "
-                     << eh.physical0 << " "
-                     << eh.physical1 << " "
-                     << eh.logical0 << " "
-                     << eh.logical1 << "\n";
+                        << eh.gate_type << " "
+                        << eh.physical0 << " "
+                        << eh.physical1 << " "
+                        << eh.logical0 << " "
+                        << eh.logical1 << "\n";
             }
 
             // output qasm file
             qasm_file << "OPENQASM 2.0;" << "\n";
             qasm_file << "include \"qelib1.inc\";" << "\n";
             qasm_file << "qreg q[" << logical_qubit_num << "];\n";
-            for (const ExecutionHistory& eh : execution_history) {
+            for (const ExecutionHistory &eh: execution_history) {
                 if (!include_swap && eh.gate_type == GateType::swap) continue;
                 qasm_file << eh.gate_type << " q[" << eh.logical0 << "], q[" << eh.logical1 << "];\n";
             }

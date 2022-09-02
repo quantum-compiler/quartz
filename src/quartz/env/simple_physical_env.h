@@ -16,7 +16,8 @@ namespace quartz {
             /// Device   topology        fixed
             // initialize context, graph and device
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
-                                                         GateType::tdg, GateType::input_qubit, GateType::s, GateType::sdg}));
+                                                         GateType::tdg, GateType::input_qubit, GateType::s,
+                                                         GateType::sdg}));
             QASMParser qasm_parser(&(*context));
             DAG *dag = nullptr;
             if (!qasm_parser.load_qasm(qasm_file_path, dag)) {

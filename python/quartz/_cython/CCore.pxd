@@ -198,3 +198,12 @@ cdef extern from "env/simple_physical_env.h" namespace "quartz":
         int total_cost()
         State get_state()
         vector[Action] get_action_space()
+
+cdef extern from "env/simple_initial_env.h" namespace "quartz":
+    cdef cppclass SimpleInitialEnv:
+        SimpleInitialEnv(const string &, BackendType)
+        void reset() except +
+        Reward step(Action)
+        State get_state()
+        vector[Action] get_action_space()
+

@@ -27,6 +27,7 @@ ctypedef GraphXfer* GraphXfer_ptr
 # physical mapping
 from CCore cimport Reward, GraphState, State, ActionType, Action
 from CCore cimport SimplePhysicalEnv, BackendType
+from CCore cimport SimpleInitialEnv
 
 
 def get_gate_type_from_str(gate_type_str):
@@ -849,6 +850,50 @@ cdef class PySimplePhysicalEnv:
 
     def total_cost(self) -> int:
         return self.env.total_cost()
+
+    def get_state(self) -> PyState:
+        cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
+        py_state = PyState()
+        py_state.set_this(c_state)
+        return py_state
+
+    def get_action_space(self) -> [PyAction]:
+        cdef vector[Action] c_action_space = self.env.get_action_space()
+        cdef shared_ptr[Action] tmp_c_action
+        total_size = c_action_space.size()
+        py_action_space = []
+        for i in range(total_size):
+            tmp_c_action = make_shared[Action](c_action_space[i])
+            py_action = PyAction(instantiate=False)
+            py_action.set_this(tmp_c_action)
+            py_action_space.append(py_action)
+        return py_action_space
+
+
+cdef class PySimpleInitialEnv:
+    cdef SimpleInitialEnv *env
+
+    def __cinit__(self, *, qasm_file_path: str, backend_type_str: str):
+        cdef string encoded_path = qasm_file_path.encode('utf-8')
+        cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
+        self.env = new SimpleInitialEnv(encoded_path, cur_backend_type)
+
+    def __dealloc__(self):
+        del self.env
+
+    def reset(self):
+        self.env.reset()
+
+    def step(self, PyAction action) -> Reward:
+        return self.env.step(deref(action.action_ptr))
+
+    def step_with_id(self, qubit_idx_0: int, qubit_idx_1: int) -> Reward:
+        cdef int _qubit_idx_0 = qubit_idx_0
+        cdef int _qubit_idx_1 = qubit_idx_1
+        cdef shared_ptr[Action] action = make_shared[Action](ActionType.PhysicalFull,
+                                                             _qubit_idx_0,
+                                                             _qubit_idx_1)
+        return self.env.step(deref(action))
 
     def get_state(self) -> PyState:
         cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())

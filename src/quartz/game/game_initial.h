@@ -16,6 +16,7 @@ namespace quartz {
             /// GameInitial expects that the input graph has been initialized !!!
             // simplify circuit
             original_gate_count = graph.gate_count();
+            single_qubit_gate_count = simplify_circuit(graph);
 
             // state related (mapping table)
             // initialize
@@ -196,6 +197,7 @@ namespace quartz {
 
         // reward related
         int original_gate_count;  // number of gates in the graph at beginning
+        int single_qubit_gate_count;
 
         // execution history & initial mapping table
         std::vector<int> initial_logical2physical;

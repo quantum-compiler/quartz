@@ -1,5 +1,3 @@
-import time
-
 from qiskit import QuantumCircuit
 from qiskit.compiler import transpile
 from qiskit.transpiler import PassManager
@@ -120,14 +118,31 @@ def run_benchmark(qasm_file_name, device_name):
     # run sabre layout and sabre swap
     sabre_manager = sabre_pass_manager(PassManagerConfig(coupling_map=coupling_map, layout_method="sabre",
                                                          routing_method="sabre"))
-    min_num_swaps = 10000
-    while True:
-        sabre_circuit = sabre_manager.run(circuit)
-        sabre_circuit_op_list = dict(sabre_circuit.count_ops())
-        num_swaps = sabre_circuit_op_list["swap"]
-        if num_swaps < min_num_swaps:
-            min_num_swaps = num_swaps
-            print(f"New best initial mapping found with {min_num_swaps} swaps.")
+    sabre_circuit = sabre_manager.run(circuit)
+
+    # original gate count
+    ori_circuit_op_list = dict(circuit.count_ops())
+    ori_gate_count = 0
+    for key in ori_circuit_op_list:
+        if key == "swap":
+            assert False, "swap in original circuit!"
+        else:
+            ori_gate_count += ori_circuit_op_list[key]
+
+    # get gate count of sabre
+    sabre_circuit_op_list = dict(sabre_circuit.count_ops())
+    sabre_gate_count = 0
+    sabre_swap_count = 0
+    for key in sabre_circuit_op_list:
+        if key == "swap":
+            sabre_gate_count += 3 * sabre_circuit_op_list[key]
+            sabre_swap_count = sabre_circuit_op_list[key]
+        else:
+            assert sabre_circuit_op_list[key] == ori_circuit_op_list[key]
+            sabre_gate_count += sabre_circuit_op_list[key]
+    assert sabre_gate_count - 3 * sabre_swap_count == ori_gate_count
+
+    return ori_gate_count, sabre_gate_count, sabre_swap_count
 
 
 def main():
@@ -136,7 +151,19 @@ def main():
     # IBM_Q20_Tokyo, IBM_Q27_Falcon
     qasm_file_name = "gf2^E5_mult_after_heavy.qasm"
     device_name = "IBM_Q27_Falcon"
-    run_benchmark(qasm_file_name=qasm_file_name, device_name=device_name)
+
+    # run benchmark
+    print(f"circuit name: {qasm_file_name}.")
+    print(f"device name: {device_name}.")
+    min_swap_count = 10000
+    step_count = 0
+    while True:
+        step_count += 1
+        data = run_benchmark(qasm_file_name=qasm_file_name, device_name=device_name)
+        ori_gate_count, sabre_gate_count, sabre_swap_count = data
+        if sabre_swap_count < min_swap_count:
+            min_swap_count = sabre_swap_count
+            print(f"Best Implementation found: {min_swap_count} swaps. ({step_count} runs)")
 
 
 if __name__ == '__main__':

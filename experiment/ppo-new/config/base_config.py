@@ -118,6 +118,7 @@ class BaseConfig:
     lr_gnn: float = 3e-4
     lr_actor: float = 3e-4
     lr_critic: float = 5e-4
+    lr_scheduler: str = 'none'  # linear
     update_policy_interval: int = 1
     save_ckpt_interval: int = 1
     time_budget: str = ''

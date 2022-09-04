@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import math
 import os
+import sched
 import time
 import warnings
 from functools import partial
@@ -197,6 +198,20 @@ class PPOMod:
                 },
             ]
         )
+        if self.cfg.lr_scheduler == 'linear':
+            self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                self.optimizer,
+                start_factor=0.01,
+                total_iters=50,
+            )
+        elif self.cfg.lr_scheduler == 'none':
+            self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+                self.optimizer,
+                start_factor=1,
+                total_iters=1,
+            )
+        else:
+            raise ValueError(f'Unknown lr_scheduler: {self.cfg.lr_scheduler}')
         if self.rank == 0:
             wandb.init(
                 project=self.cfg.wandb.project,
@@ -277,6 +292,7 @@ class PPOMod:
                 'num_exps': len(exp_list),
                 'tot_exps_collected_all_rank': self.tot_exps_collected
                 * self.ddp_processes,
+                'lr': self.optimizer.param_groups[0]['lr'],
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(
@@ -441,6 +457,7 @@ class PPOMod:
             # exps = None
             # torch.cuda.empty_cache()
         # end for k_epochs
+        self.lr_scheduler.step()
         self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
 

@@ -26,7 +26,7 @@ class NamConfig(BaseConfig):
 
 @dataclass
 class NamFTConfig(NamConfig):
-    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-New')
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-02')
     k_epochs: int = 10
     greedy_sample: bool = True
     input_graphs: List[InputGraph] = field(

@@ -2465,6 +2465,9 @@ void Graph::init_physical_mapping(InitialMappingType mapping_type, const std::sh
         case InitialMappingType::SABRE:
             _sabre_mapping(device, pass, use_extensive, w_value);
             break;
+        case InitialMappingType::RANDOM:
+            _random_mapping(device);
+            break;
         default:
             std::cout << "Unrecognized initial mapping type\n";
             assert(false);
@@ -2483,6 +2486,31 @@ void Graph::_trivial_mapping() {
             qubit_index += 1;
         }
     }
+}
+
+void Graph::_random_mapping(const std::shared_ptr<DeviceTopologyGraph>& device) {
+    // set a random initial mapping
+    _trivial_mapping();
+    size_t num_logical_qubits = qubit_mapping_table.size();
+    size_t num_physical_qubits = device->get_num_qubits();
+
+    // generate a random permutation
+    std::vector<int> permutation;
+    permutation.reserve(num_physical_qubits);
+    for (int i = 0; i < num_physical_qubits; ++i) {
+      permutation.emplace_back(i);
+    }
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(permutation.begin(), permutation.end(), g);
+
+    // generate a random initial mapping from this permutation
+    std::vector<int> l2p;
+    l2p.reserve(num_logical_qubits);
+    for (int i = 0; i < num_logical_qubits; ++i) {
+      l2p.emplace_back(permutation[i]);
+    }
+    set_physical_mapping(l2p);
 }
 
 void Graph::_sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass,

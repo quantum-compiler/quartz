@@ -180,7 +180,7 @@ enum class MappingStatus{
 };
 
 enum class InitialMappingType{
-    TRIVIAL, SABRE
+    TRIVIAL, SABRE, RANDOM
 };
 
 struct GraphState{
@@ -287,6 +287,7 @@ public:
   void init_physical_mapping(InitialMappingType mapping_type, const std::shared_ptr<DeviceTopologyGraph>& device,
                              int pass, bool use_extensive, double w_value);
   void _trivial_mapping();
+  void _random_mapping(const std::shared_ptr<DeviceTopologyGraph>& device);
   void _sabre_mapping(const std::shared_ptr<DeviceTopologyGraph>& device, int pass,
                       bool use_extensive, double w_value);
   void propagate_mapping();

@@ -1477,6 +1477,8 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
     assert(false);
   }
 
+  auto original_cost = cost_function(this);
+
   // Get xfers that strictly reduce the cost from the ECC set
   auto eccs = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
@@ -1487,12 +1489,12 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
     graphs.reserve(ecc_size);
     graph_cost.reserve(ecc_size);
     for (auto &circuit : ecc) {
-      graphs.emplace_back(circuit);
+      graphs.emplace_back(ctx, circuit);
       graph_cost.emplace_back(cost_function(&graphs.back()));
     }
     int representative_id =
-        std::min_element(graph_cost.begin(), graph_cost.end()) -
-        graph_cost.begin();
+        (int)(std::min_element(graph_cost.begin(), graph_cost.end()) -
+              graph_cost.begin());
     for (int i = 0; i < ecc_size; i++) {
       if (graph_cost[i] != graph_cost[representative_id]) {
         auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
@@ -1504,9 +1506,46 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
     }
   }
   if (print_message) {
-    std::cout << "Number of xfers that reduce cost: " << xfers.size()
-              << std::endl;
+    std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
+              << xfers.size() << std::endl;
   }
+
+  std::shared_ptr<Graph> optimized_graph = std::make_shared<Graph>(*this);
+  bool optimized_in_this_iteration;
+  std::vector<Op> all_nodes;
+  optimized_graph->topology_order_ops(all_nodes);
+  do {
+    optimized_in_this_iteration = false;
+    for (auto xfer : xfers) {
+      bool optimized_this_xfer;
+      do {
+        optimized_this_xfer = false;
+        for (auto const &node : all_nodes) {
+          auto new_graph = optimized_graph->apply_xfer(
+              xfer, node, context->has_parameterized_gate());
+          if (new_graph) {
+            optimized_graph.swap(new_graph);
+            // Update the nodes after applying a transformation.
+            all_nodes.clear();
+            optimized_graph->topology_order_ops(all_nodes);
+            optimized_this_xfer = true;
+            optimized_in_this_iteration = true;
+            // Since |all_nodes| has changed, we cannot continue this loop.
+            break;
+          }
+        }
+      } while (optimized_this_xfer);
+    }
+  } while (optimized_in_this_iteration);
+
+  auto optimized_cost = cost_function(optimized_graph.get());
+
+  if (print_message) {
+    std::cout << "greedy_optimize(): cost optimized from " << original_cost
+              << " to " << optimized_cost << std::endl;
+  }
+
+  return optimized_graph;
 }
 
 std::shared_ptr<Graph> Graph::optimize_legacy(
@@ -1818,8 +1857,11 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
   auto log_file_name =
       equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
       circuit_name + ".log";
-  return optimize(xfers, cost_upper_bound, circuit_name, log_file_name,
-                  print_message, cost_function, timeout);
+  auto preprocessed_graph =
+      greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
+  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name,
+                                      log_file_name, print_message,
+                                      cost_function, timeout);
 }
 
 std::shared_ptr<Graph>

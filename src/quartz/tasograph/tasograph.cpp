@@ -2532,7 +2532,7 @@ std::vector<size_t>
 Graph::appliable_xfers(Op op, const std::vector<GraphXfer *> &xfer_v) const {
   std::vector<size_t> appliable_xfer_v;
   auto xfer_v_s = xfer_v.size();
-  for (size_t i = 0; i < xfer_v_s; ++i){
+  for (size_t i = 0; i < xfer_v_s; ++i) {
     if (xfer_appliable(xfer_v[i], op)) {
       appliable_xfer_v.push_back(i);
     }
@@ -2706,50 +2706,53 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
 // TODO
 bool Graph::equal(const Graph &other) const { return true; }
 
-bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const{
-    std::unordered_set<Pos, PosHash> mapped_input_pos;
-    std::unordered_set<Pos, PosHash> mapped_output_pos;
-    std::queue<Pos> q;
-    std::unordered_set<Pos, PosHash> visited;
-    // Get all input positions
-    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend(); ++it) {
-        if(it->second.first.ptr->tp != GateType::input_qubit && it->second.first.ptr->tp != GateType::input_param) {
-            mapped_input_pos.insert(Pos(it->second.first, it->second.second));
-        }
+bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const {
+  std::unordered_set<Pos, PosHash> mapped_input_pos;
+  std::unordered_set<Pos, PosHash> mapped_output_pos;
+  std::queue<Pos> q;
+  std::unordered_set<Pos, PosHash> visited;
+  // Get all input positions
+  for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
+       ++it) {
+    if (it->second.first.ptr->tp != GateType::input_qubit &&
+        it->second.first.ptr->tp != GateType::input_param) {
+      mapped_input_pos.insert(Pos(it->second.first, it->second.second));
     }
+  }
 
-    // Get all output positions and initialize the queue
-    for (auto it = xfer->mappedOutputs.cbegin(); it != xfer->mappedOutputs.cend(); ++it) {
-        Pos output_pos = Pos(it->first.op->mapOp, it->first.idx);
-        mapped_output_pos.insert(output_pos);
-        q.push(output_pos);
-        visited.insert(output_pos);
+  // Get all output positions and initialize the queue
+  for (auto it = xfer->mappedOutputs.cbegin(); it != xfer->mappedOutputs.cend();
+       ++it) {
+    Pos output_pos = Pos(it->first.op->mapOp, it->first.idx);
+    mapped_output_pos.insert(output_pos);
+    q.push(output_pos);
+    visited.insert(output_pos);
+  }
+
+  while (!q.empty()) {
+    auto pos = q.front();
+    q.pop();
+    if (outEdges.find(pos.op) == outEdges.end()) {
+      continue;
     }
-
-    while(!q.empty()){
-        auto pos = q.front();
-        q.pop();
-        if(outEdges.find(pos.op) == outEdges.end()){
-            continue;
-        }
-        auto out_edges = outEdges.find(pos.op)->second;
-        for (auto e_it = out_edges.cbegin(); e_it != out_edges.cend(); ++e_it) {
-            if(e_it->srcIdx == pos.idx){
-                Op next_op = e_it->dstOp;
-                int num_qubits = next_op.ptr->get_num_qubits();
-                for(int i = 0; i < num_qubits; ++i){
-                    Pos next_pos = Pos(next_op, i);
-                    if(visited.find(next_pos) == visited.end()){
-                        if(mapped_input_pos.find(next_pos) != mapped_input_pos.end()){
-                            return false;
-                        }
-                        q.push(next_pos);
-                        visited.insert(next_pos);
-                    }
-                }
+    auto out_edges = outEdges.find(pos.op)->second;
+    for (auto e_it = out_edges.cbegin(); e_it != out_edges.cend(); ++e_it) {
+      if (e_it->srcIdx == pos.idx) {
+        Op next_op = e_it->dstOp;
+        int num_qubits = next_op.ptr->get_num_qubits();
+        for (int i = 0; i < num_qubits; ++i) {
+          Pos next_pos = Pos(next_op, i);
+          if (visited.find(next_pos) == visited.end()) {
+            if (mapped_input_pos.find(next_pos) != mapped_input_pos.end()) {
+              return false;
             }
+            q.push(next_pos);
+            visited.insert(next_pos);
+          }
         }
+      }
     }
-    return true;
+  }
+  return true;
 }
 }; // namespace quartz

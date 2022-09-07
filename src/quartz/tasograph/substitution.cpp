@@ -673,7 +673,8 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
   return true;
 }
 
-// std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
+// std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const
+// {
 //   std::shared_ptr<Graph> newGraph(new Graph(*graph));
 //   // Step 1: map dst ops
 //   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
@@ -741,51 +742,53 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 // }
 
 std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
-    std::shared_ptr<Graph> new_graph(new Graph(graph->context));
-    new_graph->constant_param_values = graph->constant_param_values;
-    new_graph->special_op_guid = graph->special_op_guid;
-    new_graph->input_qubit_op_2_qubit_idx = graph->input_qubit_op_2_qubit_idx;
-    new_graph->inEdges = graph->inEdges;
-    new_graph->outEdges = graph->outEdges;
+  std::shared_ptr<Graph> new_graph(new Graph(graph->context));
+  new_graph->constant_param_values = graph->constant_param_values;
+  new_graph->special_op_guid = graph->special_op_guid;
+  new_graph->input_qubit_op_2_qubit_idx = graph->input_qubit_op_2_qubit_idx;
+  new_graph->inEdges = graph->inEdges;
+  new_graph->outEdges = graph->outEdges;
 
-    // Step 1: add edges from mapped src -> unmapped dst
-  for(auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
+  // Step 1: add edges from mapped src -> unmapped dst
+  for (auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
     auto mapped_op = it->first;
     auto mapped_op_it = new_graph->outEdges.find(mapped_op);
-    if(mapped_op_it == new_graph->outEdges.end())
+    if (mapped_op_it == new_graph->outEdges.end())
       continue;
     auto mapped_op_out_edges = mapped_op_it->second;
     auto mapped_opx = it->second;
-    for (auto e_it = mapped_op_out_edges.cbegin(); e_it != mapped_op_out_edges.cend(); e_it++) {
-        if(mappedOps.find(e_it->dstOp) == mappedOps.end()){
-            auto src_idx = e_it->srcIdx;
-            TensorX src_output_tensor = TensorX(mapped_opx, src_idx);
-            assert(mappedOutputs.find(src_output_tensor) != mappedOutputs.end());
-            TensorX dst_output_tensor = mappedOutputs.find(src_output_tensor)->second;
-            if (dst_output_tensor.op == nullptr) {
-                // mappedOutput is an input --- this indicates
-                // an empty target graph
-                auto mapped_input_it = mappedInputs.find(dst_output_tensor.idx);
-                assert(mapped_input_it != mappedInputs.end());
-                std::pair<Op, int> src_pos = mapped_input_it->second;
-                new_graph->add_edge(src_pos.first, e_it->dstOp, src_pos.second,
-                                    e_it->dstIdx);
-            } else {
-                new_graph->add_edge(dst_output_tensor.op->mapOp, e_it->dstOp, dst_output_tensor.idx,
-                                    e_it->dstIdx);
-            }
+    for (auto e_it = mapped_op_out_edges.cbegin();
+         e_it != mapped_op_out_edges.cend(); e_it++) {
+      if (mappedOps.find(e_it->dstOp) == mappedOps.end()) {
+        auto src_idx = e_it->srcIdx;
+        TensorX src_output_tensor = TensorX(mapped_opx, src_idx);
+        assert(mappedOutputs.find(src_output_tensor) != mappedOutputs.end());
+        TensorX dst_output_tensor =
+            mappedOutputs.find(src_output_tensor)->second;
+        if (dst_output_tensor.op == nullptr) {
+          // mappedOutput is an input --- this indicates
+          // an empty target graph
+          auto mapped_input_it = mappedInputs.find(dst_output_tensor.idx);
+          assert(mapped_input_it != mappedInputs.end());
+          std::pair<Op, int> src_pos = mapped_input_it->second;
+          new_graph->add_edge(src_pos.first, e_it->dstOp, src_pos.second,
+                              e_it->dstIdx);
+        } else {
+          new_graph->add_edge(dst_output_tensor.op->mapOp, e_it->dstOp,
+                              dst_output_tensor.idx, e_it->dstIdx);
         }
+      }
     }
   }
 
   // Step 2: remove all mapped ops
-  for(auto it = mappedOps.cbegin(); it != mappedOps.cend();
-      it++) {
+  for (auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
     new_graph->remove_node_wo_input_output_connect(it->first);
   }
-  
+
   // Step 3: add edges for mapped ops
-  for (auto dst_op_it = dstOps.cbegin(); dst_op_it != dstOps.cend(); dst_op_it++) {
+  for (auto dst_op_it = dstOps.cbegin(); dst_op_it != dstOps.cend();
+       dst_op_it++) {
     OpX *dst_opx = *dst_op_it;
     for (size_t i = 0; i < dst_opx->inputs.size(); i++)
       if (dst_opx->inputs[i].op == NULL) {

@@ -15,9 +15,8 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::x, GateType::rz, GateType::add});
 
-  auto graph = Graph::from_qasm_file(
-      &ctx,
-      "../experiment/nam_circs/mod5_4.qasm");
+  auto graph =
+      Graph::from_qasm_file(&ctx, "../experiment/nam_circs/mod5_4.qasm");
 
   EquivalenceSet eqs;
   // Load equivalent dags from file

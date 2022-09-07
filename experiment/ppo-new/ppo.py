@@ -199,16 +199,28 @@ class PPOMod:
             ]
         )
         if self.cfg.lr_scheduler == 'linear':
-            self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+
+            def lr_lambda(epoch: int):
+                if epoch < 50:
+                    return 1.096478196143185**epoch / 100
+                else:
+                    return 1.0
+
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 self.optimizer,
-                start_factor=0.01,
-                total_iters=50,
+                lr_lambda=lr_lambda,
+                last_epoch=-1,
             )
+            # self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+            #     self.optimizer,
+            #     start_factor=0.01,
+            #     total_iters=50,
+            # )
         elif self.cfg.lr_scheduler == 'none':
-            self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 self.optimizer,
-                start_factor=1,
-                total_iters=1,
+                lr_lambda=lambda _: 1.0,
+                last_epoch=-1,
             )
         else:
             raise ValueError(f'Unknown lr_scheduler: {self.cfg.lr_scheduler}')
@@ -502,7 +514,8 @@ class PPOMod:
         else:
             self.ddp_ac_net.load_state_dict(model_state_dict)
             self.ac_net_old.load_state_dict(self.ac_net.state_dict())
-        self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if self.cfg.resume_optimizer:
+            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         printfl(f'resumed from "{ckpt_path}"!')
         """load best graph info"""
         if self.cfg.load_best_info:

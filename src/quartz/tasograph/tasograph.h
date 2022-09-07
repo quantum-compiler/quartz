@@ -200,6 +200,18 @@ public:
                                        Context *union_ctx,
                                        RuleParser *rule_parser,
                                        bool ignore_toffoli = false);
+  /**
+   * Greedily apply transformations towards lower cost.
+   * @param ctx The context variable.
+   * @param equiv_file_name The ECC set file name.
+   * @param print_message To output the log to the screen or not.
+   * @param cost_function The cost function.
+   * @return The optimized circuit.
+   */
+  std::shared_ptr<Graph>
+  greedy_optimize(Context *ctx, const std::string &equiv_file_name,
+                  bool print_message,
+                  std::function<float(Graph *)> cost_function = nullptr);
   std::shared_ptr<Graph>
   optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,

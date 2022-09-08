@@ -298,13 +298,17 @@ class PPOMod:
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
             other_info_dict = self.agent.other_info_dict()
+            lr_dict = {
+                f'lr_{i}': self.optimizer.param_groups[i]['lr']
+                for i in range(len(self.optimizer.param_groups))
+            }
             collect_info = {
                 **other_info_dict,  # type: ignore
                 'iter': self.i_iter,
                 'num_exps': len(exp_list),
                 'tot_exps_collected_all_rank': self.tot_exps_collected
                 * self.ddp_processes,
-                'lr': self.optimizer.param_groups[0]['lr'],
+                **lr_dict,
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(

@@ -423,6 +423,7 @@ class GraphBuffer:
                 self.cost_to_graph[gcost].pop(idx_to_pop)
             while len(self) > self.max_len:
                 self.pop_one()
+            assert hash_value in self.hashset
             return True
         else:
             return False
@@ -546,6 +547,15 @@ class GraphBuffer:
             info[f'max_{name}_iter'] = max(values)
             info[f'mean_{name}_iter'] = sum(values) / len(values)
 
+        return info
+
+    def basic_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {
+            'buffer_size': len(self),
+            'diff_costs': len(self.cost_to_graph),
+            'min_cost': self.cost_to_graph.peekitem(0)[0],
+            'max_cost': self.cost_to_graph.peekitem(-1)[0],
+        }
         return info
 
     def push_back_all_graphs(

@@ -199,10 +199,11 @@ class PPOMod:
             ]
         )
         if self.cfg.lr_scheduler == 'linear':
+            base = (1 / self.cfg.lr_start_factor) ** (1 / self.cfg.lr_warmup_epochs)
 
             def lr_lambda(epoch: int):
-                if epoch < 50:
-                    return 1.096478196143185**epoch / 100
+                if epoch < self.cfg.lr_warmup_epochs:
+                    return base**epoch * self.cfg.lr_start_factor
                 else:
                     return 1.0
 
@@ -211,11 +212,7 @@ class PPOMod:
                 lr_lambda=lr_lambda,
                 last_epoch=-1,
             )
-            # self.lr_scheduler = torch.optim.lr_scheduler.LinearLR(
-            #     self.optimizer,
-            #     start_factor=0.01,
-            #     total_iters=50,
-            # )
+
         elif self.cfg.lr_scheduler == 'none':
             self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 self.optimizer,

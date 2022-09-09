@@ -19,7 +19,7 @@ To generate an `(n,q)`-complete ECC set with `m` input parameters for some gate 
 you can change the main function in `src/test/gen_ecc_set.cpp` to the following:
 
 ```c++
-gen_ecc_set({Gate set}, "{Name of the gate set}_{n}_{q}_", true, q, m, n);
+gen_ecc_set({Gate set}, "{Name of the gate set}_{n}_{q}_", true, true, q, m, n);
 return 0;
 ```
 where `{Gate set}` can be `{GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add}` for the Nam gate set,

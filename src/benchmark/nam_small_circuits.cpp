@@ -93,7 +93,7 @@ int main() {
     std::cout << "Generating ECC set..." << std::endl;
     gen_ecc_set(
         {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
-        ecc_set_prefix, true, 3, 2, 4);
+        ecc_set_prefix, true, false, 3, 2, 4);
     std::cout << "ECC set generated." << std::endl;
   }
   // Logs are printed to Nam_4_3_tof_3.log, Nam_4_3_barenco_tof_3.log, ...

@@ -2,6 +2,7 @@
 
 #include "../context/context.h"
 #include "../dag/dag.h"
+#include "representative_set.h"
 
 #include <functional>
 #include <list>
@@ -94,6 +95,8 @@ public:
   bool save_json(const std::string &file_name) const;
 
   void clear();
+
+  std::unique_ptr<RepresentativeSet> get_representative_set() const;
 
   // A final pass of simplification before feeding the equivalences
   // to the optimizer.

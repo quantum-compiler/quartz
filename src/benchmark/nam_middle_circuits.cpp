@@ -7,7 +7,7 @@
 
 using namespace quartz;
 
-static const std::string ecc_set_prefix = "Nam_4_3_";
+static const std::string ecc_set_prefix = "Nam_6_3_";
 static const std::string ecc_set_name =
     ecc_set_prefix + "complete_ECC_set.json";
 
@@ -93,15 +93,14 @@ int main() {
     std::cout << "Generating ECC set..." << std::endl;
     gen_ecc_set(
         {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
-        ecc_set_prefix, true, false, 3, 2, 4);
+        ecc_set_prefix, true, false, 3, 2, 6);
     std::cout << "ECC set generated." << std::endl;
   }
-  // Logs are printed to Nam_4_3_tof_3.log, Nam_4_3_barenco_tof_3.log, ...
-  benchmark_nam("tof_3");         // 45 gates
-  benchmark_nam("barenco_tof_3"); // 58 gates
-  benchmark_nam("mod_mult_55");   // 119 gates
-  benchmark_nam("vbe_adder_3");   // 150 gates
-  benchmark_nam("gf2^4_mult");    // 225 gates
+  // Logs are printed to Nam_6_3_barenco_tof_10.log, Nam_6_3_gf2^8_mult.log, ...
+  benchmark_nam("barenco_tof_10"); // 450 gates
+  benchmark_nam("gf2^8_mult");     // 883 gates
+  benchmark_nam("qcla_mod_7");     // 884 gates
+  benchmark_nam("adder_8");        // 900 gates
   if (num_benchmark > 0) {
     std::cout << "Summary:" << std::endl;
     std::cout << summary_result.str();

@@ -1,4 +1,3 @@
-name: quartz
 channels:
   - defaults
   - dglteam
@@ -24,6 +23,6 @@ dependencies:
   - pylatexenc
   - natsort
   - pip:
-    - cython==3.0.0a10
+    - cython>=3.0a1
     - z3-solver
     - qiskit

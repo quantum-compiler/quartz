@@ -6,8 +6,9 @@ Quartz can be built from source code using the following instructions.
 
 ### Prerequisites
 
-* CMAKE 3.16 or higher
-* Cython 3.0 or higher
+* `apt install build-essential`
+* CMAKE 3.16 or higher: `apt install cmake`
+* Cython 3.0 or higher (We will install it with Python later by `conda`)
 
 ### Build Quartz Runtime
 
@@ -17,7 +18,7 @@ git clone --recursive https://github.com/quantum-compiler/quartz.git
 cd quartz
 ```
 
-* Set up the environment (including Python, OpenMP) by conda.
+* Set up the environment (including Python, Cython, OpenMP) by conda.
 
 ```shell
 conda env create --name quartz --file env.yml
@@ -25,10 +26,11 @@ conda activate quartz
 ```
 
 * Build the Quartz runtime library. The configuration of the Quartz runtime can be modified by `config.cmake`.
+
 ```shell
 mkdir build;
 cd build;
-cmake ..
+cmake .. # see notes below
 make install
 ```
 

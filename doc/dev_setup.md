@@ -1,5 +1,21 @@
 # Developer installation
 
+## Code format guide
+
+Please setup `pre-commit` following [pre-commit official page](https://pre-commit.com) first.
+
+Usually, this can be done in your working Python environment by:
+
+```shell
+pip install pre-commit clang-format
+# cd quartz-repo
+pre-commit install
+```
+
+Then `pre-commit` will run automatically on `git commit` .
+
+You can also manually run it by `pre-commit run --all-files` .
+
 ## Prerequisites
 
 ### Linux/Unix

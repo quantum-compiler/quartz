@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: quartz
+          environment-file: env.yml
+      - name: Install Dependencies
+        run: |
+          sudo apt install -y build-essential cmake
+      - name: Compile Quartz
+        run: |
+          mkdir build; cd build
+          cmake ..
+          sudo make install -j$(nproc --all)
+      - name: Build Cython part
+        run: |
+          cd python
+          python setup.py build_ext --inplace install

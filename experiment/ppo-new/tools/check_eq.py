@@ -8,6 +8,7 @@ from qiskit.quantum_info import Operator, Statevector
 sys.path.append(os.path.join(os.getcwd(), '..'))
 import qtz
 from icecream import ic
+from IPython import embed
 
 qtz.init_quartz_context(
     [
@@ -44,6 +45,14 @@ def check_op_eq_from_path(path_x: str, path_y: str) -> bool:
     return check_op_eq(qc_x, qc_y)
 
 
+def check_qcec_from_path(path_x: str, path_y: str) -> bool:
+    from mqt import qcec
+    from mqt.qcec import EquivalenceCriterion
+
+    result = qcec.verify(path_x, path_y)
+    return result.equivalence == EquivalenceCriterion.equivalent
+
+
 if __name__ == '__main__':
     import sys
 
@@ -54,6 +63,7 @@ if __name__ == '__main__':
         file_x = sys.argv[2]
         file_y = sys.argv[3]
 
+        # ic(check_qcec_from_path(file_x, file_y))
         ic(check_sv_eq_from_path(file_x, file_y))
         ic(check_op_eq_from_path(file_x, file_y))
     else:
@@ -89,6 +99,7 @@ if __name__ == '__main__':
                     op_eq = check_op_eq_from_path(last_qc_path, full_qc_path)
                     if not (sv_eq and op_eq):
                         ic(sv_eq, op_eq)
+                        # if not check_qcec_from_path(last_qc_path, full_qc_path):
                         print(f'Non equivalent circs: {last_qc_path}, {full_qc_path}')
                         xfer = qtz.quartz_context.get_xfer_from_id(id=last_action[1])
                         print(
@@ -96,6 +107,7 @@ if __name__ == '__main__':
                             f'Action{last_action} {xfer}:\n'
                             f'src:\n{xfer.src_str}\ndst:\n{xfer.dst_str}'
                         )
+                        embed()
 
                 # end if
                 last_qc_path = full_qc_path

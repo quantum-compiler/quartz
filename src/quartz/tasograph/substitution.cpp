@@ -673,74 +673,150 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
   return true;
 }
 
+// std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const
+// {
+//   std::shared_ptr<Graph> newGraph(new Graph(*graph));
+//   // Step 1: map dst ops
+//   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
+//   std::vector<OpX *>::const_iterator dstIt;
+//   // Step 2: add edges to the graph
+//   for (opIt = graph->inEdges.begin(); opIt != graph->inEdges.end(); opIt++)
+//     if (mappedOps.find(opIt->first) == mappedOps.end()) {
+//       // Unmapped ops
+//       const std::set<Edge, EdgeCompare> &list = opIt->second;
+//       std::set<Edge, EdgeCompare>::const_iterator it;
+//       for (it = list.begin(); it != list.end(); it++)
+//         if (mappedOps.find(it->srcOp) != mappedOps.end()) {
+//           // mapped src -> unmapped dst
+//           TensorX srcTen;
+//           srcTen.op = mappedOps.find(it->srcOp)->second;
+//           srcTen.idx = it->srcIdx;
+//           assert(mappedOutputs.find(srcTen) != mappedOutputs.end());
+//           TensorX dstTen = mappedOutputs.find(srcTen)->second;
+//           if (dstTen.op == NULL) {
+//             // mappedOutput is an input --- this indicates
+//             // an empty target graph
+//             auto it2 = mappedInputs.find(dstTen.idx);
+//             assert(it2 != mappedInputs.end());
+//             std::pair<Op, int> srcEdge = it2->second;
+//             newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second,
+//                                it->dstIdx);
+//           } else {
+//             newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
+//                                it->dstIdx);
+//           }
+//         } else {
+//           // unmapped src -> unmmaped dst
+//           newGraph->add_edge(it->srcOp, it->dstOp, it->srcIdx, it->dstIdx);
+//         }
+//     }
+//   // Step 3: add edges for mapped ops
+//   for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++) {
+//     OpX *dstOp = *dstIt;
+//     for (size_t i = 0; i < dstOp->inputs.size(); i++)
+//       if (dstOp->inputs[i].op == NULL) {
+//         // unmapped src -> mapped dst
+//         if (paramValues.find(dstOp->inputs[i].idx) != paramValues.end()) {
+//           // New constant parameters
+//           Op input_constant_param_op(context->next_global_unique_id(),
+//                                      context->get_gate(GateType::input_param));
+//           newGraph->constant_param_values[input_constant_param_op] =
+//               paramValues.find(dstOp->inputs[i].idx)->second;
+//           newGraph->add_edge(input_constant_param_op, dstOp->mapOp, 0, i);
+//           continue;
+//         };
+//         auto it = mappedInputs.find(dstOp->inputs[i].idx);
+//         assert(it != mappedInputs.end());
+//         std::pair<Op, int> srcEdge = it->second;
+//         newGraph->add_edge(srcEdge.first, dstOp->mapOp, srcEdge.second, i);
+//       } else {
+//         // mapped src -> mapped dst
+//         OpX *srcOp = dstOp->inputs[i].op;
+//         int srcIdx = dstOp->inputs[i].idx;
+//         newGraph->add_edge(srcOp->mapOp, dstOp->mapOp, srcIdx, i);
+//       }
+//   }
+
+//   newGraph->_construct_pos_2_logical_qubit();
+//   return newGraph;
+// }
+
 std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
-  std::shared_ptr<Graph> newGraph(new Graph(*graph));
-  newGraph->inEdges.clear();
-  newGraph->outEdges.clear();
-  // Step 1: map dst ops
-  std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
-  std::vector<OpX *>::const_iterator dstIt;
-  // Step 2: add edges to the graph
-  for (opIt = graph->inEdges.begin(); opIt != graph->inEdges.end(); opIt++)
-    if (mappedOps.find(opIt->first) == mappedOps.end()) {
-      // Unmapped ops
-      const std::set<Edge, EdgeCompare> &list = opIt->second;
-      std::set<Edge, EdgeCompare>::const_iterator it;
-      for (it = list.begin(); it != list.end(); it++)
-        if (mappedOps.find(it->srcOp) != mappedOps.end()) {
-          // mapped src -> unmapped dst
-          TensorX srcTen;
-          srcTen.op = mappedOps.find(it->srcOp)->second;
-          srcTen.idx = it->srcIdx;
-          assert(mappedOutputs.find(srcTen) != mappedOutputs.end());
-          TensorX dstTen = mappedOutputs.find(srcTen)->second;
-          if (dstTen.op == NULL) {
-            // mappedOutput is an input --- this indicates
-            // an empty target graph
-            auto it2 = mappedInputs.find(dstTen.idx);
-            assert(it2 != mappedInputs.end());
-            std::pair<Op, int> srcEdge = it2->second;
-            newGraph->add_edge(srcEdge.first, it->dstOp, srcEdge.second,
-                               it->dstIdx);
-          } else {
-            newGraph->add_edge(dstTen.op->mapOp, it->dstOp, dstTen.idx,
-                               it->dstIdx);
-          }
+  std::shared_ptr<Graph> new_graph(new Graph(graph->context));
+  new_graph->constant_param_values = graph->constant_param_values;
+  new_graph->special_op_guid = graph->special_op_guid;
+  new_graph->input_qubit_op_2_qubit_idx = graph->input_qubit_op_2_qubit_idx;
+  new_graph->inEdges = graph->inEdges;
+  new_graph->outEdges = graph->outEdges;
+
+  // Step 1: add edges from mapped src -> unmapped dst
+  for (auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
+    auto mapped_op = it->first;
+    auto mapped_op_it = new_graph->outEdges.find(mapped_op);
+    if (mapped_op_it == new_graph->outEdges.end())
+      continue;
+    auto mapped_op_out_edges = mapped_op_it->second;
+    auto mapped_opx = it->second;
+    for (auto e_it = mapped_op_out_edges.cbegin();
+         e_it != mapped_op_out_edges.cend(); e_it++) {
+      if (mappedOps.find(e_it->dstOp) == mappedOps.end()) {
+        auto src_idx = e_it->srcIdx;
+        TensorX src_output_tensor = TensorX(mapped_opx, src_idx);
+        assert(mappedOutputs.find(src_output_tensor) != mappedOutputs.end());
+        TensorX dst_output_tensor =
+            mappedOutputs.find(src_output_tensor)->second;
+        if (dst_output_tensor.op == nullptr) {
+          // mappedOutput is an input --- this indicates
+          // an empty target graph
+          auto mapped_input_it = mappedInputs.find(dst_output_tensor.idx);
+          assert(mapped_input_it != mappedInputs.end());
+          std::pair<Op, int> src_pos = mapped_input_it->second;
+          new_graph->add_edge(src_pos.first, e_it->dstOp, src_pos.second,
+                              e_it->dstIdx);
         } else {
-          // unmapped src -> unmmaped dst
-          newGraph->add_edge(it->srcOp, it->dstOp, it->srcIdx, it->dstIdx);
+          new_graph->add_edge(dst_output_tensor.op->mapOp, e_it->dstOp,
+                              dst_output_tensor.idx, e_it->dstIdx);
         }
+      }
     }
+  }
+
+  // Step 2: remove all mapped ops
+  for (auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
+    new_graph->remove_node_wo_input_output_connect(it->first);
+  }
+
   // Step 3: add edges for mapped ops
-  for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++) {
-    OpX *dstOp = *dstIt;
-    for (size_t i = 0; i < dstOp->inputs.size(); i++)
-      if (dstOp->inputs[i].op == NULL) {
+  for (auto dst_op_it = dstOps.cbegin(); dst_op_it != dstOps.cend();
+       dst_op_it++) {
+    OpX *dst_opx = *dst_op_it;
+    for (size_t i = 0; i < dst_opx->inputs.size(); i++)
+      if (dst_opx->inputs[i].op == NULL) {
         // unmapped src -> mapped dst
-        if (paramValues.find(dstOp->inputs[i].idx) != paramValues.end()) {
+        if (paramValues.find(dst_opx->inputs[i].idx) != paramValues.end()) {
           // New constant parameters
           Op input_constant_param_op(context->next_global_unique_id(),
                                      context->get_gate(GateType::input_param));
-          newGraph->constant_param_values[input_constant_param_op] =
-              paramValues.find(dstOp->inputs[i].idx)->second;
-          newGraph->add_edge(input_constant_param_op, dstOp->mapOp, 0, i);
+          new_graph->constant_param_values[input_constant_param_op] =
+              paramValues.find(dst_opx->inputs[i].idx)->second;
+          new_graph->add_edge(input_constant_param_op, dst_opx->mapOp, 0, i);
           continue;
         };
-        auto it = mappedInputs.find(dstOp->inputs[i].idx);
+        auto it = mappedInputs.find(dst_opx->inputs[i].idx);
         assert(it != mappedInputs.end());
         std::pair<Op, int> srcEdge = it->second;
-        newGraph->add_edge(srcEdge.first, dstOp->mapOp, srcEdge.second, i);
+        new_graph->add_edge(srcEdge.first, dst_opx->mapOp, srcEdge.second, i);
       } else {
         // mapped src -> mapped dst
-        OpX *srcOp = dstOp->inputs[i].op;
-        int srcIdx = dstOp->inputs[i].idx;
-        newGraph->add_edge(srcOp->mapOp, dstOp->mapOp, srcIdx, i);
+        OpX *srcOp = dst_opx->inputs[i].op;
+        int srcIdx = dst_opx->inputs[i].idx;
+        new_graph->add_edge(srcOp->mapOp, dst_opx->mapOp, srcIdx, i);
       }
   }
-
-  newGraph->_construct_pos_2_logical_qubit();
-  return newGraph;
+  new_graph->_construct_pos_2_logical_qubit();
+  return new_graph;
 }
+
 int GraphXfer::num_src_op() { return srcOps.size(); }
 int GraphXfer::num_dst_op() { return dstOps.size(); }
 

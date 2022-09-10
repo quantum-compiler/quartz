@@ -31,6 +31,7 @@ class BaseConfig:
 
     mode: str = 'train'
     resume: bool = False
+    resume_optimizer: bool = True
     ckpt_path: str = 'outputs/2022-07-28/15-47-54/ckpts/iter_2.pt'
     load_non_ddp_ckpt: bool = True
     load_best_info: bool = False
@@ -118,6 +119,9 @@ class BaseConfig:
     lr_gnn: float = 3e-4
     lr_actor: float = 3e-4
     lr_critic: float = 5e-4
+    lr_scheduler: str = 'none'  # linear
+    lr_start_factor: float = 0.1
+    lr_warmup_epochs: int = 50
     update_policy_interval: int = 1
     save_ckpt_interval: int = 1
     time_budget: str = ''

@@ -22,6 +22,7 @@ dependencies:
   - wandb
   - pylatexenc
   - natsort
+  - sortedcontainers
   - pip:
     - cython>=3.0a1
     - z3-solver

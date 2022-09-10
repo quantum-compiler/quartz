@@ -197,6 +197,29 @@ class PPOMod:
                 },
             ]
         )
+        if self.cfg.lr_scheduler == 'linear':
+            base = (1 / self.cfg.lr_start_factor) ** (1 / self.cfg.lr_warmup_epochs)
+
+            def lr_lambda(epoch: int):
+                if epoch < self.cfg.lr_warmup_epochs:
+                    return base**epoch * self.cfg.lr_start_factor
+                else:
+                    return 1.0
+
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer,
+                lr_lambda=lr_lambda,
+                last_epoch=-1,
+            )
+
+        elif self.cfg.lr_scheduler == 'none':
+            self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                self.optimizer,
+                lr_lambda=lambda _: 1.0,
+                last_epoch=-1,
+            )
+        else:
+            raise ValueError(f'Unknown lr_scheduler: {self.cfg.lr_scheduler}')
         if self.rank == 0:
             wandb.init(
                 project=self.cfg.wandb.project,
@@ -271,12 +294,17 @@ class PPOMod:
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
             other_info_dict = self.agent.other_info_dict()
+            lr_dict = {
+                f'lr_{i}': self.optimizer.param_groups[i]['lr']
+                for i in range(len(self.optimizer.param_groups))
+            }
             collect_info = {
                 **other_info_dict,  # type: ignore
                 'iter': self.i_iter,
                 'num_exps': len(exp_list),
                 'tot_exps_collected_all_rank': self.tot_exps_collected
                 * self.ddp_processes,
+                **lr_dict,
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(
@@ -441,6 +469,7 @@ class PPOMod:
             # exps = None
             # torch.cuda.empty_cache()
         # end for k_epochs
+        self.lr_scheduler.step()
         self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
 
@@ -485,7 +514,8 @@ class PPOMod:
         else:
             self.ddp_ac_net.load_state_dict(model_state_dict)
             self.ac_net_old.load_state_dict(self.ac_net.state_dict())
-        self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if self.cfg.resume_optimizer:
+            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         printfl(f'resumed from "{ckpt_path}"!')
         """load best graph info"""
         if self.cfg.load_best_info:

@@ -15,6 +15,7 @@ import dgl  # type: ignore
 import qtz
 import torch
 from IPython import embed  # type: ignore
+from sortedcontainers import SortedDict  # type: ignore
 from utils import *
 
 import quartz  # type: ignore
@@ -344,11 +345,13 @@ class GraphBuffer:
         self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
         self.original_cost = get_cost(self.original_graph, self.cost_type)
 
-        self.cost_to_graph: Dict[int, List[quartz.PyGraph]] = {
-            get_cost(self.original_graph, cost_type): [
-                self.original_graph,
-            ],
-        }
+        self.cost_to_graph: SortedDict[int, List[quartz.PyGraph]] = SortedDict(
+            {
+                get_cost(self.original_graph, cost_type): [
+                    self.original_graph,
+                ],
+            }
+        )
         self.hashset: Set[int] = {hash(self.original_graph)}
 
         """other infos"""
@@ -393,7 +396,7 @@ class GraphBuffer:
             printfl(f'Buffer {self.name} starts to shrink.')
             i_loop = 0  # NOTE: in case of infinite loop
             while len(self) >= 0.75 * old_len and i_loop < 1000:
-                self.pop_some(1000)
+                self.pop_some(200)
                 i_loop += 1
             gc.collect()
             printfl(
@@ -420,45 +423,38 @@ class GraphBuffer:
                 self.cost_to_graph[gcost].pop(idx_to_pop)
             while len(self) > self.max_len:
                 self.pop_one()
+            assert hash_value in self.hashset
             return True
         else:
             return False
 
     def pop_one(self) -> None:
         if len(self) > 0:
-            max_key: int = -1
-            max_num_graphs: int = -1
-            for cost_key, graphs in self.cost_to_graph.items():
-                if (
-                    max_key == -1
-                    or len(graphs) > max_num_graphs
-                    or len(graphs) == max_num_graphs
-                    and max_key == self.original_cost
-                ):
-                    max_key, max_num_graphs = cost_key, len(graphs)
-            idx_to_pop = 0 if max_key != self.original_cost else 1
-            if idx_to_pop < max_num_graphs:
-                popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
-                if len(self.cost_to_graph[max_key]) == 0:
-                    self.cost_to_graph.pop(max_key, None)
-                self.hashset.remove(hash(popped_graph))
+            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+                max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
+                idx_to_pop = 0 if max_key != self.original_cost else 1
+                if idx_to_pop < len(graphs):
+                    popped_graph = graphs.pop(idx_to_pop)
+                    self.hashset.remove(hash(popped_graph))
+                    if len(graphs) == 0:
+                        self.cost_to_graph.pop(max_key)
+                    break
+            # end for
 
     def pop_some(self, num: int) -> None:
         if len(self) > 0:
-            max_key: int = -1
-            max_num_graphs: int = -1
-            for cost_key, graphs in self.cost_to_graph.items():
-                if max_key == -1 or len(graphs) > max_num_graphs:
-                    max_key, max_num_graphs = cost_key, len(graphs)
-            idx_to_pop = 0 if max_key != self.original_cost else 1
-            for i in range(int(num)):
-                if len(self.cost_to_graph[max_key]) < idx_to_pop + 1:
+            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+                max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
+                idx_to_pop = 0 if max_key != self.original_cost else 1
+                while idx_to_pop < len(graphs) and num > 0:
+                    popped_graph = graphs.pop(idx_to_pop)
+                    self.hashset.remove(hash(popped_graph))
+                    num -= 1
+                if len(graphs) == 0:
+                    self.cost_to_graph.pop(max_key)
+                if num <= 0:
                     break
-                popped_graph = self.cost_to_graph[max_key].pop(idx_to_pop)
-                if len(self.cost_to_graph[max_key]) == 0:
-                    self.cost_to_graph.pop(max_key, None)
-                    break
-                self.hashset.remove(hash(popped_graph))
+            # end for
 
     def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())
@@ -469,7 +465,13 @@ class GraphBuffer:
             weights = 1 / gcost**4
         sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
         sampled_gcost = gcost_list[sampled_gcost_idx]
-        sampled_graph = random.choice(self.cost_to_graph[sampled_gcost])
+        graphs = self.cost_to_graph[sampled_gcost]
+        if greedy:
+            graph_weights = torch.linspace(0.6, 1.000001, len(graphs)).to(self.device)
+            sampled_graph_idx = int(torch.multinomial(graph_weights, num_samples=1))
+            sampled_graph = graphs[sampled_graph_idx]
+        else:
+            sampled_graph = random.choice(graphs)
         return sampled_graph
 
     """Note that it's not concurrency-safe to call these functions."""
@@ -545,6 +547,15 @@ class GraphBuffer:
             info[f'max_{name}_iter'] = max(values)
             info[f'mean_{name}_iter'] = sum(values) / len(values)
 
+        return info
+
+    def basic_info(self) -> Dict[str, float]:
+        info: Dict[str, float] = {
+            'buffer_size': len(self),
+            'diff_costs': len(self.cost_to_graph),
+            'min_cost': self.cost_to_graph.peekitem(0)[0],
+            'max_cost': self.cost_to_graph.peekitem(-1)[0],
+        }
         return info
 
     def push_back_all_graphs(

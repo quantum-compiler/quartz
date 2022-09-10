@@ -374,7 +374,10 @@ class PPOAgent:
             for k, v in cost_info.items():
                 info_dict[f'{buffer.name}_{k}'] = v
 
-            info_dict[f'{buffer.name}_buffer_size'] = len(buffer)
+            basic_info = buffer.basic_info()
+            for k, v in basic_info.items():
+                info_dict[f'{buffer.name}_{k}'] = v
+
         # end for
 
         return info_dict

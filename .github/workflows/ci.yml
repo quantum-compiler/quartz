@@ -24,7 +24,7 @@ jobs:
         run: |
           mkdir build; cd build
           cmake ..
-          sudo make install
+          sudo make install -j$(nproc --all)
       - name: Build Cython part
         run: |
           cd python

@@ -73,7 +73,7 @@ def IBM_Q27_Falcon():
     return coupling_map
 
 
-def run_benchmark(qasm_file_name, device_name):
+def run_benchmark(qasm_file_name, device_name, best_cost):
     # get device coupling map
     if device_name == "IBM_Q20_Tokyo":
         coupling_map, num_regs = IBM_Q20_Tokyo(), 20
@@ -141,6 +141,17 @@ def run_benchmark(qasm_file_name, device_name):
             assert sabre_circuit_op_list[key] == ori_circuit_op_list[key]
             sabre_gate_count += sabre_circuit_op_list[key]
     assert sabre_gate_count - 3 * sabre_swap_count == ori_gate_count
+    if sabre_swap_count < best_cost:
+        print(f"{sabre_swap_count=}")
+        cur_layout = sabre_manager.passes()[0]["passes"][0].property_set["layout"]
+        layout_dict = cur_layout.get_virtual_bits()
+        logical_id_list, physical_id_list = [], []
+        for key in layout_dict:
+            logical_id_list.append(key.index)
+            physical_id_list.append(layout_dict[key])
+        print(f"swap count {sabre_swap_count}")
+        print(f"logical: {logical_id_list}")
+        print(f"physical: {physical_id_list}")
 
     return ori_gate_count, sabre_gate_count, sabre_swap_count
 
@@ -159,7 +170,7 @@ def main():
     step_count = 0
     while True:
         step_count += 1
-        data = run_benchmark(qasm_file_name=qasm_file_name, device_name=device_name)
+        data = run_benchmark(qasm_file_name=qasm_file_name, device_name=device_name, best_cost=min_swap_count)
         ori_gate_count, sabre_gate_count, sabre_swap_count = data
         if sabre_swap_count < min_swap_count:
             min_swap_count = sabre_swap_count

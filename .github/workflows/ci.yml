@@ -20,7 +20,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt install -y build-essential cmake
-          conda env create --name quartz --file env.ymls
+          conda env create --name quartz --file env.yml
       - name: Compile Quartz
         run: |
           conda activate quartz

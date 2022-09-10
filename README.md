@@ -19,7 +19,7 @@ To generate an `(n,q)`-complete ECC set with `m` input parameters for some gate 
 you can change the main function in `src/test/gen_ecc_set.cpp` to the following:
 
 ```c++
-gen_ecc_set({Gate set}, "{Name of the gate set}_{n}_{q}_", true, q, m, n);
+gen_ecc_set({Gate set}, "{Name of the gate set}_{n}_{q}_", true, true, q, m, n);
 return 0;
 ```
 where `{Gate set}` can be `{GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add}` for the Nam gate set,
@@ -171,6 +171,8 @@ See [code structure](CODE_STRUCTURE.md) for more information about the organizat
 Please let us know if you encounter any bugs or have any suggestions by [submitting an issue](https://github.com/quantum-compiler/quartz/issues).
 
 We welcome all contributions to Quartz from bug fixes to new features and extensions.
+
+Please follow [developer guidance](doc/dev_setup.md).
 
 Please subscribe to the Quartz users mailing list (TODO)
 

@@ -418,7 +418,7 @@ class GraphBuffer:
             self.cost_to_graph[gcost].append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
             while len(self.cost_to_graph[gcost]) > int(
-                2e3
+                5e2
             ):  # NOTE: limit the num of graph of each kind
                 self.cost_to_graph[gcost].pop(idx_to_pop)
             while len(self) > self.max_len:

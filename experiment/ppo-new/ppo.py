@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 import math
 import os
-import sched
 import time
 import warnings
 from functools import partial

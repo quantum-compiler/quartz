@@ -432,6 +432,16 @@ void EquivalenceSet::clear() {
   classes_.clear();
 }
 
+std::unique_ptr<RepresentativeSet>
+EquivalenceSet::get_representative_set() const {
+  auto rep_set = std::make_unique<RepresentativeSet>();
+  rep_set->reserve(num_equivalence_classes());
+  for (auto &item : classes_) {
+    rep_set->insert(item->get_representative()->clone());
+  }
+  return rep_set;
+}
+
 bool EquivalenceSet::simplify(Context *ctx,
                               bool normalize_to_minimal_circuit_representation,
                               bool common_subcircuit_pruning,

@@ -15,8 +15,7 @@ jobs:
         run: |
           # $CONDA is an environment variable pointing to the root of the miniconda directory
           echo $CONDA/bin >> $GITHUB_PATH
-          ls -l $CONDA
-          which conda
+          conda init bash
       - name: Install Dependencies
         run: |
           sudo apt install -y build-essential cmake

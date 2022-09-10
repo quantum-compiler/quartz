@@ -17,7 +17,7 @@ jobs:
           echo $CONDA/bin >> $GITHUB_PATH
       - name: Install Dependencies
         run: |
-          apt install -y build-essential cmake
+          sudo apt install -y build-essential cmake
           conda env create --name quartz --file env.ymls
       - name: Compile Quartz
         run: |

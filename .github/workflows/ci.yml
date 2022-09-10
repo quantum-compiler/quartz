@@ -1,0 +1,31 @@
+name: pre-commit
+
+on:
+  pull_request:
+  push:
+    branches: [main, ci]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - name: Add conda to system path
+        run: |
+          # $CONDA is an environment variable pointing to the root of the miniconda directory
+          echo $CONDA/bin >> $GITHUB_PATH
+      - name: Install Dependencies
+        run: |
+          apt install -y build-essential cmake
+          conda env create --name quartz --file env.ymls
+      - name: Compile Quartz
+        run: |
+          conda activate quartz
+          mkdir build; cd build
+          cmake ..
+          make install
+      - name: Build Cython part
+        run: |
+          cd python
+          python setup.py build_ext --inplace install

@@ -395,7 +395,7 @@ class GraphBuffer:
         if vmem_perct > 80.0:
             printfl(f'Buffer {self.name} starts to shrink.')
             i_loop = 0  # NOTE: in case of infinite loop
-            while len(self) >= 0.75 * old_len and i_loop < 1000:
+            while len(self) >= 0.80 * old_len and i_loop < 1000:
                 self.pop_some(200)
                 i_loop += 1
             gc.collect()
@@ -445,9 +445,6 @@ class GraphBuffer:
                     break
                 if len(graphs) > 0:
                     max_key_idx -= 1
-                    raise RuntimeError(
-                        f'This should not happen: original_cost={self.original_cost} max_key={max_key} max_key_idx={max_key_idx} len(graphs)={len(graphs)}'
-                    )
             # end for
 
     def pop_some(self, num: int) -> None:
@@ -466,9 +463,6 @@ class GraphBuffer:
                     break
                 elif len(graphs) > 0:
                     max_key_idx -= 1
-                    raise RuntimeError(
-                        f'This should not happen: original_cost={self.original_cost} max_key={max_key} max_key_idx={max_key_idx} num={num} len(graphs)={len(graphs)}'
-                    )
             # end for
 
     def sample(self, greedy: bool) -> quartz.PyGraph:

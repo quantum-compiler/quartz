@@ -413,14 +413,17 @@ class GraphBuffer:
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
             gcost = get_cost(graph, self.cost_type)
+            graphs: List[quartz.PyGraph]
             if gcost not in self.cost_to_graph:
-                self.cost_to_graph[gcost] = []
-            self.cost_to_graph[gcost].append(graph)
+                graphs = []
+                self.cost_to_graph[gcost] = graphs
+            else:
+                graphs = self.cost_to_graph[gcost]
+            graphs.append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(self.cost_to_graph[gcost]) > int(
-                5e2
-            ):  # NOTE: limit the num of graph of each kind
-                self.cost_to_graph[gcost].pop(idx_to_pop)
+            while len(graphs) > int(500):  # NOTE: limit num of graphs of each kind
+                popped_graph = graphs.pop(idx_to_pop)
+                self.hashset.remove(hash(popped_graph))
             while len(self) > self.max_len:
                 self.pop_one()
             assert hash_value in self.hashset
@@ -430,7 +433,8 @@ class GraphBuffer:
 
     def pop_one(self) -> None:
         if len(self) > 0:
-            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+            max_key_idx = -1
+            while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
                 idx_to_pop = 0 if max_key != self.original_cost else 1
                 if idx_to_pop < len(graphs):
@@ -439,11 +443,17 @@ class GraphBuffer:
                     if len(graphs) == 0:
                         self.cost_to_graph.pop(max_key)
                     break
+                if len(graphs) > 0:
+                    max_key_idx -= 1
+                    raise RuntimeError(
+                        f'This should not happen: original_cost={self.original_cost} max_key={max_key} max_key_idx={max_key_idx} len(graphs)={len(graphs)}'
+                    )
             # end for
 
     def pop_some(self, num: int) -> None:
         if len(self) > 0:
-            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+            max_key_idx = -1
+            while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
                 idx_to_pop = 0 if max_key != self.original_cost else 1
                 while idx_to_pop < len(graphs) and num > 0:
@@ -454,6 +464,11 @@ class GraphBuffer:
                     self.cost_to_graph.pop(max_key)
                 if num <= 0:
                     break
+                elif len(graphs) > 0:
+                    max_key_idx -= 1
+                    raise RuntimeError(
+                        f'This should not happen: original_cost={self.original_cost} max_key={max_key} max_key_idx={max_key_idx} num={num} len(graphs)={len(graphs)}'
+                    )
             # end for
 
     def sample(self, greedy: bool) -> quartz.PyGraph:

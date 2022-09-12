@@ -335,8 +335,8 @@ class GraphBuffer:
         name: str,
         original_graph_qasm: str,
         cost_type: CostType,
-        max_len: int | float,
         device: torch.device = torch.device('cpu'),
+        max_len: int | float = math.inf,
     ) -> None:
         self.name = name
         self.max_len = max_len
@@ -390,22 +390,28 @@ class GraphBuffer:
         self.init_graph_costs.clear()
         self.graph_costs.clear()
 
+        self.shrink()
+
+    def shrink(self) -> None:
+        mem_perct_th = 78.0
         vmem_perct = vmem_used_perct()
         old_len = len(self)
-        if vmem_perct > 80.0:
+        if vmem_perct > mem_perct_th:
+            if self.max_len == math.inf:  # the first time mem usage exceeds threshold
+                self.max_len = old_len  # don't use more memory
+
+        if old_len > self.max_len:
             printfl(f'Buffer {self.name} starts to shrink.')
-            i_loop = 0  # NOTE: in case of infinite loop
-            while len(self) >= 0.80 * old_len and i_loop < 1000:
-                self.pop_some(200)
-                i_loop += 1
-            gc.collect()
+            while len(self) > self.max_len:
+                self.pop_some(len(self) - int(self.max_len))
             printfl(
                 f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).'
             )
-            if vmem_used_perct() > 95.0:
-                raise MemoryError(
-                    f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
-                )
+
+        if vmem_used_perct() > 95.0:
+            raise MemoryError(
+                f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
+            )
 
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
@@ -583,11 +589,3 @@ class GraphBuffer:
             pre_cand = AllGraphDictValue(dist, cost, pre_graph, action)
             # NOTE: action here is how this graph is got from pre_graph
         self.all_graphs[graph] = pre_cand
-
-    # def shrink(self) -> None:
-    #     for cost_key in self.cost_to_graph:
-    #         cur = self.cost_to_graph[cost_key]
-    #         new = cur[len(cur) // 2 : ]
-    #         if cost_key == get_cost(self.original_graph, self.cost_type):
-    #             new.append(self.original_graph)
-    #         self.cost_to_graph[cost_key] = new

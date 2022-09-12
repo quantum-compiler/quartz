@@ -437,12 +437,20 @@ class GraphBuffer:
         else:
             return False
 
-    def pop_one(self) -> None:
+    def pop_one(self, graph_to_remain: quartz.PyGraph = None) -> None:
         if len(self) > 0:
-            max_key_idx = -1
+            max_key_idx: int = -1
             while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
-                idx_to_pop = 0 if max_key != self.original_cost else 1
+                idx_to_pop: int = 0
+                while idx_to_pop < len(graphs):
+                    if (
+                        max_key == self.original_cost
+                        or graphs[idx_to_pop] is graph_to_remain
+                    ):
+                        idx_to_pop += 1
+                    else:
+                        break
                 if idx_to_pop < len(graphs):
                     popped_graph = graphs.pop(idx_to_pop)
                     self.hashset.remove(hash(popped_graph))
@@ -451,11 +459,11 @@ class GraphBuffer:
                     break
                 if len(graphs) > 0:
                     max_key_idx -= 1
-            # end for
+            # end while
 
     def pop_some(self, num: int) -> None:
         if len(self) > 0:
-            max_key_idx = -1
+            max_key_idx: int = -1
             while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
                 idx_to_pop = 0 if max_key != self.original_cost else 1
@@ -469,7 +477,7 @@ class GraphBuffer:
                     break
                 elif len(graphs) > 0:
                     max_key_idx -= 1
-            # end for
+            # end while
 
     def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())

@@ -431,35 +431,34 @@ class GraphBuffer:
                 popped_graph = graphs.pop(idx_to_pop)
                 self.hashset.remove(hash(popped_graph))
             while len(self) > self.max_len:
-                self.pop_one()
+                assert self.pop_one(graph_to_remain=graph) is not graph
             assert hash_value in self.hashset
             return True
         else:
             return False
 
-    def pop_one(self, graph_to_remain: quartz.PyGraph = None) -> None:
+    def pop_one(self, graph_to_remain: quartz.PyGraph = None) -> quartz.PyGraph | None:
         if len(self) > 0:
             max_key_idx: int = -1
             while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
-                idx_to_pop: int = 0
+                idx_to_pop: int = 0 if max_key != self.original_cost else 1
                 while idx_to_pop < len(graphs):
-                    if (
-                        max_key == self.original_cost
-                        or graphs[idx_to_pop] is graph_to_remain
-                    ):
+                    if graphs[idx_to_pop] is graph_to_remain:
                         idx_to_pop += 1
                     else:
                         break
                 if idx_to_pop < len(graphs):
                     popped_graph = graphs.pop(idx_to_pop)
+                    # assert popped_graph is not graph_to_remain, f'idx_to_pop = {idx_to_pop}'
                     self.hashset.remove(hash(popped_graph))
                     if len(graphs) == 0:
                         self.cost_to_graph.pop(max_key)
-                    break
+                    return popped_graph
                 if len(graphs) > 0:
                     max_key_idx -= 1
             # end while
+        return None
 
     def pop_some(self, num: int) -> None:
         if len(self) > 0:

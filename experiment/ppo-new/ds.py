@@ -393,7 +393,7 @@ class GraphBuffer:
         self.shrink()
 
     def shrink(self) -> None:
-        mem_perct_th = 78.0
+        mem_perct_th = 82.5
         vmem_perct = vmem_used_perct()
         old_len = len(self)
         if vmem_perct > mem_perct_th:
@@ -427,12 +427,12 @@ class GraphBuffer:
                 graphs = self.cost_to_graph[gcost]
             graphs.append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(graphs) > int(500):  # NOTE: limit num of graphs of each kind
+            while len(graphs) > int(250):  # NOTE: limit num of graphs of each kind
                 popped_graph = graphs.pop(idx_to_pop)
                 self.hashset.remove(hash(popped_graph))
-            while len(self) > self.max_len:
-                assert self.pop_one(graph_to_remain=graph) is not graph
-            assert hash_value in self.hashset
+            # while len(self) > self.max_len:
+            #     assert self.pop_one(graph_to_remain=graph) is not graph
+            # assert hash_value in self.hashset
             return True
         else:
             return False

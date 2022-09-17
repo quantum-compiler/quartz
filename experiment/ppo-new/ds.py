@@ -427,7 +427,7 @@ class GraphBuffer:
                 graphs = self.cost_to_graph[gcost]
             graphs.append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(graphs) > int(250):  # NOTE: limit num of graphs of each kind
+            while len(graphs) > int(500):  # NOTE: limit num of graphs of each kind
                 popped_graph = graphs.pop(idx_to_pop)
                 self.hashset.remove(hash(popped_graph))
             # while len(self) > self.max_len:

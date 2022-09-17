@@ -28,11 +28,11 @@ namespace quartz {
             device = GetDevice(backend_type);
 
             // initialize mapping for graph and create game
-            find_initial_mapping(*graph, device, 64);
+            set_initial_mapping(*graph);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             while (is_circuit_finished(cur_game_ptr->graph)) {
-                find_initial_mapping(*graph, device, 64);
+                set_initial_mapping(*graph);
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             }
@@ -40,7 +40,7 @@ namespace quartz {
 
         void reset() override {
             // re-initialize mapping and game
-            find_initial_mapping(*graph, device, 64);
+            set_initial_mapping(*graph);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             if (is_finished()) reset();

@@ -23,7 +23,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   Dataset dataset1;
 
   gen.generate(num_qubits, num_input_parameters, 1, max_num_param_gates,
-               &dataset1,                           /*verify_equivalences=*/
+               &dataset1,                           /*invoke_python_verifier=*/
                true, &equiv_set, unique_parameters, /*verbose=*/
                false);
   std::cout << "*** ch(" << file_prefix.substr(0, file_prefix.size() - 5)
@@ -34,9 +34,17 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   auto start = std::chrono::steady_clock::now();
   decltype(start - start) verification_time{0};
+  // We are not going to invoke the Python verifier when |num_input_parameters|
+  // is 0. This will be simply verifying two static matrices are equal.
+  //
+  // If we mistakenly treat two different matrices as equal due to
+  // floating-point error, our optimizations will still preserve the
+  // resulting circuit matrix up to an error of a small number times machine
+  // precision. Plus, this situation is known to be extremely rare.
   gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-               max_num_param_gates, &dataset1,      /*verify_equivalences=*/
-               true, &equiv_set, unique_parameters, /*verbose=*/
+               max_num_param_gates, &dataset1, /*invoke_python_verifier=*/
+               (num_input_parameters >= 1), &equiv_set,
+               unique_parameters, /*verbose=*/
                true, &verification_time);
   if (!generate_representative_set) {
     // For better performance

@@ -39,7 +39,7 @@ void test_pruning(
       }
       start = std::chrono::steady_clock::now();
       gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-                   max_num_param_gates, &dataset1,      /*verify_equivalences=*/
+                   max_num_param_gates, &dataset1, /*invoke_python_verifier=*/
                    true, &equiv_set, unique_parameters, /*verbose=*/
                    true, &verification_time);
       end = std::chrono::steady_clock::now();

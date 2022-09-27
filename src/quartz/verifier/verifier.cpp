@@ -1,6 +1,7 @@
 #include "verifier.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace quartz {
 bool Verifier::equivalent_on_the_fly(Context *ctx, DAG *circuit1,
@@ -13,23 +14,34 @@ bool Verifier::equivalent_on_the_fly(Context *ctx, DAG *circuit1,
 }
 
 bool Verifier::redundant(Context *ctx, DAG *dag) {
-  // Check if any suffix already exists.
-  // This function assumes that two DAGs are equivalent iff they share the
-  // same hash value.
-  auto subgraph = std::make_unique<DAG>(*dag);
-  while (subgraph->get_num_gates() > 0) {
-    subgraph->remove_gate(subgraph->edges[0].get());
-    if (subgraph->get_num_gates() == 0) {
-      break;
-    }
-    subgraph->hash(ctx);
-    const auto &rep = ctx->get_possible_representative(subgraph.get());
-    if (rep && !subgraph->fully_equivalent(*rep)) {
-      // |subgraph| already exists and is not the representative.
-      return true;
+  // RepGen.
+  // Check if |dag| is a canonical sequence.
+  if (!dag->is_canonical_representation()) {
+    return true;
+  }
+  // We have already known that DropLast(dag) is a representative.
+  // Check if canonicalize(DropFirst(dag)) is a representative.
+  auto dropfirst = std::make_unique<DAG>(*dag);
+  dropfirst->remove_first_quantum_gate();
+  DAGHashType hash_value = dropfirst->hash(ctx);
+  // XXX: here we treat any DAG with hash values differ no more than 1 with any
+  // representative as equivalent.
+  for (const auto &hash_value_offset : {0, 1, -1}) {
+    DAG *rep = nullptr;
+    if (ctx->get_possible_representative(hash_value + hash_value_offset, rep)) {
+      assert(rep);
+      if (!dropfirst->fully_equivalent(*rep)) {
+        // |dropfirst| already exists and is not the
+        // representative. So the whole |dag| is redundant.
+        return true;
+      } else {
+        // |dropfirst| already exists and is the representative.
+        return false;
+      }
     }
   }
-  return false;
+  // |dropfirst| is not found and therefore is not a representative.
+  return true;
 }
 
 bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs, DAG *dag) {

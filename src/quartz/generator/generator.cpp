@@ -378,7 +378,10 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
     }
   };
-  for (auto &dag : dags.back()) {
+  for (auto &old_dag : dags.back()) {
+    // Create a new DAG to avoid editing the old one.
+    auto new_dag = std::make_unique<DAG>(*old_dag);
+    auto dag = new_dag.get();
     InputParamMaskType input_param_usage_mask;
     std::vector<InputParamMaskType> input_param_masks;
     if (unique_parameters) {
@@ -483,7 +486,6 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
       qubit_indices.pop_back();
     }
-    dag->hash(context); // restore hash value
   }
 }
 

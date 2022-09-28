@@ -34,6 +34,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   auto start = std::chrono::steady_clock::now();
   decltype(start - start) verification_time{0};
+  const bool invoke_python_verifier = (num_input_parameters > 0);
   // We are not going to invoke the Python verifier when |num_input_parameters|
   // is 0. This will be simply verifying two static matrices are equal.
   //
@@ -42,30 +43,39 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   // resulting circuit matrix up to an error of a small number times machine
   // precision. Plus, this situation is known to be extremely rare.
   gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-               max_num_param_gates, &dataset1, /*invoke_python_verifier=*/
-               (num_input_parameters >= 1), &equiv_set,
-               unique_parameters, /*verbose=*/
+               max_num_param_gates, &dataset1, invoke_python_verifier,
+               &equiv_set, unique_parameters, /*verbose=*/
                true, &verification_time);
   if (!generate_representative_set) {
     // For better performance
     dataset1.remove_singletons(&ctx);
   }
-  dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
+  if (invoke_python_verifier) {
+    dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
 
-  auto start2 = std::chrono::steady_clock::now();
-  system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
-          "pruning_unverified.json " + file_prefix + "pruning.json")
-             .c_str());
-  auto end2 = std::chrono::steady_clock::now();
-  verification_time += end2 - start2;
-  equiv_set.clear(); // this is necessary
-  equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+    auto start2 = std::chrono::steady_clock::now();
+    system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
+            "pruning_unverified.json " + file_prefix + "pruning.json")
+               .c_str());
+    auto end2 = std::chrono::steady_clock::now();
+    verification_time += end2 - start2;
+    equiv_set.clear(); // this is necessary
+    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+  } else {
+    // Create the ECC set by ourselves.
+    equiv_set.clear(); // this is necessary
+    for (auto &it : dataset1.dataset) {
+      auto ecc = std::make_unique<EquivalenceClass>();
+      ecc->set_dags(std::move(it.second));
+      equiv_set.insert_class(&ctx, std::move(ecc));
+    }
+  }
   if (generate_representative_set) {
-    start2 = std::chrono::steady_clock::now();
+    auto start2 = std::chrono::steady_clock::now();
     auto rep_set = equiv_set.get_representative_set();
     rep_set->sort();
     rep_set->save_json(file_prefix + "representative_set.json");
-    end2 = std::chrono::steady_clock::now();
+    auto end2 = std::chrono::steady_clock::now();
     std::cout << "Representative set saved in "
               << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                      end2 - start2)
@@ -81,9 +91,9 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                 equiv_set.num_equivalence_classes()) *
                    2
             << std::endl;
-  start2 = std::chrono::steady_clock::now();
+  auto start2 = std::chrono::steady_clock::now();
   equiv_set.simplify(&ctx);
-  end2 = std::chrono::steady_clock::now();
+  auto end2 = std::chrono::steady_clock::now();
   equiv_set.save_json(file_prefix + "complete_ECC_set.json");
   auto end = std::chrono::steady_clock::now();
 

@@ -29,6 +29,10 @@ public:
   // Returns true iff the hash value is new to the |dataset|.
   bool insert(Context *ctx, std::unique_ptr<DAG> dag);
 
+  // Inserts the dag to an existing set if the hash value plus or minus 1
+  // is found. Returns true iff there is no such existing set.
+  bool insert_to_nearby_set_if_exists(Context *ctx, std::unique_ptr<DAG> dag);
+
   // Make this Dataset a brand new one.
   void clear();
 

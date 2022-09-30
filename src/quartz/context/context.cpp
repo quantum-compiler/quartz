@@ -161,10 +161,6 @@ std::vector<ParamType> Context::get_all_generated_parameters() const {
   return random_parameters_;
 }
 
-DAG *Context::get_possible_representative(DAG *dag) {
-  return representatives_[dag->hash(this)];
-}
-
 void Context::set_representative(std::unique_ptr<DAG> dag) {
   representatives_[dag->hash(this)] = dag.get();
   representative_dags_.emplace_back(std::move(dag));
@@ -173,6 +169,16 @@ void Context::set_representative(std::unique_ptr<DAG> dag) {
 void Context::clear_representatives() {
   representatives_.clear();
   representative_dags_.clear();
+}
+
+bool Context::get_possible_representative(const DAGHashType &hash_value,
+                                          DAG *&representative) const {
+  auto it = representatives_.find(hash_value);
+  if (it == representatives_.end()) {
+    return false;
+  }
+  representative = it->second;
+  return true;
 }
 
 double Context::random_number() {

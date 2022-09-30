@@ -179,6 +179,22 @@ bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
   return ret;
 }
 
+bool Dataset::insert_to_nearby_set_if_exists(Context *ctx,
+                                             std::unique_ptr<DAG> dag) {
+  const auto hash_value = dag->hash(ctx);
+  for (const auto &hash_value_offset : {0, 1, -1}) {
+    auto it = dataset.find(hash_value + hash_value_offset);
+    if (it != dataset.end()) {
+      // Found a nearby set, insert the dag.
+      it->second.push_back(std::move(dag));
+      return false;
+    }
+  }
+  // The hash value is new.
+  dataset[hash_value].push_back(std::move(dag));
+  return true;
+}
+
 void Dataset::clear() {
   // Caveat here: if only dataset.clear() is called, the behavior will be
   // different with a brand new Dataset.

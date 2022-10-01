@@ -3,6 +3,7 @@
 #include "basic_env.h"
 #include "../parser/qasm_parser.h"
 #include "../supported_devices/supported_devices.h"
+#include "../game/game_buffer.h"
 
 namespace quartz {
     class SimplePhysicalEnv : public BasicEnv {
@@ -27,6 +28,15 @@ namespace quartz {
             graph = std::make_shared<Graph>(Graph(&(*context), dag));
             device = GetDevice(backend_type);
 
+            // set randomness
+            seed = 0;
+            random_generator = std::mt19937(seed);
+            uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
+
+            // initialize game buffer
+            start_from_internal_prob = 0.8;
+            game_buffer = GameBuffer(seed);
+
             // initialize mapping for graph and create game
             set_initial_mapping(*graph);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
@@ -39,11 +49,25 @@ namespace quartz {
         }
 
         void reset() override {
-            // re-initialize mapping and game
-            set_initial_mapping(*graph);
-            assert(graph->check_mapping_correctness() == MappingStatus::VALID);
-            cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
-            if (is_finished()) reset();
+            // generate a random number
+            double _random_val = uniform01dist(random_generator);
+
+            // set new game
+            if (_random_val < start_from_internal_prob) {
+                // start from internal states
+                Game sampled_game = game_buffer.sample();
+                cur_game_ptr = std::make_shared<Game>(sampled_game);
+            } else {
+                // start from initial states
+                set_initial_mapping(*graph);
+                assert(graph->check_mapping_correctness() == MappingStatus::VALID);
+                cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
+                while (is_finished()) {
+                    set_initial_mapping(*graph);
+                    assert(graph->check_mapping_correctness() == MappingStatus::VALID);
+                    cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
+                }
+            }
         }
 
         Reward step(Action action) override {
@@ -53,6 +77,8 @@ namespace quartz {
             assert(action.qubit_idx_1 < cur_game_ptr->physical_qubit_num);
             // apply action
             Reward reward = cur_game_ptr->apply_action(action);
+            // save game to buffer
+            game_buffer.save(*cur_game_ptr);
             return reward;
         }
 
@@ -82,8 +108,18 @@ namespace quartz {
         }
 
     public:
+        // basic parameters
         std::shared_ptr<DeviceTopologyGraph> device;
         std::shared_ptr<Context> context;
         std::shared_ptr<Graph> graph;
+
+        // game buffer
+        double start_from_internal_prob;
+        GameBuffer game_buffer;
+
+        // randomness related
+        int seed;
+        std::mt19937 random_generator;
+        std::uniform_real_distribution<double> uniform01dist;
     };
 }

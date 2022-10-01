@@ -94,6 +94,31 @@ namespace quartz {
             imp_cost = graph.circuit_implementation_cost(device);
         }
 
+        Game(const Game& game) : graph(game.graph) {
+            // graph & device
+            // graph is directly copied
+            device = game.device;
+            device_edges = game.device_edges;
+
+            // full mapping table
+            logical_qubit_num = game.logical_qubit_num;
+            physical_qubit_num = game.physical_qubit_num;
+            logical2physical = game.logical2physical;
+            physical2logical = game.physical2logical;
+
+            // reward related
+            original_gate_count = game.original_gate_count;
+            single_qubit_gate_count = game.single_qubit_gate_count;
+            executed_logical_gate_count = game.executed_logical_gate_count;
+            swaps_inserted = game.swaps_inserted;
+            imp_cost = game.imp_cost;
+
+            // execution history
+            initial_logical2physical = game.initial_logical2physical;
+            initial_physical2logical = game.initial_physical2logical;
+            execution_history = game.execution_history;
+        }
+
         [[nodiscard]] State state() {
             return {device_edges, logical2physical, physical2logical,
                     graph.convert_circuit_to_state(7, true)};

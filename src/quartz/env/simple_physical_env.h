@@ -33,10 +33,6 @@ namespace quartz {
             random_generator = std::mt19937(seed);
             uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
 
-            // initialize game buffer
-            start_from_internal_prob = 0.8;
-            game_buffer = GameBuffer(seed);
-
             // initialize mapping for graph and create game
             set_initial_mapping(*graph);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
@@ -46,6 +42,11 @@ namespace quartz {
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             }
+
+            // initialize game buffer
+            start_from_internal_prob = 0.8;
+            game_buffer = GameBuffer(seed);
+            game_buffer.save(*cur_game_ptr);
         }
 
         void reset() override {
@@ -75,10 +76,15 @@ namespace quartz {
             assert(action.type == ActionType::PhysicalFront);
             assert(action.qubit_idx_0 < cur_game_ptr->physical_qubit_num);
             assert(action.qubit_idx_1 < cur_game_ptr->physical_qubit_num);
+
             // apply action
             Reward reward = cur_game_ptr->apply_action(action);
-            // save game to buffer
-            game_buffer.save(*cur_game_ptr);
+
+            // save game to buffer if not finished && w.p. 1 / 10 to avoid buffer overflow
+            bool _pass_roll_dice = (uniform01dist(random_generator) < 0.1);
+            if (!is_finished() && _pass_roll_dice) game_buffer.save(*cur_game_ptr);
+
+            // return reward
             return reward;
         }
 

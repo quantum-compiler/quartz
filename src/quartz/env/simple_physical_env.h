@@ -10,7 +10,8 @@ namespace quartz {
     public:
         SimplePhysicalEnv() = delete;
 
-        SimplePhysicalEnv(const std::string &qasm_file_path, BackendType backend_type) {
+        SimplePhysicalEnv(const std::string &qasm_file_path, BackendType backend_type,
+                          int _seed, double _start_from_internal_prob) : game_buffer(_seed), random_generator(_seed) {
             /// A simple physical environment that does not use curriculum
             /// Graph    qasm            fixed
             ///          mapping type    1 x sabre with random init
@@ -28,9 +29,8 @@ namespace quartz {
             graph = std::make_shared<Graph>(Graph(&(*context), dag));
             device = GetDevice(backend_type);
 
-            // set randomness
-            seed = 0;
-            random_generator = std::mt19937(seed);
+            // set randomness (random_generator is initialized above)
+            seed = _seed;
             uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
 
             // initialize mapping for graph and create game
@@ -43,9 +43,8 @@ namespace quartz {
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             }
 
-            // initialize game buffer
-            start_from_internal_prob = 0.8;
-            game_buffer = GameBuffer(seed);
+            // initialize game buffer (game_buffer is initialize above)
+            start_from_internal_prob = _start_from_internal_prob;
             game_buffer.save(*cur_game_ptr);
         }
 

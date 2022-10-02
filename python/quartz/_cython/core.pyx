@@ -823,10 +823,11 @@ cdef class PyState:
 cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env
 
-    def __cinit__(self, *, qasm_file_path: str, backend_type_str: str):
+    def __cinit__(self, *, qasm_file_path: str, backend_type_str: str,
+                  seed: int, start_from_internal_prob: float):
         cdef string encoded_path = qasm_file_path.encode('utf-8')
         cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
-        self.env = new SimplePhysicalEnv(encoded_path, cur_backend_type)
+        self.env = new SimplePhysicalEnv(encoded_path, cur_backend_type, seed, start_from_internal_prob)
 
     def __dealloc__(self):
         del self.env

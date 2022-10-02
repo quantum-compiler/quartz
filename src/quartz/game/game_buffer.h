@@ -7,7 +7,7 @@
 namespace quartz {
     class GameBuffer {
     public:
-        GameBuffer() : random_generator(0) {}
+        GameBuffer() = delete;
 
         explicit GameBuffer(int seed) : random_generator(seed) {
             buffer.reserve(10000);

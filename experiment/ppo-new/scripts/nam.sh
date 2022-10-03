@@ -20,9 +20,9 @@ mkdir -p ftlog
 
 export OMP_NUM_THREADS=8
 
-CKPT=nam_iter_100.pt
-BS=3200
-CIRC=barenco_tof_3
+# CKPT=nam_iter_100.pt
+# BS=3200
+# CIRC=barenco_tof_3
 
 python1 ppo.py c=nam_ft c.resume=true c.ddp_port=23343 \
     c.ckpt_path=ckpts/${CKPT} c.mini_batch_size=${BS} 'c.gpus=[0,1,2,3]' \

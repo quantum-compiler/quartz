@@ -7,7 +7,8 @@ using namespace quartz;
 int main() {
     // initialize the environment
     string circuit_file_name = "../sabre.qasm";
-    SimplePhysicalEnv env = SimplePhysicalEnv(circuit_file_name, BackendType::IBM_Q20_TOKYO);
+    SimplePhysicalEnv env = SimplePhysicalEnv(circuit_file_name, BackendType::IBM_Q20_TOKYO,
+                                              0, 0.8);
 
     // apply one step on the environment
     State state_before = env.get_state();

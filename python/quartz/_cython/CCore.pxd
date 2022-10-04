@@ -35,6 +35,8 @@ cdef extern from "gate/gate_utils.h" namespace "quartz":
         u3,
         ccz,
         cz,
+        rx1,
+        rx3,
         input_qubit,
         input_param
 

@@ -6,7 +6,10 @@ class RigConfig(BaseConfig):
     # quartz
     gate_set: List[str] = field(
         default_factory=lambda: [
-            'rx',
+            'h',
+            'rx1',
+            'rx3',
+            'x',
             'rz',
             'cz',
             'add',

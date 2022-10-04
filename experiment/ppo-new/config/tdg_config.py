@@ -10,6 +10,7 @@ class TdgConfig(BaseConfig):
             'cx',
             't',
             'tdg',
+            'x',
         ]
     )
     ecc_file: str = '../ecc_set/t_tdg_ecc.json'

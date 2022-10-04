@@ -11,9 +11,10 @@ namespace quartz {
     public:
         GameSearch() = delete;
 
-        GameSearch(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device) : graph(_graph),
-                                                                                  device(std::move(_device)) {
-            /// Game expects that the input graph has been initialized !!!
+        GameSearch(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device)
+                : graph(_graph), device(std::move(_device)) {
+            /// GameSearch expects that the input graph has been initialized !!!
+            /// Game for initial mapping search
             // simplify circuit
             original_gate_count = graph.gate_count();
             single_qubit_gate_count = simplify_circuit(graph);
@@ -65,33 +66,8 @@ namespace quartz {
                 }
             }
 
-            // reward related: execute all currently executable gates and set imp cost
-            executed_logical_gate_count = 0;
+            // track the number of swaps inserted (distance from root)
             swaps_inserted = 0;
-            while (true) {
-                auto executable_gate_list = find_executable_front_gates(graph, device);
-                for (const auto &executable_gate: executable_gate_list) {
-                    assert(graph.inEdges[executable_gate].size() == 2);
-                    Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
-                    Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
-                    if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
-                    int input_logical_0 = in_edge_0.logical_qubit_idx;
-                    int input_logical_1 = in_edge_1.logical_qubit_idx;
-                    int input_physical_0 = in_edge_0.physical_qubit_idx;
-                    int input_physical_1 = in_edge_1.physical_qubit_idx;
-                    assert(input_physical_0 == initial_logical2physical[input_logical_0]);
-                    assert(input_physical_1 == initial_logical2physical[input_logical_1]);
-                    assert(input_logical_0 == initial_physical2logical[input_physical_0]);
-                    assert(input_logical_1 == initial_physical2logical[input_physical_1]);
-                    execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
-                                                   input_logical_0, input_logical_1,
-                                                   input_physical_0, input_physical_1);
-                    execute_front_gate(graph, executable_gate);
-                    executed_logical_gate_count += 1;
-                }
-                if (executable_gate_list.empty()) break;
-            }
-            imp_cost = graph.circuit_implementation_cost(device);
         }
 
         GameSearch(const GameSearch &game) : graph(game.graph) {
@@ -109,9 +85,7 @@ namespace quartz {
             // reward related
             original_gate_count = game.original_gate_count;
             single_qubit_gate_count = game.single_qubit_gate_count;
-            executed_logical_gate_count = game.executed_logical_gate_count;
             swaps_inserted = game.swaps_inserted;
-            imp_cost = game.imp_cost;
 
             // execution history
             initial_logical2physical = game.initial_logical2physical;
@@ -138,71 +112,15 @@ namespace quartz {
                     }
                 }
                 return std::move(physical_action_space);
-            } else if (action_type == ActionType::PhysicalFront) {
-                // Physical Front: only swaps between neighbors of inputs to front gates
-                // get gates with at least one input input_qubit
-                std::set<Op, OpCompare> tmp_front_gate_set;
-                for (const auto &initial_qubit_mapping: graph.qubit_mapping_table) {
-                    auto initial_qubit = initial_qubit_mapping.first;
-                    assert(graph.outEdges.find(initial_qubit) != graph.outEdges.end()
-                           && !graph.outEdges[initial_qubit].empty());
-                    for (auto edge: graph.outEdges[initial_qubit]) {
-                        tmp_front_gate_set.insert(edge.dstOp);
-                    }
-                }
-
-                // only retain those real front gates
-                std::set<Op, OpCompare> front_gate_set;
-                for (const auto &tmp_front_gate: tmp_front_gate_set) {
-                    // check all inputs
-                    bool is_front_gate = true;
-                    for (const auto &in_edge: graph.inEdges[tmp_front_gate]) {
-                        if (in_edge.srcOp.ptr->tp != GateType::input_qubit) {
-                            is_front_gate = false;
-                        }
-                    }
-                    // append
-                    if (is_front_gate) front_gate_set.insert(tmp_front_gate);
-                }
-
-                // put their neighbors into action space
-                std::set<Action, ActionCompare> physical_action_space;
-                for (const auto &op: front_gate_set) {
-                    for (const Edge &in_edge: graph.inEdges[op]) {
-                        int input_physical_idx = graph.qubit_mapping_table[in_edge.srcOp].second;
-                        auto neighbor_list = device->get_input_neighbours(input_physical_idx);
-                        for (int neighbor: neighbor_list) {
-                            physical_action_space.insert(Action(ActionType::PhysicalFront,
-                                                                std::min(neighbor, input_physical_idx),
-                                                                std::max(neighbor, input_physical_idx)));
-                        }
-                    }
-                }
-                return physical_action_space;
-            } else if (action_type == ActionType::Logical) {
-                // Logical action space
-                std::set<Action, ActionCompare> logical_action_space;
-                for (int logical_1 = 0; logical_1 < logical_qubit_num; ++logical_1) {
-                    for (int logical_2 = 0; logical_2 < physical_qubit_num; ++logical_2) {
-                        if (logical_1 != logical_2) {
-                            logical_action_space.insert(Action(ActionType::Logical,
-                                                               std::min(logical_1, logical_2),
-                                                               std::max(logical_1, logical_2)));
-                        }
-                    }
-                }
-                return std::move(logical_action_space);
             } else {
-                std::cout << "Unknown action space type." << std::endl;
+                std::cout << "GameSearch only supports PhysicalFull" << std::endl;
                 assert(false);
                 return {};
             }
         }
 
         Reward apply_action(const Action &action) {
-            if (action.type == ActionType::PhysicalFront || action.type == ActionType::PhysicalFull) {
-                // physical action
-
+            if (action.type == ActionType::PhysicalFull) {
                 // STEP 1: put swap into history & change mapping tables
                 // put action into execution history
                 int physical_0 = action.qubit_idx_0;
@@ -230,81 +148,16 @@ namespace quartz {
                 }
                 assert(hit_count == 1 || hit_count == 2);
                 graph.propagate_mapping();
-
-                // STEP 2: execute all gates that are enabled by this swap and record them
-                int executed_gate_count = 0;
-                while (true) {
-                    auto executable_gate_list = find_executable_front_gates(graph, device);
-                    for (const auto &executable_gate: executable_gate_list) {
-                        assert(graph.inEdges[executable_gate].size() == 2);
-                        Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
-                        Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
-                        if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
-                        int input_logical_0 = in_edge_0.logical_qubit_idx;
-                        int input_logical_1 = in_edge_1.logical_qubit_idx;
-                        int input_physical_0 = in_edge_0.physical_qubit_idx;
-                        int input_physical_1 = in_edge_1.physical_qubit_idx;
-                        assert(input_physical_0 == logical2physical[input_logical_0]);
-                        assert(input_physical_1 == logical2physical[input_logical_1]);
-                        assert(input_logical_0 == physical2logical[input_physical_0]);
-                        assert(input_logical_1 == physical2logical[input_physical_1]);
-                        execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
-                                                       input_logical_0, input_logical_1,
-                                                       input_physical_0, input_physical_1);
-                        execute_front_gate(graph, executable_gate);
-                        executed_gate_count += 1;
-                    }
-                    if (executable_gate_list.empty()) break;
-                }
-                executed_logical_gate_count += executed_gate_count;
                 swaps_inserted += 1;
 
-                // STEP 3: calculate reward
-                double original_circuit_cost = imp_cost;
-                imp_cost = graph.circuit_implementation_cost(device);
-                double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
-                Reward reward = original_circuit_cost - new_circuit_cost;
-                return reward;
-            } else if (action.type == ActionType::Logical) {
-                // logical action
-                std::cout << "Logical action not implemented" << std::endl;
-                assert(false);
-                return NAN;
+                // STEP 2: return 0 as reward (since search uses value network's result as reward)
+                return 0;
             } else {
                 // unknown
-                std::cout << "Unknown action type" << std::endl;
+                std::cout << "GameSearch only supports PhysicalFull" << std::endl;
                 assert(false);
                 return NAN;
             }
-        }
-
-        [[nodiscard]] int total_cost() const {
-            // this function can only be called at the end of a game
-            // some quick sanity checks
-            assert(is_circuit_finished(graph));
-            assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count);
-            assert(execution_history.size() == swaps_inserted + executed_logical_gate_count);
-            assert(check_execution_history(graph, device, execution_history, false) == ExecutionHistoryStatus::VALID);
-            // scan through the execution history to determine cost of each swap
-            std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
-            int swap_with_cost = 0;
-            for (ExecutionHistory eh_item: execution_history) {
-                if (eh_item.gate_type == GateType::swap) {
-                    // only swaps with at least one logical input used have non-zero cost
-                    int _logical0 = eh_item.logical0;
-                    int _logical1 = eh_item.logical1;
-                    if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) swap_with_cost += 1;
-                } else {
-                    // set target logical qubit as used
-                    int _logical0 = eh_item.logical0;
-                    int _logical1 = eh_item.logical1;
-                    is_qubit_used[_logical0] = true;
-                    is_qubit_used[_logical1] = true;
-                }
-            }
-            assert(swap_with_cost <= swaps_inserted);
-
-            return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
 
         void save_execution_history_to_file(const std::string &eh_file_name,
@@ -370,9 +223,7 @@ namespace quartz {
         // reward related
         int original_gate_count;  // number of gates in the graph at beginning
         int single_qubit_gate_count;
-        int executed_logical_gate_count;  // we do not consider swaps here
         int swaps_inserted;
-        double imp_cost;
 
         // execution history & initial mapping table
         std::vector<int> initial_logical2physical;

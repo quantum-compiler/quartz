@@ -5,6 +5,7 @@ from typing import Any, List
 import hydra
 from config.base_config import BaseConfig
 from config.nam_config import *
+from config.rig_config import *
 from config.tdg_config import *
 from hydra.core.config_store import ConfigStore
 from omegaconf import MISSING, OmegaConf  # Do not confuse with dataclass.MISSING
@@ -42,6 +43,11 @@ cs.store(group="c", name="tdg", node=TdgConfig)
 cs.store(group="c", name="tdg_ft", node=TdgFTConfig)
 cs.store(group="c", name="tdg_mp", node=TdgMPConfig)
 cs.store(group="c", name="tdg_rm_mp", node=TdgRMMPConfig)
+
+cs.store(group="c", name="rig", node=RigConfig)
+cs.store(group="c", name="rig_ft", node=RigFTConfig)
+cs.store(group="c", name="rig_mp", node=RigMPConfig)
+cs.store(group="c", name="rig_rm_mp", node=RigRMMPConfig)
 
 # cfg groups for test
 # cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

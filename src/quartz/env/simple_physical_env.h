@@ -34,11 +34,11 @@ namespace quartz {
             uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
 
             // initialize mapping for graph and create game
-            set_initial_mapping(*graph);
+            set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             while (is_circuit_finished(cur_game_ptr->graph)) {
-                set_initial_mapping(*graph);
+                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             }
@@ -59,11 +59,11 @@ namespace quartz {
                 cur_game_ptr = std::make_shared<Game>(sampled_game);
             } else {
                 // start from initial states
-                set_initial_mapping(*graph);
+                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
                 while (is_finished()) {
-                    set_initial_mapping(*graph);
+                    set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
                     assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                     cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
                 }

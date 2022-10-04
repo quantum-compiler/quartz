@@ -46,7 +46,6 @@ int main() {
 
     // test reset
     for (int i = 0; i < 100; ++i) {
-        cout << endl;
         env.reset();
     }
 }

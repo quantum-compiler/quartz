@@ -8,7 +8,7 @@
 namespace quartz {
     class SimpleSearchEnv {
     public:
-        SimpleSearchEnv() = delete;
+        SimpleSearchEnv() : start_from_internal_prob(-1), seed(-1), game_buffer(0), random_generator(seed) {}
 
         SimpleSearchEnv(const std::string &qasm_file_path, BackendType backend_type,
                         int _seed, double _start_from_internal_prob) : game_buffer(_seed), random_generator(_seed) {
@@ -82,7 +82,10 @@ namespace quartz {
             }
         }
 
-        SimpleSearchEnv copy() { return *this; }
+        std::shared_ptr<SimpleSearchEnv> copy() {
+            SimpleSearchEnv env_copy = *this;
+            return std::make_shared<SimpleSearchEnv>(env_copy);
+        }
 
         Reward step(Action action) {
             // check whether action is valid

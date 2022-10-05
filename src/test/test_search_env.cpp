@@ -12,7 +12,7 @@ int main() {
     // initialize the environment
     string circuit_file_name = "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm";
     SimpleSearchEnv env = SimpleSearchEnv(circuit_file_name, BackendType::IBM_Q27_FALCON, 0, 0.8);
-    SimpleSearchEnv env_copy = env.copy();
+    std::shared_ptr<SimpleSearchEnv> env_copy = env.copy();
 
     // make a few moves
     int step_count = 0;

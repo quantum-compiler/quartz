@@ -207,3 +207,12 @@ cdef extern from "env/simple_initial_env.h" namespace "quartz":
         State get_state()
         vector[Action] get_action_space()
 
+cdef extern from "env/simple_search_env.h" namespace "quartz":
+    cdef cppclass SimpleSearchEnv:
+        SimpleSearchEnv()
+        SimpleSearchEnv(const string &, BackendType, int, double)
+        void reset() except +
+        Reward step(Action)
+        State get_state()
+        vector[Action] get_action_space()
+        shared_ptr[SimpleSearchEnv] copy()

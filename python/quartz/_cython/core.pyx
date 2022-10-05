@@ -27,7 +27,7 @@ ctypedef GraphXfer* GraphXfer_ptr
 # physical mapping
 from CCore cimport Reward, GraphState, State, ActionType, Action
 from CCore cimport SimplePhysicalEnv, BackendType
-from CCore cimport SimpleInitialEnv
+from CCore cimport SimpleInitialEnv, SimpleSearchEnv
 
 
 def get_gate_type_from_str(gate_type_str):
@@ -913,3 +913,59 @@ cdef class PySimpleInitialEnv:
             py_action.set_this(tmp_c_action)
             py_action_space.append(py_action)
         return py_action_space
+
+cdef class PySimpleSearchEnv:
+    cdef shared_ptr[SimpleSearchEnv] env
+
+    def __cinit__(self, *, qasm_file_path: str, backend_type_str: str,
+                  seed: int, start_from_internal_prob: float, instantiate=True):
+        if not instantiate:
+            return
+        cdef string encoded_path = qasm_file_path.encode('utf-8')
+        cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
+        cdef int c_seed = seed
+        cdef double c_start_from_internal_prob = start_from_internal_prob
+        self.env = make_shared[SimpleSearchEnv](encoded_path, cur_backend_type, c_seed, c_start_from_internal_prob)
+
+    def __dealloc__(self):
+        pass
+
+    def reset(self):
+        deref(self.env).reset()
+
+    def step(self, PyAction action) -> Reward:
+        return deref(self.env).step(deref(action.action_ptr))
+
+    def step_with_id(self, qubit_idx_0: int, qubit_idx_1: int) -> Reward:
+        cdef int _qubit_idx_0 = qubit_idx_0
+        cdef int _qubit_idx_1 = qubit_idx_1
+        cdef shared_ptr[Action] action = make_shared[Action](ActionType.PhysicalFull,
+                                                             _qubit_idx_0,
+                                                             _qubit_idx_1)
+        return deref(self.env).step(deref(action))
+
+    def get_state(self) -> PyState:
+        cdef shared_ptr[State] c_state = make_shared[State](deref(self.env).get_state())
+        py_state = PyState()
+        py_state.set_this(c_state)
+        return py_state
+
+    def get_action_space(self) -> [PyAction]:
+        cdef vector[Action] c_action_space = deref(self.env).get_action_space()
+        cdef shared_ptr[Action] tmp_c_action
+        total_size = c_action_space.size()
+        py_action_space = []
+        for i in range(total_size):
+            tmp_c_action = make_shared[Action](c_action_space[i])
+            py_action = PyAction(instantiate=False)
+            py_action.set_this(tmp_c_action)
+            py_action_space.append(py_action)
+        return py_action_space
+
+    def copy(self) -> PySimpleSearchEnv:
+        cdef shared_ptr[SimpleSearchEnv] copied_c_env = deref(self.env).copy()
+        copied_py_env = PySimpleSearchEnv(qasm_file_path="", backend_type_str="",
+                                          seed=-1, start_from_internal_prob=-1,
+                                          instantiate=False)
+        copied_py_env.env = copied_c_env
+        return copied_py_env

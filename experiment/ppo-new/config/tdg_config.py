@@ -26,7 +26,7 @@ class TdgConfig(BaseConfig):
 
 @dataclass
 class TdgFTConfig(TdgConfig):
-    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-cx')
     k_epochs: int = 10
     greedy_sample: bool = True
     input_graphs: List[InputGraph] = field(

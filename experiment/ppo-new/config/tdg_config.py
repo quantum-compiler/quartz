@@ -27,8 +27,17 @@ class TdgConfig(BaseConfig):
 @dataclass
 class TdgFTConfig(TdgConfig):
     wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-cx')
-    k_epochs: int = 10
     greedy_sample: bool = True
+    k_epochs: int = 20
+    lr_gnn: float = 3e-5
+    lr_actor: float = 3e-5
+    lr_critic: float = 5e-5
+    lr_scheduler: str = 'linear'
+    lr_start_factor: float = 0.1
+    lr_warmup_epochs: int = 50
+    resume_optimizer: bool = False
+    num_eps_per_iter: int = 64
+    max_eps_len: int = 600
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(

@@ -14,7 +14,7 @@ export OMP_NUM_THREADS=8
 # BS=3200
 # CIRC=barenco_tof_3
 
-python ppo.py c=nam_ft c.resume=true c.ddp_port=23343 \
+python ppo.py c=rig_ft c.resume=true c.ddp_port=23343 \
     c.ckpt_path=ckpts/${CKPT} c.mini_batch_size=${BS} 'c.gpus=[0,1,2,3]' \
     'c.input_graphs=[{ name: "'${CIRC}'", path: "../rigetti_rm_circs/'${CIRC}'.qasm" }]' \
     c.time_budget='24:00:00' \

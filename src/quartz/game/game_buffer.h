@@ -10,12 +10,13 @@ namespace quartz {
     public:
         GameBuffer() = delete;
 
-        explicit GameBuffer(int seed) : random_generator(seed) {
-            buffer.reserve(10000);
-        }
+        explicit GameBuffer(int seed) : random_generator(seed) {}
 
         void save(const Game& game) {
             buffer.emplace_back(game);
+            if (buffer.size() > 1000) {
+                buffer.pop_front();
+            }
         }
 
         Game sample() {
@@ -29,7 +30,7 @@ namespace quartz {
 
     public:
         std::mt19937 random_generator;
-        std::vector<Game> buffer;
+        std::deque<Game> buffer;
     };
 
     class GameSearchBuffer {

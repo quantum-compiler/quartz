@@ -971,6 +971,7 @@ cdef class PySimpleSearchEnv:
         cdef shared_ptr[SimpleSearchEnv] copied_c_env = deref(self.env).copy()
         copied_py_env = PySimpleSearchEnv(qasm_file_path="", backend_type_str="",
                                           seed=-1, start_from_internal_prob=-1,
+                                          initial_mapping_file_path="",
                                           instantiate=False)
         copied_py_env.env = copied_c_env
         return copied_py_env

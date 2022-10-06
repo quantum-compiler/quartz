@@ -21,7 +21,7 @@ int main() {
         assert(false);
     }
     auto graph = std::make_shared<Graph>(Graph(&(*context), dag));
-    set_initial_mapping(*graph, 0);
+    set_initial_mapping(*graph, 0, "../test_mapping_file.txt", 27);
     auto device = GetDevice(BackendType::IBM_Q27_FALCON);
 
     // initialize game

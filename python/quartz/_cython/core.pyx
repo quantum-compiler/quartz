@@ -824,10 +824,12 @@ cdef class PySimplePhysicalEnv:
     cdef SimplePhysicalEnv *env
 
     def __cinit__(self, *, qasm_file_path: str, backend_type_str: str,
-                  seed: int, start_from_internal_prob: float):
+                  seed: int, start_from_internal_prob: float, initial_mapping_file_path: str):
         cdef string encoded_path = qasm_file_path.encode('utf-8')
         cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
-        self.env = new SimplePhysicalEnv(encoded_path, cur_backend_type, seed, start_from_internal_prob)
+        cdef string encoded_initial_mapping_path = initial_mapping_file_path.encode('utf-8')
+        self.env = new SimplePhysicalEnv(encoded_path, cur_backend_type, seed,
+                                         start_from_internal_prob, encoded_initial_mapping_path)
 
     def __dealloc__(self):
         del self.env
@@ -918,14 +920,17 @@ cdef class PySimpleSearchEnv:
     cdef shared_ptr[SimpleSearchEnv] env
 
     def __cinit__(self, *, qasm_file_path: str, backend_type_str: str,
-                  seed: int, start_from_internal_prob: float, instantiate=True):
+                  seed: int, start_from_internal_prob: float, initial_mapping_file_path: str,
+                  instantiate=True):
         if not instantiate:
             return
         cdef string encoded_path = qasm_file_path.encode('utf-8')
         cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
         cdef int c_seed = seed
         cdef double c_start_from_internal_prob = start_from_internal_prob
-        self.env = make_shared[SimpleSearchEnv](encoded_path, cur_backend_type, c_seed, c_start_from_internal_prob)
+        cdef string encoded_initial_mapping_path = initial_mapping_file_path.encode('utf-8')
+        self.env = make_shared[SimpleSearchEnv](encoded_path, cur_backend_type, c_seed,
+                                                c_start_from_internal_prob, encoded_initial_mapping_path)
 
     def __dealloc__(self):
         pass

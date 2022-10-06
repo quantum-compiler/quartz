@@ -10,7 +10,7 @@ int main() {
     // initialize the environment
     string circuit_file_name = "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm";
     SimplePhysicalEnv env = SimplePhysicalEnv(circuit_file_name, BackendType::IBM_Q27_FALCON,
-                                              0, 0.8);
+                                              0, 0.8, "../test_mapping_file.txt");
     int step_count = 0;
     double total_reward = 0;
     double max_reward = -1000;

@@ -11,7 +11,8 @@ namespace quartz {
         SimplePhysicalEnv() = delete;
 
         SimplePhysicalEnv(const std::string &qasm_file_path, BackendType backend_type,
-                          int _seed, double _start_from_internal_prob) : game_buffer(_seed), random_generator(_seed) {
+                          int _seed, double _start_from_internal_prob, const std::string &_initial_mapping_file)
+                : game_buffer(_seed), random_generator(_seed) {
             /// A simple physical environment that does not use curriculum
             /// Graph    qasm            fixed
             ///          mapping type    1 x sabre with random init
@@ -34,11 +35,15 @@ namespace quartz {
             uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
 
             // initialize mapping for graph and create game
-            set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+            device_reg_count = device->get_num_qubits();
+            initial_mapping_file = _initial_mapping_file;
+            set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                initial_mapping_file, device_reg_count);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             while (is_circuit_finished(cur_game_ptr->graph)) {
-                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                    initial_mapping_file, device_reg_count);
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
             }
@@ -59,11 +64,13 @@ namespace quartz {
                 cur_game_ptr = std::make_shared<Game>(sampled_game);
             } else {
                 // start from initial states
-                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+                set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                    initial_mapping_file, device_reg_count);
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
                 while (is_finished()) {
-                    set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+                    set_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                        initial_mapping_file, device_reg_count);
                     assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                     cur_game_ptr = std::make_shared<Game>(Game(*graph, device));
                 }
@@ -114,6 +121,8 @@ namespace quartz {
 
     public:
         // basic parameters
+        int device_reg_count;
+        std::string initial_mapping_file;
         std::shared_ptr<DeviceTopologyGraph> device;
         std::shared_ptr<Context> context;
         std::shared_ptr<Graph> graph;

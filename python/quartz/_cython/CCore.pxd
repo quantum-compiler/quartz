@@ -191,7 +191,7 @@ cdef extern from "game/game_utils.h" namespace "quartz":
 
 cdef extern from "env/simple_physical_env.h" namespace "quartz":
     cdef cppclass SimplePhysicalEnv:
-        SimplePhysicalEnv(const string &, BackendType, int, double)
+        SimplePhysicalEnv(const string &, BackendType, int, double, const string &)
         void reset() except +
         Reward step(Action)
         bool is_finished()
@@ -210,7 +210,7 @@ cdef extern from "env/simple_initial_env.h" namespace "quartz":
 cdef extern from "env/simple_search_env.h" namespace "quartz":
     cdef cppclass SimpleSearchEnv:
         SimpleSearchEnv()
-        SimpleSearchEnv(const string &, BackendType, int, double)
+        SimpleSearchEnv(const string &, BackendType, int, double, const string &)
         void reset() except +
         Reward step(Action)
         State get_state()

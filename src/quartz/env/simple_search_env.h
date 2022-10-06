@@ -8,10 +8,12 @@
 namespace quartz {
     class SimpleSearchEnv {
     public:
-        SimpleSearchEnv() : start_from_internal_prob(-1), seed(-1), game_buffer(0), random_generator(seed) {}
+        SimpleSearchEnv() : start_from_internal_prob(-1), seed(-1), device_reg_count(-1),
+                            game_buffer(0), random_generator(seed) {}
 
         SimpleSearchEnv(const std::string &qasm_file_path, BackendType backend_type,
-                        int _seed, double _start_from_internal_prob) : game_buffer(_seed), random_generator(_seed) {
+                        int _seed, double _start_from_internal_prob, const std::string &_initial_mapping_file)
+                : game_buffer(_seed), random_generator(_seed) {
             /// A simple physical environment that does not use curriculum
             /// Graph    qasm            fixed
             ///          mapping type    1 x sabre with random init
@@ -34,7 +36,10 @@ namespace quartz {
             uniform01dist = std::uniform_real_distribution<double>(0.0, 1.0);
 
             // initialize mapping for graph and create game
-            set_search_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+            device_reg_count = device->get_num_qubits();
+            initial_mapping_file = _initial_mapping_file;
+            set_search_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                       initial_mapping_file, device_reg_count);
             assert(graph->check_mapping_correctness() == MappingStatus::VALID);
             cur_game_ptr = std::make_shared<GameSearch>(GameSearch(*graph, device));
 
@@ -47,6 +52,8 @@ namespace quartz {
                 : game_buffer(old_env.seed), random_generator(old_env.seed) {
             // basic parameters
             // TODO: context here refer to the same object when copy, consider changing it if necessary
+            device_reg_count = old_env.device_reg_count;
+            initial_mapping_file = old_env.initial_mapping_file;
             GameSearch game_copy = *old_env.cur_game_ptr;
             cur_game_ptr = std::make_shared<GameSearch>(game_copy);
             device = old_env.device;
@@ -76,7 +83,8 @@ namespace quartz {
                 cur_game_ptr = std::make_shared<GameSearch>(sampled_game);
             } else {
                 // start from initial states
-                set_search_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000));
+                set_search_initial_mapping(*graph, static_cast<int>(uniform01dist(random_generator) * 1000000),
+                                           initial_mapping_file, device_reg_count);
                 assert(graph->check_mapping_correctness() == MappingStatus::VALID);
                 cur_game_ptr = std::make_shared<GameSearch>(GameSearch(*graph, device));
             }
@@ -121,6 +129,8 @@ namespace quartz {
 
     public:
         // basic parameters
+        int device_reg_count;
+        std::string initial_mapping_file;
         std::shared_ptr<GameSearch> cur_game_ptr;
         std::shared_ptr<DeviceTopologyGraph> device;
         std::shared_ptr<Context> context;

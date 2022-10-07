@@ -1419,9 +1419,12 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123*pi/2,
           // 0.123
           ParamType p;
+          bool negative = token[0] == '-';
+          if (negative)
+            token = token.substr(1);
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
-            if (d[0] == '*') {
+            if (token[2] == '*') {
               // pi*0.123
               p = std::stod(d) * PI;
             } else {
@@ -1440,8 +1443,11 @@ Graph::_from_qasm_stream(Context *ctx,
               p = std::stod(d) * PI;
             }
           } else {
+            // 0.123
             p = std::stod(token);
           }
+          if (negative)
+            p = -p;
           auto src_op = graph->add_parameter(p);
           int src_idx = 0;
           auto dst_op = op;

@@ -17,11 +17,11 @@ def optimize(
     max_candidate_len: int = 1_000_000,
     timeout: int = 86400,
 ) -> tuple[int, quartz.PyGraph]:
-    candidate = [(init_circ.gate_count, init_circ.to_qasm_str())]
+    candidate = [(init_circ.cx_count, init_circ.to_qasm_str())]
     hash_set = set([init_circ.hash()])
     best_circ: quartz.PyGraph = init_circ
-    best_gate_cnt: int = init_circ.gate_count
-    original_cnt = init_circ.gate_count
+    best_gate_cnt: int = init_circ.cx_count
+    original_cnt = init_circ.cx_count
 
     start = time.time()
     invoke_cnt: int = 0
@@ -59,7 +59,7 @@ def optimize(
                     continue
 
                 new_hash = new_circ.hash()
-                new_cnt = new_circ.gate_count
+                new_cnt = new_circ.cx_count
                 if new_cnt > original_cnt * upper_limit:
                     continue
                 if new_hash not in hash_set:
@@ -73,7 +73,7 @@ def optimize(
                             {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
                         )
                         print(
-                            f"[{circ_name} (rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
+                            f"[{circ_name} (w/o rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
                         )
 
     return best_gate_cnt, best_circ
@@ -86,19 +86,19 @@ if __name__ == '__main__':
     output_dir = sys.argv[2]
 
     context = quartz.QuartzContext(
-        gate_set=['h', 'cx', 'x', 'rz', 'add'],
-        filename='../../experiment/ecc_set/nam_ecc.json',
+        gate_set=['h', 'cx', 't', 'tdg', 'x'],
+        filename='../../experiment/ecc_set/t_tdg_ecc.json',
         no_increase=False,
         include_nop=True,
     )
     circ = quartz.PyGraph.from_qasm(
-        context=context, filename=f"../../circuit/nam_rm_circs/{circ_name}.qasm"
+        context=context, filename=f"../../experiment/t_tdg_circs/{circ_name}.qasm"
     )
 
     wandb.init(
-        project='quartz_nam',
+        project='quartz_tdg_cx',
         entity='quartz',
-        name=f'rm_{circ_name}',
+        name=f'{circ_name}',
     )
 
     best_gate_cnt, best_circ = optimize(context, circ, circ_name)

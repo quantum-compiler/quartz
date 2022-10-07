@@ -1413,15 +1413,32 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          // Currently only support the format of pi*0.123, 0.123*pi or 0.123
+          // Currently only support the format of
+          // pi*0.123,
+          // 0.123*pi,
+          // 0.123*pi/2,
+          // 0.123
           ParamType p;
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
-            p = std::stod(d) * PI;
+            if (d[0] == '*') {
+              // pi*0.123
+              p = std::stod(d) * PI;
+            } else {
+              // pi/2
+              p = PI / std::stod(d);
+            }
           } else if (token.find("pi") != std::string::npos) {
             // 0.123*pi
             auto d = token.substr(0, token.find("*"));
-            p = std::stod(d) * PI;
+            if (token.find("/") != std::string::npos) {
+              // 0.123*pi/2
+              p = std::stod(d) * PI /
+                  std::stod(token.substr(token.find("/") + 1));
+            } else {
+              // 0.123*pi
+              p = std::stod(d) * PI;
+            }
           } else {
             p = std::stod(token);
           }
@@ -1899,9 +1916,13 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
       circuit_name + ".log";
   auto preprocessed_graph =
       greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
-  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name,
-                                      log_file_name, print_message,
-                                      cost_function, timeout);
+  //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
+  //   circuit_name,
+  //                                       log_file_name, print_message,
+  //                                       cost_function, timeout);
+
+  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name, "",
+                                      print_message, cost_function, timeout);
 }
 
 std::shared_ptr<Graph>

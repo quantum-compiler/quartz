@@ -1413,15 +1413,32 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          // Currently only support the format of pi*0.123, 0.123*pi or 0.123
+          // Currently only support the format of
+          // pi*0.123,
+          // 0.123*pi,
+          // 0.123*pi/2,
+          // 0.123
           ParamType p;
           if (token.find("pi") == 0) {
             auto d = token.substr(3, std::string::npos);
-            p = std::stod(d) * PI;
+            if (d[0] == '*') {
+              // pi*0.123
+              p = std::stod(d) * PI;
+            } else {
+              // pi/2
+              p = PI / std::stod(d);
+            }
           } else if (token.find("pi") != std::string::npos) {
             // 0.123*pi
             auto d = token.substr(0, token.find("*"));
-            p = std::stod(d) * PI;
+            if (token.find("/") != std::string::npos) {
+              // 0.123*pi/2
+              p = std::stod(d) * PI /
+                  std::stod(token.substr(token.find("/") + 1));
+            } else {
+              // 0.123*pi
+              p = std::stod(d) * PI;
+            }
           } else {
             p = std::stod(token);
           }
@@ -2409,7 +2426,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   if (!fail) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      std::cout << "loop" << std::endl;
+      //   std::cout << "loop" << std::endl;
       new_graph.reset();
       fail = true;
     }

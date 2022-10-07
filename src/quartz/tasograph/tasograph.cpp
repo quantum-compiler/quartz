@@ -1916,13 +1916,9 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
       circuit_name + ".log";
   auto preprocessed_graph =
       greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
-  //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
-  //   circuit_name,
-  //                                       log_file_name, print_message,
-  //                                       cost_function, timeout);
-
-  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name, "",
-                                      print_message, cost_function, timeout);
+  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name,
+                                      log_file_name, print_message,
+                                      cost_function, timeout);
 }
 
 std::shared_ptr<Graph>
@@ -2430,7 +2426,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   if (!fail) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      std::cout << "loop" << std::endl;
+      //   std::cout << "loop" << std::endl;
       new_graph.reset();
       fail = true;
     }

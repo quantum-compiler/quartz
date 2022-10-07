@@ -7,8 +7,6 @@ import wandb
 
 import quartz
 
-wandb.init(project='nam_rm')
-
 
 def optimize(
     context: quartz.QuartzContext,
@@ -89,12 +87,18 @@ if __name__ == '__main__':
 
     context = quartz.QuartzContext(
         gate_set=['h', 'cx', 'x', 'rz', 'add'],
-        filename='../../Nam_complete_ECC_set.json',
+        filename='../../experiment/ecc_set/nam_ecc.json',
         no_increase=False,
         include_nop=True,
     )
     circ = quartz.PyGraph.from_qasm(
         context=context, filename=f"../../circuit/nam_rm_circs/{circ_name}.qasm"
+    )
+
+    wandb.init(
+        project='quartz_nam',
+        entity='quartz',
+        name=f'rm_{circ_name}',
     )
 
     best_gate_cnt, best_circ = optimize(context, circ, circ_name)

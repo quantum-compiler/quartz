@@ -582,6 +582,15 @@ class PPOAgent:
                 printfl(
                     f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
                 )
+                if self.output_full_seq:
+                    buffer.all_graphs = {
+                        buffer.best_graph: AllGraphDictValue(
+                            0,
+                            get_cost(buffer.best_graph, buffer.cost_type),
+                            None,
+                            Action(0, 0),
+                        ),
+                    }
             # end if
         # end for i
 

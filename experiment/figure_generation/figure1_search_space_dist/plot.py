@@ -27,8 +27,8 @@ def main():
     plt.yticks(ticks=[0, 1, 2, 3, 4, 5, 6, 7],
                labels=["0", "1e1", "1e2", "1e3", "1e4", "1e5", "1e6", "1e7"])
     plt.xticks(ticks=[1, 2, 3, 4, 5, 6, 7, 8, 9])
-    plt.xlabel("#steps from original circuit", fontsize=30, labelpad=10.0)
-    plt.ylabel("#circuits", fontsize=30, labelpad=10.0)
+    plt.xlabel("#steps from original circuit", fontsize=20, labelpad=10.0)
+    plt.ylabel("#circuits", fontsize=20, labelpad=10.0)
 
     # plot
     plt.rcParams.update({'font.size': 12})

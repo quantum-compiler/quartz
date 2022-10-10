@@ -201,6 +201,66 @@ def cz(use_z3=True):
     ]
 
 
+def ry1(use_z3=True):
+    if use_z3:
+        return [
+            [(z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(z3.Sqrt(2) / 2, 0), (z3.Sqrt(2) / 2, 0)],
+        ]
+    else:
+        return [
+            [(math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0)],
+            [(math.sqrt(2) / 2, 0), (math.sqrt(2) / 2, 0)],
+        ]
+
+
+def ry3(use_z3=True):
+    if use_z3:
+        return [
+            [(-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
+        ]
+    else:
+        return [
+            [(-math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0)],
+            [(math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0)],
+        ]
+
+
+def rxx1(use_z3=True):
+    if use_z3:
+        return [
+            [(z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(0, 0), (z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
+            [(0, 0), (-z3.Sqrt(2) / 2, 0), (z3.Sqrt(2) / 2, 0), (0, 0)],
+            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (z3.Sqrt(2) / 2, 0)],
+        ]
+    else:
+        return [
+            [(math.sqrt(2) / 2, 0), (0, 0), (0, 0), (-math.sqrt(2) / 2, 0)],
+            [(0, 0), (math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0), (0, 0)],
+            [(0, 0), (-math.sqrt(2) / 2, 0), (math.sqrt(2) / 2, 0), (0, 0)],
+            [(-math.sqrt(2) / 2, 0), (0, 0), (0, 0), (math.sqrt(2) / 2, 0)],
+        ]
+
+
+def rxx3(use_z3=True):
+    if use_z3:
+        return [
+            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(0, 0), (-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
+            [(0, 0), (-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
+            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
+        ]
+    else:
+        return [
+            [(-math.sqrt(2) / 2, 0), (0, 0), (0, 0), (-math.sqrt(2) / 2, 0)],
+            [(0, 0), (-math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0), (0, 0)],
+            [(0, 0), (-math.sqrt(2) / 2, 0), (-math.sqrt(2) / 2, 0), (0, 0)],
+            [(-math.sqrt(2) / 2, 0), (0, 0), (0, 0), (-math.sqrt(2) / 2, 0)],
+        ]
+
+
 # functions exposed to verifier
 
 
@@ -208,7 +268,7 @@ def get_matrix(gate_name, *params):
     try:
         result = eval(gate_name)(*params)
     except NameError:
-        raise Exception(f'Gate \'{gate_name}\' is not implemented.')
+        raise Exception(f"Gate '{gate_name}' is not implemented.")
     return result
 
 

@@ -1919,9 +1919,12 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
       circuit_name + ".log";
   auto preprocessed_graph =
       greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
-  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name,
-                                      log_file_name, print_message,
-                                      cost_function, timeout);
+  //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
+  //   circuit_name,
+  //                                       log_file_name, print_message,
+  //                                       cost_function, timeout);
+  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name, "",
+                                      print_message, cost_function, timeout);
 }
 
 std::shared_ptr<Graph>

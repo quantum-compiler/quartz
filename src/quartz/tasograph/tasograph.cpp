@@ -1434,13 +1434,10 @@ Graph::_from_qasm_stream(Context *ctx,
           } else if (token.find("pi") != std::string::npos) {
             // 0.123*pi
             auto d = token.substr(0, token.find("*"));
+            p = std::stod(d) * PI;
             if (token.find("/") != std::string::npos) {
               // 0.123*pi/2
-              p = std::stod(d) * PI /
-                  std::stod(token.substr(token.find("/") + 1));
-            } else {
-              // 0.123*pi
-              p = std::stod(d) * PI;
+              p = p / std::stod(token.substr(token.find("/") + 1));
             }
           } else {
             // 0.123

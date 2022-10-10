@@ -94,7 +94,7 @@ if __name__ == '__main__':
         include_nop=True,
     )
     circ = quartz.PyGraph.from_qasm(
-        context=context, filename=f"../../experiment/t_tdg_circs/{circ_name}.qasm"
+        context=context, filename=f"../../experiment/t_tdg_rm_circs/{circ_name}.qasm"
     )
 
     wandb.init(

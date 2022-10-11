@@ -1418,18 +1418,24 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123*pi,
           // 0.123*pi/2,
           // 0.123
+          // pi
           ParamType p;
           bool negative = token[0] == '-';
           if (negative)
             token = token.substr(1);
           if (token.find("pi") == 0) {
-            auto d = token.substr(3, std::string::npos);
-            if (token[2] == '*') {
-              // pi*0.123
-              p = std::stod(d) * PI;
+            if (token == "pi") {
+              // pi
+              p = PI;
             } else {
-              // pi/2
-              p = PI / std::stod(d);
+              auto d = token.substr(3, std::string::npos);
+              if (token[2] == '*') {
+                // pi*0.123
+                p = std::stod(d) * PI;
+              } else {
+                // pi/2
+                p = PI / std::stod(d);
+              }
             }
           } else if (token.find("pi") != std::string::npos) {
             // 0.123*pi

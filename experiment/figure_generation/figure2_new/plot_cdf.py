@@ -69,7 +69,7 @@ def main():
     plt.plot(gate_count_x_list, gate_count_y_list,
              marker='o', markersize=5, mew=7,
              label="gate count",
-             linewidth=5, color=matplotlib.colors.CSS4_COLORS.get("mediumslateblue"))
+             linewidth=5, color=matplotlib.colors.CSS4_COLORS.get("slateblue"))
     plt.legend()
 
     # curve label

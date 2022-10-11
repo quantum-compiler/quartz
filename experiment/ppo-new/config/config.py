@@ -50,9 +50,9 @@ cs.store(group="c", name="rig_ft", node=RigFTConfig)
 cs.store(group="c", name="rig_mp", node=RigMPConfig)
 cs.store(group="c", name="rig_rm_mp", node=RigRMMPConfig)
 
-cs.store(group="c", name="rig", node=IonQConfig)
-cs.store(group="c", name="rig_ft", node=IonQFTConfig)
-cs.store(group="c", name="rig_mp", node=IonQMPConfig)
+cs.store(group="c", name="ionq", node=IonQConfig)
+cs.store(group="c", name="ionq_ft", node=IonQFTConfig)
+cs.store(group="c", name="ionq_mp", node=IonQMPConfig)
 
 # cfg groups for test
 # cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

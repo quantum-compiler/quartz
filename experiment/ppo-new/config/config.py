@@ -4,6 +4,7 @@ from typing import Any, List
 
 import hydra
 from config.base_config import BaseConfig
+from config.ionq_config import *
 from config.nam_config import *
 from config.rig_config import *
 from config.tdg_config import *
@@ -48,6 +49,10 @@ cs.store(group="c", name="rig", node=RigConfig)
 cs.store(group="c", name="rig_ft", node=RigFTConfig)
 cs.store(group="c", name="rig_mp", node=RigMPConfig)
 cs.store(group="c", name="rig_rm_mp", node=RigRMMPConfig)
+
+cs.store(group="c", name="ionq", node=IonQConfig)
+cs.store(group="c", name="ionq_ft", node=IonQFTConfig)
+cs.store(group="c", name="ionq_mp", node=IonQMPConfig)
 
 # cfg groups for test
 # cs.store(group="c", name="nam_test", node=NamMultiPretrainConfig)

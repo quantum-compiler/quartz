@@ -70,7 +70,7 @@ def main():
              marker='o', markersize=5, mew=7,
              label="gate count",
              linewidth=5, color=matplotlib.colors.CSS4_COLORS.get("mediumslateblue"))
-    plt.legend()
+    # plt.legend()
 
     # curve label
     plt.rcParams.update({'font.size': 15})

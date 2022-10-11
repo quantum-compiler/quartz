@@ -99,7 +99,7 @@ def worker_proc(rank, circuit_batch, max_depth, gate_count_to_plot):
 def main():
     # more parameters
     random.seed(12345)
-    sample_circuit_count = 200
+    sample_circuit_count = 200  # we run on five machines, so effective size is 1000
     max_search_depth = 6
     num_workers = 100
 

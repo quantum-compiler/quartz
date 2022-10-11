@@ -1,7 +1,7 @@
 import os
 import pickle
-import argparse
 
+import matplotlib.colors
 import matplotlib.pyplot as plt
 
 
@@ -38,25 +38,45 @@ def get_data(folder_name):
     x_list[-1] = f">{x_list[-2]}"
     print(x_list)
 
+    # prepare label list
+    label_list = []
+    for y in y_list:
+        label_list.append("%.2f" % y)
+
     # return
-    return x_list, y_list
+    return x_list, y_list, label_list
 
 
 # This file plot cdf.
 def main():
     # get data
-    gate_count_x_list, gate_count_y_list = get_data(folder_name="gate_count_raw_results")
+    gate_count_x_list, gate_count_y_list, label_list = get_data(folder_name="gate_count_raw_results")
 
-    # plot
+    # figure
+    plt.rcParams.update({'font.size': 20})
     plt.figure(num=1, figsize=(8, 6), dpi=300)
-    plt.xlabel("min #xfers")
-    plt.ylabel("percentage (%)")
-    plt.ylim((-0.02, 1.02))
-    plt.xlim((-0.1, 7.1))
-    plt.yticks(ticks=[1, 0.8, 0.6, 0.4, 0.2, 0],
-               labels=["100%", "80%", "60%", "40%", "20%", "0%"])
-    plt.plot(gate_count_x_list, gate_count_y_list, marker='o', label="gate count", linewidth=3)
+    plt.subplots_adjust(bottom=0.2)
+    plt.subplots_adjust(left=0.13)
+
+    # axis
+    plt.xlabel("Minimal Number of Transformations to Reduce Cost", fontsize=20, labelpad=10.0)
+    plt.ylabel("CDF", fontsize=20, labelpad=10.0)
+    plt.ylim((-0.03, 1.1))
+    plt.xlim((-0.3, 7.3))
+    plt.yticks(ticks=[1.0, 0.8, 0.6, 0.4, 0.2, 0.0])
+
+    # curve
+    plt.plot(gate_count_x_list, gate_count_y_list,
+             marker='o', markersize=5, mew=7,
+             label="gate count",
+             linewidth=5, color=matplotlib.colors.CSS4_COLORS.get("mediumslateblue"))
     plt.legend()
+
+    # curve label
+    plt.rcParams.update({'font.size': 15})
+    for x, y, label in zip(gate_count_x_list, gate_count_y_list, label_list):
+        plt.text(x, y + 0.02, label, ha="center", va="bottom")
+
     plt.savefig(f"./figure2_new_final_figures/cdf.pdf")
     plt.show()
 

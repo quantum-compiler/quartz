@@ -33,7 +33,7 @@ def main():
 
     # plot
     plt.rcParams.update({'font.size': 12})
-    bars = plt.bar(x_list, y_list, color=matplotlib.colors.CSS4_COLORS.get("slateblue"))
+    bars = plt.bar(x_list, y_list, color=matplotlib.colors.CSS4_COLORS.get("mediumslateblue"))
     plt.bar_label(bars, fmt="%d", labels=raw_y_list)
 
     # plot

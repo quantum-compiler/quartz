@@ -22,6 +22,7 @@ class TdgConfig(BaseConfig):
             ),
         ]
     )
+    num_gate_types: int = 29
 
 
 @dataclass

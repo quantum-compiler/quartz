@@ -2106,40 +2106,92 @@ void Graph::toffoli_flip_greedy_with_trace(GateType target_rotation,
                                            GraphXfer *xfer,
                                            GraphXfer *inverse_xfer,
                                            std::vector<int> &trace) {
+  //   std::shared_ptr<Graph> temp_graph(new Graph(*this));
+  //   while (true) {
+  //     auto new_graph_0 = xfer->run_1_time(0, temp_graph.get());
+  //     auto new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
+  //     if (new_graph_0.get() == nullptr) {
+  //       assert(new_graph_1.get() == nullptr);
+  //       return;
+  //     }
+  //     new_graph_0->rotation_merging(target_rotation);
+  //     new_graph_1->rotation_merging(target_rotation);
+  //     if (new_graph_0->gate_count() <= new_graph_1->gate_count()) {
+  //       temp_graph = new_graph_0;
+  //       trace.push_back(0);
+  //     } else {
+  //       temp_graph = new_graph_1;
+  //       trace.push_back(1);
+  //     }
+  //   }
+  //   assert(false); // Should never reach here
+  trace.clear();
   std::shared_ptr<Graph> temp_graph(new Graph(*this));
+  std::vector<Op> all_ops;
   while (true) {
-    auto new_graph_0 = xfer->run_1_time(0, temp_graph.get());
-    auto new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
-    if (new_graph_0.get() == nullptr) {
-      assert(new_graph_1.get() == nullptr);
+    all_ops.clear();
+    temp_graph->topology_order_ops(all_ops);
+    bool has_toffoli = false;
+    for (auto op : all_ops) {
+      if (temp_graph->xfer_appliable(xfer, op)) {
+        assert(temp_graph->xfer_appliable(inverse_xfer, op));
+        auto new_graph_0 = temp_graph->apply_xfer(xfer, op);
+        auto new_graph_1 = temp_graph->apply_xfer(inverse_xfer, op);
+        new_graph_0->rotation_merging(target_rotation);
+        new_graph_1->rotation_merging(target_rotation);
+        if (new_graph_0->gate_count() <= new_graph_1->gate_count()) {
+          temp_graph = new_graph_0;
+          trace.push_back(0);
+        } else {
+          temp_graph = new_graph_1;
+          trace.push_back(1);
+        }
+        has_toffoli = true;
+        break;
+      }
+    }
+    if (!has_toffoli) {
       return;
     }
-    new_graph_0->rotation_merging(target_rotation);
-    new_graph_1->rotation_merging(target_rotation);
-    if (new_graph_0->gate_count() <= new_graph_1->gate_count()) {
-      temp_graph = new_graph_0;
-      trace.push_back(0);
-    } else {
-      temp_graph = new_graph_1;
-      trace.push_back(1);
-    }
   }
-  assert(false); // Should never reach here
 }
 
 std::shared_ptr<Graph>
 Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                                    GraphXfer *inverse_xfer,
                                    std::vector<int> instruction) {
+  //   std::shared_ptr<Graph> graph(new Graph(*this));
+  //   std::shared_ptr<Graph> new_graph(nullptr);
+  //   for (const auto direction : instruction) {
+  //     if (direction == 0) {
+  //       new_graph = xfer->run_1_time(0, graph.get());
+  //     } else {
+  //       new_graph = inverse_xfer->run_1_time(0, graph.get());
+  //     }
+  //     graph = new_graph;
+  //   }
+  //   return graph;
+
   std::shared_ptr<Graph> graph(new Graph(*this));
   std::shared_ptr<Graph> new_graph(nullptr);
-  for (const auto direction : instruction) {
-    if (direction == 0) {
-      new_graph = xfer->run_1_time(0, graph.get());
-    } else {
-      new_graph = inverse_xfer->run_1_time(0, graph.get());
+  std::vector<Op> all_ops;
+  for (int i = 0; i < instruction.size();) {
+    all_ops.clear();
+    graph->topology_order_ops(all_ops);
+    for (auto op : all_ops) {
+      // the first appliable
+      if (xfer_appliable(xfer, op)) {
+        assert(xfer_appliable(inverse_xfer, op));
+        if (instruction[i] == 0) {
+          new_graph = graph->apply_xfer(xfer, op);
+        } else {
+          new_graph = graph->apply_xfer(inverse_xfer, op);
+        }
+        graph = new_graph;
+        i++;
+        break;
+      }
     }
-    graph = new_graph;
   }
   return graph;
 }

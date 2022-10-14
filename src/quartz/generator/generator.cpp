@@ -79,7 +79,7 @@ void Generator::generate(
         start = std::chrono::steady_clock::now();
       }
       // Assume working directory is cmake-build-debug/ here.
-      system("python src/python/verifier/invoke_python_verifier.py "
+      system("python src/python/verifier/verify_equivalences.py "
              "tmp_before_verify.json tmp_after_verify.json");
       if (record_verification_time) {
         auto end = std::chrono::steady_clock::now();

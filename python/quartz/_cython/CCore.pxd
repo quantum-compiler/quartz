@@ -39,7 +39,7 @@ cdef extern from "gate/gate_utils.h" namespace "quartz":
         rx3,
         input_qubit,
         input_param,
-        ry1, 
+        ry1,
         ry3,
         rxx1,
         rxx3

@@ -476,6 +476,8 @@ class PPOMod:
         self.lr_scheduler.step()
         self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
+        if self.rank == 0:
+            self.agent.output_best_graph(self.cfg.best_graph_output_dir)
 
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO(not going to do) save top-k model

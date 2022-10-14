@@ -182,6 +182,7 @@ class PPOAgent:
         self.device = device
         self.output_full_seq = output_full_seq
         self.output_dir = output_dir
+
         self.dyn_eps_len = dyn_eps_len
         self.max_eps_len = max_eps_len
         self.min_eps_len = min_eps_len
@@ -593,6 +594,16 @@ class PPOAgent:
                     }
             # end if
         # end for i
+
+    def output_best_graph(self, output_dir: str) -> None:
+        os.makedirs(output_dir, exist_ok=True)
+        for buffer in self.graph_buffers:
+            best_g = buffer.best_graph
+            best_cost = get_cost(best_g, self.cost_type)
+            best_qasm = best_g.to_qasm_str()
+            best_path = os.path.join(output_dir, f'{buffer.name}_cost_{best_cost}.qasm')
+            with open(best_path, 'w') as f:
+                f.write(best_qasm)
 
     @torch.no_grad()
     def select_action_for_self(

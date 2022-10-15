@@ -7,8 +7,6 @@ import wandb
 
 import quartz
 
-wandb.init(project='nam_worm')
-
 
 def optimize(
     context: quartz.QuartzContext,
@@ -50,7 +48,8 @@ def optimize(
                         {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
                     )
                     print(
-                        f"[{circ_name} (w/o rotation merging)] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
+                        f"[{circ_name} (w/o rotation merging)] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
+                        flush=True,
                     )
 
                 new_circ = circ.apply_xfer(
@@ -75,7 +74,8 @@ def optimize(
                             {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
                         )
                         print(
-                            f"[{circ_name} (w/o rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s"
+                            f"[{circ_name} (w/o rotation merging)] better circuit found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
+                            flush=True,
                         )
 
     return best_gate_cnt, best_circ
@@ -89,12 +89,18 @@ if __name__ == '__main__':
 
     context = quartz.QuartzContext(
         gate_set=['h', 'cx', 'x', 'rz', 'add'],
-        filename='../../Nam_complete_ECC_set.json',
+        filename='../../experiment/ecc_set/nam_ecc.json',
         no_increase=False,
         include_nop=True,
     )
     circ = quartz.PyGraph.from_qasm(
         context=context, filename=f"../../circuit/nam_circs/{circ_name}.qasm"
+    )
+
+    wandb.init(
+        project='quartz_nam',
+        entity='quartz',
+        name=f'{circ_name}',
     )
 
     best_gate_cnt, best_circ = optimize(context, circ, circ_name)

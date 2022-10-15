@@ -10,6 +10,7 @@ class TdgConfig(BaseConfig):
             'cx',
             't',
             'tdg',
+            'x',
         ]
     )
     ecc_file: str = '../ecc_set/t_tdg_ecc.json'
@@ -21,13 +22,23 @@ class TdgConfig(BaseConfig):
             ),
         ]
     )
+    num_gate_types: int = 29
 
 
 @dataclass
 class TdgFTConfig(TdgConfig):
-    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune')
-    k_epochs: int = 10
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-cx')
     greedy_sample: bool = True
+    k_epochs: int = 20
+    lr_gnn: float = 3e-5
+    lr_actor: float = 3e-5
+    lr_critic: float = 5e-5
+    lr_scheduler: str = 'linear'
+    lr_start_factor: float = 0.1
+    lr_warmup_epochs: int = 50
+    resume_optimizer: bool = False
+    num_eps_per_iter: int = 64
+    max_eps_len: int = 600
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
@@ -45,29 +56,17 @@ class TdgMPConfig(TdgConfig):
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
+                name=f'{circ}',
+                path=f'../t_tdg_circs/{circ}.qasm',
+            )
+            for circ in [
                 'barenco_tof_3',
-                '../t_tdg_circs/barenco_tof_3.qasm',
-            ),
-            InputGraph(
                 'vbe_adder_3',
-                '../t_tdg_circs/vbe_adder_3.qasm',
-            ),
-            InputGraph(
                 'mod5_4',
-                '../t_tdg_circs/mod5_4.qasm',
-            ),
-            InputGraph(
                 'mod_mult_55',
-                '../t_tdg_circs/mod_mult_55.qasm',
-            ),
-            InputGraph(
                 'tof_5',
-                '../t_tdg_circs/tof_5.qasm',
-            ),
-            InputGraph(
                 'gf2^4_mult',
-                '../t_tdg_circs/gf2^4_mult.qasm',
-            ),
+            ]
         ]
     )
 
@@ -79,28 +78,16 @@ class TdgRMMPConfig(TdgConfig):
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
+                name=f'{circ}',
+                path=f'../t_tdg_rm_circs/{circ}.qasm',
+            )
+            for circ in [
                 'barenco_tof_3',
-                '../t_tdg_rm_circs/barenco_tof_3.qasm',
-            ),
-            InputGraph(
                 'vbe_adder_3',
-                '../t_tdg_rm_circs/vbe_adder_3.qasm',
-            ),
-            InputGraph(
                 'mod5_4',
-                '../t_tdg_rm_circs/mod5_4.qasm',
-            ),
-            InputGraph(
                 'mod_mult_55',
-                '../t_tdg_rm_circs/mod_mult_55.qasm',
-            ),
-            InputGraph(
                 'tof_5',
-                '../t_tdg_rm_circs/tof_5.qasm',
-            ),
-            InputGraph(
                 'gf2^4_mult',
-                '../t_tdg_rm_circs/gf2^4_mult.qasm',
-            ),
+            ]
         ]
     )

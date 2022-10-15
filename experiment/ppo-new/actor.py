@@ -182,6 +182,7 @@ class PPOAgent:
         self.device = device
         self.output_full_seq = output_full_seq
         self.output_dir = output_dir
+
         self.dyn_eps_len = dyn_eps_len
         self.max_eps_len = max_eps_len
         self.min_eps_len = min_eps_len
@@ -218,7 +219,6 @@ class PPOAgent:
                 input_graph['name'],
                 input_graph['qasm'],
                 self.cost_type,
-                int(1e6 / len(input_graphs)),
                 self.device,
             )
             for input_graph in input_graphs
@@ -519,7 +519,7 @@ class PPOAgent:
                     msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
                     printfl(f'\n{msg}\n')
                     if (
-                        self.id == 0
+                        self.id == 0 and os.getenv('ALERT_BETTER') == '1'
                     ):  # TODO(not going to do) Colin multi-processing logging
                         wandb.alert(
                             title='Better graph is found!',
@@ -583,8 +583,27 @@ class PPOAgent:
                 printfl(
                     f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
                 )
+                if self.output_full_seq:
+                    buffer.all_graphs = {
+                        buffer.best_graph: AllGraphDictValue(
+                            0,
+                            get_cost(buffer.best_graph, buffer.cost_type),
+                            None,
+                            Action(0, 0),
+                        ),
+                    }
             # end if
         # end for i
+
+    def output_best_graph(self, output_dir: str) -> None:
+        os.makedirs(output_dir, exist_ok=True)
+        for buffer in self.graph_buffers:
+            best_g = buffer.best_graph
+            best_cost = get_cost(best_g, self.cost_type)
+            best_qasm = best_g.to_qasm_str()
+            best_path = os.path.join(output_dir, f'{buffer.name}_cost_{best_cost}.qasm')
+            with open(best_path, 'w') as f:
+                f.write(best_qasm)
 
     @torch.no_grad()
     def select_action_for_self(

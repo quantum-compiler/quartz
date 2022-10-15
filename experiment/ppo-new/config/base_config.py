@@ -63,7 +63,7 @@ class BaseConfig:
     ecc_file: str = '../ecc_set/t_tdg_ecc.json'
     no_increase: bool = False
     include_nop: bool = True
-    num_gate_types: int = 29
+    num_gate_types: int = 40
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
@@ -127,6 +127,7 @@ class BaseConfig:
     time_budget: str = ''
 
     # logging
+    best_graph_output_dir: str = 'best_graphs'
     output_full_seq: bool = False
     full_seq_path: str = ''  # for read in
 

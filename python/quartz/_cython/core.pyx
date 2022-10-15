@@ -53,8 +53,14 @@ def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "u3" :return GateType.u3
     if gate_type_str == "ccz" :return GateType.ccz
     if gate_type_str == "cz" :return GateType.cz
+    if gate_type_str == "rx1" :return GateType.rx1
+    if gate_type_str == "rx3" :return GateType.rx3
     if gate_type_str == "input_qubit" :return GateType.input_qubit
     if gate_type_str == "input_param" :return GateType.input_param
+    if gate_type_str == "ry1": return GateType.ry1
+    if gate_type_str == "ry3": return GateType.ry3
+    if gate_type_str == "rxx1": return GateType.rxx1
+    if gate_type_str == "rxx3": return GateType.rxx3
 
 cdef class PyQASMParser:
     cdef QASMParser *parser

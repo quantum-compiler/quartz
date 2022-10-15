@@ -335,8 +335,8 @@ class GraphBuffer:
         name: str,
         original_graph_qasm: str,
         cost_type: CostType,
-        max_len: int | float,
         device: torch.device = torch.device('cpu'),
+        max_len: int | float = math.inf,
     ) -> None:
         self.name = name
         self.max_len = max_len
@@ -390,22 +390,28 @@ class GraphBuffer:
         self.init_graph_costs.clear()
         self.graph_costs.clear()
 
+        self.shrink()
+
+    def shrink(self) -> None:
+        mem_perct_th = 82.5
         vmem_perct = vmem_used_perct()
         old_len = len(self)
-        if vmem_perct > 80.0:
+        if vmem_perct > mem_perct_th:
+            if self.max_len == math.inf:  # the first time mem usage exceeds threshold
+                self.max_len = old_len  # don't use more memory
+
+        if old_len > self.max_len:
             printfl(f'Buffer {self.name} starts to shrink.')
-            i_loop = 0  # NOTE: in case of infinite loop
-            while len(self) >= 0.75 * old_len and i_loop < 1000:
-                self.pop_some(200)
-                i_loop += 1
-            gc.collect()
+            while len(self) > self.max_len:
+                self.pop_some(len(self) - int(self.max_len))
             printfl(
                 f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).'
             )
-            if vmem_used_perct() > 95.0:
-                raise MemoryError(
-                    f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
-                )
+
+        if vmem_used_perct() > 95.0:
+            raise MemoryError(
+                f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
+            )
 
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
         if hash_value is None:
@@ -413,37 +419,51 @@ class GraphBuffer:
         if hash_value not in self.hashset:
             self.hashset.add(hash_value)
             gcost = get_cost(graph, self.cost_type)
+            graphs: List[quartz.PyGraph]
             if gcost not in self.cost_to_graph:
-                self.cost_to_graph[gcost] = []
-            self.cost_to_graph[gcost].append(graph)
+                graphs = []
+                self.cost_to_graph[gcost] = graphs
+            else:
+                graphs = self.cost_to_graph[gcost]
+            graphs.append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(self.cost_to_graph[gcost]) > int(
-                5e2
-            ):  # NOTE: limit the num of graph of each kind
-                self.cost_to_graph[gcost].pop(idx_to_pop)
-            while len(self) > self.max_len:
-                self.pop_one()
-            assert hash_value in self.hashset
+            while len(graphs) > int(500):  # NOTE: limit num of graphs of each kind
+                popped_graph = graphs.pop(idx_to_pop)
+                self.hashset.remove(hash(popped_graph))
+            # while len(self) > self.max_len:
+            #     assert self.pop_one(graph_to_remain=graph) is not graph
+            # assert hash_value in self.hashset
             return True
         else:
             return False
 
-    def pop_one(self) -> None:
+    def pop_one(self, graph_to_remain: quartz.PyGraph = None) -> quartz.PyGraph | None:
         if len(self) > 0:
-            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+            max_key_idx: int = -1
+            while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
-                idx_to_pop = 0 if max_key != self.original_cost else 1
+                idx_to_pop: int = 0 if max_key != self.original_cost else 1
+                while idx_to_pop < len(graphs):
+                    if graphs[idx_to_pop] is graph_to_remain:
+                        idx_to_pop += 1
+                    else:
+                        break
                 if idx_to_pop < len(graphs):
                     popped_graph = graphs.pop(idx_to_pop)
+                    # assert popped_graph is not graph_to_remain, f'idx_to_pop = {idx_to_pop}'
                     self.hashset.remove(hash(popped_graph))
                     if len(graphs) == 0:
                         self.cost_to_graph.pop(max_key)
-                    break
-            # end for
+                    return popped_graph
+                if len(graphs) > 0:
+                    max_key_idx -= 1
+            # end while
+        return None
 
     def pop_some(self, num: int) -> None:
         if len(self) > 0:
-            for max_key_idx in range(len(self.cost_to_graph) - 1, -1, -1):
+            max_key_idx: int = -1
+            while True:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
                 idx_to_pop = 0 if max_key != self.original_cost else 1
                 while idx_to_pop < len(graphs) and num > 0:
@@ -454,7 +474,9 @@ class GraphBuffer:
                     self.cost_to_graph.pop(max_key)
                 if num <= 0:
                     break
-            # end for
+                elif len(graphs) > 0:
+                    max_key_idx -= 1
+            # end while
 
     def sample(self, greedy: bool) -> quartz.PyGraph:
         gcost_list = list(self.cost_to_graph.keys())
@@ -574,11 +596,3 @@ class GraphBuffer:
             pre_cand = AllGraphDictValue(dist, cost, pre_graph, action)
             # NOTE: action here is how this graph is got from pre_graph
         self.all_graphs[graph] = pre_cand
-
-    # def shrink(self) -> None:
-    #     for cost_key in self.cost_to_graph:
-    #         cur = self.cost_to_graph[cost_key]
-    #         new = cur[len(cur) // 2 : ]
-    #         if cost_key == get_cost(self.original_graph, self.cost_type):
-    #             new.append(self.original_graph)
-    #         self.cost_to_graph[cost_key] = new

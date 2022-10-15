@@ -221,11 +221,15 @@ class PPOMod:
         else:
             raise ValueError(f'Unknown lr_scheduler: {self.cfg.lr_scheduler}')
         if self.rank == 0:
+            run_name: str | None = None
+            if len(self.cfg.input_graphs) == 1:
+                run_name = self.cfg.input_graphs[0].name
             wandb.init(
                 project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
                 mode=self.wandb_mode,
                 config=self.cfg,  # type: ignore
+                name=run_name,
             )
         printfl(f'rank {self.rank} / {self.ddp_processes} on {self.device} initialized')
 
@@ -472,6 +476,8 @@ class PPOMod:
         self.lr_scheduler.step()
         self.ddp_ac_net.eval()
         self.agent.sync_best_graph()
+        if self.rank == 0:
+            self.agent.output_best_graph(self.cfg.best_graph_output_dir)
 
     def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
         # TODO(not going to do) save top-k model

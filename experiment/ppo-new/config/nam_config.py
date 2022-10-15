@@ -22,11 +22,12 @@ class NamConfig(BaseConfig):
             ),
         ]
     )
+    num_gate_types: int = 29
 
 
 @dataclass
 class NamFTConfig(NamConfig):
-    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-02')
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-03')
     greedy_sample: bool = True
     k_epochs: int = 20
     lr_gnn: float = 3e-5
@@ -36,6 +37,8 @@ class NamFTConfig(NamConfig):
     lr_start_factor: float = 0.1
     lr_warmup_epochs: int = 50
     resume_optimizer: bool = False
+    num_eps_per_iter: int = 64
+    max_eps_len: int = 600
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
@@ -67,29 +70,17 @@ class NamMPConfig(NamConfig):
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
+                name=f'{circ}',
+                path=f'../nam_circs/{circ}.qasm',
+            )
+            for circ in [
                 'barenco_tof_3',
-                '../nam_circs/barenco_tof_3.qasm',
-            ),
-            InputGraph(
                 'vbe_adder_3',
-                '../nam_circs/vbe_adder_3.qasm',
-            ),
-            InputGraph(
                 'mod5_4',
-                '../nam_circs/mod5_4.qasm',
-            ),
-            InputGraph(
                 'mod_mult_55',
-                '../nam_circs/mod_mult_55.qasm',
-            ),
-            InputGraph(
                 'tof_5',
-                '../nam_circs/tof_5.qasm',
-            ),
-            InputGraph(
                 'gf2^4_mult',
-                '../nam_circs/gf2^4_mult.qasm',
-            ),
+            ]
         ]
     )
 
@@ -101,29 +92,17 @@ class NamRMMPConfig(NamConfig):
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
+                name=f'{circ}',
+                path=f'../nam_rm_circs/{circ}.qasm',
+            )
+            for circ in [
                 'barenco_tof_3',
-                '../nam_rm_circs/barenco_tof_3.qasm',
-            ),
-            InputGraph(
                 'vbe_adder_3',
-                '../nam_rm_circs/vbe_adder_3.qasm',
-            ),
-            InputGraph(
                 'mod5_4',
-                '../nam_rm_circs/mod5_4.qasm',
-            ),
-            InputGraph(
                 'mod_mult_55',
-                '../nam_rm_circs/mod_mult_55.qasm',
-            ),
-            InputGraph(
                 'tof_5',
-                '../nam_rm_circs/tof_5.qasm',
-            ),
-            InputGraph(
                 'gf2^4_mult',
-                '../nam_rm_circs/gf2^4_mult.qasm',
-            ),
+            ]
         ]
     )
 

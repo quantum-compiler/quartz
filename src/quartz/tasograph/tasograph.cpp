@@ -572,6 +572,7 @@ void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);
   int num_qubits = oldOp.ptr->get_num_qubits();
   if (inEdges.find(oldOp) != inEdges.end()) {
+    // Remove out edges of in-ops
     auto in_edges = inEdges[oldOp];
     for (auto edge : in_edges) {
       auto src_op = edge.srcOp;
@@ -588,6 +589,7 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (outEdges.find(oldOp) != outEdges.end()) {
+    // Remove in edges of out-ops
     auto out_edges = outEdges[oldOp];
     for (auto out_edge : out_edges) {
       auto dst_op = out_edge.dstOp;
@@ -704,7 +706,7 @@ void Graph::constant_and_rotation_elimination() {
   }
 
   // Construct in-degree map
-  std::map<Op, size_t> op_in_edges_cnt;
+  std::unordered_map<Op, size_t, OpHash> op_in_edges_cnt;
   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }
@@ -807,7 +809,7 @@ void Graph::constant_and_rotation_elimination() {
       if (all_parameter_is_0) {
         // Delete all parameter nodes, they are all 0
         for (const auto &e : input_edges) {
-          if (e.dstIdx > num_qubits) {
+          if (e.dstIdx >= num_qubits) {
             remove_node(e.srcOp);
           }
         }
@@ -1432,9 +1434,13 @@ Graph::_from_qasm_stream(Context *ctx,
               if (token[2] == '*') {
                 // pi*0.123
                 p = std::stod(d) * PI;
-              } else {
+              } else if (token[2] == '/') {
                 // pi/2
                 p = PI / std::stod(d);
+              } else {
+                std::cerr << "Unsupported parameter format: " << token
+                          << std::endl;
+                assert(false);
               }
             }
           } else if (token.find("pi") != std::string::npos) {

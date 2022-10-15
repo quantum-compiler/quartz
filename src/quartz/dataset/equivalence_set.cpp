@@ -346,6 +346,14 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
       }
       equiv_class->insert(std::move(dag));
     }
+
+    // If the equivalence class is merged with some others,
+    // we need to select the new representative as the smaller one.
+    // Select the new representative can be done in O(1), but doing in
+    // O(nlogn) where n is the number of DAGs is fine here.
+    // For some reason, even if the equivalence class is not merged with any
+    // others here, we still need to sort the equivalence class.
+    equiv_class->sort();
   }
 
   // Move all previous representatives to the beginning of the

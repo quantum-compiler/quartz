@@ -23,7 +23,7 @@ void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
 
 void Generator::generate(
     int num_qubits, int num_input_parameters, int max_num_quantum_gates,
-    int max_num_param_gates, Dataset *dataset, bool verify_equivalences,
+    int max_num_param_gates, Dataset *dataset, bool invoke_python_verifier,
     EquivalenceSet *equiv_set, bool unique_parameters, bool verbose,
     decltype(std::chrono::steady_clock::now() -
              std::chrono::steady_clock::now()) *record_verification_time) {
@@ -33,7 +33,7 @@ void Generator::generate(
   empty_dag->generate_parameter_gates(context);
   empty_dag->hash(context); // generate other hash values
   std::vector<DAG *> dags_to_search(1, empty_dag.get());
-  if (verify_equivalences) {
+  if (invoke_python_verifier) {
     assert(equiv_set);
     auto equiv_class = std::make_unique<EquivalenceClass>();
     equiv_class->insert(std::make_unique<DAG>(*empty_dag));
@@ -54,20 +54,20 @@ void Generator::generate(
                 << " representative DAGs to search with " << num_gates - 1
                 << " gates." << std::endl;
     }
-    if (!verify_equivalences) {
+    if (!invoke_python_verifier) {
       assert(dataset);
       dags_to_search.clear();
       bfs(dags, max_num_param_gates, *dataset, &dags_to_search,
-          verify_equivalences, nullptr, unique_parameters);
+          invoke_python_verifier, nullptr, unique_parameters);
       dags.push_back(dags_to_search);
     } else {
       assert(dataset);
       assert(equiv_set);
-      bfs(dags, max_num_param_gates, *dataset, nullptr, verify_equivalences,
+      bfs(dags, max_num_param_gates, *dataset, nullptr, invoke_python_verifier,
           equiv_set, unique_parameters);
       // Do not verify when |num_gates == max_num_quantum_gates|.
       // This is to make the behavior the same when
-      // |verify_equivalences| is true or false.
+      // |invoke_python_verifier| is true or false.
       if (num_gates == max_num_quantum_gates) {
         break;
       }
@@ -339,11 +339,12 @@ void Generator::dfs(int gate_idx, int max_num_gates,
 void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
                     int max_num_param_gates, Dataset &dataset,
                     std::vector<DAG *> *new_representatives,
-                    bool verify_equivalences, const EquivalenceSet *equiv_set,
-                    bool unique_parameters) {
+                    bool invoke_python_verifier,
+                    const EquivalenceSet *equiv_set, bool unique_parameters) {
   auto try_to_add_to_result = [&](DAG *new_dag) {
     // A new DAG with |current_max_num_gates| + 1 gates.
-    if (verify_equivalences) {
+    if (invoke_python_verifier) {
+      // We will verify the equivalence later in Python.
       assert(equiv_set);
       if (!verifier_.redundant(context, equiv_set, new_dag)) {
         auto new_new_dag = std::make_unique<DAG>(*new_dag);
@@ -361,8 +362,9 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       if (verifier_.redundant(context, new_dag)) {
         return;
       }
-      bool ret = dataset.insert(context, std::make_unique<DAG>(*new_dag));
-      // Presuming different hash values imply different DAGs.
+      // XXX: Try to insert to a set with hash value differing no more than 1.
+      bool ret = dataset.insert_to_nearby_set_if_exists(
+          context, std::make_unique<DAG>(*new_dag));
       if (ret) {
         // The DAG's hash value is new to the dataset.
         // Note: this is the second instance of DAG we create in
@@ -376,7 +378,10 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
     }
   };
-  for (auto &dag : dags.back()) {
+  for (auto &old_dag : dags.back()) {
+    // Create a new DAG to avoid editing the old one.
+    auto new_dag = std::make_unique<DAG>(*old_dag);
+    auto dag = new_dag.get();
     InputParamMaskType input_param_usage_mask;
     std::vector<InputParamMaskType> input_param_masks;
     if (unique_parameters) {
@@ -481,7 +486,6 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
       qubit_indices.pop_back();
     }
-    dag->hash(context); // restore hash value
   }
 }
 

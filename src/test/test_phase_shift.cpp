@@ -23,7 +23,7 @@ int main() {
   EquivalenceSet equiv_set;
   auto start = std::chrono::steady_clock::now();
   gen.generate(num_qubits, num_input_parameters, max_num_gates,
-               max_num_param_gates, &dataset, /*verify_equivalences=*/
+               max_num_param_gates, &dataset, /*invoke_python_verifier=*/
                true, &equiv_set, /*unique_parameters=*/false, /*verbose=*/
                true);
   auto end = std::chrono::steady_clock::now();

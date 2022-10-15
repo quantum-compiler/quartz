@@ -40,14 +40,12 @@ public:
   // A hacky function: set a generated parameter.
   void set_generated_parameter(int id, ParamType param);
 
-  // This function assumes that two DAGs are equivalent iff they share the
-  // same hash value.
-  DAG *get_possible_representative(DAG *dag);
-
-  // This function assumes that two DAGs are equivalent iff they share the
-  // same hash value.
+  // These three functions are used in |Verifier::redundant()| for a version
+  // of RepGen algorithm that does not invoke Python verifier.
   void set_representative(std::unique_ptr<DAG> dag);
   void clear_representatives();
+  bool get_possible_representative(const DAGHashType &hash_value,
+                                   DAG *&representative) const;
 
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].

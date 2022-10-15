@@ -35,15 +35,36 @@ public:
                     Dataset &dataset, bool restrict_search_space,
                     bool unique_parameters);
 
-  // Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
-  // |num_input_parameters| input parameters (probably with some unused),
-  // and <= |max_num_quantum_gates| gates.
-  // If |unique_parameters| is true, we only search for DAGs that use
-  // each input parameters only once (note: use a doubled parameter, i.e.,
-  // Rx(2theta) is considered using the parameter theta once).
+  /**
+   * Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
+   * |num_input_parameters| input parameters (probably with some unused),
+   * and <= |max_num_quantum_gates| gates.
+   *
+   * @param num_qubits number of qubits in the circuits generated.
+   * @param num_input_parameters number of input parameters in the circuits
+   * generated.
+   * @param max_num_quantum_gates max number of quantum gates in the circuits
+   * generated.
+   * @param max_num_param_gates currently unused.
+   * @param dataset the |Dataset| object to store the result.
+   * @param invoke_python_verifier if true, invoke Z3 verifier in Python to
+   * verify that the equivalences we found are indeed equivalent. Otherwise,
+   * we will simply trust the one-time random testing result, which may
+   * treat hash collision as equivalent. XXX: when this is false, we will
+   * treat any DAG with hash values differ no more than 1 with any
+   * representative as equivalent.
+   * @param equiv_set should be an empty |EquivalenceSet| object at the
+   * beginning, and will store the intermediate ECC sets during generation.
+   * @param unique_parameters if true, we only search for DAGs that use
+   * each input parameters only once (note: use a doubled parameter, i.e.,
+   * Rx(2theta) is considered using the parameter theta once).
+   * @param verbose print debug message or not.
+   * @param record_verification_time use |std::chrono::steady_clock| to
+   * record the verification time or not.
+   */
   void generate(
       int num_qubits, int num_input_parameters, int max_num_quantum_gates,
-      int max_num_param_gates, Dataset *dataset, bool verify_equivalences,
+      int max_num_param_gates, Dataset *dataset, bool invoke_python_verifier,
       EquivalenceSet *equiv_set, bool unique_parameters, bool verbose = false,
       decltype(std::chrono::steady_clock::now() -
                std::chrono::steady_clock::now()) *record_verification_time =
@@ -57,7 +78,7 @@ private:
   // |dags[i]| is the DAGs with |i| gates.
   void bfs(const std::vector<std::vector<DAG *>> &dags, int max_num_param_gates,
            Dataset &dataset, std::vector<DAG *> *new_representatives,
-           bool verify_equivalences, const EquivalenceSet *equiv_set,
+           bool invoke_python_verifier, const EquivalenceSet *equiv_set,
            bool unique_parameters);
 
   void dfs_parameter_gates(std::unique_ptr<DAG> dag, int remaining_gates,

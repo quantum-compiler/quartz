@@ -18,7 +18,7 @@ void test_generator(const std::vector<GateType> &support_gates, int num_qubits,
   EquivalenceSet equiv_set;
   generator.generate(num_qubits, max_num_input_parameters, max_num_gates,
                      /*max_num_param_gates=*/1, &dataset,
-                     /*verify_equivalences=*/false, &equiv_set,
+                     /*invoke_python_verifier=*/false, &equiv_set,
                      /*unique_parameters=*/false);
   auto end = std::chrono::steady_clock::now();
   if (verbose) {

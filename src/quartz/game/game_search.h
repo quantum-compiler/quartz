@@ -105,6 +105,7 @@ namespace quartz {
                 for (const auto &qubit_pair: graph.qubit_mapping_table) {
                     int physical_idx = qubit_pair.second.second;
                     for (int other = 0; other < physical_qubit_num; ++other) {
+                        if (other == physical_idx) continue;
                         physical_action_space.insert(Action(ActionType::SearchFull,
                                                             std::min(other, physical_idx),
                                                             std::max(other, physical_idx)));

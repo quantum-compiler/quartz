@@ -180,6 +180,7 @@ cdef extern from "game/game_utils.h" namespace "quartz":
         PhysicalFull,
         PhysicalFront,
         Logical,
+        SearchFull,
         Unknown
 
     cdef cppclass Action:

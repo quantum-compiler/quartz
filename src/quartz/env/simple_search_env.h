@@ -97,7 +97,7 @@ namespace quartz {
 
         Reward step(Action action) {
             // check whether action is valid
-            assert(action.type == ActionType::PhysicalFull);
+            assert(action.type == ActionType::SearchFull);
             assert(action.qubit_idx_0 < cur_game_ptr->physical_qubit_num);
             assert(action.qubit_idx_1 < cur_game_ptr->physical_qubit_num);
 
@@ -118,7 +118,7 @@ namespace quartz {
         [[nodiscard]] std::vector<Action> get_action_space() const {
             // ActionType: Physical Front
             std::set<Action, ActionCompare> available_action_set = cur_game_ptr->action_space(
-                    ActionType::PhysicalFull);
+                    ActionType::SearchFull);
             std::vector<Action> action_space;
             action_space.reserve(available_action_set.size());
             for (const auto &available_action: available_action_set) {

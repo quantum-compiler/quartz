@@ -636,6 +636,8 @@ def ToActionType(tp_str: str) -> ActionType:
         return ActionType.PhysicalFront
     elif tp_str == "Logical":
         return ActionType.Logical
+    elif tp_str == "SearchFull":
+        return ActionType.SearchFull
     elif tp_str == "Unknown":
         return ActionType.Unknown
     else:
@@ -648,6 +650,8 @@ def FromActionType(tp: ActionType) -> str:
         return "PhysicalFront"
     elif tp == ActionType.Logical:
         return "Logical"
+    elif tp == ActionType.SearchFull:
+        return "SearchFull"
     elif tp == ActionType.Unknown:
         return "Unknown"
     else:
@@ -944,7 +948,7 @@ cdef class PySimpleSearchEnv:
     def step_with_id(self, qubit_idx_0: int, qubit_idx_1: int) -> Reward:
         cdef int _qubit_idx_0 = qubit_idx_0
         cdef int _qubit_idx_1 = qubit_idx_1
-        cdef shared_ptr[Action] action = make_shared[Action](ActionType.PhysicalFull,
+        cdef shared_ptr[Action] action = make_shared[Action](ActionType.SearchFull,
                                                              _qubit_idx_0,
                                                              _qubit_idx_1)
         return deref(self.env).step(deref(action))

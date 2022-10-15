@@ -30,7 +30,8 @@ namespace quartz {
         PhysicalFull = 0,   // swaps between physical neighbors of all used logical qubits
         PhysicalFront = 1,  // swaps between physical neighbors of inputs to front gates
         Logical = 2,        // swaps between logical qubits, at least one must be used
-        Unknown = 3
+        SearchFull = 3,     // swaps between one used physical qubit and any other physical qubits
+        Unknown = 4
     };
 
     class Action {

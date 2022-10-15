@@ -99,28 +99,27 @@ namespace quartz {
         }
 
         std::set<Action, ActionCompare> action_space(ActionType action_type) {
-            if (action_type == ActionType::PhysicalFull) {
-                // Physical Full: swaps between physical neighbors of all used logical qubits
+            if (action_type == ActionType::SearchFull) {
+                // Physical Full: The Physical
                 std::set<Action, ActionCompare> physical_action_space;
                 for (const auto &qubit_pair: graph.qubit_mapping_table) {
                     int physical_idx = qubit_pair.second.second;
-                    auto neighbor_list = device->get_input_neighbours(physical_idx);
-                    for (int neighbor: neighbor_list) {
-                        physical_action_space.insert(Action(ActionType::PhysicalFull,
-                                                            std::min(neighbor, physical_idx),
-                                                            std::max(neighbor, physical_idx)));
+                    for (int other = 0; other < physical_qubit_num; ++other) {
+                        physical_action_space.insert(Action(ActionType::SearchFull,
+                                                            std::min(other, physical_idx),
+                                                            std::max(other, physical_idx)));
                     }
                 }
                 return std::move(physical_action_space);
             } else {
-                std::cout << "GameSearch only supports PhysicalFull" << std::endl;
+                std::cout << "GameSearch only supports SearchFull" << std::endl;
                 assert(false);
                 return {};
             }
         }
 
         Reward apply_action(const Action &action) {
-            if (action.type == ActionType::PhysicalFull) {
+            if (action.type == ActionType::SearchFull) {
                 // STEP 1: put swap into history & change mapping tables
                 // put action into execution history
                 int physical_0 = action.qubit_idx_0;

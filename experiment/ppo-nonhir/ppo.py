@@ -195,6 +195,10 @@ class PPOMod:
                     'params': self.ddp_ac_net.critic.parameters(),
                     'lr': self.cfg.lr_critic,
                 },
+                {
+                    'params': self.ddp_ac_net.attn.parameters(),
+                    'lr': self.cfg.lr_critic,
+                },
             ]
         )
         if self.cfg.lr_scheduler == 'linear':
@@ -447,9 +451,6 @@ class PPOMod:
                 # # (batch_num_graphs, )
                 # xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
                 # xfer_entropys = xfer_dists.entropy()
-                print(
-                    f'{b_softmax_node_values_pad.shape = }\n{softmax_xfer_logits.shape = }'
-                )
                 action_probs = torch.bmm(
                     b_softmax_node_values_pad.unsqueeze(-1),
                     softmax_xfer_logits.unsqueeze(1),

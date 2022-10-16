@@ -438,10 +438,10 @@ class PPOMod:
                 # end for
                 softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
                 xfer_dists = Categorical(softmax_xfer_logits)
-                action_xfers = xfer_dists.sample()
+                # action_xfers = xfer_dists.sample()
                 action_logprobs: torch.Tensor = xfer_dists.log_prob(
-                    action_xfers
-                ) + node_dists.log_prob(action_nodes_ts)
+                    exps.action[:, 1]
+                ) + node_dists.log_prob(exps.action[:, 0])
                 # # (batch_num_graphs, action_dim)
                 # xfer_logits: torch.Tensor = self.ddp_ac_net(
                 #     selected_node_embeds, NonHirActorCritic.actor_name()
@@ -451,12 +451,15 @@ class PPOMod:
                 # # (batch_num_graphs, )
                 # xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
                 # xfer_entropys = xfer_dists.entropy()
-                action_probs = torch.bmm(
-                    b_softmax_node_values_pad.unsqueeze(-1),
-                    softmax_xfer_logits.unsqueeze(1),
-                ).reshape(len(num_nodes), -1)
-                action_dists = Categorical(action_probs)
-                action_entropys = action_dists.entropy()
+
+                # action_probs = torch.bmm(
+                #     b_softmax_node_values_pad.unsqueeze(-1),
+                #     softmax_xfer_logits.unsqueeze(1),
+                # ).reshape(len(num_nodes), -1)
+                # action_dists = Categorical(action_probs)
+                # action_entropys = action_dists.entropy()
+
+                action_entropys = xfer_dists.entropy() + node_dists.entropy()
 
                 """compute loss for Actor (policy_net, theta)"""
                 # prob ratio = (pi_theta / pi_theta__old)

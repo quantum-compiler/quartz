@@ -12,7 +12,31 @@ from model.qgnn import *
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 
-class ActorCritic(nn.Module):
+class NodeGraphAttn(nn.Module):
+    def __init__(
+        self,
+        node_embed_dim: int,
+        graph_embed_dim: int,
+        hidden_size: int,
+    ):
+        super().__init__()
+        self.node_linear = nn.Linear(node_embed_dim, hidden_size)
+        self.graph_linear = nn.Linear(graph_embed_dim, hidden_size)
+
+    def forward(self, g_feats: torch.Tensor, n_feats: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            g_feats: (B, graph_embed_dim)
+            n_feats: (B, num_nodes, node_embed_dim)
+        Return: (B, num_nodes)
+        """
+        g_feats = self.graph_linear(g_feats)
+        n_feats = self.node_linear(n_feats)
+        scores = torch.bmm(n_feats, g_feats.unsqueeze(-1)).squeeze(-1)
+        return scores
+
+
+class NonHirActorCritic(nn.Module):
     def __init__(
         self,
         gnn_type: str = 'QGIN',
@@ -32,6 +56,7 @@ class ActorCritic(nn.Module):
         gnn: nn.Module = None,
         actor: nn.Module = None,
         critic: nn.Module = None,
+        attn: nn.Module = None,
     ) -> None:
         """
         Args:
@@ -46,6 +71,7 @@ class ActorCritic(nn.Module):
             self.gnn = gnn
             self.actor = actor
             self.critic = critic
+            self.attn = attn
             self.device = device
             return
 
@@ -77,23 +103,26 @@ class ActorCritic(nn.Module):
 
         self.actor = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
         self.critic = MLP(2, gnn_output_dim, critic_hidden_size, 1)
+        self.attn = NodeGraphAttn(gnn_output_dim, gnn_output_dim, gnn_output_dim)
 
-    def ddp_model(self) -> ActorCritic:
+    def ddp_model(self) -> NonHirActorCritic:
         """make ddp verison instances for each sub-model"""
-        _ddp_model = ActorCritic(
+        _ddp_model = NonHirActorCritic(
             device=self.device,
             gnn=DDP(self.gnn, device_ids=[self.device]),
             actor=DDP(self.actor, device_ids=[self.device]),
             critic=DDP(self.critic, device_ids=[self.device]),
+            attn=DDP(self.attn, device_ids=[self.device]),
         )
         return _ddp_model
 
-    def forward(self, x: torch.Tensor | dgl.DGLGraph, callee: str) -> torch.Tensor:
+    def forward(self, x: Any, callee: str) -> torch.Tensor:
         if callee == self.gnn_name():
             """
             Get tensor representations of nodes in graph(s)
             Return: torch.Tensor (num_nodes, gnn_output_dim)
             """
+            x = cast(dgl.DGLGraph, x)
             return self.gnn(x)
         elif callee == self.actor_name():
             """
@@ -102,6 +131,7 @@ class ActorCritic(nn.Module):
                 x: (B, gnn_output_dim)
             Return: torch.Tensor (B, action_dim)
             """
+            x = cast(torch.Tensor, x)
             return self.actor(x)
         elif callee == self.critic_name():
             """
@@ -110,7 +140,19 @@ class ActorCritic(nn.Module):
                 x: (B, gnn_output_dim)
             Return: torch.Tensor (B, 1)
             """
+            x = cast(torch.Tensor, x)
             return self.critic(x)
+        elif callee == self.attn_name():
+            """
+            Evaluate nodes in graphs
+            Args:
+                x: (g_feats, n_feats)
+                    g_feats: (B, graph_embed_dim)
+                    n_feats: (B, num_nodes, node_embed_dim)
+            Return: torch.Tensor (B, num_nodes)
+            """
+            x = cast(Tuple[torch.Tensor, torch.Tensor], x)
+            return self.attn(x[0], x[1])
         else:
             raise NotImplementedError(f'Unexpected callee name: {callee}')
 
@@ -125,3 +167,7 @@ class ActorCritic(nn.Module):
     @staticmethod
     def critic_name() -> str:
         return 'critic'
+
+    @staticmethod
+    def attn_name() -> str:
+        return 'attn'

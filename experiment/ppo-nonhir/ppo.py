@@ -21,7 +21,7 @@ from config.config import *
 from ds import *
 from icecream import ic  # type: ignore
 from IPython import embed  # type: ignore
-from model.actor_critic import ActorCritic
+from model.actor_critic import NonHirActorCritic
 from natsort import natsorted
 from numpy import str0
 from tester import Tester
@@ -125,8 +125,8 @@ class PPOMod:
 
     def _make_actor_critic(
         self,
-    ) -> ActorCritic:
-        return ActorCritic(
+    ) -> NonHirActorCritic:
+        return NonHirActorCritic(
             gnn_type=self.cfg.gnn_type,
             num_gate_types=self.cfg.num_gate_types,
             gate_type_embed_dim=self.cfg.gate_type_embed_dim,
@@ -150,9 +150,9 @@ class PPOMod:
         else:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
         torch.cuda.set_device(self.device)
-        self.ac_net: ActorCritic = self._make_actor_critic()
+        self.ac_net: NonHirActorCritic = self._make_actor_critic()
         self.ac_net = cast(
-            ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
+            NonHirActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
         )
         self.ac_net_old = copy.deepcopy(self.ac_net)
         self.agent = PPOAgent(
@@ -337,48 +337,16 @@ class PPOMod:
                 """get embeds"""
                 # (batch_next_graphs_nodes, embed_dim)
                 b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(
-                    exps.next_state, ActorCritic.gnn_name()
+                    exps.next_state, NonHirActorCritic.gnn_name()
                 )
-                next_graph_embeds_list: List[torch.Tensor] = torch.split(
-                    b_next_graph_embeds, next_num_nodes.tolist()
+
+                next_global_embeds = split_reduce_mean(
+                    b_next_graph_embeds, next_num_nodes
                 )
-                """select embeds"""
-                # ( sum(num_next_nodes), embed_dim )
-                next_node_embeds: torch.Tensor = torch.cat(
-                    [
-                        graph_embed[next_node_ids]
-                        for (next_node_ids, graph_embed) in zip(
-                            exps.next_nodes, next_graph_embeds_list
-                        )
-                    ]
-                )
-                """evaluate"""
-                # ( sum(num_next_nodes), )
-                next_node_values: torch.Tensor = self.ddp_ac_net(
-                    next_node_embeds, ActorCritic.critic_name()
+                max_next_values = self.ddp_ac_net(
+                    next_global_embeds, NonHirActorCritic.critic_name()
                 ).squeeze()
-                num_next_nodes = list(map(len, exps.next_nodes))
-                next_node_values_list: List[torch.Tensor] = torch.split(
-                    next_node_values, num_next_nodes
-                )
-                """get max next value for each graph"""
-                max_next_values_list: List[torch.Tensor] = []
-                for i in range(len(exps)):
-                    max_next_value: torch.Tensor
-                    # invalid xfer, gate count exceeds limit, NOP
-                    if (
-                        next_node_values_list[i].shape[0] == 0
-                        or exps.game_over[i]
-                        or qtz.is_nop(int(exps.action[i, 1]))
-                        and self.cfg.nop_stop
-                    ):
-                        max_next_value = torch.zeros(1).to(self.device)
-                    else:
-                        max_next_value, _ = torch.max(
-                            next_node_values_list[i], dim=0, keepdim=True
-                        )
-                    max_next_values_list.append(max_next_value)
-                max_next_values = torch.cat(max_next_values_list)
+
                 target_values = exps.reward + self.cfg.gamma * max_next_values
                 advs = target_values - exps.node_value
                 all_target_values += target_values.tolist()
@@ -401,29 +369,97 @@ class PPOMod:
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
                 # (batch_num_nodes, embed_dim)
                 b_node_embeds: torch.Tensor = self.ddp_ac_net(
-                    exps.state, ActorCritic.gnn_name()
+                    exps.state, NonHirActorCritic.gnn_name()
                 )
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device)  # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset
-                selected_node_embeds = b_graph_embeds[selected_nodes]
-                # NOTE: this is the "new value" updated with the network's updates
-                selected_node_values: torch.Tensor = self.ddp_ac_net(
-                    selected_node_embeds, ActorCritic.critic_name()
-                ).squeeze()
-                """get xfer dist by Actor"""
-                # (batch_num_graphs, action_dim)
-                xfer_logits: torch.Tensor = self.ddp_ac_net(
-                    selected_node_embeds, ActorCritic.actor_name()
-                )
-                softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
-                xfer_dists = Categorical(softmax_xfer)
+
+                b_node_mask = torch.zeros(b_node_embeds.shape[0], dtype=torch.bool)
+                b_global_embeds = split_reduce_mean(b_node_embeds, num_nodes)
                 # (batch_num_graphs, )
-                xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
-                xfer_entropys = xfer_dists.entropy()
+                global_values = self.ddp_ac_net(
+                    b_global_embeds, NonHirActorCritic.critic_name()
+                ).squeeze()
+                # (num_graphs, max_num_nodes, embed_dim)
+                b_node_embeds_pad = nn.utils.rnn.pad_sequence(
+                    torch.split(b_node_embeds, num_nodes.tolist()), batch_first=True
+                )
+                b_node_mask = nn.utils.rnn.pad_sequence(
+                    torch.split(b_node_mask, num_nodes.tolist()),
+                    batch_first=True,
+                    padding_value=True,
+                )
+                # (num_graphs, max_num_nodes)
+                b_node_values_pad = self.ddp_ac_net(
+                    (b_global_embeds, b_node_embeds_pad), NonHirActorCritic.attn_name()
+                )
+                b_node_values_pad[b_node_mask] -= 1e10
+                # (num_graphs, )
+                temperature: torch.Tensor
+                if not self.cfg.softmax_temp_en:
+                    temperature = torch.ones(1).to(self.device)
+                else:
+                    temperature = 1 / (
+                        torch.log(
+                            self.cfg.hit_rate
+                            * (num_nodes - 1)
+                            / (1 - self.cfg.hit_rate)
+                        )
+                    )
+                b_softmax_node_values_pad = F.softmax(
+                    b_node_values_pad / temperature.unsqueeze(1), dim=-1
+                )
+                node_dists = Categorical(b_softmax_node_values_pad)
+                # (num_graphs, )
+                action_nodes_ts: torch.Tensor = node_dists.sample()
+                action_nodes: List[int] = action_nodes_ts.tolist()
+
+                # (num_graphs, action_dim)
+                xfer_logits: torch.Tensor = self.ddp_ac_net(
+                    b_global_embeds, NonHirActorCritic.actor_name()
+                )
+                """sample action_xfer with mask"""
+                av_xfer_masks = torch.zeros_like(
+                    xfer_logits, dtype=torch.bool
+                )  # device is the same with xfer_logits
+                av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
+                for i_batch in range(len(num_nodes)):
+                    graph = exps.pystate[i_batch]
+                    av_xfers = graph.available_xfers_parallel(
+                        context=qtz.quartz_context,
+                        node=graph.get_node_from_id(id=action_nodes[i_batch]),
+                    )
+                    av_xfer_masks[i_batch][av_xfers] = True
+                # end for
+                softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
+                xfer_dists = Categorical(softmax_xfer_logits)
+                action_xfers = xfer_dists.sample()
+                action_logprobs: torch.Tensor = xfer_dists.log_prob(
+                    action_xfers
+                ) + node_dists.log_prob(action_nodes_ts)
+                # # (batch_num_graphs, action_dim)
+                # xfer_logits: torch.Tensor = self.ddp_ac_net(
+                #     selected_node_embeds, NonHirActorCritic.actor_name()
+                # )
+                # softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
+                # xfer_dists = Categorical(softmax_xfer)
+                # # (batch_num_graphs, )
+                # xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
+                # xfer_entropys = xfer_dists.entropy()
+                print(
+                    f'{b_softmax_node_values_pad.shape = }\n{softmax_xfer_logits.shape = }'
+                )
+                action_probs = torch.bmm(
+                    b_softmax_node_values_pad.unsqueeze(-1),
+                    softmax_xfer_logits.unsqueeze(1),
+                ).reshape(len(num_nodes), -1)
+                action_dists = Categorical(action_probs)
+                action_entropys = action_dists.entropy()
+
                 """compute loss for Actor (policy_net, theta)"""
                 # prob ratio = (pi_theta / pi_theta__old)
-                ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
+                ratios = torch.exp(action_logprobs - exps.xfer_logprob)
                 surr1 = ratios * exps.advantages
                 surr2 = (
                     torch.clamp(ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip)
@@ -431,10 +467,8 @@ class PPOMod:
                 )  # NOTE: use fixed advantages
                 actor_loss = -torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.mean(
-                    (exps.target_values - selected_node_values) ** 2
-                )
-                xfer_entropy = torch.mean(xfer_entropys)
+                critic_loss = torch.mean((exps.target_values - global_values) ** 2)
+                xfer_entropy = torch.mean(action_entropys)
                 """compute overall loss"""
                 loss = (
                     actor_loss
@@ -549,7 +583,7 @@ class PPOMod:
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
-        self.ac_net: ActorCritic = self._make_actor_critic()
+        self.ac_net: NonHirActorCritic = self._make_actor_critic()
         self.ddp_ac_net = self.ac_net.ddp_model()
 
     @torch.no_grad()

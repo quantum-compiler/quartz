@@ -111,7 +111,6 @@ class BaseConfig:
     agent_collect: bool = True
     agent_batch_size: int = 128
     subgraph_opt: bool = True
-
     # training
     max_iterations: int = int(1e8)
     num_eps_per_iter: int = 128  # 30

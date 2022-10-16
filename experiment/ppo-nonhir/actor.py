@@ -20,7 +20,7 @@ import wandb
 from ds import *
 from icecream import ic  # type: ignore
 from IPython import embed  # type: ignore
-from model.actor_critic import ActorCritic
+from model.actor_critic import NonHirActorCritic
 from omegaconf.dictconfig import DictConfig
 from torch.distributions import Categorical
 from torch.futures import Future
@@ -166,7 +166,7 @@ class PPOAgent:
         invalid_reward: float,
         limit_total_gate_count: bool,
         cost_type: CostType,
-        ac_net: ActorCritic,
+        ac_net: NonHirActorCritic,
         input_graphs: List[Dict[str, str]],
         softmax_temp_en: bool,
         hit_rate: float,
@@ -620,17 +620,22 @@ class PPOAgent:
         )  # (num_graphs, ) assert each elem > 0
         # (batch_num_nodes, embed_dim)
         b_node_embeds: torch.Tensor = self.ac_net.gnn(b_state)
-        # (batch_num_nodes, )
-        b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
-        # list with length num_graphs; each member is a tensor of node values in a graph
-        node_values_list: List[torch.Tensor] = torch.split(
-            b_node_values, num_nodes.tolist()
+
+        b_node_mask = torch.zeros(b_node_embeds.shape[0], dtype=torch.bool)
+        # (num_graphs, embed_dim)
+        b_global_embeds = split_reduce_mean(b_node_embeds, num_nodes)
+        # (num_graphs, max_num_nodes, embed_dim)
+        b_node_embeds_pad = nn.utils.rnn.pad_sequence(
+            torch.split(b_node_embeds, num_nodes.tolist()), batch_first=True
         )
-        """sample node by softmax with temperature for each graph as a batch"""
+        b_node_mask = nn.utils.rnn.pad_sequence(
+            torch.split(b_node_mask, num_nodes.tolist()),
+            batch_first=True,
+            padding_value=True,
+        )
         # (num_graphs, max_num_nodes)
-        b_node_values_pad = nn.utils.rnn.pad_sequence(
-            node_values_list, batch_first=True, padding_value=-math.inf
-        )
+        b_node_values_pad = self.ac_net.attn(b_global_embeds, b_node_embeds_pad)
+        b_node_values_pad[b_node_mask] -= 1e10
         # (num_graphs, )
         temperature: torch.Tensor
         if not self.softmax_temp_en:
@@ -642,20 +647,13 @@ class PPOAgent:
         b_softmax_node_values_pad = F.softmax(
             b_node_values_pad / temperature.unsqueeze(1), dim=-1
         )
-        b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
-        action_nodes: List[int] = b_sampled_nodes.tolist()
-        """collect embeddings of sampled nodes"""
+        node_dists = Categorical(b_softmax_node_values_pad)
         # (num_graphs, )
-        node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(
-            self.device
-        )
-        node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-        sampled_node_ids = b_sampled_nodes + node_offsets
-        # (num_graphs, embed_dim)
-        sampled_node_embeds = b_node_embeds[sampled_node_ids]
-        """use Actor to evaluate xfers for sampled nodes"""
+        action_nodes_ts: torch.Tensor = node_dists.sample()
+        action_nodes: List[int] = action_nodes_ts.tolist()
+
         # (num_graphs, action_dim)
-        xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
+        xfer_logits: torch.Tensor = self.ac_net.actor(b_global_embeds)
         """sample action_xfer with mask"""
         av_xfer_masks = torch.zeros_like(
             xfer_logits, dtype=torch.bool
@@ -672,10 +670,13 @@ class PPOAgent:
         softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
         xfer_dists = Categorical(softmax_xfer_logits)
         action_xfers = xfer_dists.sample()
-        action_xfer_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
-        action_node_values: List[float] = b_node_values_pad[
-            list(range(num_eps)), action_nodes
-        ].tolist()
+        action_xfer_logps: torch.Tensor = xfer_dists.log_prob(
+            action_xfers
+        ) + node_dists.log_prob(action_nodes_ts)
+        action_node_values: List[float] = (
+            self.ac_net.critic(b_global_embeds).squeeze().tolist()
+        )
+
         return (
             dgl_graphs,
             action_nodes,
@@ -883,6 +884,7 @@ class PPOAgent:
                     )
                     action.node = new_indices[0]
                 eps_list.state.append(dgl_graphs[i_eps])
+                eps_list.pystate.append(graph)
                 eps_list.action.append(action)
 
                 # collect other info

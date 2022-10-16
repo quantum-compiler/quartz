@@ -1,0 +1,29 @@
+channels:
+  - defaults
+  - dglteam
+  - pytorch
+  - conda-forge
+  # ref: https://stackoverflow.com/a/69180871
+dependencies:
+  - python
+  - pip
+  - ipython
+  - tqdm
+  - numpy
+  - matplotlib
+  - pytorch::pytorch
+  - cudatoolkit=11.3
+  - dgl-cuda11.3
+  - openmp
+  - hydra-core
+  - icecream
+  - mypy
+  - mypy_extensions
+  - wandb
+  - pylatexenc
+  - natsort
+  - sortedcontainers
+  - pip:
+    - cython>=3.0a1
+    - z3-solver
+    - qiskit

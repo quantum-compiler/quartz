@@ -107,7 +107,7 @@ class ActorCritic(nn.Module):
             context=context, node=g.get_node_from_id(id=node)
         )
         mask[available_xfers] = True
-        xfer_logits = self.actor(graph_embed)
+        xfer_logits = self.actor_xfer(graph_embed)
         xfer_probs = masked_softmax(xfer_logits[node], mask)
         xfer_dist = Categorical(xfer_probs)
         xfer = xfer_dist.sample()

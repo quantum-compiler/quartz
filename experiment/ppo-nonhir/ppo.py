@@ -423,20 +423,20 @@ class PPOMod:
                 xfer_logits: torch.Tensor = self.ddp_ac_net(
                     b_global_embeds, NonHirActorCritic.actor_name()
                 )
-                """sample action_xfer with mask"""
-                av_xfer_masks = torch.zeros_like(
-                    xfer_logits, dtype=torch.bool
-                )  # device is the same with xfer_logits
-                av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
-                for i_batch in range(len(num_nodes)):
-                    graph = exps.pystate[i_batch]
-                    av_xfers = graph.available_xfers_parallel(
-                        context=qtz.quartz_context,
-                        node=graph.get_node_from_id(id=action_nodes[i_batch]),
-                    )
-                    av_xfer_masks[i_batch][av_xfers] = True
-                # end for
-                softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
+                # """sample action_xfer with mask"""
+                # av_xfer_masks = torch.zeros_like(
+                #     xfer_logits, dtype=torch.bool
+                # )  # device is the same with xfer_logits
+                # av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
+                # for i_batch in range(len(num_nodes)):
+                #     graph = exps.pystate[i_batch]
+                #     av_xfers = graph.available_xfers_parallel(
+                #         context=qtz.quartz_context,
+                #         node=graph.get_node_from_id(id=action_nodes[i_batch]),
+                #     )
+                #     av_xfer_masks[i_batch][av_xfers] = True
+                # # end for
+                softmax_xfer_logits = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer_logits)
                 # action_xfers = xfer_dists.sample()
                 action_logprobs: torch.Tensor = xfer_dists.log_prob(

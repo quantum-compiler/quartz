@@ -144,7 +144,6 @@ class ExperienceList:
     def shuffle(self) -> None:
         (
             self.state,
-            self.pystate,
             self.action,
             self.reward,
             self.next_state,
@@ -156,7 +155,6 @@ class ExperienceList:
             self.info,
         ) = shuffle_lists(
             self.state,
-            self.pystate,
             self.action,
             self.reward,
             self.next_state,
@@ -178,7 +176,6 @@ class ExperienceList:
         if start_pos < len(self):
             sc = slice(start_pos, start_pos + batch_size)
             exps.state = dgl.batch(self.state[sc]).to(device)
-            exps.pystate = self.pystate[sc]
             exps.next_state = dgl.batch(self.next_state[sc]).to(device)
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device)  # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
@@ -203,7 +200,6 @@ class TrainExpList(ExperienceList):
     def shuffle(self) -> None:
         (
             self.state,
-            self.pystate,
             self.action,
             self.reward,
             self.next_state,
@@ -217,7 +213,6 @@ class TrainExpList(ExperienceList):
             self.advantages,
         ) = shuffle_lists(
             self.state,
-            self.pystate,
             self.action,
             self.reward,
             self.next_state,
@@ -241,7 +236,6 @@ class TrainExpList(ExperienceList):
         if start_pos < len(self):
             sc = slice(start_pos, start_pos + batch_size)
             exps.state = dgl.batch(self.state[sc]).to(device)
-            exps.pystate = self.pystate[sc]
             exps.next_state = dgl.batch(self.next_state[sc]).to(device)
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device)  # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
@@ -275,7 +269,6 @@ class BatchedExperience:
     def __add__(self, other: BatchedExperience) -> BatchedExperience:
         res = BatchedExperience.new_empty()
         res.state = dgl.batch([self.state, other.state])
-        res.pystate = self.pystate + other.pystate
         res.next_state = dgl.batch([self.next_state, other.next_state])
         res.action = torch.cat([self.action, other.action])  # type: ignore
         res.reward = torch.cat([self.reward, other.reward])

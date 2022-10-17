@@ -884,7 +884,6 @@ class PPOAgent:
                     )
                     action.node = new_indices[0]
                 eps_list.state.append(dgl_graphs[i_eps])
-                eps_list.pystate.append(graph)
                 eps_list.action.append(action)
 
                 # collect other info

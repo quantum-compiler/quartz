@@ -423,41 +423,11 @@ class PPOMod:
                 xfer_logits: torch.Tensor = self.ddp_ac_net(
                     b_global_embeds, NonHirActorCritic.actor_name()
                 )
-                # """sample action_xfer with mask"""
-                # av_xfer_masks = torch.zeros_like(
-                #     xfer_logits, dtype=torch.bool
-                # )  # device is the same with xfer_logits
-                # av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
-                # for i_batch in range(len(num_nodes)):
-                #     graph = exps.pystate[i_batch]
-                #     av_xfers = graph.available_xfers_parallel(
-                #         context=qtz.quartz_context,
-                #         node=graph.get_node_from_id(id=action_nodes[i_batch]),
-                #     )
-                #     av_xfer_masks[i_batch][av_xfers] = True
-                # # end for
                 softmax_xfer_logits = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer_logits)
-                # action_xfers = xfer_dists.sample()
                 action_logprobs: torch.Tensor = xfer_dists.log_prob(
                     exps.action[:, 1]
                 ) + node_dists.log_prob(exps.action[:, 0])
-                # # (batch_num_graphs, action_dim)
-                # xfer_logits: torch.Tensor = self.ddp_ac_net(
-                #     selected_node_embeds, NonHirActorCritic.actor_name()
-                # )
-                # softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
-                # xfer_dists = Categorical(softmax_xfer)
-                # # (batch_num_graphs, )
-                # xfer_logprobs: torch.Tensor = xfer_dists.log_prob(exps.action[:, 1])
-                # xfer_entropys = xfer_dists.entropy()
-
-                # action_probs = torch.bmm(
-                #     b_softmax_node_values_pad.unsqueeze(-1),
-                #     softmax_xfer_logits.unsqueeze(1),
-                # ).reshape(len(num_nodes), -1)
-                # action_dists = Categorical(action_probs)
-                # action_entropys = action_dists.entropy()
 
                 action_entropys = xfer_dists.entropy() + node_dists.entropy()
 

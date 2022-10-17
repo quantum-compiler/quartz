@@ -4,6 +4,7 @@
 #include "ccx.h"
 #include "ccz.h"
 #include "ch.h"
+#include "cp.h"
 #include "cx.h"
 #include "cz.h"
 #include "gate.h"

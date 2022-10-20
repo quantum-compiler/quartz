@@ -59,8 +59,8 @@ def main():
     plt.subplots_adjust(left=0.13)
 
     # axis
-    plt.xlabel("Minimal Number of Transformations to Reduce Cost", fontsize=20, labelpad=10.0)
-    plt.ylabel("CDF", fontsize=20, labelpad=10.0)
+    plt.xlabel("Minimal Number of Transformations to Reduce Cost", fontsize=18, labelpad=10.0, fontweight='bold')
+    plt.ylabel("CDF", fontsize=20, labelpad=10.0, fontweight='bold')
     plt.ylim((-0.03, 1.1))
     plt.xlim((-0.3, 7.3))
     plt.yticks(ticks=[1.0, 0.8, 0.6, 0.4, 0.2, 0.0])

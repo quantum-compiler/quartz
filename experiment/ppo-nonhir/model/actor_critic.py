@@ -20,8 +20,16 @@ class NodeGraphAttn(nn.Module):
         hidden_size: int,
     ):
         super().__init__()
-        self.node_linear = nn.Linear(node_embed_dim, hidden_size)
-        self.graph_linear = nn.Linear(graph_embed_dim, hidden_size)
+        self.node_linear = nn.Sequential(
+            nn.Linear(node_embed_dim, hidden_size),
+            # nn.ReLU(),
+            # nn.Linear(hidden_size, hidden_size),
+        )
+        self.graph_linear = nn.Sequential(
+            nn.Linear(graph_embed_dim, hidden_size),
+            # nn.ReLU(),
+            # nn.Linear(hidden_size, hidden_size),
+        )
 
     def forward(self, g_feats: torch.Tensor, n_feats: torch.Tensor) -> torch.Tensor:
         """

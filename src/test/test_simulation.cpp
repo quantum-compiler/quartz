@@ -10,9 +10,8 @@ using namespace quartz;
 int main() {
   Context ctx(
       {GateType::h, GateType::u2, GateType::u3, GateType::cx, GateType::cp});
-  QASMParser parser(&ctx);
-  DAG *dag = nullptr;
-  parser.load_qasm("circuit/MQTBench_40q/ae_indep_qiskit_40.qasm", dag);
+  auto graph = Graph::from_qasm_file(
+      &ctx, "circuit/MQTBench_40q/ae_indep_qiskit_40.qasm");
   std::cout << "TODO" << std::endl;
   return 0;
 }

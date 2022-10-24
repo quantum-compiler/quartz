@@ -1388,6 +1388,10 @@ Graph::_from_qasm_stream(Context *ctx,
       continue; // header, ignore this line
     } else if (command == "include") {
       continue; // header, ignore this line
+    } else if (command == "barrier") {
+      continue; // file end, ignore this line
+    } else if (command == "measure") {
+      continue; // file end, ignore this line
     } else if (command == "creg") {
       continue; // ignore this line
     } else if (command == "qreg") {

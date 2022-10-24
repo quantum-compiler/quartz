@@ -1380,10 +1380,14 @@ Graph::_from_qasm_stream(Context *ctx,
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
-    if (command == "OPENQASM") {
-      continue; // ignore this line
+    if (command == "//") {
+      continue; // comment, ignore this line
+    } else if (command == "") {
+      continue; // empty line, ignore this line
+    } else if (command == "OPENQASM") {
+      continue; // header, ignore this line
     } else if (command == "include") {
-      continue; // ignore this line
+      continue; // header, ignore this line
     } else if (command == "creg") {
       continue; // ignore this line
     } else if (command == "qreg") {

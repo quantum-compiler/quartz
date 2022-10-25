@@ -10,6 +10,7 @@ public:
         mat({{1, 0}, {0, 1.0i}}) {}
 
   MatrixBase *get_matrix() override { return &mat; }
+  bool is_sparse() const override { return true; }
   Matrix<2> mat;
 };
 } // namespace quartz

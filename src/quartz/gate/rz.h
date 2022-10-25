@@ -19,6 +19,7 @@ public:
     }
     return cached_matrices[theta].get();
   }
+  bool is_sparse() const override { return true; }
   std::unordered_map<float, std::unique_ptr<Matrix<2>>> cached_matrices;
 };
 

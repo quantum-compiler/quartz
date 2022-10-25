@@ -18,6 +18,7 @@ public:
              {0, 0, 0, 0, 0, 0, 1, 0},
              {0, 0, 0, 1, 0, 0, 0, 0}}) {}
   MatrixBase *get_matrix() override { return &mat; }
+  bool is_sparse() const override { return true; }
   Matrix<8> mat;
 };
 

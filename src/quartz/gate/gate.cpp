@@ -23,6 +23,8 @@ bool Gate::is_commutative() const { return false; }
 
 bool Gate::is_symmetric() const { return false; }
 
+bool Gate::is_sparse() const { return false; }
+
 int Gate::get_num_qubits() const { return num_qubits; }
 
 int Gate::get_num_parameters() const { return num_parameters; }

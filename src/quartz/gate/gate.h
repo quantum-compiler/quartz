@@ -18,6 +18,9 @@ public:
   [[nodiscard]] virtual bool is_commutative() const; // for traditional gates
   [[nodiscard]] virtual bool
   is_symmetric() const; // for 2-qubit gates; currently unused (always false)
+  // Returns true iff the number of non-zero elements in the matrix
+  // representation of the quantum gate is exactly 2 to the power of num_qubits.
+  [[nodiscard]] virtual bool is_sparse() const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] bool is_parameter_gate() const;

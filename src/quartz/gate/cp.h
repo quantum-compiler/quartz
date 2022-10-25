@@ -21,6 +21,7 @@ public:
     }
     return cached_matrices[phi].get();
   }
+  bool is_sparse() const override { return true; }
   std::unordered_map<float, std::unique_ptr<Matrix<4>>> cached_matrices;
 };
 

@@ -10,6 +10,7 @@ public:
         mat({{ComplexType(0), ComplexType(-1.0i)},
              {ComplexType(1.0i), ComplexType(0)}}) {}
   MatrixBase *get_matrix() override { return &mat; }
+  bool is_sparse() const override { return true; }
   Matrix<2> mat;
 };
 

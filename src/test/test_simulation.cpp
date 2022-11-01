@@ -9,14 +9,7 @@
 
 using namespace quartz;
 
-int main() {
-  Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::u2, GateType::cx, GateType::cp, GateType::swap});
-  auto graph = Graph::from_qasm_file(
-      &ctx, "circuit/MQTBench_40q/qft_indep_qiskit_40.qasm");
-  auto dag = graph->to_dag();
-  std::cout << dag->to_string() << std::endl;
-  int num_local_qubits = 30;
+int num_shuffles_by_heuristics(DAG *dag, int num_local_qubits) {
   int num_qubits = dag->get_num_qubits();
   std::unordered_map<DAGHyperEdge *, bool> executed;
   std::vector<bool> local_qubit(num_qubits, false);
@@ -44,10 +37,10 @@ int main() {
         }
         if (ok) {
           // execute
-          for (auto &output : gate->output_nodes) {
+          /*for (auto &output : gate->output_nodes) {
             std::cout << output->index << " ";
           }
-          std::cout << "execute\n";
+          std::cout << "execute\n";*/
           executed[gate.get()] = true;
         } else {
           // not executable, block the qubits
@@ -117,5 +110,39 @@ int main() {
     std::cout << "}" << std::endl;
   }
   std::cout << num_shuffles << " shuffles." << std::endl;
+  return num_shuffles;
+}
+
+int main() {
+  Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
+               GateType::x, GateType::ry, GateType::u2, GateType::u3,
+               GateType::cx, GateType::cz, GateType::cp, GateType::swap});
+  std::vector<std::string> circuit_names = {
+      "dj",           "ghz",           "graphstate", "qft",
+      "qftentangled", "realamprandom", "su2random",  "twolocalrandom",
+      "wstate"};
+  std::vector<int> num_qubits = {40, 41, 42};
+  std::vector<int> num_local_qubits;
+  for (int i = 12; i <= 33; i++) {
+    num_local_qubits.push_back(i);
+  }
+  FILE *fout = fopen("result.txt", "w");
+  for (auto circuit : circuit_names) {
+    fprintf(fout, "%s\n", circuit.c_str());
+    for (int num_q : num_qubits) {
+      auto graph = Graph::from_qasm_file(
+          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
+                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
+                    ".qasm");
+      auto dag = graph->to_dag();
+      fprintf(fout, "%d", num_q);
+      for (int local_q : num_local_qubits) {
+        int result = num_shuffles_by_heuristics(dag.get(), local_q);
+        fprintf(fout, " %d", result);
+      }
+      fprintf(fout, "\n");
+    }
+  }
+  fclose(fout);
   return 0;
 }

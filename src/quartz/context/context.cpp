@@ -1,6 +1,6 @@
 #include "context.h"
-#include "../dag/dag.h"
 #include "../gate/all_gates.h"
+#include "quartz/circuitseq/circuitseq.h"
 
 #include <cassert>
 #include <cmath>
@@ -161,18 +161,18 @@ std::vector<ParamType> Context::get_all_generated_parameters() const {
   return random_parameters_;
 }
 
-void Context::set_representative(std::unique_ptr<DAG> dag) {
-  representatives_[dag->hash(this)] = dag.get();
-  representative_dags_.emplace_back(std::move(dag));
+void Context::set_representative(std::unique_ptr<CircuitSeq> seq) {
+  representatives_[seq->hash(this)] = seq.get();
+  representative_seqs_.emplace_back(std::move(seq));
 }
 
 void Context::clear_representatives() {
   representatives_.clear();
-  representative_dags_.clear();
+  representative_seqs_.clear();
 }
 
-bool Context::get_possible_representative(const DAGHashType &hash_value,
-                                          DAG *&representative) const {
+bool Context::get_possible_representative(const CircuitSeqHashType &hash_value,
+                                          CircuitSeq *&representative) const {
   auto it = representatives_.find(hash_value);
   if (it == representatives_.end()) {
     return false;

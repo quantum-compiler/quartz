@@ -1,5 +1,5 @@
+#include "quartz/circuitseq/circuitseq.h"
 #include "quartz/context/context.h"
-#include "quartz/dag/dag.h"
 #include "quartz/dataset/dataset.h"
 #include "quartz/dataset/equivalence_set.h"
 #include "quartz/gate/gate.h"

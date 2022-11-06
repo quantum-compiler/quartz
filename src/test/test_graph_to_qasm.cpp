@@ -9,7 +9,7 @@ int main() {
   Context *ctx = new Context({GateType::input_qubit, GateType::input_param,
                               GateType::t, GateType::tdg, GateType::cx});
   QASMParser qasm_parser(ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm("circuit/example-circuits/t_cx_tdg.qasm", dag)) {
     std::cout << "Parser failed" << std::endl;
   }

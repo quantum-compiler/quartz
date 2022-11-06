@@ -1,5 +1,5 @@
+#include "quartz/circuitseq/circuitseq.h"
 #include "quartz/context/context.h"
-#include "quartz/dag/dag.h"
 #include "quartz/gate/gate.h"
 #include "quartz/math/vector.h"
 #include "test_dataset.h"
@@ -18,7 +18,7 @@ int main() {
   auto y = ctx.get_gate(GateType::y);
   y->get_matrix()->print();
 
-  DAG dag(2, 0);
+  CircuitSeq dag(2, 0);
   dag.add_gate({0}, {}, y, nullptr);
   std::cout << "Is_canonical=" << dag.is_canonical_representation()
             << std::endl;
@@ -29,8 +29,8 @@ int main() {
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
 
-  auto dag1 = std::make_unique<DAG>(2, 2);
-  auto dag2 = std::make_unique<DAG>(2, 2);
+  auto dag1 = std::make_unique<CircuitSeq>(2, 2);
+  auto dag2 = std::make_unique<CircuitSeq>(2, 2);
   int tmp;
   dag1->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
   dag1->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
@@ -53,8 +53,8 @@ int main() {
   std::cout << dag1->to_json() << std::endl;
   std::cout << dag2->to_json() << std::endl;
 
-  /*dag1 = std::make_unique<DAG>(1, 7);
-  dag2 = std::make_unique<DAG>(1, 7);
+  /*dag1 = std::make_unique<CircuitSeq>(1, 7);
+  dag2 = std::make_unique<CircuitSeq>(1, 7);
   ctx.set_generated_parameter(0, 0);
   ctx.set_generated_parameter(3, 0);
   ctx.set_generated_parameter(6, std::acos(-1.0) / 2);

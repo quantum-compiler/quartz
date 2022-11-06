@@ -8,7 +8,7 @@ void Generator::generate_dfs(int num_qubits, int max_num_input_parameters,
                              int max_num_quantum_gates, int max_num_param_gates,
                              Dataset &dataset, bool restrict_search_space,
                              bool unique_parameters) {
-  DAG *dag = new DAG(num_qubits, max_num_input_parameters);
+  CircuitSeq *dag = new CircuitSeq(num_qubits, max_num_input_parameters);
   // Generate all possible parameter gates at the beginning.
   assert(max_num_param_gates == 1);
   dag->generate_parameter_gates(context);
@@ -27,26 +27,27 @@ void Generator::generate(
     EquivalenceSet *equiv_set, bool unique_parameters, bool verbose,
     decltype(std::chrono::steady_clock::now() -
              std::chrono::steady_clock::now()) *record_verification_time) {
-  auto empty_dag = std::make_unique<DAG>(num_qubits, num_input_parameters);
+  auto empty_dag =
+      std::make_unique<CircuitSeq>(num_qubits, num_input_parameters);
   // Generate all possible parameter gates at the beginning.
   assert(max_num_param_gates == 1);
   empty_dag->generate_parameter_gates(context);
   empty_dag->hash(context); // generate other hash values
-  std::vector<DAG *> dags_to_search(1, empty_dag.get());
+  std::vector<CircuitSeq *> dags_to_search(1, empty_dag.get());
   if (invoke_python_verifier) {
     assert(equiv_set);
     auto equiv_class = std::make_unique<EquivalenceClass>();
-    equiv_class->insert(std::make_unique<DAG>(*empty_dag));
+    equiv_class->insert(std::make_unique<CircuitSeq>(*empty_dag));
     equiv_set->insert_class(context, std::move(equiv_class));
   } else {
-    context->set_representative(std::make_unique<DAG>(*empty_dag));
+    context->set_representative(std::make_unique<CircuitSeq>(*empty_dag));
   }
   dataset->insert(context, std::move(empty_dag));
-  std::vector<std::vector<DAG *>> dags(1, dags_to_search);
+  std::vector<std::vector<CircuitSeq *>> dags(1, dags_to_search);
 
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().
-  std::vector<std::unique_ptr<DAG>> dag_holder;
+  std::vector<std::unique_ptr<CircuitSeq>> dag_holder;
 
   for (int num_gates = 1; num_gates <= max_num_quantum_gates; num_gates++) {
     if (verbose) {
@@ -91,7 +92,7 @@ void Generator::generate(
                                  &dags_to_search);
       assert(ret);
       for (auto &dag : dags_to_search) {
-        auto new_dag = std::make_unique<DAG>(*dag);
+        auto new_dag = std::make_unique<CircuitSeq>(*dag);
         dag = new_dag.get();
         dag_holder.push_back(std::move(new_dag));
       }
@@ -99,11 +100,11 @@ void Generator::generate(
       dags.push_back(dags_to_search);
       /* Seems problematic
       equiv_set->remove_common_first_or_last_gates(context);
-      std::vector<DAG *> simplified_dags_to_search;
+      std::vector<CircuitSeq *> simplified_dags_to_search;
       simplified_dags_to_search.reserve(dags_to_search.size());
-      for (auto &dag : dags_to_search) {
-        if (equiv_set->contains(context, dag)) {
-          simplified_dags_to_search.push_back(dag);
+      for (auto &circuitseq : dags_to_search) {
+        if (equiv_set->contains(context, circuitseq)) {
+          simplified_dags_to_search.push_back(circuitseq);
         }
       }
       dags.push_back(simplified_dags_to_search);
@@ -113,7 +114,7 @@ void Generator::generate(
 }
 
 void Generator::dfs(int gate_idx, int max_num_gates,
-                    int max_remaining_param_gates, DAG *dag,
+                    int max_remaining_param_gates, CircuitSeq *dag,
                     std::vector<int> &used_parameters, Dataset &dataset,
                     bool restrict_search_space, bool unique_parameters) {
   if (restrict_search_space) {
@@ -122,8 +123,8 @@ void Generator::dfs(int gate_idx, int max_num_gates,
     bool pass_checks = true;
     // check that qubits are used in an increasing order
     for (int i = 1; i < dag->get_num_qubits(); i++)
-      if (dag->outputs[i] != dag->nodes[i].get() &&
-          dag->outputs[i - 1] == dag->nodes[i - 1].get())
+      if (dag->outputs[i] != dag->wires[i].get() &&
+          dag->outputs[i - 1] == dag->wires[i - 1].get())
         pass_checks = false;
     // check that input parameters are used in an increasing order
     for (int i = 1; i < dag->get_num_input_parameters(); i++)
@@ -143,28 +144,28 @@ void Generator::dfs(int gate_idx, int max_num_gates,
   }
 
   /*int num_unused_internal_parameter = 0;
-  for (int i = dag->get_num_input_parameters();
-       i < dag->get_num_total_parameters(); i++) {
+  for (int i = circuitseq->get_num_input_parameters();
+       i < circuitseq->get_num_total_parameters(); i++) {
     if (used_parameters[i] == 0)
       num_unused_internal_parameter++;
   }
 
   bool save_into_dataset = (num_unused_internal_parameter == 0);
   if (save_into_dataset) {
-    // save a clone of dag to |dataset|
+    // save a clone of circuitseq to |dataset|
     dataset.insert(context,
-  dag->clone_and_shrink_unused_input_parameters());
+  circuitseq->clone_and_shrink_unused_input_parameters());
   }*/
   dataset.insert(context, dag->clone());
 
   // Check that this circuit is different with any other circuits in the
   // |dataset|.
   // Optimization disabled.
-  /*for (auto &other_dag : dataset[dag->hash(context)]) {
+  /*for (auto &other_dag : dataset[circuitseq->hash(context)]) {
     // we could use BFS to avoid searching DAGs with more gates at first
-    if (dag->get_num_gates() >= other_dag->get_num_gates()
-        && verifier_.equivalent_on_the_fly(context, dag, other_dag.get()))
-  { return;
+    if (circuitseq->get_num_gates() >= other_dag->get_num_gates()
+        && verifier_.equivalent_on_the_fly(context, circuitseq,
+  other_dag.get())) { return;
     }
   }*/
 
@@ -336,18 +337,18 @@ void Generator::dfs(int gate_idx, int max_num_gates,
   }
 }
 
-void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
+void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
                     int max_num_param_gates, Dataset &dataset,
-                    std::vector<DAG *> *new_representatives,
+                    std::vector<CircuitSeq *> *new_representatives,
                     bool invoke_python_verifier,
                     const EquivalenceSet *equiv_set, bool unique_parameters) {
-  auto try_to_add_to_result = [&](DAG *new_dag) {
-    // A new DAG with |current_max_num_gates| + 1 gates.
+  auto try_to_add_to_result = [&](CircuitSeq *new_dag) {
+    // A new CircuitSeq with |current_max_num_gates| + 1 gates.
     if (invoke_python_verifier) {
       // We will verify the equivalence later in Python.
       assert(equiv_set);
       if (!verifier_.redundant(context, equiv_set, new_dag)) {
-        auto new_new_dag = std::make_unique<DAG>(*new_dag);
+        auto new_new_dag = std::make_unique<CircuitSeq>(*new_dag);
         auto new_new_dag_ptr = new_new_dag.get();
         dataset.insert(context, std::move(new_new_dag));
         if (new_representatives) {
@@ -364,12 +365,12 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
       }
       // XXX: Try to insert to a set with hash value differing no more than 1.
       bool ret = dataset.insert_to_nearby_set_if_exists(
-          context, std::make_unique<DAG>(*new_dag));
+          context, std::make_unique<CircuitSeq>(*new_dag));
       if (ret) {
-        // The DAG's hash value is new to the dataset.
-        // Note: this is the second instance of DAG we create in
+        // The CircuitSeq's hash value is new to the dataset.
+        // Note: this is the second instance of CircuitSeq we create in
         // this function.
-        auto rep = std::make_unique<DAG>(*new_dag);
+        auto rep = std::make_unique<CircuitSeq>(*new_dag);
         auto rep_ptr = rep.get();
         context->set_representative(std::move(rep));
         if (new_representatives) {
@@ -379,8 +380,8 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
     }
   };
   for (auto &old_dag : dags.back()) {
-    // Create a new DAG to avoid editing the old one.
-    auto new_dag = std::make_unique<DAG>(*old_dag);
+    // Create a new CircuitSeq to avoid editing the old one.
+    auto new_dag = std::make_unique<CircuitSeq>(*old_dag);
     auto dag = new_dag.get();
     InputParamMaskType input_param_usage_mask;
     std::vector<InputParamMaskType> input_param_masks;
@@ -391,8 +392,8 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
     std::vector<bool> last_gate_used_qubit_index(dag->get_num_qubits(), false);
     int last_gate_min_qubit_index = -1;
     if (dag->get_num_gates() > 0) {
-      last_gate_min_qubit_index = dag->edges.back()->get_min_qubit_index();
-      for (auto &input_node : dag->edges.back()->input_nodes) {
+      last_gate_min_qubit_index = dag->gates.back()->get_min_qubit_index();
+      for (auto &input_node : dag->gates.back()->input_wires) {
         if (input_node->is_qubit()) {
           last_gate_used_qubit_index[input_node->index] = true;
         }
@@ -489,11 +490,10 @@ void Generator::bfs(const std::vector<std::vector<DAG *>> &dags,
   }
 }
 
-void Generator::dfs_parameter_gates(std::unique_ptr<DAG> dag,
-                                    int remaining_gates, int max_unused_params,
-                                    int current_unused_params,
-                                    std::vector<int> &params_used_times,
-                                    std::vector<std::unique_ptr<DAG>> &result) {
+void Generator::dfs_parameter_gates(
+    std::unique_ptr<CircuitSeq> dag, int remaining_gates, int max_unused_params,
+    int current_unused_params, std::vector<int> &params_used_times,
+    std::vector<std::unique_ptr<CircuitSeq>> &result) {
   if (remaining_gates == 0) {
     result.push_back(std::move(dag));
     return;
@@ -523,7 +523,7 @@ void Generator::dfs_parameter_gates(std::unique_ptr<DAG> dag,
           continue;
         }
         int output_param_index;
-        auto new_dag = std::make_unique<DAG>(*dag);
+        auto new_dag = std::make_unique<CircuitSeq>(*dag);
         bool ret =
             new_dag->add_gate({}, param_indices, gate, &output_param_index);
         assert(ret);
@@ -580,7 +580,7 @@ void Generator::dfs_parameter_gates(std::unique_ptr<DAG> dag,
             continue;
           }
           int output_param_index;
-          auto new_dag = std::make_unique<DAG>(*dag);
+          auto new_dag = std::make_unique<CircuitSeq>(*dag);
           bool ret =
               new_dag->add_gate({}, param_indices, gate, &output_param_index);
           assert(ret);

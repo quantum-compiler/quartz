@@ -40,7 +40,7 @@ int main() {
   //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(benchmark_filename, dag)) {
     std::cout << "Parser failed" << std::endl;
   }

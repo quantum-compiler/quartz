@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../context/context.h"
-#include "../dag/dag.h"
+#include "quartz/circuitseq/circuitseq.h"
+#include "quartz/context/context.h"
 #include "representative_set.h"
 
 #include <functional>
@@ -17,47 +17,48 @@ class EquivalenceSet;
 class EquivalenceClass {
 public:
   // Returns all DAGs in this equivalence class.
-  [[nodiscard]] std::vector<DAG *> get_all_dags() const;
+  [[nodiscard]] std::vector<CircuitSeq *> get_all_dags() const;
 
-  void insert(std::unique_ptr<DAG> dag);
+  void insert(std::unique_ptr<CircuitSeq> dag);
 
   [[nodiscard]] int size() const;
   void reserve(std::size_t new_cap);
 
   // Extract all DAGs in this equivalence class, and make this class
   // empty.
-  std::vector<std::unique_ptr<DAG>> extract();
+  std::vector<std::unique_ptr<CircuitSeq>> extract();
 
   // Replace |dags_| with |dags|.
-  void set_dags(std::vector<std::unique_ptr<DAG>> dags);
+  void set_dags(std::vector<std::unique_ptr<CircuitSeq>> dags);
 
-  // The first DAG is the representative.
-  DAG *get_representative();
+  // The first CircuitSeq is the representative.
+  CircuitSeq *get_representative();
 
-  // Returns whether this equivalence class contains (a DAG fully
-  // equivalent to) |dag|.
-  [[nodiscard]] bool contains(const DAG &dag) const;
+  // Returns whether this equivalence class contains (a CircuitSeq fully
+  // equivalent to) |circuitseq|.
+  [[nodiscard]] bool contains(const CircuitSeq &dag) const;
 
-  // If this equivalence class contains |dag|, set |dag| as the
+  // If this equivalence class contains |circuitseq|, set |circuitseq| as the
   // representative of the class and return true. Otherwise, return false.
-  [[nodiscard]] bool set_as_representative(const DAG &dag);
+  [[nodiscard]] bool set_as_representative(const CircuitSeq &dag);
 
   // For each pair of circuits in this class, if they share
   // a common "first" gate or a common "last" gate, remove the latter one.
   // Here "first" means a quantum gate which does not topologically depend
   // on any other quantum gates, and "last" means a quantum gate which can
-  // appear at last in some topological order of the DAG.
+  // appear at last in some topological order of the CircuitSeq.
   // Return the number of circuits removed.
   int remove_common_first_or_last_gates(
-      Context *ctx, std::unordered_set<DAGHashType> &hash_values_to_remove);
+      Context *ctx,
+      std::unordered_set<CircuitSeqHashType> &hash_values_to_remove);
 
   // Return the number of circuits modified.
   int remove_unused_internal_parameters(Context *ctx);
 
-  // Return the hash of the first DAG.
-  DAGHashType hash(Context *ctx);
+  // Return the hash of the first CircuitSeq.
+  CircuitSeqHashType hash(Context *ctx);
 
-  // Sort the circuits in this equivalence class by DAG::less_than().
+  // Sort the circuits in this equivalence class by CircuitSeq::less_than().
   void sort();
 
   // Compare two ECCs in a deterministic order.
@@ -68,7 +69,7 @@ public:
                         const EquivalenceClass &ecc2);
 
 private:
-  std::vector<std::unique_ptr<DAG>> dags_;
+  std::vector<std::unique_ptr<CircuitSeq>> dags_;
 };
 
 class UniquePtrEquivalenceClassComparator {
@@ -90,7 +91,7 @@ public:
   // It will be pushed back all representatives previously not in
   // the equivalence set.
   bool load_json(Context *ctx, const std::string &file_name,
-                 std::vector<DAG *> *new_representatives = nullptr);
+                 std::vector<CircuitSeq *> *new_representatives = nullptr);
 
   bool save_json(const std::string &file_name) const;
 
@@ -106,14 +107,14 @@ public:
                 bool common_subcircuit_pruning = true,
                 bool other_simplification = true, bool verbose = false);
 
-  // Sort the circuits in each equivalence class by DAG::less_than().
+  // Sort the circuits in each equivalence class by CircuitSeq::less_than().
   void sort();
 
-  // Remove equivalence classes with only one DAG.
+  // Remove equivalence classes with only one CircuitSeq.
   // Return the number of equivalent classes removed.
   int remove_singletons(Context *ctx, bool verbose = false);
 
-  // Normalize each DAG to have the canonical representation.
+  // Normalize each CircuitSeq to have the canonical representation.
   // Return the number of equivalent classes modified.
   int normalize_to_canonical_representations(Context *ctx,
                                              bool verbose = false);
@@ -123,7 +124,7 @@ public:
   int remove_unused_internal_params(Context *ctx, bool verbose = false);
 
   // Remove unused qubits and input parameters if they are unused in
-  // each DAG of an equivalent class.
+  // each CircuitSeq of an equivalent class.
   // Return the number of equivalent classes removed
   // (and possibly inserted again).
   int remove_unused_qubits_and_input_params(Context *ctx, bool verbose = false);
@@ -132,7 +133,7 @@ public:
   // a common "first" gate or a common "last" gate, remove the latter one.
   // Here "first" means a quantum gate which does not topologically depend
   // on any other quantum gates, and "last" means a quantum gate which can
-  // appear at last in some topological order of the DAG.
+  // appear at last in some topological order of the CircuitSeq.
   // Return the number of equivalent classes modified.
   int remove_common_first_or_last_gates(Context *ctx, bool verbose = false);
 
@@ -152,11 +153,11 @@ public:
 
   [[nodiscard]] std::string get_class_id(int num_class) const;
 
-  [[nodiscard]] std::vector<std::vector<DAG *>>
+  [[nodiscard]] std::vector<std::vector<CircuitSeq *>>
   get_all_equivalence_sets() const;
 
   [[nodiscard]] std::vector<EquivalenceClass *>
-  get_possible_classes(const DAGHashType &hash_value) const;
+  get_possible_classes(const CircuitSeqHashType &hash_value) const;
 
   // A hacky function to insert a single class to the equivalence set.
   // There's no guarantee that the class inserted is different with any
@@ -164,27 +165,27 @@ public:
   void insert_class(Context *ctx,
                     std::unique_ptr<EquivalenceClass> equiv_class);
 
-  // Calls |equiv_class->insert(dag)| and updates |possible_classes_|.
+  // Calls |equiv_class->insert(circuitseq)| and updates |possible_classes_|.
   void insert(Context *ctx, EquivalenceClass *equiv_class,
-              std::unique_ptr<DAG> dag);
+              std::unique_ptr<CircuitSeq> dag);
 
-  // If the whole equivalence set contains a DAG fully equivalent to
-  // |dag|, return the equivalence class(es) containing it. Otherwise, return
-  // an empty vector.
+  // If the whole equivalence set contains a CircuitSeq fully equivalent to
+  // |circuitseq|, return the equivalence class(es) containing it. Otherwise,
+  // return an empty vector.
   [[nodiscard]] std::vector<EquivalenceClass *>
-  get_containing_class(Context *ctx, DAG *dag) const;
+  get_containing_class(Context *ctx, CircuitSeq *dag) const;
 
 private:
-  void set_possible_class(const DAGHashType &hash_value,
+  void set_possible_class(const CircuitSeqHashType &hash_value,
                           EquivalenceClass *equiv_class);
-  void remove_possible_class(const DAGHashType &hash_value,
+  void remove_possible_class(const CircuitSeqHashType &hash_value,
                              EquivalenceClass *equiv_class);
 
   std::vector<std::unique_ptr<EquivalenceClass>> classes_;
 
   // A map from the hash value to all equivalence classes with at least
-  // one DAG of the hash value.
-  std::unordered_map<DAGHashType, std::set<EquivalenceClass *>>
+  // one CircuitSeq of the hash value.
+  std::unordered_map<CircuitSeqHashType, std::set<EquivalenceClass *>>
       possible_classes_;
 };
 

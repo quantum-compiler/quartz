@@ -12,14 +12,17 @@ namespace quartz {
     public:
         GameHybrid() = delete;
 
-        GameHybrid(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device, int _initial_phase_len)
+        GameHybrid(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device,
+                   int _initial_phase_len, bool _allow_nop_in_initial, double _initial_phase_reward)
                 : graph(_graph), device(std::move(_device)) {
             /// GameHybrid expects that the input graph has been initialized !!!
 
             // STEP 1: record phase info
             Assert(_initial_phase_len > 0, "Initial phase must have length > 0!");
             initial_phase_len = _initial_phase_len;
-            current_step = 0;
+            allow_nop_in_initial = _allow_nop_in_initial;
+            initial_phase_reward = _initial_phase_reward;
+            is_initial_phase = true;
 
             // STEP 2: simplify circuit
             original_gate_count = graph.gate_count();
@@ -75,6 +78,7 @@ namespace quartz {
             // STEP 5: record some extra statistics (we do not execute gates at the beginning)
             executed_logical_gate_count = 0;
             swaps_inserted = 0;
+            virtual_swaps_inserted = 0;
             imp_cost = graph.circuit_implementation_cost(device);
         }
 
@@ -85,7 +89,9 @@ namespace quartz {
 
             // phase info
             initial_phase_len = game.initial_phase_len;
-            current_step = game.current_step;
+            allow_nop_in_initial = game.allow_nop_in_initial;
+            is_initial_phase = game.is_initial_phase;
+            initial_phase_reward = game.initial_phase_reward;
 
             // full mapping table
             logical_qubit_num = game.logical_qubit_num;
@@ -98,6 +104,7 @@ namespace quartz {
             single_qubit_gate_count = game.single_qubit_gate_count;
             executed_logical_gate_count = game.executed_logical_gate_count;
             swaps_inserted = game.swaps_inserted;
+            virtual_swaps_inserted = game.virtual_swaps_inserted;
             imp_cost = game.imp_cost;
 
             // execution history
@@ -108,24 +115,31 @@ namespace quartz {
 
         [[nodiscard]] State state() {
             return {device_edges, logical2physical, physical2logical,
-                    graph.convert_circuit_to_state(7, true)};
+                    graph.convert_circuit_to_state(7, true),
+                    is_initial_phase};
         }
 
-        std::set<Action, ActionCompare> action_space(ActionType action_type) {
-            if (action_type == ActionType::PhysicalFull) {
-                // Physical Full: swaps between physical neighbors of all used logical qubits
+        std::set<Action, ActionCompare> action_space() {
+            if (is_initial_phase) {
+                // We are in stage 1 (add free swaps to change mapping), use SearchFull space
+                // Search Full: swaps between one used physical qubit and any other physical qubit
                 std::set<Action, ActionCompare> physical_action_space;
                 for (const auto &qubit_pair: graph.qubit_mapping_table) {
                     int physical_idx = qubit_pair.second.second;
-                    auto neighbor_list = device->get_input_neighbours(physical_idx);
-                    for (int neighbor: neighbor_list) {
-                        physical_action_space.insert(Action(ActionType::PhysicalFull,
-                                                            std::min(neighbor, physical_idx),
-                                                            std::max(neighbor, physical_idx)));
+                    for (int other = 0; other < physical_qubit_num; ++other) {
+                        if (other == physical_idx) continue;
+                        physical_action_space.insert(Action(ActionType::SearchFull,
+                                                            std::min(other, physical_idx),
+                                                            std::max(other, physical_idx)));
                     }
                 }
+                // Add nop into action space if allowed
+                if (allow_nop_in_initial) {
+                    physical_action_space.insert(Action(ActionType::SearchFull, 0, 0));
+                }
                 return std::move(physical_action_space);
-            } else if (action_type == ActionType::PhysicalFront) {
+            } else {
+                // We are in stage 2 (insert swaps into circuit), use PhysicalFront
                 // Physical Front: only swaps between neighbors of inputs to front gates
                 // get gates with at least one input input_qubit
                 std::set<Op, OpCompare> tmp_front_gate_set;
@@ -166,29 +180,59 @@ namespace quartz {
                     }
                 }
                 return physical_action_space;
-            } else if (action_type == ActionType::Logical) {
-                // Logical action space
-                std::set<Action, ActionCompare> logical_action_space;
-                for (int logical_1 = 0; logical_1 < logical_qubit_num; ++logical_1) {
-                    for (int logical_2 = 0; logical_2 < physical_qubit_num; ++logical_2) {
-                        if (logical_1 != logical_2) {
-                            logical_action_space.insert(Action(ActionType::Logical,
-                                                               std::min(logical_1, logical_2),
-                                                               std::max(logical_1, logical_2)));
-                        }
-                    }
-                }
-                return std::move(logical_action_space);
-            } else {
-                std::cout << "Unknown action space type." << std::endl;
-                assert(false);
-                return {};
             }
         }
 
         Reward apply_action(const Action &action) {
-            if (action.type == ActionType::PhysicalFront || action.type == ActionType::PhysicalFull) {
-                // physical action
+            if (is_initial_phase) {
+                // In stage 1, we should have SearchFull action space
+                Assert(action.type == ActionType::SearchFull, "Action should be SearchFull in phase 1!");
+                Assert(virtual_swaps_inserted < initial_phase_len, "Phase 1 termination error!");
+                virtual_swaps_inserted += 1;
+                if (virtual_swaps_inserted == initial_phase_len) is_initial_phase = false;
+
+                // check if this action is nop (nop terminates phase 1 immediately and has reward 0)
+                if (action.qubit_idx_0 == 0 && action.qubit_idx_1 == 0) {
+                    Assert(allow_nop_in_initial, "Found NOP in phase 1, while allow_nop = False.");
+                    execution_history.emplace_back(-2, GateType::swap, 0, 0, 0, 0);
+                    is_initial_phase = false;
+                    return 0;
+                }
+
+                // STEP 1: put swap into history & change mapping tables
+                // put action into execution history
+                int physical_0 = action.qubit_idx_0;
+                int physical_1 = action.qubit_idx_1;
+                int logical_0 = physical2logical[physical_0];
+                int logical_1 = physical2logical[physical_1];
+                execution_history.emplace_back(-2, GateType::swap, logical_0, logical_1, physical_0, physical_1);
+                // change full mapping table
+                logical2physical[logical_0] = physical_1;
+                logical2physical[logical_1] = physical_0;
+                physical2logical[physical_0] = logical_1;
+                physical2logical[physical_1] = logical_0;
+                // change mapping table in graph and propagate
+                int hit_count = 0;
+                for (auto &input_mapping_pair: graph.qubit_mapping_table) {
+                    int cur_logical_idx = input_mapping_pair.second.first;
+                    if (cur_logical_idx == logical_0) {
+                        input_mapping_pair.second.second = physical_1;
+                        hit_count += 1;
+                    }
+                    if (cur_logical_idx == logical_1) {
+                        input_mapping_pair.second.second = physical_0;
+                        hit_count += 1;
+                    }
+                }
+                assert(hit_count == 1 || hit_count == 2);
+                graph.propagate_mapping();
+
+                // STEP 2: return reward
+                imp_cost = graph.circuit_implementation_cost(device);
+                return initial_phase_reward;
+            } else {
+                // In stage 2, we should have PhysicalFront action space
+                Assert(action.type == ActionType::PhysicalFront, "Action should be PhysicalFront in phase 2!");
 
                 // STEP 1: put swap into history & change mapping tables
                 // put action into execution history
@@ -246,32 +290,27 @@ namespace quartz {
                 executed_logical_gate_count += executed_gate_count;
                 swaps_inserted += 1;
 
-                // STEP 3: calculate reward
+                // STEP 3: calculate imp reward (This reward might be ignored in RL on the Python side)
                 double original_circuit_cost = imp_cost;
                 imp_cost = graph.circuit_implementation_cost(device);
                 double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
                 Reward reward = original_circuit_cost - new_circuit_cost;
                 return reward;
-            } else if (action.type == ActionType::Logical) {
-                // logical action
-                std::cout << "Logical action not implemented" << std::endl;
-                assert(false);
-                return NAN;
-            } else {
-                // unknown
-                std::cout << "Unknown action type" << std::endl;
-                assert(false);
-                return NAN;
             }
         }
 
         [[nodiscard]] int total_cost() const {
             // this function can only be called at the end of a game
             // some quick sanity checks
-            assert(is_circuit_finished(graph));
-            assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count);
-            assert(execution_history.size() == swaps_inserted + executed_logical_gate_count);
-            assert(check_execution_history(graph, device, execution_history, false) == ExecutionHistoryStatus::VALID);
+            Assert(is_circuit_finished(graph),
+                   "Circuit should be finished when call total cost!");
+            Assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count,
+                   "original gate count != single qubit gate count + executed logical gate count!");
+            Assert(execution_history.size() == swaps_inserted + virtual_swaps_inserted + executed_logical_gate_count,
+                   "Execution history size mismatch with gates executed!");
+            Assert(check_execution_history(graph, device, execution_history, false) == ExecutionHistoryStatus::VALID,
+                   "Execution history should be valid!");
+
             // scan through the execution history to determine cost of each swap
             std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
             int swap_with_cost = 0;
@@ -281,6 +320,12 @@ namespace quartz {
                     int _logical0 = eh_item.logical0;
                     int _logical1 = eh_item.logical1;
                     if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) swap_with_cost += 1;
+
+                    // check if virtual swaps indeed have cost 0
+                    if (eh_item.guid == -2) {
+                        Assert(!is_qubit_used[_logical0] && !is_qubit_used[_logical1],
+                               "Virtual Swaps in phase one must have cost 0!");
+                    }
                 } else {
                     // set target logical qubit as used
                     int _logical0 = eh_item.logical0;
@@ -289,7 +334,8 @@ namespace quartz {
                     is_qubit_used[_logical1] = true;
                 }
             }
-            assert(swap_with_cost <= swaps_inserted);
+            Assert(swap_with_cost <= swaps_inserted,
+                   "Swaps with cost must be fewer than swaps inserted!");
 
             return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
@@ -297,7 +343,7 @@ namespace quartz {
         void save_execution_history_to_file(const std::string &eh_file_name,
                                             const std::string &qasm_file_name,
                                             bool include_swap = true) const {
-            assert(is_circuit_finished(graph));
+            Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
             // initialize file
             std::ofstream eh_file;
@@ -328,6 +374,7 @@ namespace quartz {
             }
 
             // output qasm file
+            // TODO: the qasm output is not well defined, fix this if necessary
             qasm_file << "OPENQASM 2.0;" << "\n";
             qasm_file << "include \"qelib1.inc\";" << "\n";
             qasm_file << "qreg q[" << logical_qubit_num << "];\n";
@@ -349,7 +396,9 @@ namespace quartz {
 
         // phase info
         int initial_phase_len;
-        int current_step;
+        bool allow_nop_in_initial;
+        bool is_initial_phase;
+        double initial_phase_reward;
 
         // full mapping table
         // Note that the first #logical_qubit_num elements are the same as the mapping table in graph
@@ -363,6 +412,7 @@ namespace quartz {
         int single_qubit_gate_count;
         int executed_logical_gate_count;  // we do not consider swaps here
         int swaps_inserted;
+        int virtual_swaps_inserted;  // swaps in phase 1 are virtual swaps
         double imp_cost;
 
         // execution history & initial mapping table

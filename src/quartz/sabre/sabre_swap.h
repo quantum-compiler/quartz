@@ -359,17 +359,24 @@ namespace quartz {
                 return ExecutionHistoryStatus::UNINITIALIZED_EH;
             }
             // check gate count
-            if (!(execution_history.gate_type == GateType::swap && execution_history.guid == -1)) {
+            if (!(execution_history.gate_type == GateType::swap && execution_history.guid == -1) &&
+                !(execution_history.gate_type == GateType::swap && execution_history.guid == -2)) {
                 executed_gate_count += 1;
             }
             // check whether the gate is valid on device
-            int physical_0 = execution_history.physical0;
-            int physical_1 = execution_history.physical1;
-            if (physical_1 != -10) {
-                auto neighbours = device->get_input_neighbours(physical_0);
-                auto iterator = std::find(neighbours.begin(), neighbours.end(), physical_1);
-                if (iterator == neighbours.end()) {
-                    return ExecutionHistoryStatus::INVALID_EH;
+            if (execution_history.gate_type == GateType::swap && execution_history.guid == -2) {
+                // virtual swaps in phase 1 of GameHybrid are always executable
+                continue;
+            } else {
+                // execution of other swaps and logical gates
+                int physical_0 = execution_history.physical0;
+                int physical_1 = execution_history.physical1;
+                if (physical_1 != -10) {
+                    auto neighbours = device->get_input_neighbours(physical_0);
+                    auto iterator = std::find(neighbours.begin(), neighbours.end(), physical_1);
+                    if (iterator == neighbours.end()) {
+                        return ExecutionHistoryStatus::INVALID_EH;
+                    }
                 }
             }
         }

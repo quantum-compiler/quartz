@@ -14,16 +14,19 @@ namespace quartz {
         State(std::vector<std::pair<int, int>> _device_edges,
               std::vector<int> _logical2physical,
               std::vector<int> _physical2logical,
-              GraphState _graph_state) : device_edges(std::move(_device_edges)),
-                                         logical2physical(std::move(_logical2physical)),
-                                         physical2logical(std::move(_physical2logical)),
-                                         graph_state(std::move(_graph_state)) {}
+              GraphState _graph_state,
+              bool _is_initial_phase = false) : device_edges(std::move(_device_edges)),
+                                                logical2physical(std::move(_logical2physical)),
+                                                physical2logical(std::move(_physical2logical)),
+                                                graph_state(std::move(_graph_state)),
+                                                is_initial_phase(_is_initial_phase) {}
 
     public:
         std::vector<std::pair<int, int>> device_edges;
         std::vector<int> logical2physical;
         std::vector<int> physical2logical;
         GraphState graph_state;
+        bool is_initial_phase;
     };
 
     enum class ActionType {
@@ -399,7 +402,7 @@ namespace quartz {
             }
 
             // check mapping validity and save to
-            Assert(num==reg_count, "Incompatible Mapping!");
+            Assert(num == reg_count, "Incompatible Mapping!");
             logical2physical_list.emplace_back(std::move(cur_logical2physical));
         }
 
@@ -408,7 +411,7 @@ namespace quartz {
         return std::move(logical2physical_list);
     }
 
-    void set_initial_mapping(Graph &graph, int random_number, const std::string& file_name, int reg_count) {
+    void set_initial_mapping(Graph &graph, int random_number, const std::string &file_name, int reg_count) {
         // read candidate logical2physical mappings from disk
         std::vector<std::vector<int>> logical2physical = read_logical2physical_file(file_name, reg_count);
 
@@ -418,7 +421,7 @@ namespace quartz {
         graph.set_physical_mapping(chosen_mapping);
     }
 
-    void set_search_initial_mapping(Graph &graph, int random_number, const std::string& file_name, int reg_count) {
+    void set_search_initial_mapping(Graph &graph, int random_number, const std::string &file_name, int reg_count) {
         // read candidate logical2physical mappings from disk
         std::vector<std::vector<int>> logical2physical = read_logical2physical_file(file_name, reg_count);
 

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "quartz/circuitseq/circuitseq.h"
 #include "quartz/context/context.h"
-#include "quartz/dag/dag.h"
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"

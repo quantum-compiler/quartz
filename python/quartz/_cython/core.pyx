@@ -28,6 +28,7 @@ ctypedef GraphXfer* GraphXfer_ptr
 from CCore cimport Reward, GraphState, State, ActionType, Action
 from CCore cimport SimplePhysicalEnv, BackendType
 from CCore cimport SimpleInitialEnv, SimpleSearchEnv
+from CCore cimport SimpleHybridEnv
 
 
 def get_gate_type_from_str(gate_type_str):
@@ -729,6 +730,7 @@ cdef class PyState:
         self.device_edges = None        # PyDevice
         self.logical2physical = None    # PyMappingTable
         self.physical2logical = None    # PyMappingTable
+        self.is_initial_phase = None    # bool
 
     def __cinit__(self, *):
         pass
@@ -778,6 +780,9 @@ cdef class PyState:
         for i in range(num_regs):
             self.physical2logical.add_mapping(i, c_physical2logical[i])
         assert num_regs == num_qubits
+
+        # set initial phase status
+        self.is_initial_phase = deref(_state_ptr).is_initial_phase
 
     @property
     def circuit(self) -> PyGraphState:
@@ -979,3 +984,66 @@ cdef class PySimpleSearchEnv:
                                           instantiate=False)
         copied_py_env.env = copied_c_env
         return copied_py_env
+
+cdef class PySimpleHybridEnv:
+    cdef SimpleHybridEnv *env
+
+    def __cinit__(self, *,
+                  # basic parameters
+                  qasm_file_path: str, backend_type_str: str, initial_mapping_file_path: str,
+                  # randomness and buffer
+                  seed: int, start_from_internal_prob: float,
+                  # GameHybrid
+                  initial_phase_len: int, allow_nop_in_initial: bool, initial_phase_reward: double):
+        cdef string encoded_path = qasm_file_path.encode('utf-8')
+        cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
+        cdef string encoded_initial_mapping_path = initial_mapping_file_path.encode('utf-8')
+        self.env = new SimpleHybridEnv(encoded_path, cur_backend_type, encoded_initial_mapping_path,
+                                       seed, start_from_internal_prob,
+                                       initial_phase_len, allow_nop_in_initial, initial_phase_reward)
+
+    def __dealloc__(self):
+        del self.env
+
+    def reset(self):
+        self.env.reset()
+
+    def step(self, PyAction action) -> Reward:
+        return self.env.step(deref(action.action_ptr))
+
+    def step_with_id(self, qubit_idx_0: int, qubit_idx_1: int) -> Reward:
+        # determine action type
+        cdef vector[Action] c_action_space = self.env.get_action_space()
+        cdef ActionType action_type = c_action_space[0].type
+
+        # construct action and apply
+        cdef int _qubit_idx_0 = qubit_idx_0
+        cdef int _qubit_idx_1 = qubit_idx_1
+        cdef shared_ptr[Action] action = make_shared[Action](action_type,
+                                                             _qubit_idx_0,
+                                                             _qubit_idx_1)
+        return self.env.step(deref(action))
+
+    def is_finished(self) -> bool:
+        return self.env.is_finished()
+
+    def total_cost(self) -> int:
+        return self.env.total_cost()
+
+    def get_state(self) -> PyState:
+        cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
+        py_state = PyState()
+        py_state.set_this(c_state)
+        return py_state
+
+    def get_action_space(self) -> [PyAction]:
+        cdef vector[Action] c_action_space = self.env.get_action_space()
+        cdef shared_ptr[Action] tmp_c_action
+        total_size = c_action_space.size()
+        py_action_space = []
+        for i in range(total_size):
+            tmp_c_action = make_shared[Action](c_action_space[i])
+            py_action = PyAction(instantiate=False)
+            py_action.set_this(tmp_c_action)
+            py_action_space.append(py_action)
+        return py_action_space

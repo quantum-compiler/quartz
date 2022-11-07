@@ -175,6 +175,7 @@ cdef extern from "game/game_utils.h" namespace "quartz":
         vector[int] logical2physical
         vector[int] physical2logical
         GraphState graph_state
+        bool is_initial_phase
 
     cpdef enum class ActionType:
         PhysicalFull,
@@ -217,3 +218,14 @@ cdef extern from "env/simple_search_env.h" namespace "quartz":
         State get_state()
         vector[Action] get_action_space()
         shared_ptr[SimpleSearchEnv] copy()
+
+cdef extern from "env/simple_hybrid_env.h" namespace "quartz":
+    cdef cppclass SimpleHybridEnv:
+        SimpleHybridEnv()
+        SimpleHybridEnv(const string &, BackendType, const string &, int, double, int, bool, double)
+        void reset()
+        Reward step(Action)
+        bool is_finished()
+        int total_cost()
+        State get_state()
+        vector[Action] get_action_space()

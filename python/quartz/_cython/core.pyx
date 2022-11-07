@@ -724,6 +724,7 @@ cdef class PyState:
     cdef object device_edges
     cdef object logical2physical
     cdef object physical2logical
+    cdef object is_initial_phase
 
     def __init__(self):
         self.graph_state = None         # PyGraphState
@@ -827,6 +828,10 @@ cdef class PyState:
     @property
     def physical2logical_mapping(self) -> {int: int}:
         return self.physical2logical.map
+
+    @property
+    def is_initial_phase(self) -> bool:
+        return self.is_initial_phase
 
 
 cdef class PySimplePhysicalEnv:

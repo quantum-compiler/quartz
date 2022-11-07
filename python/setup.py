@@ -46,7 +46,7 @@ setup_args = {}
 
 setup(
     name='quartz',
-    version="1.8.0",
+    version="1.8.1",
     description="Quartz: Superoptimization of Quantum Circuits",
     zip_safe=False,
     install_requires=[],

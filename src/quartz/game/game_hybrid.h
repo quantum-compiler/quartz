@@ -290,12 +290,13 @@ namespace quartz {
                 executed_logical_gate_count += executed_gate_count;
                 swaps_inserted += 1;
 
-                // STEP 3: calculate imp reward (This reward might be ignored in RL on the Python side)
-                double original_circuit_cost = imp_cost;
+                // STEP 3: calculate imp cost (not used)
+                // We use -3 reward here instead.
+                // double original_circuit_cost = imp_cost;
                 imp_cost = graph.circuit_implementation_cost(device);
-                double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
-                Reward reward = original_circuit_cost - new_circuit_cost;
-                return reward;
+                // double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
+                // Reward reward = original_circuit_cost - new_circuit_cost;
+                return -SWAPCOST;
             }
         }
 

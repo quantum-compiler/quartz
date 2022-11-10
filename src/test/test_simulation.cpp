@@ -9,9 +9,9 @@
 
 using namespace quartz;
 
-int num_shuffles_by_heuristics(DAG *dag, int num_local_qubits) {
-  int num_qubits = dag->get_num_qubits();
-  std::unordered_map<DAGHyperEdge *, bool> executed;
+int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
+  int num_qubits = seq->get_num_qubits();
+  std::unordered_map<CircuitGate *, bool> executed;
   std::vector<bool> local_qubit(num_qubits, false);
   for (int i = 0; i < num_local_qubits; i++) {
     local_qubit[i] = true;
@@ -20,16 +20,16 @@ int num_shuffles_by_heuristics(DAG *dag, int num_local_qubits) {
   while (true) {
     bool all_done = true;
     std::vector<bool> executable(num_qubits, true);
-    for (auto &gate : dag->edges) {
+    for (auto &gate : seq->gates) {
       if (gate->gate->is_quantum_gate() && !executed[gate.get()]) {
         bool ok = true;
-        for (auto &output : gate->output_nodes) {
+        for (auto &output : gate->output_wires) {
           if (!executable[output->index]) {
             ok = false;
           }
         }
         if (!gate->gate->is_sparse()) {
-          for (auto &output : gate->output_nodes) {
+          for (auto &output : gate->output_wires) {
             if (!local_qubit[output->index]) {
               ok = false;
             }
@@ -45,7 +45,7 @@ int num_shuffles_by_heuristics(DAG *dag, int num_local_qubits) {
         } else {
           // not executable, block the qubits
           all_done = false;
-          for (auto &output : gate->output_nodes) {
+          for (auto &output : gate->output_wires) {
             executable[output->index] = false;
           }
         }
@@ -60,17 +60,17 @@ int num_shuffles_by_heuristics(DAG *dag, int num_local_qubits) {
     std::vector<int> local_gates(num_qubits, 0);
     std::vector<int> global_gates(num_qubits, 0);
     bool first = true;
-    for (auto &gate : dag->edges) {
+    for (auto &gate : seq->gates) {
       if (gate->gate->is_quantum_gate() && !executed[gate.get()]) {
         bool local = true;
         if (!gate->gate->is_sparse()) {
-          for (auto &output : gate->output_nodes) {
+          for (auto &output : gate->output_wires) {
             if (!local_qubit[output->index]) {
               local = false;
             }
           }
         }
-        for (auto &output : gate->output_nodes) {
+        for (auto &output : gate->output_wires) {
           if (local) {
             local_gates[output->index]++;
           } else {
@@ -134,10 +134,10 @@ int main() {
           &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
-      auto dag = graph->to_dag();
+      auto seq = graph->to_circuit_sequence();
       fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        int result = num_shuffles_by_heuristics(dag.get(), local_q);
+        int result = num_shuffles_by_heuristics(seq.get(), local_q);
         fprintf(fout, " %d", result);
       }
       fprintf(fout, "\n");

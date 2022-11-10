@@ -42,7 +42,7 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
   start0 = true;
   for (const auto &it : dataset) {
     if (it.second.empty()) {
-      // Empty DAG set
+      // Empty CircuitSeq set
       continue;
     }
     if (start0) {
@@ -108,9 +108,10 @@ int Dataset::remove_singletons(Context *ctx) {
 
 int Dataset::normalize_to_canonical_representations(Context *ctx) {
   int num_removed = 0;
-  std::vector<std::unique_ptr<DAG>> dags_to_insert_afterwards;
+  std::vector<std::unique_ptr<CircuitSeq>> dags_to_insert_afterwards;
   auto dag_already_exists =
-      [](const DAG &dag, const std::vector<std::unique_ptr<DAG>> &new_dags) {
+      [](const CircuitSeq &dag,
+         const std::vector<std::unique_ptr<CircuitSeq>> &new_dags) {
         for (auto &other_dag : new_dags) {
           if (dag.fully_equivalent(*other_dag)) {
             return true;
@@ -123,8 +124,8 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
     auto &current_hash_value = item.first;
     auto &dags = item.second;
     auto size_before = dags.size();
-    std::vector<std::unique_ptr<DAG>> new_dags;
-    std::unique_ptr<DAG> new_dag;
+    std::vector<std::unique_ptr<CircuitSeq>> new_dags;
+    std::unique_ptr<CircuitSeq> new_dag;
 
     for (auto &dag : dags) {
       bool is_canonical = dag->canonical_representation(&new_dag);
@@ -132,7 +133,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));
         }
-        dag = nullptr; // delete the original DAG
+        dag = nullptr; // delete the original CircuitSeq
       }
     }
     if (!new_dags.empty()) {
@@ -153,7 +154,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
           dags.push_back(std::move(dag));
         } else {
           // The hash value changed due to floating-point errors.
-          // Insert |dag| later to avoid corrupting the iterator
+          // Insert |circuitseq| later to avoid corrupting the iterator
           // of |dataset|.
           dags_to_insert_afterwards.push_back(std::move(dag));
         }
@@ -165,14 +166,14 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
   for (auto &dag : dags_to_insert_afterwards) {
     const auto hash_value = dag->hash(ctx);
     if (!dag_already_exists(*dag, dataset[hash_value])) {
-      num_removed--; // Insert |dag| back.
+      num_removed--; // Insert |circuitseq| back.
       dataset[hash_value].push_back(std::move(dag));
     }
   }
   return num_removed;
 }
 
-bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
+bool Dataset::insert(Context *ctx, std::unique_ptr<CircuitSeq> dag) {
   const auto hash_value = dag->hash(ctx);
   bool ret = dataset.count(hash_value) == 0;
   dataset[hash_value].push_back(std::move(dag));
@@ -180,12 +181,12 @@ bool Dataset::insert(Context *ctx, std::unique_ptr<DAG> dag) {
 }
 
 bool Dataset::insert_to_nearby_set_if_exists(Context *ctx,
-                                             std::unique_ptr<DAG> dag) {
+                                             std::unique_ptr<CircuitSeq> dag) {
   const auto hash_value = dag->hash(ctx);
   for (const auto &hash_value_offset : {0, 1, -1}) {
     auto it = dataset.find(hash_value + hash_value_offset);
     if (it != dataset.end()) {
-      // Found a nearby set, insert the dag.
+      // Found a nearby set, insert the circuitseq.
       it->second.push_back(std::move(dag));
       return false;
     }
@@ -198,8 +199,8 @@ bool Dataset::insert_to_nearby_set_if_exists(Context *ctx,
 void Dataset::clear() {
   // Caveat here: if only dataset.clear() is called, the behavior will be
   // different with a brand new Dataset.
-  dataset =
-      std::unordered_map<DAGHashType, std::vector<std::unique_ptr<DAG>>>();
+  dataset = std::unordered_map<CircuitSeqHashType,
+                               std::vector<std::unique_ptr<CircuitSeq>>>();
 }
 
 } // namespace quartz

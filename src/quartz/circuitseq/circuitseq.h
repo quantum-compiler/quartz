@@ -3,8 +3,8 @@
 #include "../gate/gate.h"
 #include "../math/vector.h"
 #include "../utils/utils.h"
-#include "daghyperedge.h"
-#include "dagnode.h"
+#include "circuitgate.h"
+#include "circuitwire.h"
 
 #include <istream>
 #include <string>
@@ -13,14 +13,14 @@ namespace quartz {
 
 class Context;
 
-class DAG {
+class CircuitSeq {
 public:
-  DAG(int num_qubits, int num_input_parameters);
-  DAG(const DAG &other); // clone a DAG
-  [[nodiscard]] std::unique_ptr<DAG> clone() const;
-  [[nodiscard]] bool fully_equivalent(const DAG &other) const;
-  [[nodiscard]] bool fully_equivalent(Context *ctx, DAG &other);
-  [[nodiscard]] bool less_than(const DAG &other) const;
+  CircuitSeq(int num_qubits, int num_input_parameters);
+  CircuitSeq(const CircuitSeq &other); // clone a CircuitSeq
+  [[nodiscard]] std::unique_ptr<CircuitSeq> clone() const;
+  [[nodiscard]] bool fully_equivalent(const CircuitSeq &other) const;
+  [[nodiscard]] bool fully_equivalent(Context *ctx, CircuitSeq &other);
+  [[nodiscard]] bool less_than(const CircuitSeq &other) const;
 
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices, Gate *gate,
@@ -34,8 +34,8 @@ public:
 
   // Return the total number of gates removed.
   // The time complexity is O((number of gates removed) *
-  // ((total number of nodes) + (total number of edges))).
-  int remove_gate(DAGHyperEdge *edge);
+  // ((total number of wires) + (total number of gates))).
+  int remove_gate(CircuitGate *circuit_gate);
   int remove_first_quantum_gate();
   // Evaluate the output distribution given input distribution and
   // input parameters. Also output all parameter values (including input
@@ -54,19 +54,19 @@ public:
   // Used by a parameter gate is considered as used here.
   [[nodiscard]] bool input_param_used(int param_index) const;
   // Returns a pair. The first component denotes the input parameters
-  // already used in this DAG. The second component denotes the input
-  // parameters used in each of the parameters in this DAG.
+  // already used in this CircuitSeq. The second component denotes the input
+  // parameters used in each of the parameters in this CircuitSeq.
   [[nodiscard]] std::pair<InputParamMaskType, std::vector<InputParamMaskType>>
   get_input_param_mask() const;
-  DAGHashType hash(Context *ctx);
+  CircuitSeqHashType hash(Context *ctx);
   // Evaluate the output distribution 2^|num_qubits| times, with the i-th
   // time the input distribution being a vector with only the i-th entry
   // equals to 1 and all other entries equal to 0.
   [[nodiscard]] std::vector<Vector> get_matrix(Context *ctx) const;
   [[nodiscard]] bool hash_value_valid() const;
-  [[nodiscard]] DAGHashType cached_hash_value() const;
-  [[nodiscard]] std::vector<DAGHashType> other_hash_values() const;
-  [[nodiscard]] std::vector<std::pair<DAGHashType, PhaseShiftIdType>>
+  [[nodiscard]] CircuitSeqHashType cached_hash_value() const;
+  [[nodiscard]] std::vector<CircuitSeqHashType> other_hash_values() const;
+  [[nodiscard]] std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>>
   other_hash_values_with_phase_shift_id() const;
 
   // Remove the qubit set of |unused_qubits|, given that they are unused.
@@ -78,8 +78,8 @@ public:
   bool remove_unused_input_params(std::vector<int> unused_input_params);
 
   // Remove a suffix of unused input parameters.
-  DAG &shrink_unused_input_parameters();
-  [[nodiscard]] std::unique_ptr<DAG>
+  CircuitSeq &shrink_unused_input_parameters();
+  [[nodiscard]] std::unique_ptr<CircuitSeq>
   clone_and_shrink_unused_input_parameters() const;
   [[nodiscard]] bool has_unused_parameter() const;
   // Returns the number of internal parameters removed.
@@ -87,9 +87,9 @@ public:
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
-  static std::unique_ptr<DAG> read_json(Context *ctx, std::istream &fin);
+  static std::unique_ptr<CircuitSeq> read_json(Context *ctx, std::istream &fin);
 
-  // Returns true iff the DAG is already under the canonical
+  // Returns true iff the CircuitSeq is already under the canonical
   // representation.
   // Canonical representation is a sequence representation of a
   // circuit such that the sequence is the lexicographically smallest
@@ -110,55 +110,55 @@ public:
   // The parameter "gates" are placed at the beginning.
   //
   // If |output| is true, store the canonical representation into
-  // |output_dag|.
-  // The parameter |output_dag| should be a pointer containing nullptr
+  // |output_seq|.
+  // The parameter |output_seq| should be a pointer containing nullptr
   // (otherwise its content will be deleted).
   // This functions guarantees that if and only if two sequence
   // representations share the same canonical representation, they have
   // the same circuit representation.
-  bool canonical_representation(std::unique_ptr<DAG> *output_dag,
+  bool canonical_representation(std::unique_ptr<CircuitSeq> *output_seq,
                                 bool output = true) const;
   [[nodiscard]] bool is_canonical_representation() const;
   // Returns true iff this is NOT canonical representation
-  // (so the function changes this DAG to canonical representation).
+  // (so the function changes this CircuitSeq to canonical representation).
   bool to_canonical_representation();
-  [[nodiscard]] std::unique_ptr<DAG>
-  get_permuted_dag(const std::vector<int> &qubit_permutation,
+  [[nodiscard]] std::unique_ptr<CircuitSeq>
+  get_permuted_seq(const std::vector<int> &qubit_permutation,
                    const std::vector<int> &param_permutation) const;
 
   // Returns quantum gates which do not topologically depend on any other
   // quantum gates.
-  std::vector<DAGHyperEdge *> first_quantum_gates() const;
+  std::vector<CircuitGate *> first_quantum_gates() const;
   // Returns quantum gates which can appear at last in some topological
-  // order of the DAG.
-  std::vector<DAGHyperEdge *> last_quantum_gates() const;
+  // order of the CircuitSeq.
+  std::vector<CircuitGate *> last_quantum_gates() const;
 
-  static bool same_gate(const DAG &dag1, int index1, const DAG &dag2,
-                        int index2);
+  static bool same_gate(const CircuitSeq &seq1, int index1,
+                        const CircuitSeq &seq2, int index2);
 
-  static bool same_gate(DAGHyperEdge *edge1, DAGHyperEdge *edge2);
+  static bool same_gate(CircuitGate *gate1, CircuitGate *gate2);
 
 private:
-  void clone_from(const DAG &other, const std::vector<int> &qubit_permutation,
+  void clone_from(const CircuitSeq &other,
+                  const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
 
-  // A helper function used by |DAGHashType hash(Context *ctx)|.
+  // A helper function used by |CircuitSeqHashType hash(Context *ctx)|.
   static void generate_hash_values(
       Context *ctx, const ComplexType &hash_value,
       const PhaseShiftIdType &phase_shift_id,
-      const std::vector<ParamType> &param_values, DAGHashType *main_hash,
-      std::vector<std::pair<DAGHashType, PhaseShiftIdType>> *other_hash);
+      const std::vector<ParamType> &param_values, CircuitSeqHashType *main_hash,
+      std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>> *other_hash);
 
 public:
-  std::vector<std::unique_ptr<DAGNode>> nodes;
-  std::vector<std::unique_ptr<DAGHyperEdge>> edges;
-  // The gates' information is owned by edges.
-  std::vector<DAGNode *> outputs;
-  std::vector<DAGNode *> parameters;
+  std::vector<std::unique_ptr<CircuitWire>> wires;
+  std::vector<std::unique_ptr<CircuitGate>> gates;
+  std::vector<CircuitWire *> outputs;
+  std::vector<CircuitWire *> parameters;
 
 private:
   int num_qubits, num_input_parameters;
-  DAGHashType hash_value_;
+  CircuitSeqHashType hash_value_;
   // For both floating-point error tolerance
   // and equivalences under a phase shift.
   // The first component of the pair is the hash value,
@@ -171,20 +171,21 @@ private:
   //   get_num_total_parameters()):
   //       shifted by e^(-i * ((p - get_num_total_parameters())-th
   //       parameter))
-  std::vector<std::pair<DAGHashType, PhaseShiftIdType>> other_hash_values_;
+  std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>>
+      other_hash_values_;
   ComplexType original_fingerprint_;
   bool hash_value_valid_;
 };
 
-class UniquePtrDAGComparator {
+class UniquePtrCircuitSeqComparator {
 public:
-  bool operator()(const std::unique_ptr<DAG> &dag1,
-                  const std::unique_ptr<DAG> &dag2) const {
-    if (!dag1 || !dag2) {
+  bool operator()(const std::unique_ptr<CircuitSeq> &seq1,
+                  const std::unique_ptr<CircuitSeq> &seq2) const {
+    if (!seq1 || !seq2) {
       // nullptr
-      return !dag2;
+      return !seq2;
     }
-    return dag1->less_than(*dag2);
+    return seq1->less_than(*seq2);
   }
 };
 } // namespace quartz

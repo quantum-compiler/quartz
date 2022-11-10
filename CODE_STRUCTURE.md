@@ -21,44 +21,44 @@ In `src/quartz/context/rule_parser.h`
 * `class RuleParser`: define the rules to write 3-qubit gates in each of the gate sets
 
 In `src/quartz/parser/qasm_parser.h`
-* `class QASMParser`: parse an input QASM file to Quartz's DAG representation
+* `class QASMParser`: parse an input QASM file to Quartz's CircuitSeq representation
 
-In `src/dag/dag.h`
-* `class DAG`: a circuit represented in a DAG with all gates stored in an `std::vector` (which is a sequence representation)
+In `src/quartz/circuitseq/circuitseq.h`
+* `class CircuitSeq`: a circuit sequence with all gates stored in an `std::vector`
 
-In `src/dag/dagnode.h`
-* `class DAGNode`: a node in DAG corresponds to a wire in the circuit
+In `src/quartz/circuitseq/circuitwire.h`
+* `class CircuitWire`: a wire in the circuit sequence
 
-In `src/dag/daghyperedge.h`
-* `class DAGHyperEdge`: a hyperedge in DAG corresponds to a gate (or parameter expression) in the circuit
+In `src/quartz/circuitseq/circuitgate.h`
+* `class CircuitGate`: a gate (or parameter expression) in the circuit sequence
 
-In `src/dataset/dataset.h`
+In `src/quartz/dataset/dataset.h`
 * `class Dataset`: a collection of circuits grouped by fingerprints
 
-In `src/dataset/equivalence_set.h`
+In `src/quartz/dataset/equivalence_set.h`
 * `class EquivalenceClass`: an ECC
 * `class EquivalenceSet`: an ECC set
 
-In `src/generator/generator.h`
+In `src/quartz/generator/generator.h`
 * `class Generator`: the circuit generator
 * `Generator::generate`: generate circuits for an unverified ECC set (then use `src/python/verify_equivalences.py` to get the ECC set)
 
-In `src/math/matrix.h`
+In `src/quartz/math/matrix.h`
 * `class Matrix`: a complex square matrix
 
-In `src/math/vector.h`
+In `src/quartz/math/vector.h`
 * `class Vector`: a complex vector
 
-In `src/verifier/verifier.h`
+In `src/quartz/verifier/verifier.h`
 * `Verifier::redundant`: check if the circuit generated is redundant, i.e., having some slices not in the representative set
 
-In `src/tasograph/tasograph.h`
+In `src/quartz/tasograph/tasograph.h`
 * `class Graph`: the circuit to be optimized
 * `Graph::optimize`: use the search algorithm to optimize the circuit
 * `Graph::context_shift`: shift the context of the circuit, e.g., changing the gate set
 
-In `src/tasograph/substitution.h`
+In `src/quartz/tasograph/substitution.h`
 * `class GraphXfer`: a circuit transformation
 
-In `src/test/gen_ecc_set.cpp`
+In `src/quartz/test/gen_ecc_set.cpp`
 * `gen_ecc_set`: a function to generate ECC sets with given gate set and hyperparameters

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../context/context.h"
-#include "../dag/dag.h"
+#include "quartz/circuitseq/circuitseq.h"
 
 #include <cassert>
 #include <fstream>
@@ -20,7 +20,7 @@ public:
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
-                        DAG *&dag) {
+                        CircuitSeq *&dag) {
     dag = NULL;
     std::string line;
     GateType gate_type;
@@ -46,7 +46,7 @@ public:
         // TODO: temporarily assume a program has at most 16
         // parameters
         assert(dag == NULL);
-        dag = new DAG(num_qubits, 16);
+        dag = new CircuitSeq(num_qubits, 16);
         assert(!ss.good());
       } else if (is_gate_string(command, gate_type)) {
         Gate *gate = context->get_gate(gate_type);
@@ -78,12 +78,12 @@ public:
     return true;
   }
 
-  bool load_qasm_str(const std::string &qasm_str, DAG *&dag) {
+  bool load_qasm_str(const std::string &qasm_str, CircuitSeq *&dag) {
     std::stringstream sstream(qasm_str);
     return load_qasm_stream(sstream, dag);
   }
 
-  bool load_qasm(const std::string &file_name, DAG *&dag) {
+  bool load_qasm(const std::string &file_name, CircuitSeq *&dag) {
     std::ifstream fin;
     fin.open(file_name, std::ifstream::in);
     if (!fin.is_open()) {

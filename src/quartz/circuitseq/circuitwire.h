@@ -4,10 +4,13 @@
 #include <vector>
 
 namespace quartz {
-class DAGHyperEdge;
+class CircuitGate;
 
-// A node in DAG corresponds to a wire in the circuit.
-class DAGNode {
+/**
+ * A wire in the circuit.
+ * Can be a qubit or a parameter (see comment below).
+ */
+class CircuitWire {
 public:
   enum Type {
     internal_qubit,
@@ -22,13 +25,13 @@ public:
   [[nodiscard]] std::string to_string() const;
 
   Type type;
-  // If this node is a qubit, |index| is the qubit id it correspond to,
+  // If this wire is a qubit, |index| is the qubit id it corresponds to,
   // ranging [0, get_num_qubits()).
-  // If this node is a parameter, |index| is the parameter id,
+  // If this wire is a parameter, |index| is the parameter id,
   // ranging [0, get_num_total_parameters()).
   int index;
-  std::vector<DAGHyperEdge *> input_edges;
-  std::vector<DAGHyperEdge *> output_edges;
+  std::vector<CircuitGate *> input_gates;
+  std::vector<CircuitGate *> output_gates;
 };
 
 } // namespace quartz

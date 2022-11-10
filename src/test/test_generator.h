@@ -50,7 +50,7 @@ void test_generator(const std::vector<GateType> &support_gates, int num_qubits,
   if (count_minimal_representations) {
     int num_different_minrep = 0;
     int num_missing_minrep = 0;
-    std::unique_ptr<DAG> tmp_dag;
+    std::unique_ptr<CircuitSeq> tmp_dag;
     for (auto &it : dataset.dataset) {
       bool has_minimal_representation = false;
       for (auto &dag : it.second) {

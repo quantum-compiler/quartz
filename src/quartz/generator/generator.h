@@ -1,10 +1,10 @@
 #pragma once
 
 #include "../context/context.h"
-#include "../dag/dag.h"
 #include "../dataset/dataset.h"
 #include "../dataset/equivalence_set.h"
 #include "../verifier/verifier.h"
+#include "quartz/circuitseq/circuitseq.h"
 
 #include <chrono>
 #include <unordered_set>
@@ -51,7 +51,7 @@ public:
    * verify that the equivalences we found are indeed equivalent. Otherwise,
    * we will simply trust the one-time random testing result, which may
    * treat hash collision as equivalent. XXX: when this is false, we will
-   * treat any DAG with hash values differ no more than 1 with any
+   * treat any CircuitSeq with hash values differ no more than 1 with any
    * representative as equivalent.
    * @param equiv_set should be an empty |EquivalenceSet| object at the
    * beginning, and will store the intermediate ECC sets during generation.
@@ -72,19 +72,20 @@ public:
 
 private:
   void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,
-           DAG *dag, std::vector<int> &used_parameters, Dataset &dataset,
+           CircuitSeq *dag, std::vector<int> &used_parameters, Dataset &dataset,
            bool restrict_search_space, bool unique_parameters);
 
   // |dags[i]| is the DAGs with |i| gates.
-  void bfs(const std::vector<std::vector<DAG *>> &dags, int max_num_param_gates,
-           Dataset &dataset, std::vector<DAG *> *new_representatives,
+  void bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
+           int max_num_param_gates, Dataset &dataset,
+           std::vector<CircuitSeq *> *new_representatives,
            bool invoke_python_verifier, const EquivalenceSet *equiv_set,
            bool unique_parameters);
 
-  void dfs_parameter_gates(std::unique_ptr<DAG> dag, int remaining_gates,
+  void dfs_parameter_gates(std::unique_ptr<CircuitSeq> dag, int remaining_gates,
                            int max_unused_params, int current_unused_params,
                            std::vector<int> &params_used_times,
-                           std::vector<std::unique_ptr<DAG>> &result);
+                           std::vector<std::unique_ptr<CircuitSeq>> &result);
 
   Context *context;
   Verifier verifier_;

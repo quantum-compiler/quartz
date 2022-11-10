@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(input_fn, dag)) {
     std::cout << "Parser failed" << std::endl;
   }

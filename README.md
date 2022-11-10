@@ -70,26 +70,26 @@ After that, you need a `QASMParser` object to parse the input `qasm` file. You c
 QASMParser qasm_parser(&src_ctx);
 ```
 
-Now you can use the `QASMParser` object to load the circuit from the `qasm` file to a `DAG` object, as below:
+Now you can use the `QASMParser` object to load the circuit from the `qasm` file to a `CircuitSeq` object, as below:
 
 ``` cpp
-DAG *dag = nullptr;
-if (!qasm_parser.load_qasm(input_fn, dag)) {
+CircuitSeq *seq = nullptr;
+if (!qasm_parser.load_qasm(input_fn, seq)) {
     std::cout << "Parser failed" << std::endl;
 }
 ```
 
-After you have the circuit loaded into the `DAG` object, you can construct a `Graph` object from it. The `Graph` object is the final circuit representation used in our optimizer. You can construct it as below:
+After you have the circuit loaded into the `CircuitSeq` object, you can construct a `Graph` object from it. The `Graph` object is the final circuit representation used in our optimizer. You can construct it as below:
 
 ``` cpp
-Graph graph(&src_ctx, dag);
+Graph graph(&src_ctx, seq);
 ```
 
 #### Context shift
 
 If the input gate set is different from your target gate set, you should consider using the `context_shift` APIs to shift the context constructed with the gate sets to a context constructed with the target gate set.
 
-To shift the context, you should create three `Contxt` objects, one for input, one for target, and one for their union as below:
+To shift the context, you should create three `Context` objects, one for input, one for target, and one for their union as below:
 
 ``` cpp
 Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,

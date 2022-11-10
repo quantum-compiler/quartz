@@ -6,8 +6,8 @@
 #include <queue>
 
 namespace quartz {
-std::vector<DAG *> EquivalenceClass::get_all_dags() const {
-  std::vector<DAG *> result;
+std::vector<CircuitSeq *> EquivalenceClass::get_all_dags() const {
+  std::vector<CircuitSeq *> result;
   result.reserve(dags_.size());
   for (const auto &dag : dags_) {
     result.push_back(dag.get());
@@ -15,7 +15,7 @@ std::vector<DAG *> EquivalenceClass::get_all_dags() const {
   return result;
 }
 
-void EquivalenceClass::insert(std::unique_ptr<DAG> dag) {
+void EquivalenceClass::insert(std::unique_ptr<CircuitSeq> dag) {
   dags_.push_back(std::move(dag));
 }
 
@@ -23,20 +23,20 @@ int EquivalenceClass::size() const { return (int)dags_.size(); }
 
 void EquivalenceClass::reserve(std::size_t new_cap) { dags_.reserve(new_cap); }
 
-std::vector<std::unique_ptr<DAG>> EquivalenceClass::extract() {
+std::vector<std::unique_ptr<CircuitSeq>> EquivalenceClass::extract() {
   return std::move(dags_);
 }
 
-void EquivalenceClass::set_dags(std::vector<std::unique_ptr<DAG>> dags) {
+void EquivalenceClass::set_dags(std::vector<std::unique_ptr<CircuitSeq>> dags) {
   dags_ = std::move(dags);
 }
 
-DAG *EquivalenceClass::get_representative() {
+CircuitSeq *EquivalenceClass::get_representative() {
   assert(!dags_.empty());
   return dags_[0].get();
 }
 
-bool EquivalenceClass::contains(const DAG &dag) const {
+bool EquivalenceClass::contains(const CircuitSeq &dag) const {
   for (const auto &dag_in_class : dags_) {
     if (dag.fully_equivalent(*dag_in_class)) {
       return true;
@@ -45,9 +45,9 @@ bool EquivalenceClass::contains(const DAG &dag) const {
   return false;
 }
 
-bool EquivalenceClass::set_as_representative(const DAG &dag) {
+bool EquivalenceClass::set_as_representative(const CircuitSeq &dag) {
   if (dag.fully_equivalent(*dags_[0])) {
-    // |dag| is already the representative.
+    // |circuitseq| is already the representative.
     return true;
   }
   for (int i = 1; i < (int)dags_.size(); i++) {
@@ -60,9 +60,10 @@ bool EquivalenceClass::set_as_representative(const DAG &dag) {
 }
 
 int EquivalenceClass::remove_common_first_or_last_gates(
-    Context *ctx, std::unordered_set<DAGHashType> &hash_values_to_remove) {
+    Context *ctx,
+    std::unordered_set<CircuitSeqHashType> &hash_values_to_remove) {
   assert(hash_values_to_remove.empty());
-  std::vector<DAGHyperEdge *> all_first_gates, all_last_gates;
+  std::vector<CircuitGate *> all_first_gates, all_last_gates;
   std::vector<int> removing_ids;
   for (int i = 0; i < (int)dags_.size(); i++) {
     auto first_gates = dags_[i]->first_quantum_gates();
@@ -73,7 +74,7 @@ int EquivalenceClass::remove_common_first_or_last_gates(
         break;
       }
       for (auto &other_first_gate : all_first_gates) {
-        if (DAG::same_gate(first_gate, other_first_gate)) {
+        if (CircuitSeq::same_gate(first_gate, other_first_gate)) {
           remove = true;
           break;
         }
@@ -84,7 +85,7 @@ int EquivalenceClass::remove_common_first_or_last_gates(
         break;
       }
       for (auto &other_last_gate : all_last_gates) {
-        if (DAG::same_gate(last_gate, other_last_gate)) {
+        if (CircuitSeq::same_gate(last_gate, other_last_gate)) {
           remove = true;
           break;
         }
@@ -124,7 +125,7 @@ int EquivalenceClass::remove_common_first_or_last_gates(
     }
   }
 
-  std::vector<std::unique_ptr<DAG>> previous_dags;
+  std::vector<std::unique_ptr<CircuitSeq>> previous_dags;
   std::swap(dags_, previous_dags);
   // |dags_| is empty now.
   assert(previous_dags.size() >= removing_ids.size());
@@ -147,14 +148,14 @@ int EquivalenceClass::remove_unused_internal_parameters(Context *ctx) {
     if (dag->remove_unused_internal_parameters()) {
       num_dag_modified++;
       // Restore the hash value.
-      // (probably |dag->hash_value_valid_ = true;| also works)
+      // (probably |circuitseq->hash_value_valid_ = true;| also works)
       dag->hash(ctx);
     }
   }
   return num_dag_modified;
 }
 
-DAGHashType EquivalenceClass::hash(Context *ctx) {
+CircuitSeqHashType EquivalenceClass::hash(Context *ctx) {
   for (auto &dag : dags_) {
     if (dag) {
       // Not nullptr
@@ -165,7 +166,7 @@ DAGHashType EquivalenceClass::hash(Context *ctx) {
 }
 
 void EquivalenceClass::sort() {
-  std::sort(dags_.begin(), dags_.end(), UniquePtrDAGComparator());
+  std::sort(dags_.begin(), dags_.end(), UniquePtrCircuitSeqComparator());
 }
 
 bool EquivalenceClass::less_than(const EquivalenceClass &ecc1,
@@ -192,7 +193,7 @@ bool EquivalenceClass::less_than(const EquivalenceClass &ecc1,
 }
 
 bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
-                               std::vector<DAG *> *new_representatives) {
+                               std::vector<CircuitSeq *> *new_representatives) {
   std::ifstream fin;
   fin.open(file_name, std::ifstream::in);
   if (!fin.is_open()) {
@@ -202,7 +203,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
 
   // If the current equivalence set is not empty, keep the
   // representatives.
-  std::vector<std::unique_ptr<DAG>> representatives;
+  std::vector<std::unique_ptr<CircuitSeq>> representatives;
   representatives.reserve(classes_.size());
   for (auto &item : classes_) {
     auto dags = item->extract();
@@ -213,8 +214,8 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
   clear();
 
   // Equivalences between equivalence classes with different hash values.
-  using EquivClassTag = std::pair<DAGHashType, int>;
-  // This vector stores edges in an undirected graph with nodes being
+  using EquivClassTag = std::pair<CircuitSeqHashType, int>;
+  // This vector stores gates in an undirected graph with wires being
   // equivalence classes.
   std::unordered_map<EquivClassTag, std::vector<EquivClassTag>, PairHash>
       equiv_edges;
@@ -232,7 +233,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
 
     // New equivalence between a pair of equivalence class
 
-    DAGHashType hash_value;
+    CircuitSeqHashType hash_value;
     int id;
 
     // the tags
@@ -301,7 +302,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
     // New equivalence class
 
     // the tag
-    DAGHashType hash_value;
+    CircuitSeqHashType hash_value;
     fin >> std::hex >> hash_value;
     fin.ignore(); // '_'
     int id;
@@ -333,9 +334,9 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
         break;
       }
 
-      // New DAG
+      // New CircuitSeq
       fin.unget(); // '['
-      auto dag = DAG::read_json(ctx, fin);
+      auto dag = CircuitSeq::read_json(ctx, fin);
       auto dag_hash_value = dag->hash(ctx);
       // Due to floating point errors and for compatibility of
       // different platforms, |dag_hash_value| can be different from
@@ -559,9 +560,9 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
   int num_class_modified = 0;
   for (auto &item : classes_) {
     auto dags = item->extract();
-    std::vector<std::unique_ptr<DAG>> new_dags;
-    std::unique_ptr<DAG> new_dag;
-    std::unordered_set<DAGHashType> hash_values_to_remove;
+    std::vector<std::unique_ptr<CircuitSeq>> new_dags;
+    std::unique_ptr<CircuitSeq> new_dag;
+    std::unordered_set<CircuitSeqHashType> hash_values_to_remove;
     int class_modified = 0;
     for (auto &dag : dags) {
       bool is_minimal = dag->canonical_representation(&new_dag);
@@ -572,7 +573,7 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
         for (const auto &other_hash : dag->other_hash_values()) {
           hash_values_to_remove.insert(other_hash);
         }
-        dag = nullptr; // delete the DAG
+        dag = nullptr; // delete the CircuitSeq
       }
     }
     if (!class_modified) {
@@ -584,8 +585,8 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
                 << new_dags[0]->hash(ctx) << ": " << class_modified
                 << " DAGs modified." << std::endl;
     }
-    std::unordered_set<DAGHashType> existing_hash_values;
-    std::unordered_set<DAGHashType> hash_values_to_insert;
+    std::unordered_set<CircuitSeqHashType> existing_hash_values;
+    std::unordered_set<CircuitSeqHashType> hash_values_to_insert;
     num_class_modified++;
     item->set_dags({}); // insert the DAGs one by one
     for (auto &dag : dags) {
@@ -693,7 +694,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
       continue;
     }
 
-    // Lazily remove the original DAG class.
+    // Lazily remove the original CircuitSeq class.
     classes_to_remove.emplace_back(item.get());
     // Remove all pointers to the current class.
     for (auto &dag : dags) {
@@ -724,13 +725,13 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
     }
 
     if (keep_dag_class) {
-      // Construct a new DAG class
+      // Construct a new CircuitSeq class
       classes_to_insert.push_back(std::make_unique<EquivalenceClass>());
       auto &new_dag_class = classes_to_insert.back();
       new_dag_class->reserve(item->size());
       auto dags_unique_ptr = item->extract();
       bool already_exist = false;
-      // We only need to check the first DAG to see if the class
+      // We only need to check the first CircuitSeq to see if the class
       // already exists.
       bool first_dag = true;
       for (auto &dag : dags_unique_ptr) {
@@ -738,7 +739,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
         assert(ret);
         ret = dag->remove_unused_input_params(unused_input_params);
         assert(ret);
-        auto check_hash_value = [&](const DAGHashType &hash_value) {
+        auto check_hash_value = [&](const CircuitSeqHashType &hash_value) {
           if (already_exist) {
             return;
           }
@@ -822,7 +823,7 @@ int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx,
                                                       bool verbose) {
   int num_classes_modified = 0;
   for (auto &item : classes_) {
-    std::unordered_set<DAGHashType> hash_values_to_remove;
+    std::unordered_set<CircuitSeqHashType> hash_values_to_remove;
     if (item->remove_common_first_or_last_gates(ctx, hash_values_to_remove)) {
       num_classes_modified++;
       if (verbose) {
@@ -873,13 +874,13 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
     bool found_permuted_equivalence = false;
     do {
       // Check all permutations including the identity (because
-      // we want to merge ECCs with the same DAG).
+      // we want to merge ECCs with the same CircuitSeq).
       std::set<EquivalenceClass *> permuted_classes;
-      std::vector<std::unique_ptr<DAG>> permuted_dags;
+      std::vector<std::unique_ptr<CircuitSeq>> permuted_dags;
       permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
         permuted_dags.emplace_back(
-            dag->get_permuted_dag(qubit_permutation, param_permutation));
+            dag->get_permuted_seq(qubit_permutation, param_permutation));
       }
       for (auto &permuted_dag : permuted_dags) {
         for (const auto &permuted_class :
@@ -987,26 +988,26 @@ int EquivalenceSet::first_class_with_common_first_or_last_gates() const {
         if (dag2->get_num_gates() == 0) {
           continue;
         }
-        if (DAG::same_gate(*dag1, 0, *dag2, 0)) {
+        if (CircuitSeq::same_gate(*dag1, 0, *dag2, 0)) {
           int id = 0;
           bool same = true;
-          while (dag1->edges[id]->gate->is_parameter_gate()) {
+          while (dag1->gates[id]->gate->is_parameter_gate()) {
             // A prefix of only parameter gates doesn't count.
             id++;
             if (id >= dag1->get_num_gates() || id >= dag2->get_num_gates()) {
               same = false;
               break;
             }
-            same = DAG::same_gate(*dag1, id, *dag2, id);
+            same = CircuitSeq::same_gate(*dag1, id, *dag2, id);
           }
           if (same) {
             return class_id;
           }
         }
-        if (DAG::same_gate(*dag1, dag1->get_num_gates() - 1, *dag2,
-                           dag2->get_num_gates() - 1)) {
+        if (CircuitSeq::same_gate(*dag1, dag1->get_num_gates() - 1, *dag2,
+                                  dag2->get_num_gates() - 1)) {
           assert(
-              dag1->edges[dag1->get_num_gates() - 1]->gate->is_quantum_gate());
+              dag1->gates[dag1->get_num_gates() - 1]->gate->is_quantum_gate());
           return class_id;
         }
       }
@@ -1021,9 +1022,9 @@ std::string EquivalenceSet::get_class_id(int num_class) const {
          std::to_string(classes_[num_class]->size());
 }
 
-std::vector<std::vector<DAG *>>
+std::vector<std::vector<CircuitSeq *>>
 EquivalenceSet::get_all_equivalence_sets() const {
-  std::vector<std::vector<DAG *>> result;
+  std::vector<std::vector<CircuitSeq *>> result;
   result.reserve(num_equivalence_classes());
   for (const auto &item : classes_) {
     result.push_back(item->get_all_dags());
@@ -1031,8 +1032,8 @@ EquivalenceSet::get_all_equivalence_sets() const {
   return result;
 }
 
-std::vector<EquivalenceClass *>
-EquivalenceSet::get_possible_classes(const DAGHashType &hash_value) const {
+std::vector<EquivalenceClass *> EquivalenceSet::get_possible_classes(
+    const CircuitSeqHashType &hash_value) const {
   auto it = possible_classes_.find(hash_value);
   if (it == possible_classes_.end()) {
     return std::vector<EquivalenceClass *>();
@@ -1055,8 +1056,8 @@ void EquivalenceSet::insert_class(
 }
 
 void EquivalenceSet::insert(Context *ctx, EquivalenceClass *equiv_class,
-                            std::unique_ptr<DAG> dag) {
-  DAG *dag_backup = dag.get();
+                            std::unique_ptr<CircuitSeq> dag) {
+  CircuitSeq *dag_backup = dag.get();
   equiv_class->insert(std::move(dag));
   set_possible_class(dag_backup->hash(ctx), equiv_class);
   for (const auto &other_hash : dag_backup->other_hash_values()) {
@@ -1065,7 +1066,7 @@ void EquivalenceSet::insert(Context *ctx, EquivalenceClass *equiv_class,
 }
 
 std::vector<EquivalenceClass *>
-EquivalenceSet::get_containing_class(Context *ctx, DAG *dag) const {
+EquivalenceSet::get_containing_class(Context *ctx, CircuitSeq *dag) const {
   std::set<EquivalenceClass *> result;
   auto possible_classes = get_possible_classes(dag->hash(ctx));
   for (auto &equiv_class : possible_classes) {
@@ -1090,13 +1091,13 @@ EquivalenceSet::get_containing_class(Context *ctx, DAG *dag) const {
   return std::vector<EquivalenceClass *>(result.begin(), result.end());
 }
 
-void EquivalenceSet::set_possible_class(const DAGHashType &hash_value,
+void EquivalenceSet::set_possible_class(const CircuitSeqHashType &hash_value,
                                         EquivalenceClass *equiv_class) {
   auto &possible_classes = possible_classes_[hash_value];
   possible_classes.insert(equiv_class);
 }
 
-void EquivalenceSet::remove_possible_class(const DAGHashType &hash_value,
+void EquivalenceSet::remove_possible_class(const CircuitSeqHashType &hash_value,
                                            EquivalenceClass *equiv_class) {
   auto &possible_classes = possible_classes_[hash_value];
   possible_classes.erase(equiv_class);

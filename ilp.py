@@ -1,24 +1,39 @@
+import time
+
 import pulp
 import qiskit
 import qiskit.circuit.library.standard_gates as gates
 
-sparse_gates = {gates.p.CPhaseGate, gates.swap.SwapGate}
-non_sparse_gates = {gates.h.HGate}
+sparse_gates = {
+    gates.x.XGate,
+    gates.x.CXGate,
+    gates.z.CZGate,
+    gates.p.CPhaseGate,
+    gates.swap.SwapGate,
+}
+non_sparse_gates = {
+    gates.h.HGate,
+    gates.ry.RYGate,
+    gates.u.UGate,
+    gates.u2.U2Gate,
+    gates.u3.U3Gate,
+}
+log_file = open("result_ilp.txt", "w")
 
 
-def solve_ilp(circuit_seq, n, k, M):
+def solve_ilp(circuit_seq, n, k, M, print_solution=False):
     # Check if the ILP is feasible in M rounds.
-    prob = pulp.LpProblem(f'{n}_{k}_{M}', pulp.LpMinimize)
+    prob = pulp.LpProblem(f"{n}_{k}_{M}", pulp.LpMinimize)
     G = len(circuit_seq)
 
     # a[i, j] = 1 iff the i-th qubit is a local qubit in the j-th iteration
     a = pulp.LpVariable.dicts(
-        'a', [(i, j) for i in range(n) for j in range(M)], 0, 1, pulp.LpInteger
+        "a", [(i, j) for i in range(n) for j in range(M)], 0, 1, pulp.LpInteger
     )
 
     # b[i, j] = 1 iff the i-th gate is finished before or at the j-th iteration
     b = pulp.LpVariable.dicts(
-        'b', [(i, j) for i in range(G) for j in range(M + 1)], 0, 1, pulp.LpInteger
+        "b", [(i, j) for i in range(G) for j in range(M + 1)], 0, 1, pulp.LpInteger
     )
 
     prob += 0  # minimize nothing
@@ -63,26 +78,53 @@ def solve_ilp(circuit_seq, n, k, M):
         prob += b[i, M] == 1
 
     prob.solve()
-    print("Status:", pulp.LpStatus[prob.status])
-    # for v in prob.variables():
-    #     print(v.name, "=", v.varValue)
+    if print_solution:
+        print("Status:", pulp.LpStatus[prob.status])
+        for v in prob.variables():
+            print(v.name, "=", v.varValue)
     return prob.status is pulp.LpStatusOptimal
 
 
-circuit = qiskit.circuit.QuantumCircuit.from_qasm_file(
-    'circuit/MQTBench_40q/qft_indep_qiskit_40.qasm'
-)
-circuit_seq_raw = circuit.data
-circuit_seq = []
-for gate in circuit_seq_raw:
-    if not isinstance(gate[0], qiskit.circuit.barrier.Barrier) and not isinstance(
-        gate[0], qiskit.circuit.measure.Measure
-    ):
-        circuit_seq.append(gate)
-        # print(gate)
-        assert type(gate[0]) in sparse_gates or type(gate[0]) in non_sparse_gates
-n = circuit.num_qubits
+def run(n, circuit_name):
+    circuit = qiskit.circuit.QuantumCircuit.from_qasm_file(
+        f"circuit/MQTBench_{n}q/{circuit_name}_indep_qiskit_{n}.qasm"
+    )
+    circuit_seq_raw = circuit.data
+    circuit_seq = []
+    for gate in circuit_seq_raw:
+        if not isinstance(gate[0], qiskit.circuit.barrier.Barrier) and not isinstance(
+            gate[0], qiskit.circuit.measure.Measure
+        ):
+            circuit_seq.append(gate)
+            # print(gate)
+            assert type(gate[0]) in sparse_gates or type(gate[0]) in non_sparse_gates
+    print(n, end=" ", file=log_file, flush=True)
+    for k in range(12, 34):
+        for M in range(1, 100):
+            if solve_ilp(circuit_seq, n, k, M):
+                print(M, end=" ", file=log_file, flush=True)
+                break
+    if circuit_name == "wstate":
+        solve_ilp(circuit_seq, n, 13, 3, print_solution=True)
 
 
-print(solve_ilp(circuit_seq, n, 30, 1))
-print(solve_ilp(circuit_seq, n, 30, 2))
+circuit_names = [
+    "dj",
+    "ghz",
+    "graphstate",
+    "qft",
+    "qftentangled",
+    "realamprandom",
+    "su2random",
+    "twolocalrandom",
+    "wstate",
+]
+
+for circuit_name in circuit_names:
+    print(circuit_name, file=log_file)
+    for n in range(40, 43):
+        run(n, circuit_name)
+        print(file=log_file)
+
+log_file.close()
+print(time.process_time())

@@ -105,7 +105,7 @@ def run(n, circuit_name):
                 print(M, end=" ", file=log_file, flush=True)
                 break
     if circuit_name == "wstate":
-        solve_ilp(circuit_seq, n, 13, 3, print_solution=True)
+        solve_ilp(circuit_seq, n, 14, 3, print_solution=True)
 
 
 circuit_names = [

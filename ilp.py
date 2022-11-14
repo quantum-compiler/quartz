@@ -99,14 +99,14 @@ def run(n, circuit_name):
     # Dependencies
     G = len(circuit_seq)
     last_gate = [None for _ in range(n)]
-    in_gate = [[] for _ in range(G)]
-    out_gate = [[] for _ in range(G)]
+    in_gate = [set() for _ in range(G)]
+    out_gate = [set() for _ in range(G)]
     for i in range(G):
         for qubit in circuit_seq[i][1]:
             qubit_id = qubit.index
             if last_gate[qubit_id] is not None:
-                in_gate[i].append(last_gate[qubit_id])
-                out_gate[last_gate[qubit_id]].append(i)
+                in_gate[i].add(last_gate[qubit_id])
+                out_gate[last_gate[qubit_id]].add(i)
             last_gate[qubit_id] = i
 
     for i in range(G):
@@ -117,8 +117,8 @@ def run(n, circuit_name):
                 in_gate[g2].remove(i)
             for g1 in in_gate[i]:
                 for g2 in out_gate[i]:
-                    out_gate[g1].append(g2)
-                    in_gate[g2].append(g1)
+                    out_gate[g1].add(g2)
+                    in_gate[g2].add(g1)
             in_gate[i].clear()
             out_gate[i].clear()
 

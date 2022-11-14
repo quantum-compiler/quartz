@@ -82,6 +82,7 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
 
 
 def run(n, circuit_name):
+    print("Start running", circuit_name, "with n =", n)
     circuit = qiskit.circuit.QuantumCircuit.from_qasm_file(
         f"circuit/MQTBench_{n}q/{circuit_name}_indep_qiskit_{n}.qasm"
     )
@@ -121,12 +122,14 @@ def run(n, circuit_name):
             in_gate[i].clear()
             out_gate[i].clear()
 
+    print("Start solving ILP...")
     print(n, end=" ", file=log_file, flush=True)
     for k in range(12, 34):
         for M in range(1, 100):
             if solve_ilp(circuit_seq, out_gate, n, k, M):
                 print(M, end=" ", file=log_file, flush=True)
                 break
+    print("Done!")
     if circuit_name == "wstate":
         solve_ilp(circuit_seq, out_gate, n, 14, 3, print_solution=True)
 

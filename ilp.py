@@ -21,7 +21,7 @@ non_sparse_gates = {
 log_file = open("result_ilp.txt", "w")
 
 
-def solve_ilp(circuit_seq, n, k, M, print_solution=False):
+def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
     # Check if the ILP is feasible in M rounds.
     prob = pulp.LpProblem(f"{n}_{k}_{M}", pulp.LpMinimize)
     G = len(circuit_seq)
@@ -53,21 +53,17 @@ def solve_ilp(circuit_seq, n, k, M, print_solution=False):
     for i in range(G):
         if type(circuit_seq[i][0]) in non_sparse_gates:
             for qubit in circuit_seq[i][1]:
-                qubit_id = qubit.index  # XXX: assume there is only one qreg
+                qubit_id = (
+                    qubit.index
+                )  # XXX: assume there is only one qreg; similarly hereinafter
                 for j in range(M):
                     prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
 
-    # TODO: this is ad-hoc
     # Dependencies
     for i1 in range(G):
-        if type(circuit_seq[i1][0]) in non_sparse_gates:
-            i1_qubits = set([qubit.index for qubit in circuit_seq[i1][1]])
-            for i2 in range(G):
-                if type(circuit_seq[i2][0]) in non_sparse_gates:
-                    i2_qubits = set([qubit.index for qubit in circuit_seq[i2][1]])
-                    if i1_qubits & i2_qubits:
-                        for j in range(M):
-                            prob += b[i1, j] >= b[i2, j]
+        for i2 in out_gate[i1]:
+            for j in range(M + 1):
+                prob += b[i1, j] >= b[i2, j]
 
     # At the beginning, all gates should be executed.
     for i in range(G):
@@ -98,14 +94,41 @@ def run(n, circuit_name):
             circuit_seq.append(gate)
             # print(gate)
             assert type(gate[0]) in sparse_gates or type(gate[0]) in non_sparse_gates
+
+    # Dependencies
+    G = len(circuit_seq)
+    last_gate = [None for _ in range(n)]
+    in_gate = [[] for _ in range(G)]
+    out_gate = [[] for _ in range(G)]
+    for i in range(G):
+        for qubit in circuit_seq[i][1]:
+            qubit_id = qubit.index
+            if last_gate[qubit_id] is not None:
+                in_gate[i].append(last_gate[qubit_id])
+                out_gate[last_gate[qubit_id]].append(i)
+            last_gate[qubit_id] = i
+
+    for i in range(G):
+        if type(circuit_seq[i][0]) in sparse_gates:
+            for g1 in in_gate[i]:
+                out_gate[g1].remove(i)
+            for g2 in out_gate[i]:
+                in_gate[g2].remove(i)
+            for g1 in in_gate[i]:
+                for g2 in out_gate[i]:
+                    out_gate[g1].append(g2)
+                    in_gate[g2].append(g1)
+            in_gate[i].clear()
+            out_gate[i].clear()
+
     print(n, end=" ", file=log_file, flush=True)
     for k in range(12, 34):
         for M in range(1, 100):
-            if solve_ilp(circuit_seq, n, k, M):
+            if solve_ilp(circuit_seq, out_gate, n, k, M):
                 print(M, end=" ", file=log_file, flush=True)
                 break
     if circuit_name == "wstate":
-        solve_ilp(circuit_seq, n, 14, 3, print_solution=True)
+        solve_ilp(circuit_seq, out_gate, n, 14, 3, print_solution=True)
 
 
 circuit_names = [

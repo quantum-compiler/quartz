@@ -78,6 +78,12 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():
             print(v.name, "=", v.varValue)
+        for j in range(M):
+            for v in prob.variables():
+                if v.name.startswith('a') and v.varValue == 1.0:
+                    if v.name.endswith(str(j) + ')'):
+                        print(v.name.split('(')[1].split(',')[0], end=' ')
+            print()
     return prob.status is pulp.LpStatusOptimal
 
 
@@ -109,18 +115,20 @@ def run(n, circuit_name):
                 out_gate[last_gate[qubit_id]].add(i)
             last_gate[qubit_id] = i
 
-    for i in range(G):
-        if type(circuit_seq[i][0]) in sparse_gates:
-            for g1 in in_gate[i]:
-                out_gate[g1].remove(i)
-            for g2 in out_gate[i]:
-                in_gate[g2].remove(i)
-            for g1 in in_gate[i]:
-                for g2 in out_gate[i]:
-                    out_gate[g1].add(g2)
-                    in_gate[g2].add(g1)
-            in_gate[i].clear()
-            out_gate[i].clear()
+    # Contract the sparse gates.
+    # Commented to not contract them now.
+    # for i in range(G):
+    #     if type(circuit_seq[i][0]) in sparse_gates:
+    #         for g1 in in_gate[i]:
+    #             out_gate[g1].remove(i)
+    #         for g2 in out_gate[i]:
+    #             in_gate[g2].remove(i)
+    #         for g1 in in_gate[i]:
+    #             for g2 in out_gate[i]:
+    #                 out_gate[g1].add(g2)
+    #                 in_gate[g2].add(g1)
+    #         in_gate[i].clear()
+    #         out_gate[i].clear()
 
     print("Start solving ILP...")
     print(n, end=" ", file=log_file, flush=True)

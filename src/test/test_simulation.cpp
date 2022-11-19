@@ -9,14 +9,14 @@
 
 using namespace quartz;
 
-int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
+int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
   int num_qubits = seq->get_num_qubits();
   std::unordered_map<CircuitGate *, bool> executed;
   std::vector<bool> local_qubit(num_qubits, false);
   for (int i = 0; i < num_local_qubits; i++) {
     local_qubit[i] = true;
   }
-  int num_shuffles = 0;
+  int num_iterations = 1;
   while (true) {
     bool all_done = true;
     std::vector<bool> executable(num_qubits, true);
@@ -54,7 +54,7 @@ int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
     if (all_done) {
       break;
     }
-    num_shuffles++;
+    num_iterations++;
     // count global and local gates
     std::vector<bool> first_unexecuted_gate(num_qubits, false);
     std::vector<int> local_gates(num_qubits, 0);
@@ -91,7 +91,11 @@ int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
       if (global_gates[a] != global_gates[b]) {
         return global_gates[a] > global_gates[b];
       }
-      return local_gates[a] > local_gates[b];
+      if (local_gates[a] != local_gates[b]) {
+        return local_gates[a] > local_gates[b];
+      }
+      // Use the qubit index as a final tiebreaker.
+      return a < b;
     };
     std::vector<int> candidate_indices(num_qubits, 0);
     for (int i = 0; i < num_qubits; i++) {
@@ -99,7 +103,7 @@ int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
       local_qubit[i] = false;
     }
     std::sort(candidate_indices.begin(), candidate_indices.end(), cmp);
-    std::cout << "Shuffle " << num_shuffles << ": {";
+    std::cout << "Iteration " << num_iterations << ": {";
     for (int i = 0; i < num_local_qubits; i++) {
       local_qubit[candidate_indices[i]] = true;
       std::cout << candidate_indices[i];
@@ -109,8 +113,8 @@ int num_shuffles_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
     }
     std::cout << "}" << std::endl;
   }
-  std::cout << num_shuffles << " shuffles." << std::endl;
-  return num_shuffles;
+  std::cout << num_iterations << " iterations." << std::endl;
+  return num_iterations;
 }
 
 int main() {
@@ -137,7 +141,7 @@ int main() {
       auto seq = graph->to_circuit_sequence();
       fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        int result = num_shuffles_by_heuristics(seq.get(), local_q);
+        int result = num_iterations_by_heuristics(seq.get(), local_q);
         fprintf(fout, " %d", result);
       }
       fprintf(fout, "\n");

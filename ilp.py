@@ -22,6 +22,7 @@ log_file = open("result_ilp.txt", "w")
 
 
 def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
+    print(f"Solving ILP for n={n}, k={k}, M={M}...")
     # Check if the ILP is feasible in M rounds.
     prob = pulp.LpProblem(f"{n}_{k}_{M}", pulp.LpMinimize)
     G = len(circuit_seq)
@@ -65,7 +66,7 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
             for j in range(M + 1):
                 prob += b[i1, j] >= b[i2, j]
 
-    # At the beginning, all gates should be executed.
+    # At the beginning, all gates should not be executed.
     for i in range(G):
         prob += b[i, 0] == 0
 
@@ -73,7 +74,10 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
     for i in range(G):
         prob += b[i, M] == 1
 
-    prob.solve()
+    print("Available solvers:", pulp.listSolvers(onlyAvailable=True))
+    solver = pulp.HiGHS_CMD()
+    prob.solve(solver)
+    # prob.solve()
     if print_solution:
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():

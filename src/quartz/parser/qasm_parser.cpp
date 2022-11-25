@@ -38,4 +38,17 @@ bool is_gate_string(const std::string &token, GateType &type) {
   return false;
 }
 
+std::string strip(const std::string &input) {
+  auto st = input.begin();
+  while (st != input.end() && std::isspace(*st))
+    ++st;
+  if (st == input.end()) {
+    return std::string();
+  }
+  auto ed = input.rbegin();
+  while (std::isspace(*ed))
+    ++ed;
+  return std::string(st, ed.base());
+}
+
 } // namespace quartz

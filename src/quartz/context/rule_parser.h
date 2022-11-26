@@ -11,7 +11,6 @@
 #include <vector>
 
 namespace quartz {
-#define PI 3.14159265358979323846
 
 class Command {
 public:

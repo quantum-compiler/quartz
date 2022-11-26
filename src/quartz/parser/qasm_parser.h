@@ -4,7 +4,9 @@
 #include "quartz/circuitseq/circuitseq.h"
 
 #include <cassert>
+#include <cmath>
 #include <fstream>
+#include <map>
 
 namespace quartz {
 void find_and_replace_all(std::string &data, const std::string &tofind,
@@ -14,69 +16,15 @@ int string_to_number(const std::string &input);
 
 bool is_gate_string(const std::string &token, GateType &type);
 
+std::string strip(const std::string &input);
+
 class QASMParser {
 public:
   QASMParser(Context *ctx) : context(ctx) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
-                        CircuitSeq *&dag) {
-    dag = NULL;
-    std::string line;
-    GateType gate_type;
-    while (std::getline(qasm_stream, line)) {
-      // repleace comma with space
-      find_and_replace_all(line, ",", " ");
-      // ignore semicolon at the end
-      find_and_replace_all(line, ";", "");
-      // std::cout << line << std::endl;
-      std::stringstream ss(line);
-      std::string command;
-      std::getline(ss, command, ' ');
-      if (command == "OPENQASM") {
-        continue; // ignore this line
-      } else if (command == "include") {
-        continue; // ignore this line
-      } else if (command == "creg") {
-        continue; // ignore this line
-      } else if (command == "qreg") {
-        std::string token;
-        getline(ss, token, ' ');
-        size_t num_qubits = string_to_number(token);
-        // TODO: temporarily assume a program has at most 16
-        // parameters
-        assert(dag == NULL);
-        dag = new CircuitSeq(num_qubits, 16);
-        assert(!ss.good());
-      } else if (is_gate_string(command, gate_type)) {
-        Gate *gate = context->get_gate(gate_type);
-        if (!gate) {
-          std::cerr << "Unsupported gate in current context: " << command
-                    << std::endl;
-          return false;
-        }
-        // Currently don't support parameter gate
-        assert(gate->is_quantum_gate());
-        std::vector<int> qubit_indices, parameter_indices;
-        while (ss.good()) {
-          std::string token;
-          //   std::getline(ss, token, ' ');
-          ss >> token;
-          int index = string_to_number(token);
-          if (index != -1) {
-            qubit_indices.push_back(index);
-          }
-        }
-        assert(dag != NULL);
-        bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, NULL);
-        assert(ret == true);
-      } else {
-        std::cout << "Unknown gate: " << command << std::endl;
-        assert(false);
-      }
-    }
-    return true;
-  }
+                        CircuitSeq *&seq);
 
   bool load_qasm_str(const std::string &qasm_str, CircuitSeq *&dag) {
     std::stringstream sstream(qasm_str);
@@ -98,5 +46,159 @@ public:
 private:
   Context *context;
 };
+
+// We cannot put this template function implementation in a .cpp file.
+template <class _CharT, class _Traits>
+bool QASMParser::load_qasm_stream(
+    std::basic_istream<_CharT, _Traits> &qasm_stream, CircuitSeq *&seq) {
+  seq = nullptr;
+  std::string line;
+  GateType gate_type;
+  // At the beginning, |index_offset| stores the mapping from qreg names to
+  // their sizes. After creating the CircuitSeq object, |index_offset| stores
+  // the mapping from qreg names to the qubit index offset. The qregs are
+  // ordered alphabetically.
+  std::map<std::string, int> index_offset;
+  std::unordered_map<ParamType, int> parameters;
+  int num_total_params = 0;
+
+  while (std::getline(qasm_stream, line)) {
+    // Replace comma with space
+    find_and_replace_all(line, ",", " ");
+    find_and_replace_all(line, "(", " ");
+    find_and_replace_all(line, ")", " ");
+    // Ignore semicolon at the end
+    find_and_replace_all(line, ";", "");
+    std::stringstream ss(line);
+    std::string command;
+    std::getline(ss, command, ' ');
+    if (command == "//") {
+      continue; // comment, ignore this line
+    } else if (command == "") {
+      continue; // empty line, ignore this line
+    } else if (command == "OPENQASM") {
+      continue; // header, ignore this line
+    } else if (command == "include") {
+      continue; // header, ignore this line
+    } else if (command == "barrier") {
+      continue; // file end, ignore this line
+    } else if (command == "measure") {
+      continue; // file end, ignore this line
+    } else if (command == "creg") {
+      continue; // ignore this line
+    } else if (command == "qreg") {
+      std::string name;
+      getline(ss, name, '[');
+      name = strip(name);
+      if (seq != nullptr) {
+        std::cerr << "We only support creating qregs before all quantum gates."
+                  << std::endl;
+        return false;
+      }
+      std::string token;
+      getline(ss, token, ' ');
+      int num_qubits = string_to_number(token);
+      // No two qregs have the same name.
+      assert(index_offset.count(name) == 0);
+      index_offset[name] = num_qubits;
+      std::cout << "qreg: " << name << num_qubits << std::endl;
+      assert(!ss.good());
+    } else if (is_gate_string(command, gate_type)) {
+      if (seq == nullptr) {
+        // End the phase of creating qregs.
+        // Compute the total number of qubits, and let |index_offset| stores
+        // the mapping from qreg names to the qubit index offset.
+        int num_qubits = 0;
+        for (auto &qreg : index_offset) {
+          int new_num_qubits = num_qubits + qreg.second;
+          qreg.second = num_qubits;
+          num_qubits = new_num_qubits;
+        }
+        seq = new CircuitSeq(num_qubits, /*num_input_parameters=*/0);
+      }
+      Gate *gate = context->get_gate(gate_type);
+      if (!gate) {
+        std::cerr << "Unsupported gate in current context: " << command
+                  << std::endl;
+        return false;
+      }
+      int num_qubits = context->get_gate(gate_type)->num_qubits;
+      int num_params = context->get_gate(gate_type)->num_parameters;
+      std::vector<int> qubit_indices(num_qubits);
+      std::vector<int> param_indices(num_params);
+      for (int i = 0; i < num_params; ++i) {
+        assert(ss.good());
+        std::string token;
+        ss >> token;
+        // Currently only support the format of
+        // pi*0.123,
+        // 0.123*pi,
+        // 0.123*pi/2,
+        // 0.123
+        // pi
+        ParamType p;
+        bool negative = token[0] == '-';
+        if (negative)
+          token = token.substr(1);
+        if (token.find("pi") == 0) {
+          if (token == "pi") {
+            // pi
+            p = PI;
+          } else {
+            auto d = token.substr(3, std::string::npos);
+            if (token[2] == '*') {
+              // pi*0.123
+              p = std::stod(d) * PI;
+            } else {
+              // pi/2
+              p = PI / std::stod(d);
+            }
+          }
+        } else if (token.find("pi") != std::string::npos) {
+          // 0.123*pi
+          auto d = token.substr(0, token.find("*"));
+          p = std::stod(d) * PI;
+          if (token.find("/") != std::string::npos) {
+            // 0.123*pi/2
+            p = p / std::stod(token.substr(token.find("/") + 1));
+          }
+        } else {
+          // 0.123
+          p = std::stod(token);
+        }
+        if (negative)
+          p = -p;
+        if (parameters.count(p) == 0) {
+          seq->add_input_parameter();
+          parameters[p] = num_total_params++;
+        }
+        param_indices[i] = parameters[p];
+      }
+      for (int i = 0; i < num_qubits; ++i) {
+        assert(ss.good());
+        std::string token;
+        std::string name;
+        getline(ss, name, '[');
+        name = strip(name);
+        ss >> token;
+        int index = string_to_number(token);
+        if (index_offset.count(name) == 0) {
+          std::cerr << "Unknown qreg: " << name << std::endl;
+          return false;
+        }
+        if (index == -1) {
+          std::cerr << "Unknown qubit index: " << token << std::endl;
+          return false;
+        }
+        qubit_indices[i] = index_offset[name] + index;
+      }
+      seq->add_gate(qubit_indices, param_indices, gate, nullptr);
+    } else {
+      std::cout << "Unknown gate: " << command << std::endl;
+      assert(false);
+    }
+  }
+  return true;
+}
 
 } // namespace quartz

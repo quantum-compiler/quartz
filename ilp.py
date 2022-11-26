@@ -142,7 +142,7 @@ def run(n, circuit_name):
 
     print("Start solving ILP...")
     print(n, end=" ", file=log_file, flush=True)
-    for k in range(30, 34):
+    for k in range(12, 34):
         for M in range(1, 100):
             if solve_ilp(circuit_seq, out_gate, index_offset, n, k, M):
                 print(M, end=" ", file=log_file, flush=True)

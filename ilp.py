@@ -21,7 +21,7 @@ non_sparse_gates = {
 log_file = open("result_ilp.txt", "w")
 
 
-def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
+def solve_ilp(circuit_seq, out_gate, index_offset, n, k, M, print_solution=False):
     print(f"Solving ILP for n={n}, k={k}, M={M}...")
     # Check if the ILP is feasible in M rounds.
     prob = pulp.LpProblem(f"{n}_{k}_{M}", pulp.LpMinimize)
@@ -54,9 +54,7 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
     for i in range(G):
         if type(circuit_seq[i][0]) in non_sparse_gates:
             for qubit in circuit_seq[i][1]:
-                qubit_id = (
-                    qubit.index
-                )  # XXX: assume there is only one qreg; similarly hereinafter
+                qubit_id = index_offset[qubit.register] + qubit.index
                 for j in range(M):
                     prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
 
@@ -84,9 +82,9 @@ def solve_ilp(circuit_seq, out_gate, n, k, M, print_solution=False):
             print(v.name, "=", v.varValue)
         for j in range(M):
             for v in prob.variables():
-                if v.name.startswith('a') and v.varValue == 1.0:
-                    if v.name.endswith(str(j) + ')'):
-                        print(v.name.split('(')[1].split(',')[0], end=' ')
+                if v.name.startswith("a") and v.varValue == 1.0:
+                    if v.name.endswith(str(j) + ")"):
+                        print(v.name.split("(")[1].split(",")[0], end=" ")
             print()
     return prob.status is pulp.LpStatusOptimal
 
@@ -96,6 +94,14 @@ def run(n, circuit_name):
     circuit = qiskit.circuit.QuantumCircuit.from_qasm_file(
         f"circuit/MQTBench_{n}q/{circuit_name}_indep_qiskit_{n}.qasm"
     )
+    # Compute |index_offset| by sorting quantum registers by their names.
+    qregs = sorted(circuit.qregs, key=lambda qreg: qreg.name)
+    index_offset = {}
+    num_qubits = 0
+    for qreg in qregs:
+        index_offset[qreg] = num_qubits
+        num_qubits += qreg.size
+
     circuit_seq_raw = circuit.data
     circuit_seq = []
     for gate in circuit_seq_raw:
@@ -113,7 +119,7 @@ def run(n, circuit_name):
     out_gate = [set() for _ in range(G)]
     for i in range(G):
         for qubit in circuit_seq[i][1]:
-            qubit_id = qubit.index
+            qubit_id = index_offset[qubit.register] + qubit.index
             if last_gate[qubit_id] is not None:
                 in_gate[i].add(last_gate[qubit_id])
                 out_gate[last_gate[qubit_id]].add(i)
@@ -136,14 +142,14 @@ def run(n, circuit_name):
 
     print("Start solving ILP...")
     print(n, end=" ", file=log_file, flush=True)
-    for k in range(12, 34):
+    for k in range(30, 34):
         for M in range(1, 100):
-            if solve_ilp(circuit_seq, out_gate, n, k, M):
+            if solve_ilp(circuit_seq, out_gate, index_offset, n, k, M):
                 print(M, end=" ", file=log_file, flush=True)
                 break
     print("Done!")
-    if circuit_name == "wstate":
-        solve_ilp(circuit_seq, out_gate, n, 14, 3, print_solution=True)
+    # if circuit_name == "wstate":
+    #     solve_ilp(circuit_seq, out_gate, index_offset, n, 14, 3, print_solution=True)
 
 
 circuit_names = [
@@ -156,6 +162,9 @@ circuit_names = [
     "su2random",
     "twolocalrandom",
     "wstate",
+    "ae",
+    "qpeexact",
+    "qpeinexact",
 ]
 
 for circuit_name in circuit_names:

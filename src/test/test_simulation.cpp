@@ -134,11 +134,10 @@ int main() {
   for (auto circuit : circuit_names) {
     fprintf(fout, "%s\n", circuit.c_str());
     for (int num_q : num_qubits) {
-      auto graph = Graph::from_qasm_file(
+      auto seq = CircuitSeq::from_qasm_file(
           &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
-      auto seq = graph->to_circuit_sequence();
       fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
         int result = num_iterations_by_heuristics(seq.get(), local_q);

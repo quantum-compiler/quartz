@@ -26,19 +26,19 @@ public:
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
                         CircuitSeq *&seq);
 
-  bool load_qasm_str(const std::string &qasm_str, CircuitSeq *&dag) {
+  bool load_qasm_str(const std::string &qasm_str, CircuitSeq *&seq) {
     std::stringstream sstream(qasm_str);
-    return load_qasm_stream(sstream, dag);
+    return load_qasm_stream(sstream, seq);
   }
 
-  bool load_qasm(const std::string &file_name, CircuitSeq *&dag) {
+  bool load_qasm(const std::string &file_name, CircuitSeq *&seq) {
     std::ifstream fin;
     fin.open(file_name, std::ifstream::in);
     if (!fin.is_open()) {
       std::cerr << "QASMParser fails to open " << file_name << std::endl;
       return false;
     }
-    const bool res = load_qasm_stream(fin, dag);
+    const bool res = load_qasm_stream(fin, seq);
     fin.close();
     return res;
   }

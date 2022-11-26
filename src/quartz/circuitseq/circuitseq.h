@@ -88,6 +88,8 @@ public:
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_json() const;
   static std::unique_ptr<CircuitSeq> read_json(Context *ctx, std::istream &fin);
+  static std::unique_ptr<CircuitSeq>
+  from_qasm_file(Context *ctx, const std::string &filename);
 
   // Returns true iff the CircuitSeq is already under the canonical
   // representation.

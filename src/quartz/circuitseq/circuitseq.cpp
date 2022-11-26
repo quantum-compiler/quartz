@@ -1,6 +1,7 @@
 #include "circuitseq.h"
 #include "../context/context.h"
 #include "../gate/gate.h"
+#include "../parser/qasm_parser.h"
 
 #include <algorithm>
 #include <cassert>
@@ -1022,6 +1023,16 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
 
   return result;
+}
+
+std::unique_ptr<CircuitSeq>
+CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
+  QASMParser parser(ctx);
+  CircuitSeq *seq = nullptr;
+  parser.load_qasm(filename, seq);
+  std::unique_ptr<CircuitSeq> ret;
+  ret.reset(seq); // transfer ownership of |seq|
+  return ret;
 }
 
 bool CircuitSeq::canonical_representation(

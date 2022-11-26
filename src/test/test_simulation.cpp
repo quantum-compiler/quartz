@@ -121,10 +121,12 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
-  std::vector<std::string> circuit_names = {
-      "dj",           "ghz",           "graphstate", "qft",
-      "qftentangled", "realamprandom", "su2random",  "twolocalrandom",
-      "wstate"};
+  std::vector<std::string> circuit_names = {"dj",           "ghz",
+                                            "graphstate",   "qft",
+                                            "qftentangled", "realamprandom",
+                                            "su2random",    "twolocalrandom",
+                                            "wstate",       "ae",
+                                            "qpeexact",     "qpeinexact"};
   std::vector<int> num_qubits = {40, 41, 42};
   std::vector<int> num_local_qubits;
   for (int i = 12; i <= 33; i++) {

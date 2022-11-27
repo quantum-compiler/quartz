@@ -12,11 +12,9 @@ using namespace quartz;
 int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
   int num_qubits = seq->get_num_qubits();
   std::unordered_map<CircuitGate *, bool> executed;
+  // No initial configuration -- all qubits are global.
   std::vector<bool> local_qubit(num_qubits, false);
-  for (int i = 0; i < num_local_qubits; i++) {
-    local_qubit[i] = true;
-  }
-  int num_iterations = 1;
+  int num_iterations = 0;
   while (true) {
     bool all_done = true;
     std::vector<bool> executable(num_qubits, true);

@@ -11,6 +11,22 @@ void find_and_replace_all(std::string &data, const std::string &tofind,
   }
 }
 
+void find_and_replace_first(std::string &data, const std::string &tofind,
+                            const std::string &toreplace) {
+  size_t pos = data.find(tofind);
+  if (pos != std::string::npos) {
+    data.replace(pos, tofind.size(), toreplace);
+  }
+}
+
+void find_and_replace_last(std::string &data, const std::string &tofind,
+                           const std::string &toreplace) {
+  size_t pos = data.rfind(tofind);
+  if (pos != std::string::npos) {
+    data.replace(pos, tofind.size(), toreplace);
+  }
+}
+
 int string_to_number(const std::string &input) {
   int ret = -1;
   for (size_t i = 0; i < input.length(); i++) {

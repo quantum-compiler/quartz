@@ -12,6 +12,12 @@ namespace quartz {
 void find_and_replace_all(std::string &data, const std::string &tofind,
                           const std::string &toreplace);
 
+void find_and_replace_first(std::string &data, const std::string &tofind,
+                            const std::string &toreplace);
+
+void find_and_replace_last(std::string &data, const std::string &tofind,
+                           const std::string &toreplace);
+
 int string_to_number(const std::string &input);
 
 bool is_gate_string(const std::string &token, GateType &type);
@@ -65,8 +71,9 @@ bool QASMParser::load_qasm_stream(
   while (std::getline(qasm_stream, line)) {
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
-    find_and_replace_all(line, "(", " ");
-    find_and_replace_all(line, ")", " ");
+    // Replace parentheses for parameterized gate with space
+    find_and_replace_first(line, "(", " ");
+    find_and_replace_last(line, ")", " ");
     // Ignore semicolon at the end
     find_and_replace_all(line, ";", "");
     std::stringstream ss(line);
@@ -101,7 +108,6 @@ bool QASMParser::load_qasm_stream(
       // No two qregs have the same name.
       assert(index_offset.count(name) == 0);
       index_offset[name] = num_qubits;
-      std::cout << "qreg: " << name << num_qubits << std::endl;
       assert(!ss.good());
     } else if (is_gate_string(command, gate_type)) {
       if (seq == nullptr) {
@@ -136,6 +142,7 @@ bool QASMParser::load_qasm_stream(
         // 0.123*pi/2,
         // 0.123
         // pi
+        // 0.123/(2*pi)
         ParamType p;
         bool negative = token[0] == '-';
         if (negative)
@@ -155,12 +162,22 @@ bool QASMParser::load_qasm_stream(
             }
           }
         } else if (token.find("pi") != std::string::npos) {
-          // 0.123*pi
-          auto d = token.substr(0, token.find("*"));
-          p = std::stod(d) * PI;
-          if (token.find("/") != std::string::npos) {
-            // 0.123*pi/2
-            p = p / std::stod(token.substr(token.find("/") + 1));
+          if (token.find("(") != std::string::npos) {
+            assert(token.find("/") != std::string::npos);
+            auto left_parenthesis_pos = token.find("(");
+            // 0.123/(2*pi)
+            p = std::stod(token.substr(0, token.find("/"))) / PI;
+            p /= std::stod(
+                token.substr(left_parenthesis_pos + 1,
+                             token.find("*") - left_parenthesis_pos - 1));
+          } else {
+            // 0.123*pi
+            auto d = token.substr(0, token.find("*"));
+            p = std::stod(d) * PI;
+            if (token.find("/") != std::string::npos) {
+              // 0.123*pi/2
+              p = p / std::stod(token.substr(token.find("/") + 1));
+            }
           }
         } else {
           // 0.123

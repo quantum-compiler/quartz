@@ -53,6 +53,13 @@ public:
 
 private:
   bool insert_gate(GateType tp);
+
+public:
+  // The parameters from the input QASM file.
+  // Written by QASMParser.
+  std::vector<ParamType> input_parameters;
+
+private:
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::vector<GateType> supported_gates_;

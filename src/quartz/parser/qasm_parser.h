@@ -66,7 +66,7 @@ bool QASMParser::load_qasm_stream(
   // ordered alphabetically.
   std::map<std::string, int> index_offset;
   std::unordered_map<ParamType, int> parameters;
-  int num_total_params = 0;
+  int num_total_params = context->input_parameters.size();
 
   while (std::getline(qasm_stream, line)) {
     // Replace comma with space
@@ -120,7 +120,8 @@ bool QASMParser::load_qasm_stream(
           qreg.second = num_qubits;
           num_qubits = new_num_qubits;
         }
-        seq = new CircuitSeq(num_qubits, /*num_input_parameters=*/0);
+        seq = new CircuitSeq(num_qubits,
+                             /*num_input_parameters=*/num_total_params);
       }
       Gate *gate = context->get_gate(gate_type);
       if (!gate) {
@@ -188,6 +189,7 @@ bool QASMParser::load_qasm_stream(
         if (parameters.count(p) == 0) {
           seq->add_input_parameter();
           parameters[p] = num_total_params++;
+          context->input_parameters.push_back(p);
         }
         param_indices[i] = parameters[p];
       }

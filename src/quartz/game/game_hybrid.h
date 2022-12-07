@@ -23,6 +23,7 @@ namespace quartz {
             allow_nop_in_initial = _allow_nop_in_initial;
             initial_phase_reward = _initial_phase_reward;
             is_initial_phase = true;
+            initial_phase_action_type = ActionType::PhysicalFull;   // Type of initial phase action
 
             // STEP 2: simplify circuit
             original_gate_count = graph.gate_count();
@@ -92,6 +93,7 @@ namespace quartz {
             allow_nop_in_initial = game.allow_nop_in_initial;
             is_initial_phase = game.is_initial_phase;
             initial_phase_reward = game.initial_phase_reward;
+            initial_phase_action_type = game.initial_phase_action_type;
 
             // full mapping table
             logical_qubit_num = game.logical_qubit_num;
@@ -121,21 +123,22 @@ namespace quartz {
 
         std::set<Action, ActionCompare> action_space() {
             if (is_initial_phase) {
-                // We are in stage 1 (add free swaps to change mapping), use SearchFull space
-                // Search Full: swaps between one used physical qubit and any other physical qubit
+                // We are in stage 1 (add free swaps to change mapping), we use Physical Full instead of
+                // Search Full to avoid bumping into bad mappings on large devices.
+                // Physical Full: swaps between one used physical qubit and any of its physical neighbors
                 std::set<Action, ActionCompare> physical_action_space;
                 for (const auto &qubit_pair: graph.qubit_mapping_table) {
                     int physical_idx = qubit_pair.second.second;
-                    for (int other = 0; other < physical_qubit_num; ++other) {
-                        if (other == physical_idx) continue;
-                        physical_action_space.insert(Action(ActionType::SearchFull,
-                                                            std::min(other, physical_idx),
-                                                            std::max(other, physical_idx)));
+                    auto neighbor_list = device->get_input_neighbours(physical_idx);
+                    for (int neighbor: neighbor_list) {
+                        physical_action_space.insert(Action(initial_phase_action_type,
+                                                            std::min(neighbor, physical_idx),
+                                                            std::max(neighbor, physical_idx)));
                     }
                 }
                 // Add nop into action space if allowed
                 if (allow_nop_in_initial) {
-                    physical_action_space.insert(Action(ActionType::SearchFull, 0, 0));
+                    physical_action_space.insert(Action(initial_phase_action_type, 0, 0));
                 }
                 return std::move(physical_action_space);
             } else {
@@ -186,7 +189,7 @@ namespace quartz {
         Reward apply_action(const Action &action) {
             if (is_initial_phase) {
                 // In stage 1, we should have SearchFull action space
-                Assert(action.type == ActionType::SearchFull, "Action should be SearchFull in phase 1!");
+                Assert(action.type == initial_phase_action_type, "Action should be the same as initial phase mapping type in phase 1!");
                 Assert(virtual_swaps_inserted < initial_phase_len, "Phase 1 termination error!");
                 virtual_swaps_inserted += 1;
                 if (virtual_swaps_inserted == initial_phase_len) is_initial_phase = false;
@@ -400,6 +403,7 @@ namespace quartz {
         bool allow_nop_in_initial;
         bool is_initial_phase;
         double initial_phase_reward;
+        ActionType initial_phase_action_type;
 
         // full mapping table
         // Note that the first #logical_qubit_num elements are the same as the mapping table in graph

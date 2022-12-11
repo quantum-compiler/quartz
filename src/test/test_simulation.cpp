@@ -127,18 +127,36 @@ int main() {
                                             "qpeexact",     "qpeinexact"};
   std::vector<int> num_qubits = {40, 41, 42};
   std::vector<int> num_local_qubits;
-  for (int i = 12; i <= 33; i++) {
+  for (int i = 28; i <= 28; i++) {
     num_local_qubits.push_back(i);
   }
   FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
-    fprintf(fout, "%s\n", circuit.c_str());
+    fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
       auto seq = CircuitSeq::from_qasm_file(
           &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
-      fprintf(fout, "%d", num_q);
+
+      /*
+      // Repeat the whole circuit for 1 time.
+      int num_gates = seq->get_num_gates();
+      for (int i = 0; i < num_gates; i++) {
+        std::vector<int> qubit_indices, param_indices;
+        for (auto &wire : seq->gates[i]->input_wires) {
+          if (wire->is_qubit()) {
+            qubit_indices.push_back(wire->index);
+          } else {
+            param_indices.push_back(wire->index);
+          }
+        }
+        seq->add_gate(qubit_indices, param_indices, seq->gates[i]->gate,
+      nullptr);
+      }
+      */
+
+      // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
         int result = num_iterations_by_heuristics(seq.get(), local_q);
         fprintf(fout, " %d", result);

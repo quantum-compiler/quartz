@@ -80,6 +80,16 @@ def solve_ilp(circuit_seq, out_gate, index_offset, n, k, M, print_solution=False
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():
             print(v.name, "=", v.varValue)
+        executed = set()
+        for j in range(1, M + 1):
+            print("Iteration", j)
+            for v in prob.variables():
+                if v.name.startswith("b") and v.varValue == 1.0:
+                    if v.name.endswith(str(j) + ")"):
+                        gate_id = int(v.name.split("(")[1].split(",")[0])
+                        if gate_id not in executed:
+                            print(gate_id, circuit_seq[gate_id])
+                            executed.add(gate_id)
         for j in range(M):
             for v in prob.variables():
                 if v.name.startswith("a") and v.varValue == 1.0:
@@ -89,7 +99,7 @@ def solve_ilp(circuit_seq, out_gate, index_offset, n, k, M, print_solution=False
     return prob.status is pulp.LpStatusOptimal
 
 
-def run(n, circuit_name):
+def run(n, circuit_name, repeat_circuit=1):
     print("Start running", circuit_name, "with n =", n)
     circuit = qiskit.circuit.QuantumCircuit.from_qasm_file(
         f"circuit/MQTBench_{n}q/{circuit_name}_indep_qiskit_{n}.qasm"
@@ -111,6 +121,10 @@ def run(n, circuit_name):
             circuit_seq.append(gate)
             # print(gate)
             assert type(gate[0]) in sparse_gates or type(gate[0]) in non_sparse_gates
+
+    if repeat_circuit > 1:
+        # Repeat the whole circuit |repeat_circuit| times
+        circuit_seq *= repeat_circuit
 
     # Dependencies
     G = len(circuit_seq)
@@ -141,15 +155,15 @@ def run(n, circuit_name):
     #         out_gate[i].clear()
 
     print("Start solving ILP...")
-    print(n, end=" ", file=log_file, flush=True)
-    for k in range(12, 34):
+    # print(n, end=" ", file=log_file, flush=True)
+    for k in range(28, 29):
         for M in range(1, 100):
             if solve_ilp(circuit_seq, out_gate, index_offset, n, k, M):
                 print(M, end=" ", file=log_file, flush=True)
                 break
     print("Done!")
     # if circuit_name == "wstate":
-    #     solve_ilp(circuit_seq, out_gate, index_offset, n, 14, 3, print_solution=True)
+    #     solve_ilp(circuit_seq, out_gate, index_offset, n, 30, 2, print_solution=True)
 
 
 circuit_names = [
@@ -167,11 +181,14 @@ circuit_names = [
     "qpeinexact",
 ]
 
+start = time.time()
+
 for circuit_name in circuit_names:
     print(circuit_name, file=log_file)
     for n in range(40, 43):
-        run(n, circuit_name)
+        run(n, circuit_name, repeat_circuit=2)
         print(file=log_file)
 
 log_file.close()
-print(time.process_time())
+end = time.time()
+print(end - start)

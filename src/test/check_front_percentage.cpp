@@ -79,13 +79,16 @@ void test_front_gate(const string &circuit_file_name) {
     auto gate_count = graph.gate_count();
     auto single_qubit_gate_count = simplify_circuit(graph);
     auto cnot_count = graph.gate_count();
-    auto front_set_size =
+    auto front_set_size_7 =
             graph.get_front_layers(7, true).size() - num_qubits;  // This is because front set contains input qubits
+    auto front_set_size_6 =
+            graph.get_front_layers(6, true).size() - num_qubits;  // This is because front set contains input qubits
     assert(single_qubit_gate_count + cnot_count == gate_count);
     // name -- #qubits -- #gates -- #CNOTs -- #FrontSet Gates -- Percentage
     cout << circuit_file_name << " " << num_qubits << " "
-         << gate_count << " " << cnot_count << " " << front_set_size << " "
-         << double(front_set_size) / cnot_count << endl;
+         << gate_count << " " << cnot_count << " "
+         << front_set_size_7 << " " << double(front_set_size_7) / cnot_count << " "
+         << front_set_size_6 << " " << double(front_set_size_6) / cnot_count << endl;
 }
 
 int main() {

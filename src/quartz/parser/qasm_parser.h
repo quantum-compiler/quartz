@@ -79,6 +79,10 @@ bool QASMParser::load_qasm_stream(
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
+    // XXX: "u" is an alias of "u3".
+    if (command == std::string("u")) {
+      command = std::string("u3");
+    }
     if (command == "//") {
       continue; // comment, ignore this line
     } else if (command == "") {

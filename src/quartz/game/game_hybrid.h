@@ -78,8 +78,8 @@ namespace quartz {
 
             // STEP 5: record some extra statistics (we do not execute gates at the beginning)
             executed_logical_gate_count = 0;
-            swaps_inserted = 0;
-            virtual_swaps_inserted = 0;
+            swaps_inserted = 0;             // This is for real swaps (i.e. phase 2 swaps)
+            virtual_swaps_inserted = 0;     // This is for virtual swaps (i.e. phase 1 swaps)
             imp_cost = graph.circuit_implementation_cost(device);
         }
 
@@ -194,12 +194,18 @@ namespace quartz {
                 virtual_swaps_inserted += 1;
                 if (virtual_swaps_inserted == initial_phase_len) is_initial_phase = false;
 
-                // check if this action is nop (nop terminates phase 1 immediately and has reward 0)
+                // check if this action is nop (nop terminates phase 1 immediately and has reward 0 + # executed gates)
                 if (action.qubit_idx_0 == 0 && action.qubit_idx_1 == 0) {
                     Assert(allow_nop_in_initial, "Found NOP in phase 1, while allow_nop = False.");
+
+                    // nop terminates phase 1
                     execution_history.emplace_back(-2, GateType::swap, 0, 0, 0, 0);
                     is_initial_phase = false;
-                    return 0;
+
+                    // execute all executable gates
+                    int executed_gate_count = _execute_all_executable_gates();
+                    executed_logical_gate_count += executed_gate_count;
+                    return 0 + executed_gate_count;
                 }
 
                 // STEP 1: put swap into history & change mapping tables
@@ -230,9 +236,17 @@ namespace quartz {
                 assert(hit_count == 1 || hit_count == 2);
                 graph.propagate_mapping();
 
-                // STEP 2: return reward
+                // STEP 2: return reward (condition on whether this is the last step in phase 1)
                 imp_cost = graph.circuit_implementation_cost(device);
-                return initial_phase_reward;
+                if (is_initial_phase) {
+                    // Not last step
+                    return initial_phase_reward;
+                } else {
+                    // Last step, need to execute gates
+                    int executed_gate_count = _execute_all_executable_gates();
+                    executed_logical_gate_count += executed_gate_count;
+                    return initial_phase_reward + executed_gate_count;
+                }
             } else {
                 // In stage 2, we should have PhysicalFront action space
                 Assert(action.type == ActionType::PhysicalFront, "Action should be PhysicalFront in phase 2!");
@@ -266,41 +280,49 @@ namespace quartz {
                 graph.propagate_mapping();
 
                 // STEP 2: execute all gates that are enabled by this swap and record them
-                int executed_gate_count = 0;
-                while (true) {
-                    auto executable_gate_list = find_executable_front_gates(graph, device);
-                    for (const auto &executable_gate: executable_gate_list) {
-                        assert(graph.inEdges[executable_gate].size() == 2);
-                        Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
-                        Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
-                        if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
-                        int input_logical_0 = in_edge_0.logical_qubit_idx;
-                        int input_logical_1 = in_edge_1.logical_qubit_idx;
-                        int input_physical_0 = in_edge_0.physical_qubit_idx;
-                        int input_physical_1 = in_edge_1.physical_qubit_idx;
-                        assert(input_physical_0 == logical2physical[input_logical_0]);
-                        assert(input_physical_1 == logical2physical[input_logical_1]);
-                        assert(input_logical_0 == physical2logical[input_physical_0]);
-                        assert(input_logical_1 == physical2logical[input_physical_1]);
-                        execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
-                                                       input_logical_0, input_logical_1,
-                                                       input_physical_0, input_physical_1);
-                        execute_front_gate(graph, executable_gate);
-                        executed_gate_count += 1;
-                    }
-                    if (executable_gate_list.empty()) break;
-                }
+                int executed_gate_count = _execute_all_executable_gates();
                 executed_logical_gate_count += executed_gate_count;
                 swaps_inserted += 1;
 
                 // STEP 3: calculate imp cost (not used)
                 // We use -3 reward here instead. Recover the following four lines if we want to use imp reward
-//                 double original_circuit_cost = imp_cost;
-//                 imp_cost = graph.circuit_implementation_cost(device);
-//                 double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
-//                 Reward imp_reward = original_circuit_cost - new_circuit_cost;
+                // ------------------------------------------------------------------------- //
+                // double original_circuit_cost = imp_cost;
+                // imp_cost = graph.circuit_implementation_cost(device);
+                // double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
+                // Reward imp_reward = original_circuit_cost - new_circuit_cost;
+                // ------------------------------------------------------------------------- //
                 return -SWAPCOST + executed_gate_count;
             }
+        }
+
+        int _execute_all_executable_gates() {
+            // Execute all executable gates and return the number
+            int executed_gate_count = 0;
+            while (true) {
+                auto executable_gate_list = find_executable_front_gates(graph, device);
+                for (const auto &executable_gate: executable_gate_list) {
+                    assert(graph.inEdges[executable_gate].size() == 2);
+                    Edge in_edge_0 = *(graph.inEdges[executable_gate].begin());
+                    Edge in_edge_1 = *(std::next(graph.inEdges[executable_gate].begin()));
+                    if (in_edge_0.dstIdx == 1) std::swap(in_edge_0, in_edge_1);
+                    int input_logical_0 = in_edge_0.logical_qubit_idx;
+                    int input_logical_1 = in_edge_1.logical_qubit_idx;
+                    int input_physical_0 = in_edge_0.physical_qubit_idx;
+                    int input_physical_1 = in_edge_1.physical_qubit_idx;
+                    assert(input_physical_0 == logical2physical[input_logical_0]);
+                    assert(input_physical_1 == logical2physical[input_logical_1]);
+                    assert(input_logical_0 == physical2logical[input_physical_0]);
+                    assert(input_logical_1 == physical2logical[input_physical_1]);
+                    execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
+                                                   input_logical_0, input_logical_1,
+                                                   input_physical_0, input_physical_1);
+                    execute_front_gate(graph, executable_gate);
+                    executed_gate_count += 1;
+                }
+                if (executable_gate_list.empty()) break;
+            }
+            return executed_gate_count;
         }
 
         [[nodiscard]] int total_cost() const {

@@ -25,6 +25,7 @@ public:
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices, Gate *gate,
                 int *output_para_index);
+  bool add_gate(CircuitGate *gate);
   void add_input_parameter();
   bool remove_last_gate();
 

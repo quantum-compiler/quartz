@@ -16,6 +16,7 @@ size_t Schedule::num_down_sets() {
   down_sets.insert(empty_set);
   to_search.push(empty_set);
 
+  long long tmp = 1; // debug
   while (!to_search.empty()) {
     auto current_set = to_search.front();
     to_search.pop();
@@ -24,6 +25,10 @@ size_t Schedule::num_down_sets() {
       std::cout << (int)bit;
     }
     std::cout << std::endl;*/
+    if (down_sets.size() >= tmp) {
+      std::cout << "down sets: " << down_sets.size() << std::endl;
+      tmp *= 2;
+    }
     std::vector<bool> qubit_used(num_qubits, false);
     for (int i = 0; i < num_gates; i++) {
       if (!current_set[i]) {

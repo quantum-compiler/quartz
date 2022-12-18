@@ -1,15 +1,18 @@
 #include "quartz/context/context.h"
 #include "quartz/gate/gate_utils.h"
 #include "quartz/parser/qasm_parser.h"
+#include "quartz/simulator/schedule.h"
 #include "quartz/tasograph/tasograph.h"
 
 #include <algorithm>
 #include <iostream>
 #include <unordered_map>
+#include <vector>
 
 using namespace quartz;
 
-int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
+int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
+                                 std::vector<std::vector<bool>> &local_qubits) {
   int num_qubits = seq->get_num_qubits();
   std::unordered_map<CircuitGate *, bool> executed;
   // No initial configuration -- all qubits are global.
@@ -110,6 +113,7 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits) {
       }
     }
     std::cout << "}" << std::endl;
+    local_qubits.push_back(local_qubit);
   }
   std::cout << num_iterations << " iterations." << std::endl;
   return num_iterations;
@@ -158,8 +162,14 @@ int main() {
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        int result = num_iterations_by_heuristics(seq.get(), local_q);
+        std::vector<std::vector<bool>> local_qubits;
+        int result =
+            num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
         fprintf(fout, " %d", result);
+        auto schedules = get_schedules(*seq, local_qubits, &ctx);
+        for (auto &schedule : schedules) {
+          std::cout << schedule.num_down_sets() << std::endl;
+        }
       }
       fprintf(fout, "\n");
     }

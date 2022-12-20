@@ -20,7 +20,10 @@ def parse_gate_type(tp, circuit):
         return circuit.s
     elif tp == "sdg":
         return circuit.sdg
+    elif tp == "x":
+        return circuit.x
     else:
+        print(tp)
         raise NotImplementedError
 
 
@@ -191,7 +194,7 @@ def main():
     # parameters
     # gf2^E5_mult_after_heavy.qasm, barenco_tof_10_before.qasm, csla_mux_3_after_heavy.qasm, qcla_adder_10_before.qasm
     # IBM_Q20_Tokyo, IBM_Q27_Falcon, IBM_Q65_Hummingbird
-    qasm_file_name = "qcla_adder_10_before.qasm"
+    qasm_file_name = "mod_adder_1024_before.qasm"
     device_name = "IBM_Q65_Hummingbird"
     num_runs = 100 * 1000
     show_mapping = False
@@ -199,6 +202,7 @@ def main():
     # run benchmark
     print(f"circuit name: {qasm_file_name}.")
     print(f"device name: {device_name}.")
+    print(f"num runs: {num_runs}")
     min_swap_count = 10000
     step_count = 0
     original_gate_count = 0

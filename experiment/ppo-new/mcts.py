@@ -4,6 +4,7 @@ import dgl
 from model.actor_critic import ActorCritic
 from utils import masked_softmax
 import torch.functional as F
+import math
 
 
 class Node:
@@ -61,22 +62,29 @@ class MCTSAgent:
         self.root: Node = Node(circuit=circuit,
                                num_xfers=quartz_context.num_xfers)
 
-    def select_child(self, node: Node) -> Node:
-        # TODO: implement the UCB formula
-        pass
+    def select_child(self, node: Node) -> tuple[Node, int, int]:
+        ucb_scores: torch.Tensor = self.Q + self.P * math.sqrt(
+            self.total_visit_count) / (1 + self.N) * (self.c_1 + math.log(
+                (self.total_visit_count + self.c_2 + 1) / self.c_2))
+        idx: int = torch.argmax(ucb_scores).item()
+        g: int = idx // self.quartz_context.num_xfers
+        xfer: int = idx % self.quartz_context.num_xfers
+        return node.child_nodes[g][xfer], g, xfer
 
-    def select(self) -> list[Node]:
+    def select(self) -> tuple[list[Node], list[tuple[int, int]]]:
         # Returns a sequence of Node for backpropagate
         node_sequence: list[Node] = []
+        path: list[tuple[int, int]] = []
         curr_node: Node = self.root
         # TODO: maybe we don't need check_leaf()?
         curr_node.check_leaf()
         while not curr_node.is_leaf:
             node_sequence.append(curr_node)
-            curr_node = self.select_child(curr_node)
+            curr_node, g, xfer = self.select_child(curr_node)
+            path.append((g, xfer))
             curr_node.check_leaf()
         node_sequence.append(curr_node)
-        return node_sequence
+        return node_sequence, path
 
     def expand(self, node: Node) -> None:
         # During expansion, we expand a node to get all of its child nodes
@@ -101,7 +109,7 @@ class MCTSAgent:
                 child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
                     xfer=self.quartz_context.get_xfer_from_id(id=xfer),
                     node=node.circuit.get_node_from_id(id=g))
-                # Eliminate circuits that has been seen?
+                # TODO: Eliminate circuits that has been seen?
                 node.child_nodes[g][xfer] = Node(self.quartz_context,
                                                  child_circuit)
                 # Fill in R
@@ -142,19 +150,37 @@ class MCTSAgent:
                         xfer].circuit.gate_count + self.init_gate_count
                     node.N[g][xfer] = 1
                     child_visit_count += 1
-                    total_value += node.Q[g][xfer]
+                    total_value += (node.Q[g][xfer] + node.R[g][xfer])
+        node.total_visit_count = child_visit_count
         return child_visit_count, total_value
 
-    def backpropagate(self, node_sequence: list[Node], value: torch.Tensor,
-                      visit_count: int) -> None:
-        # TODO: implement the backpropagation
-        pass
+    def backpropagate(self, node_sequence: list[Node], path: list[tuple[int,
+                                                                        int]],
+                      value: torch.Tensor, visit_count: int) -> None:
+        for node, (g, xfer) in zip(reversed(node_sequence[:-1]),
+                                   reversed(path)):
+            node.Q[g][xfer] = (node.Q[g][xfer] * node.N[g][xfer] +
+                               value) / (node.N[g][xfer] + visit_count)
+            node.N[g][xfer] += visit_count
+            value = value * self.gamma + node.R[g][xfer]
 
     def run(self):
         # TODO: use the budget to stop the search
+        budget = None
         while True:
-            node_sequence: list[Node] = self.select()
+            node_sequence, path: list[Node] = self.select()
             self.expand(node_sequence[-1])
             value, visit_count = self.simulate(node_sequence[-1])
-            self.backpropagate(node_sequence[-1], value, visit_count)
+            self.backpropagate(node_sequence, path, value, visit_count)
             # TODO: print some messages
+
+
+if __name__ == "__main__":
+    # TODO: load actor-critic network
+    ckpt_path = "checkpoints/2021-06-01-15-30-00"
+
+    # TODO: Build quartz context
+
+    # TODO: Build circuit
+
+    # TODO: Initialize MCTS and run

@@ -577,6 +577,12 @@ cdef class PyGraph:
     def __le__(self, other):
         return self.gate_count <= other.gate_count
 
+    def __eq__(self, other):
+        return self.equal(other)
+
+    def __hash__(self):
+        return self.hash()
+
     @property
     def gate_count(self):
         return deref(self.graph).gate_count()

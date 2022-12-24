@@ -2880,8 +2880,51 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-// TODO
-bool Graph::equal(const Graph &other) const { return true; }
+// This function compares two graphs
+// It construct a sequence of gates in topology order for each graph
+// Returns true if the two sequences are the same
+bool Graph::equal(const Graph &other) const { 
+    double epsilon = 1e-6;
+    std::vector<Op> ops1, ops2;
+    topology_order_ops(ops1);
+    other.topology_order_ops(ops2);
+    if (ops1.size() != ops2.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < ops1.size(); i++) {
+        if (ops1[i].ptr->tp != ops2[i].ptr->tp) {
+            return false;
+        }
+        if(ops1[i].ptr->is_parametrized_gate()) {
+            // make sure all the parameters are the same
+            int num_params = ops1[i].ptr->get_num_parameters();
+            std::vector<ParamType> params1(num_params);
+            std::vector<ParamType> params2(num_params);
+            // assume no parameter gates
+            // all parameter gates have constant value
+            auto edges1 = inEdges.find(ops1[i])->second;
+            for(auto it = edges1.cbegin(); it != edges1.cend(); ++it) {
+                if(it->srcOp.ptr->tp == GateType::input_param) {
+                    params1[it->dstIdx] = constant_param_values.find(it->srcOp)->second;
+                }
+            }
+            auto edges2 = other.inEdges.find(ops2[i])->second;
+            for(auto it = edges2.cbegin(); it != edges2.cend(); ++it) {
+                if(it->srcOp.ptr->tp == GateType::input_param) {
+                    params2[it->dstIdx] = other.constant_param_values.find(it->srcOp)->second;
+                }
+            }
+            for(int j = 0; j < num_params; j++) {
+                if(std::abs(params1[j] - params2[j]) > epsilon) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool operator==(const Graph &g1, const Graph &g2) { return g1.equal(g2); }
 
 bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const {
   std::unordered_set<Pos, PosHash> mapped_input_pos;

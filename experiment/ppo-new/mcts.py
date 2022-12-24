@@ -13,7 +13,7 @@ from typing import cast, OrderedDict
 
 
 class Node:
-    def __init__(self, circuit: quartz.PyGraph, num_xfers: int) -> None:
+    def __init__(self, circuit: quartz.PyGraph) -> None:
         self.circuit: quartz.PyGraph = circuit
         self.gate_count: int = self.circuit.gate_count
         self.is_leaf: bool = True
@@ -27,13 +27,6 @@ class Node:
         self.N: torch.Tensor
         self.R: torch.Tensor
         self.P: torch.Tensor
-        # Initialize
-        self.child_nodes = [[None for _ in range(num_xfers)]
-                            for i in range(self.gate_count)]
-        self.N = torch.zeros((self.gate_count, num_xfers), dtype=torch.int32)
-        self.R = torch.zeros((self.gate_count, num_xfers), dtype=torch.float32)
-        self.Q = torch.zeros((self.gate_count, num_xfers), dtype=torch.float32)
-        self.P = torch.zeros((self.gate_count, num_xfers), dtype=torch.float32)
 
 
 class MCTSAgent:
@@ -42,7 +35,7 @@ class MCTSAgent:
         gamma: float,
         c_1: float,
         c_2: float,
-        quartz_context: quartz.QuartzContext,
+        qtz: quartz.QuartzContext,
         circuit: quartz.PyGraph,
         actor_critic: ActorCritic,
         device: torch.device,
@@ -50,23 +43,22 @@ class MCTSAgent:
         self.gamma: float = gamma
         self.c_1: float = c_1
         self.c_2: float = c_2
-        self.quartz_context: quartz.QuartzContext = quartz_context
+        self.qtz: quartz.QuartzContext = qtz
         self.input_circuit: quartz.PyGraph = circuit
         self.init_gate_count: int = circuit.gate_count
         self.actor_critic: ActorCritic = actor_critic
         self.actor_critic.eval()
         self.device: torch.device = device
 
-        self.root: Node = Node(circuit=circuit,
-                               num_xfers=quartz_context.num_xfers)
+        self.root: Node = Node(circuit=circuit)
 
     def select_child(self, node: Node) -> tuple[Node, int, int]:
         ucb_scores: torch.Tensor = node.Q + node.P * math.sqrt(
             node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
                 (node.total_visit_count + self.c_2 + 1) / self.c_2))
         idx: int = torch.argmax(ucb_scores).item()
-        g: int = idx // self.quartz_context.num_xfers
-        xfer: int = idx % self.quartz_context.num_xfers
+        g: int = idx // self.qtz.num_xfers
+        xfer: int = idx % self.qtz.num_xfers
         return node.child_nodes[g][xfer], g, xfer
 
     def select(self) -> tuple[list[Node], list[tuple[int, int]]]:
@@ -88,13 +80,25 @@ class MCTSAgent:
         # N and Q corresponding to a child node is initialized to 0
         # we also compute the policy
         # which is, basically, a probability distribution over all the child nodes
+
+        # Initialize node attributes
+        node.child_nodes = [[None for _ in range(self.qtz.num_xfers)]
+                            for i in range(node.gate_count)]
+        node.N = torch.zeros((node.gate_count, self.qtz.num_xfers),
+                             dtype=torch.int32)
+        node.R = torch.zeros((node.gate_count, self.qtz.num_xfers),
+                             dtype=torch.float16)
+        node.Q = torch.zeros((node.gate_count, self.qtz.num_xfers),
+                             dtype=torch.float16)
+        node.P = torch.zeros((node.gate_count, self.qtz.num_xfers),
+                             dtype=torch.float16)
+
         masks: list[torch.Tensor] = []
         for g in range(node.gate_count):
             appliable_xfers: list[int] = node.circuit.available_xfers_parallel(
-                context=self.quartz_context,
-                node=node.circuit.get_node_from_id(id=g))
+                context=self.qtz, node=node.circuit.get_node_from_id(id=g))
             # construct mask
-            mask: torch.Tensor = torch.zeros((self.quartz_context.num_xfers),
+            mask: torch.Tensor = torch.zeros((self.qtz.num_xfers),
                                              dtype=torch.bool)
             mask[appliable_xfers] = True
             mask[-1] = False  # exclude NOP
@@ -102,11 +106,10 @@ class MCTSAgent:
             # construct child nodes
             for xfer in appliable_xfers:
                 child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
-                    xfer=self.quartz_context.get_xfer_from_id(id=xfer),
+                    xfer=self.qtz.get_xfer_from_id(id=xfer),
                     node=node.circuit.get_node_from_id(id=g))
                 # TODO: Eliminate circuits that has been seen?
-                node.child_nodes[g][xfer] = Node(child_circuit,
-                                                 self.quartz_context.num_xfers)
+                node.child_nodes[g][xfer] = Node(child_circuit)
                 # Fill in R
                 node.R[g][xfer] = node.gate_count - child_circuit.gate_count
         node.action_mask = torch.stack(masks, dim=0)
@@ -135,7 +138,7 @@ class MCTSAgent:
         child_visit_count: int = 0
         total_value: torch.Tensor = 0
         for g in range(node.gate_count):
-            for xfer in range(self.quartz_context.num_xfers):
+            for xfer in range(self.qtz.num_xfers):
                 if node.child_nodes[g][xfer] is not None:
                     with torch.no_grad():
                         dgl_graph: dgl.DGLGraph = node.child_nodes[g][
@@ -198,12 +201,11 @@ def main(config: Config) -> None:
     # Device
     device = torch.device("cuda:0")
 
-    # TODO: Build circuit
-    # use the best circuit found in the PPO training
+    # Use the best circuit found in the PPO training
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(context=qtz,
                                                       filename="test.qasm")
 
-    # TODO: load actor-critic network
+    # Load actor-critic network
     ckpt_path = "ckpts/nam_iter_100.pt"
     actor_critic: ActorCritic = ActorCritic(
         gnn_type=cfg.gnn_type,
@@ -227,13 +229,14 @@ def main(config: Config) -> None:
                             ckpt['model_state_dict'])
     actor_critic.load_state_dict(model_state_dict)
 
-    # TODO: Initialize MCTS and run
+    # Initialize MCTS and run
+    # TODO: tune the hyperparameters
     mcts = MCTSAgent(gamma=0.99,
                      c_1=1.25,
                      c_2=19625,
                      device=device,
                      actor_critic=actor_critic,
-                     quartz_context=qtz,
+                     qtz=qtz,
                      circuit=circ)
 
     mcts.run()

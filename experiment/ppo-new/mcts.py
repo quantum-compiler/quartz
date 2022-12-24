@@ -11,6 +11,12 @@ import os
 import warnings
 from typing import cast, OrderedDict
 
+# TODO: Modify the data structure to store the edge data to save memory
+# TODO: De-duplicate the circuits
+# A circuit should appear only once in the tree. This is because
+# the meaning of different appearances of the same circuit are
+# exactly the same
+
 
 class Node:
     def __init__(self, circuit: quartz.PyGraph) -> None:

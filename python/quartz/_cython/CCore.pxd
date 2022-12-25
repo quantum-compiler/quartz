@@ -130,7 +130,6 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
         bool equal(const Graph &) const
         void rotation_merging(GateType)
         int circuit_depth() const
-        bool equal(const Graph &) const
 
 
 cdef extern from "dataset/equivalence_set.h" namespace "quartz":

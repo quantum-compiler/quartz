@@ -168,7 +168,9 @@ int main() {
         fprintf(fout, " %d", result);
         auto schedules = get_schedules(*seq, local_qubits, &ctx);
         for (auto &schedule : schedules) {
-          std::cout << schedule.num_down_sets() << std::endl;
+          schedule.compute_kernel_schedule(
+              {0, 10.4, 10.4, 10.4, 11, 40, 46, 66});
+          std::cout << "cost = " << schedule.cost_ << std::endl;
         }
       }
       fprintf(fout, "\n");

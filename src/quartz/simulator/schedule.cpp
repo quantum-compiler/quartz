@@ -250,12 +250,23 @@ bool Schedule::compute_kernel_schedule(
         }
       }
       if (touching_set_indices.empty()) {
+        // Optimization:
         // The current gate is not touching any kernels on the frontier.
         // Directly add the gate to the frontier.
         auto new_status = current_status;
         new_status.insert_set(current_indices);
         new_status.hash ^= current_indices_hash;
         update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
+        continue;
+      }
+      if (touching_set_indices.size() == 1 &&
+          touching_size[0] == current_indices.size()) {
+        // Optimization:
+        // The current gate is touching exactly one kernel on the frontier,
+        // and is subsumed by that kernel.
+        // Directly update.
+        update_f(f[~i & 1], current_status, current_cost,
+                 current_local_schedule);
         continue;
       }
       std::vector<bool> is_touching_set(num_kernels, false);

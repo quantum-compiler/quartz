@@ -10,12 +10,13 @@ import hydra
 import os
 import warnings
 from typing import cast, OrderedDict
+import time
 
-# TODO: Modify the data structure to store the edge data to save memory
 # TODO: De-duplicate the circuits
-# A circuit should appear only once in the tree. This is because
+# - A circuit should appear only once in the tree. This is because
 # the meaning of different appearances of the same circuit are
 # exactly the same
+# TODO: Prevent selecting invalid child: use mask?
 
 
 class Node:
@@ -23,12 +24,13 @@ class Node:
         self.circuit: quartz.PyGraph = circuit
         self.gate_count: int = self.circuit.gate_count
         self.is_leaf: bool = True
+        self.is_terminal: bool = False
         # Should be equal to the sum of child visit counts
         self.total_visit_count: int = 0
 
         # Child states and statics
-        self.child_nodes: list[list[Node | None]]
-        self.action_mask: torch.Tensor
+        self.terminal_mask: torch.Tensor
+        self.child_nodes: list[Node]
         self.Q: torch.Tensor
         self.N: torch.Tensor
         self.R: torch.Tensor
@@ -57,29 +59,40 @@ class MCTSAgent:
         self.device: torch.device = device
 
         self.root: Node = Node(circuit=circuit)
+        self.circ_set: set[quartz.PyGraph] = set()
+        self.circ_set.add(circuit)
+        self.min_gate_count: int = self.init_gate_count
+        self.longest_path: int = 0
 
-    def select_child(self, node: Node) -> tuple[Node, int, int]:
+    def select_child(self, node: Node) -> tuple[Node, int]:
         ucb_scores: torch.Tensor = node.Q + node.P * math.sqrt(
             node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
-                (node.total_visit_count + self.c_2 + 1) / self.c_2))
+                (node.total_visit_count + self.c_2 + 1) /
+                self.c_2)) - node.terminal_mask * 1e10
+        # ucb_scores: torch.Tensor = node.P * math.sqrt(
+        #     node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
+        #         (node.total_visit_count + self.c_2 + 1) /
+        #         self.c_2)) - node.terminal_mask * 1e10
+        # print(ucb_scores)
+        # print(ucb_scores.max())
         idx: int = torch.argmax(ucb_scores).item()
-        g: int = idx // self.qtz.num_xfers
-        xfer: int = idx % self.qtz.num_xfers
-        return node.child_nodes[g][xfer], g, xfer
+        return node.child_nodes[idx], idx
 
     def select(self) -> tuple[list[Node], list[tuple[int, int]]]:
         # Returns a sequence of Node for backpropagate
         node_sequence: list[Node] = []
-        path: list[tuple[int, int]] = []
+        path: list[int] = []
         curr_node: Node = self.root
         while not curr_node.is_leaf:
             node_sequence.append(curr_node)
-            curr_node, g, xfer = self.select_child(curr_node)
-            path.append((g, xfer))
+            curr_node, idx = self.select_child(curr_node)
+            path.append(idx)
         node_sequence.append(curr_node)
         return node_sequence, path
 
-    def expand(self, node: Node) -> None:
+    def expand(self, node: Node, gate_count_increase: int = 1) -> bool:
+        # Returns False if the node is terminal
+
         # During expansion, we expand a node to get all of its child nodes
         # we construct a mask to indicate which actions are appliable
         # for the appliable actions, there is a reward
@@ -88,106 +101,144 @@ class MCTSAgent:
         # which is, basically, a probability distribution over all the child nodes
 
         # Initialize node attributes
-        node.child_nodes = [[None for _ in range(self.qtz.num_xfers)]
-                            for i in range(node.gate_count)]
-        node.N = torch.zeros((node.gate_count, self.qtz.num_xfers),
-                             dtype=torch.int32)
-        node.R = torch.zeros((node.gate_count, self.qtz.num_xfers),
-                             dtype=torch.float16)
-        node.Q = torch.zeros((node.gate_count, self.qtz.num_xfers),
-                             dtype=torch.float16)
-        node.P = torch.zeros((node.gate_count, self.qtz.num_xfers),
-                             dtype=torch.float16)
+        node.child_nodes = []
+        idx_2_g_xfer: list[tuple[int, int]] = []
+        R_: list[float] = []
+        P_: list[torch.Tensor] = []
 
-        masks: list[torch.Tensor] = []
+        mask: torch.Tensor = torch.zeros((node.gate_count, self.qtz.num_xfers),
+                                         dtype=torch.bool)
         for g in range(node.gate_count):
             appliable_xfers: list[int] = node.circuit.available_xfers_parallel(
                 context=self.qtz, node=node.circuit.get_node_from_id(id=g))
-            # construct mask
-            mask: torch.Tensor = torch.zeros((self.qtz.num_xfers),
-                                             dtype=torch.bool)
-            mask[appliable_xfers] = True
-            mask[-1] = False  # exclude NOP
-            masks.append(mask)
+            appliable_xfers = appliable_xfers[:-1]  # remove NOP
+            mask[g, appliable_xfers] = True
             # construct child nodes
             for xfer in appliable_xfers:
                 child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
                     xfer=self.qtz.get_xfer_from_id(id=xfer),
-                    node=node.circuit.get_node_from_id(id=g))
-                # TODO: Eliminate circuits that has been seen?
-                node.child_nodes[g][xfer] = Node(child_circuit)
-                # Fill in R
-                node.R[g][xfer] = node.gate_count - child_circuit.gate_count
-        node.action_mask = torch.stack(masks, dim=0)
+                    node=node.circuit.get_node_from_id(id=g),
+                    eliminate_rotation=True)
+                # Eliminate circuits that has been seen
+                if child_circuit in self.circ_set:
+                    continue
+                if child_circuit.gate_count > self.init_gate_count + gate_count_increase:
+                    continue
+
+                self.circ_set.add(child_circuit)
+                idx_2_g_xfer.append((g, xfer))
+                node.child_nodes.append(Node(circuit=child_circuit))
+                R_.append(node.gate_count - child_circuit.gate_count)
+                if child_circuit.gate_count < self.min_gate_count:
+                    self.min_gate_count = child_circuit.gate_count
+                    print(f"min gate count: {self.min_gate_count}")
+                    exit(1)
+        node.R = torch.tensor(R_, dtype=torch.float32)
+        node.terminal_mask = torch.zeros(node.R.shape, dtype=torch.bool)
+        # print("in expansion")
+        # print(f"num nodes: {node.gate_count}")
+        # print(f"num childs: {len(node.child_nodes)}")
+
+        # No child, a terminal node
+        if len(R_) == 0:
+            node.is_terminal = True
+            node.is_leaf = False
+            return False
 
         # Compute policy
         # Policy should take into consideration of gate values
-        dgl_graph: dgl.DGLGraph = node.circuit.to_dgl_graph().to(self.device)
-        node_embeds: torch.Tensor = self.actor_critic.gnn(dgl_graph)
-        node_values: torch.Tensor = self.actor_critic.critic(
-            node_embeds).squeeze().cpu()
-        softmax_node_values = F.softmax(node_values, dim=0)
-        xfer_logits: torch.Tensor = self.actor_critic.actor(node_embeds).cpu()
-        xfer_probs: torch.Tensor = masked_softmax(xfer_logits,
-                                                  node.action_mask)
-        for g, (node_prob, xfer_prob_list) in enumerate(
-                zip(softmax_node_values, xfer_probs)):
-            node.P[g] = node_prob * xfer_prob_list
+        policy_table: torch.Tensor = torch.zeros(
+            (node.gate_count, self.qtz.num_xfers))
+        with torch.no_grad():
+            dgl_graph: dgl.DGLGraph = node.circuit.to_dgl_graph().to(
+                self.device)
+            node_embeds: torch.Tensor = self.actor_critic.gnn(dgl_graph)
+            node_values: torch.Tensor = self.actor_critic.critic(
+                node_embeds).squeeze()
+            softmax_node_values = F.softmax(node_values, dim=0)
+            xfer_logits: torch.Tensor = self.actor_critic.actor(node_embeds)
+            xfer_probs: torch.Tensor = masked_softmax(xfer_logits, mask)
+            for g, (node_prob, xfer_prob_list) in enumerate(
+                    zip(softmax_node_values, xfer_probs)):
+                policy_table[g] = node_prob * xfer_prob_list
+
+        # Construct node.P
+        for g, xfer in idx_2_g_xfer:
+            P_.append(policy_table[g, xfer])
+        node.P = torch.stack(P_)
 
         # Modify leaf flag
         node.is_leaf = False
+        return True
 
     def simulate(self, node: Node) -> tuple[int, torch.Tensor]:
         # Instead of running a rollout
         # we just use the sum of gate values as the node value
         # In this method, we visit all of the child nodes once
-        child_visit_count: int = 0
+        Q_: list[torch.Tensor] = []
+        child_visit_count: int = len(node.child_nodes)
         total_value: torch.Tensor = 0
-        for g in range(node.gate_count):
-            for xfer in range(self.qtz.num_xfers):
-                if node.child_nodes[g][xfer] is not None:
-                    with torch.no_grad():
-                        dgl_graph: dgl.DGLGraph = node.child_nodes[g][
-                            xfer].circuit.to_dgl_graph().to(self.device)
-                        node_embeds: torch.Tensor = self.actor_critic.gnn(
-                            dgl_graph)
-                        # The node value is sum(gate_values) - gate_count + init_gate_count
-                        node.Q[g][xfer] = torch.sum(
-                            self.actor_critic.critic(node_embeds).squeeze().
-                            cpu()) - node.child_nodes[g][
-                                xfer].circuit.gate_count + self.init_gate_count
-                        node.N[g][xfer] = 1
-                        child_visit_count += 1
-                        total_value += (node.Q[g][xfer] + node.R[g][xfer])
+        with torch.no_grad():
+            b_dgl_graph = dgl.batch([
+                n.circuit.to_dgl_graph().to(self.device)
+                for n in node.child_nodes
+            ])
+            num_nodes: list[int] = [n.gate_count for n in node.child_nodes]
+            b_node_embeds: torch.Tensor = self.actor_critic.gnn(b_dgl_graph)
+            b_values: torch.Tensor = self.actor_critic.critic(
+                b_node_embeds).squeeze().cpu()
+            values: list[torch.Tensor] = torch.split(b_values, num_nodes)
+        for n, v in zip(node.child_nodes, values):
+            Q_.append(torch.sum(v) - n.gate_count + self.init_gate_count)
+
+        node.Q = torch.stack(Q_)
+        node.N = torch.ones(node.Q.shape, dtype=torch.int32)
+        total_value = torch.sum(node.Q) + torch.sum(node.R)
         node.total_visit_count = child_visit_count
         return child_visit_count, total_value
 
-    def backpropagate(self, node_sequence: list[Node], path: list[tuple[int,
-                                                                        int]],
+    def backpropagate(self, node_sequence: list[Node], path: list[int],
                       value: torch.Tensor, visit_count: int) -> None:
-        for node, (g, xfer) in zip(reversed(node_sequence[:-1]),
-                                   reversed(path)):
-            node.Q[g][xfer] = (node.Q[g][xfer] * node.N[g][xfer] +
-                               value) / (node.N[g][xfer] + visit_count)
-            node.N[g][xfer] += visit_count
-            value = value * self.gamma + node.R[g][xfer]
+        for node, idx in zip(reversed(node_sequence[:-1]), reversed(path)):
+            node.Q[idx] = (node.Q[idx] * node.N[idx] + value) / (node.N[idx] +
+                                                                 visit_count)
+            # print(
+            #     f"gate count: {node.gate_count}, visit count: {node.total_visit_count}, total nodes: {len(self.circ_set)}"
+            # )
+            node.N[idx] += visit_count
+            node.total_visit_count += visit_count
+            value = value * self.gamma + node.R[idx]
+        # print(f"total nodes: {len(self.circ_set)}")
 
     def run(self):
         # TODO: use the budget to stop the search
         budget = None
         expansion_cnt: int = 0
+        start = time.time()
         while True:
             expansion_cnt += 1
-            if expansion_cnt % 1000 == 0:
-                print(f'Expansion count: {expansion_cnt}')
+            if expansion_cnt % 100 == 0:
+                print(
+                    f'Expansion count: {expansion_cnt}, num circuits: {len(self.circ_set)}, longest path: {self.longest_path}, time: {time.time() - start}'
+                )
             node_sequence, path = self.select()
-            self.expand(node_sequence[-1])
+            if len(path) > self.longest_path:
+                self.longest_path = len(path)
+            not_terminated: bool = self.expand(node_sequence[-1])
+            if not not_terminated:
+                not_terminated: bool = self.expand(node_sequence[-1],
+                                                   gate_count_increase=2)
+            if not not_terminated:
+                for node, idx in zip(reversed(node_sequence[:-1]),
+                                     reversed(path)):
+                    node.terminal_mask[idx] = True
+                    node.child_nodes[idx] = None
+                    if not torch.all(node.terminal_mask):
+                        break
+                continue
             visit_count, value = self.simulate(node_sequence[-1])
-            print(visit_count, value)
             self.backpropagate(node_sequence, path, value, visit_count)
             # TODO: print more messages
-            min_gate_count = min([node.gate_count for node in node_sequence])
-            print(min_gate_count)
 
 
 @hydra.main(config_path='config', config_name='config')
@@ -208,8 +259,8 @@ def main(config: Config) -> None:
     device = torch.device("cuda:0")
 
     # Use the best circuit found in the PPO training
-    circ: quartz.PyGraph = quartz.PyGraph().from_qasm(context=qtz,
-                                                      filename="test.qasm")
+    circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
+        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
 
     # Load actor-critic network
     ckpt_path = "ckpts/nam_iter_100.pt"
@@ -237,8 +288,8 @@ def main(config: Config) -> None:
 
     # Initialize MCTS and run
     # TODO: tune the hyperparameters
-    mcts = MCTSAgent(gamma=0.99,
-                     c_1=1.25,
+    mcts = MCTSAgent(gamma=1.00,
+                     c_1=8,
                      c_2=19625,
                      device=device,
                      actor_critic=actor_critic,
@@ -249,4 +300,5 @@ def main(config: Config) -> None:
 
 
 if __name__ == "__main__":
+    # os.environ['OMP_NUM_THREADS'] = str(16)
     main()

@@ -17,9 +17,7 @@ class Node:
     def __init__(self, circuit: quartz.PyGraph) -> None:
         self.circuit: quartz.PyGraph = circuit
         self.gate_count: int = self.circuit.gate_count
-        self.terminal_mask: torch.Tensor
-        self.child_circs: list[quartz.PyGraph]
-        self.policy: torch.Tensor
+        self.g_xfer: list[tuple[int, int]] = []
 
 
 class GreedySearchAgent:
@@ -27,6 +25,7 @@ class GreedySearchAgent:
         self,
         qtz: quartz.QuartzContext,
         circuit: quartz.PyGraph,
+        gate_count_increase: int,
         actor_critic: ActorCritic,
         device: torch.device,
     ) -> None:
@@ -38,17 +37,16 @@ class GreedySearchAgent:
         self.device: torch.device = device
 
         self.node_list: list[Node] = [Node(circuit=circuit)]
-        self.path: list[int] = []
         self.circ_set: set[quartz.PyGraph] = set()
         self.circ_set.add(circuit)
         self.min_gate_count: int = self.init_gate_count
+        self.gate_count_increase: int = gate_count_increase
 
-    def expand(self, gate_count_increase: int = 2) -> bool:
+    def expand(self) -> bool:
         # Initialize node attributes
         node = self.node_list[-1]
-        node.child_nodes = []
-        idx_2_g_xfer: list[tuple[int, int]] = []
-        P_: list[torch.Tensor] = []
+        g_xfer: list[tuple[int, int]] = []
+        P_: list[tuple[float, tuple[int, int]]] = []
 
         mask: torch.Tensor = torch.zeros((node.gate_count, self.qtz.num_xfers),
                                          dtype=torch.bool)
@@ -59,29 +57,7 @@ class GreedySearchAgent:
             mask[g, appliable_xfers] = True
             # construct child nodes
             for xfer in appliable_xfers:
-                child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
-                    xfer=self.qtz.get_xfer_from_id(id=xfer),
-                    node=node.circuit.get_node_from_id(id=g),
-                    eliminate_rotation=True)
-                # Eliminate circuits that has been seen
-                if child_circuit in self.circ_set:
-                    continue
-                if child_circuit.gate_count > self.init_gate_count + gate_count_increase:
-                    continue
-
-                self.circ_set.add(child_circuit)
-                idx_2_g_xfer.append((g, xfer))
-                node.child_nodes.append(Node(circuit=child_circuit))
-                if child_circuit.gate_count < self.min_gate_count:
-                    self.min_gate_count = child_circuit.gate_count
-                    print(f"min gate count: {self.min_gate_count}")
-                    exit(1)
-        node.terminal_mask = torch.zeros((len(node.child_nodes), ),
-                                         dtype=torch.bool)
-
-        # No child, a terminal node
-        if len(node.child_nodes) == 0:
-            return False
+                g_xfer.append((g, xfer))
 
         # Compute policy
         # Policy should take into consideration of gate values
@@ -100,32 +76,66 @@ class GreedySearchAgent:
                     zip(softmax_node_values, xfer_probs)):
                 policy_table[g] = node_prob * xfer_prob_list
 
-        # Construct node.P
-        for g, xfer in idx_2_g_xfer:
-            P_.append(policy_table[g, xfer])
-        node.P = torch.stack(P_)
+        # Construct node.g_xfer
+        for g, xfer in g_xfer:
+            P_.append((policy_table[g, xfer].item(), (g, xfer)))
+        P_.sort()
+        for _, (g, xfer) in P_:
+            node.g_xfer.append((g, xfer))
 
-        # Return the node with the highest policy
-        idx: int = torch.argmax(node.P).item()
-        self.node_list.append(node.child_nodes[idx])
-        self.path.append(idx)
-        return True
+        success: bool = False
+        while len(node.g_xfer) > 0:
+            g, xfer = node.g_xfer.pop()
+            py_xfer: quartz.PyXfer = self.qtz.get_xfer_from_id(id=xfer)
+            if node.gate_count - py_xfer.src_gate_count + py_xfer.dst_gate_count > self.min_gate_count + self.gate_count_increase:
+                continue
+            child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
+                xfer=self.qtz.get_xfer_from_id(id=xfer),
+                node=node.circuit.get_node_from_id(id=g),
+                eliminate_rotation=True)
+            # Eliminate circuits that has been seen
+            if child_circuit in self.circ_set:
+                continue
+
+            self.circ_set.add(child_circuit)
+            self.node_list.append(Node(circuit=child_circuit))
+            success = True
+            if child_circuit.gate_count < self.min_gate_count:
+                self.min_gate_count = child_circuit.gate_count
+                print(f"min gate count: {self.min_gate_count}")
+            break
+
+        return success
 
     def back_track(self) -> None:
         terminated: bool = True
         while terminated:
             self.node_list.pop()
-            idx: int = self.path.pop()
             node = self.node_list[-1]
-            node.terminal_mask[idx] = True
-            if node.terminal_mask.all():
+            success: bool = False
+            while len(node.g_xfer) > 0:
+                g, xfer = node.g_xfer.pop()
+                py_xfer: quartz.PyXfer = self.qtz.get_xfer_from_id(id=xfer)
+                if node.gate_count - py_xfer.src_gate_count + py_xfer.dst_gate_count > self.min_gate_count + self.gate_count_increase:
+                    continue
+                child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
+                    xfer=self.qtz.get_xfer_from_id(id=xfer),
+                    node=node.circuit.get_node_from_id(id=g),
+                    eliminate_rotation=True)
+                # Eliminate circuits that has been seen
+                if child_circuit in self.circ_set:
+                    continue
+
+                self.circ_set.add(child_circuit)
+                self.node_list.append(Node(circuit=child_circuit))
+                success = True
+                if child_circuit.gate_count < self.min_gate_count:
+                    self.min_gate_count = child_circuit.gate_count
+                    print(f"min gate count: {self.min_gate_count}")
+                return
+
+            if not success:
                 continue
-            else:
-                terminated = False
-                idx: int = torch.argmax(node.P -
-                                        node.terminal_mask * 1e10).item()
-                self.node_list.append(node.child_nodes[idx])
-                self.path.append(idx)
 
     def run(self):
         # TODO: use the budget to stop the search
@@ -162,8 +172,10 @@ def main(config: Config) -> None:
     device = torch.device("cuda:0")
 
     # Use the best circuit found in the PPO training
+    # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
+    #     context=qtz, filename="../nam_circs/adder_8.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
-        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
+        context=qtz, filename="best_graphs/barenco_tof_3_cost_58.qasm")
 
     # Load actor-critic network
     ckpt_path = "ckpts/nam_iter_100.pt"
@@ -194,6 +206,7 @@ def main(config: Config) -> None:
     greedy_search_agent = GreedySearchAgent(device=device,
                                             actor_critic=actor_critic,
                                             qtz=qtz,
+                                            gate_count_increase=2,
                                             circuit=circ)
 
     greedy_search_agent.run()

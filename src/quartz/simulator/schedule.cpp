@@ -169,7 +169,31 @@ bool Schedule::compute_kernel_schedule(
       }
       return true;
     }
+    std::string to_string() const {
+      std::string result;
+      result += "{";
+      for (int i = 0; i < (int)sets.size(); i++) {
+        result += "{";
+        for (int j = 0; j < (int)sets[i].size(); j++) {
+          result += std::to_string(sets[i][j]);
+          if (j != (int)sets[i].size() - 1) {
+            result += ", ";
+          }
+        }
+        result += "}";
+        if (i != (int)sets.size() - 1) {
+          result += ", ";
+        }
+      }
+      result += "}";
+      return result;
+    }
     std::vector<std::vector<int>> sets;
+    // TODO: The set of qubits such that although we have terminated some
+    //  kernels operating on them, as long as there is a gate in the sequence
+    //  that is not depending on any qubits not in this set, we can execute
+    //  the gate at no cost.
+    // std::vector<int> absorbing_qubits;
     size_t hash;
   };
   class StatusHash {
@@ -231,6 +255,59 @@ bool Schedule::compute_kernel_schedule(
     auto current_indices_hash = Status::get_hash(current_indices);
     // TODO: add an option to directly execute the gate if it's a controlled
     //  gate
+
+    // TODO: make these numbers configurable
+    constexpr int kMaxNumOfStatus = 1000000;
+    constexpr int kShrinkToNumOfStatus = 100000;
+    if (f[i & 1].size() > kMaxNumOfStatus) {
+      // Pruning.
+      std::vector<std::pair<
+          KernelCostType,
+          std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
+                             StatusHash>::iterator>>
+          costs;
+      // debug
+      std::cout << "Shrink f[" << i << "] from " << f[i & 1].size()
+                << " elements to " << kShrinkToNumOfStatus << " elements."
+                << std::endl;
+      costs.reserve(f[i & 1].size());
+      KernelCostType lowest_cost, highest_cost; // for debugging
+      for (auto it = f[i & 1].begin(); it != f[i & 1].end(); it++) {
+        // Use the current "end" cost as a heuristic.
+        // TODO: profile the running time of |compute_end_schedule| and see
+        //  if an approximation optimization is necessary.
+        KernelCostType result_cost;
+        std::vector<std::vector<int>> result_kernels;
+        compute_end_schedule(kernel_costs, it->first.sets, result_cost,
+                             result_kernels);
+        costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
+        if (it == f[i & 1].begin() ||
+            result_cost + it->second.first > highest_cost) {
+          highest_cost = result_cost + it->second.first;
+        }
+        if (it == f[i & 1].begin() ||
+            result_cost + it->second.first < lowest_cost) {
+          lowest_cost = result_cost + it->second.first;
+        }
+      }
+      // Retrieve the first |kShrinkToNumOfStatus| lowest cost.
+      std::nth_element(
+          costs.begin(), costs.begin() + kShrinkToNumOfStatus, costs.end(),
+          [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
+      std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
+                         StatusHash>
+          new_f;
+      for (int j = 0; j < kShrinkToNumOfStatus; j++) {
+        // Extract the node and insert to the new unordered_map.
+        new_f.insert(f[i & 1].extract(costs[j].second));
+      }
+      f[i & 1] = new_f;
+      // debug
+      std::cout << "Costs shrank from [" << lowest_cost << ", " << highest_cost
+                << "] to [" << lowest_cost << ", "
+                << costs[kShrinkToNumOfStatus - 1].first << "]." << std::endl;
+    }
+
     for (auto &it : f[i & 1]) {
       auto &current_status = it.first;
       auto &current_cost = it.second.first;
@@ -269,14 +346,14 @@ bool Schedule::compute_kernel_schedule(
                  current_local_schedule);
         continue;
       }
-      std::vector<bool> is_touching_set(num_kernels, false);
-      for (auto &index : touching_set_indices) {
-        is_touching_set[index] = true;
-      }
       // Keep track of the schedule during the search.
       LocalSchedule local_schedule = current_local_schedule;
       // Keep track of which kernels are merged during the search.
       std::vector<bool> kernel_merged(num_kernels, false);
+      for (auto &index : touching_set_indices) {
+        // These kernels are already considered -- treat them as merged.
+        kernel_merged[index] = true;
+      }
       auto search_merging_kernels =
           [&](auto &this_ref, const std::vector<int> &current_gate_kernel,
               const std::vector<int> &current_merging_kernel,
@@ -347,7 +424,7 @@ bool Schedule::compute_kernel_schedule(
         // We can always try not to merge with this kernel.
         this_ref(this_ref, current_gate_kernel, current_merging_kernel, cost,
                  touching_set_index, kernel_index + 1);
-        if (is_touching_set[kernel_index] || kernel_merged[kernel_index]) {
+        if (kernel_merged[kernel_index]) {
           // This kernel is already considered. Continue to the next one.
           return;
         }

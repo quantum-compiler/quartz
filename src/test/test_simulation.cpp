@@ -171,6 +171,7 @@ int main() {
           schedule.compute_kernel_schedule(
               {0, 10.4, 10.4, 10.4, 11, 40, 46, 66});
           std::cout << "cost = " << schedule.cost_ << std::endl;
+          schedule.print_kernel_schedule();
         }
       }
       fprintf(fout, "\n");

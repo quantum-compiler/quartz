@@ -169,7 +169,7 @@ int main() {
         auto schedules = get_schedules(*seq, local_qubits, &ctx);
         for (auto &schedule : schedules) {
           schedule.compute_kernel_schedule(
-              {0, 10.4, 10.4, 10.4, 11, 40, 46, 66});
+              {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66});
           std::cout << "cost = " << schedule.cost_ << std::endl;
           schedule.print_kernel_schedule();
         }

@@ -1,6 +1,7 @@
 #include "schedule.h"
 
 #include <queue>
+#include <stack>
 #include <unordered_set>
 
 namespace quartz {
@@ -140,6 +141,10 @@ bool Schedule::compute_kernel_schedule(
       return result;
     }
     void compute_hash() {
+      // XXX: We are not using |absorbing_qubits| to compute the hash.
+      // If we decide to use it in the future, we need to search for every
+      // place we modify |absorbing_qubits| and update all places where we
+      // update the hash manually.
       hash = 0;
       for (const auto &s : sets) {
         hash ^= get_hash(s);
@@ -167,6 +172,14 @@ bool Schedule::compute_kernel_schedule(
           }
         }
       }
+      if (absorbing_qubits.size() != b.absorbing_qubits.size()) {
+        return false;
+      }
+      for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
+        if (absorbing_qubits[i] != b.absorbing_qubits[i]) {
+          return false;
+        }
+      }
       return true;
     }
     std::string to_string() const {
@@ -185,15 +198,28 @@ bool Schedule::compute_kernel_schedule(
           result += ", ";
         }
       }
+      if (!absorbing_qubits.empty()) {
+        if (!sets.empty()) {
+          result += ", ";
+        }
+        result += "absorbing {";
+        for (int j = 0; j < absorbing_qubits.size(); j++) {
+          result += std::to_string(absorbing_qubits[j]);
+          if (j != (int)absorbing_qubits.size() - 1) {
+            result += ", ";
+          }
+        }
+        result += "}";
+      }
       result += "}";
       return result;
     }
     std::vector<std::vector<int>> sets;
-    // TODO: The set of qubits such that although we have terminated some
-    //  kernels operating on them, as long as there is a gate in the sequence
-    //  that is not depending on any qubits not in this set, we can execute
-    //  the gate at no cost.
-    // std::vector<int> absorbing_qubits;
+    // The set of qubits such that although we have terminated some
+    // kernels operating on them, as long as there is a gate in the sequence
+    // that is not depending on any qubits not in this set, we can execute
+    // the gate at no cost.
+    std::vector<int> absorbing_qubits;
     size_t hash;
   };
   class StatusHash {
@@ -254,7 +280,8 @@ bool Schedule::compute_kernel_schedule(
     std::sort(current_indices.begin(), current_indices.end());
     auto current_indices_hash = Status::get_hash(current_indices);
     // TODO: add an option to directly execute the gate if it's a controlled
-    //  gate
+    //  gate -- don't forget to remove the corresponding qubits from the
+    //  |absorbed_qubits| set if they are partially in the set.
 
     // TODO: make these numbers configurable
     constexpr int kMaxNumOfStatus = 1000000;
@@ -312,6 +339,22 @@ bool Schedule::compute_kernel_schedule(
       auto &current_status = it.first;
       auto &current_cost = it.second.first;
       auto &current_local_schedule = it.second.second;
+
+      int absorb_count = 0;
+      for (auto &qubit : current_status.absorbing_qubits) {
+        if (current_index[qubit]) {
+          absorb_count++;
+        }
+      }
+      if (absorb_count == current_indices.size()) {
+        // Optimization:
+        // The current gate absorbed by a previous kernel.
+        // Directly update.
+        update_f(f[~i & 1], current_status, current_cost,
+                 current_local_schedule);
+        continue;
+      }
+
       const int num_kernels = current_status.sets.size();
       std::vector<int> touching_set_indices, touching_size;
       for (int j = 0; j < num_kernels; j++) {
@@ -326,18 +369,9 @@ bool Schedule::compute_kernel_schedule(
           }
         }
       }
-      if (touching_set_indices.empty()) {
-        // Optimization:
-        // The current gate is not touching any kernels on the frontier.
-        // Directly add the gate to the frontier.
-        auto new_status = current_status;
-        new_status.insert_set(current_indices);
-        new_status.hash ^= current_indices_hash;
-        update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
-        continue;
-      }
       if (touching_set_indices.size() == 1 &&
           touching_size[0] == current_indices.size()) {
+        assert(absorb_count == 0);
         // Optimization:
         // The current gate is touching exactly one kernel on the frontier,
         // and is subsumed by that kernel.
@@ -346,8 +380,33 @@ bool Schedule::compute_kernel_schedule(
                  current_local_schedule);
         continue;
       }
+      auto new_absorbing_qubits = current_status.absorbing_qubits;
+      if (absorb_count != 0) {
+        // Remove all qubits touching the current gate from the
+        // |absorbing_qubits| set.
+        // Loop in reverse order so that we do not need to worry about
+        // the index change during removal.
+        for (int j = (int)new_absorbing_qubits.size() - 1; j >= 0; j--) {
+          if (current_index[new_absorbing_qubits[j]]) {
+            new_absorbing_qubits.erase(new_absorbing_qubits.begin() + j);
+          }
+        }
+      }
+      if (touching_set_indices.empty()) {
+        // Optimization:
+        // The current gate is not touching any kernels on the frontier.
+        // Directly add the gate to the frontier.
+        auto new_status = current_status;
+        new_status.insert_set(current_indices);
+        new_status.absorbing_qubits = new_absorbing_qubits;
+        new_status.hash ^= current_indices_hash;
+        update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
+        continue;
+      }
       // Keep track of the schedule during the search.
       LocalSchedule local_schedule = current_local_schedule;
+      std::stack<std::vector<int>> absorbing_qubits_search_stack;
+      absorbing_qubits_search_stack.push(new_absorbing_qubits);
       // Keep track of which kernels are merged during the search.
       std::vector<bool> kernel_merged(num_kernels, false);
       for (auto &index : touching_set_indices) {
@@ -368,7 +427,21 @@ bool Schedule::compute_kernel_schedule(
             // Because we are not merging this kernel with the current
             // gate, we need to record the merged kernel.
             local_schedule.sets.push_back(current_merging_kernel);
+            std::sort(local_schedule.sets.back().begin(),
+                      local_schedule.sets.back().end());
             new_cost += kernel_costs[current_merging_kernel.size()];
+            std::vector<int> absorbing_qubits =
+                absorbing_qubits_search_stack.top();
+            for (auto &index : current_merging_kernel) {
+              if (!current_index[index]) {
+                // As long as the current gate does not block the qubit |index|,
+                // we can execute a gate at the qubit |index| later in the
+                // kernel |current_merging_kernel|.
+                absorbing_qubits.push_back(index);
+              }
+            }
+            std::sort(absorbing_qubits.begin(), absorbing_qubits.end());
+            absorbing_qubits_search_stack.push(absorbing_qubits);
           }
           if (touching_set_index == (int)touching_set_indices.size()) {
             // We have searched everything.
@@ -381,6 +454,7 @@ bool Schedule::compute_kernel_schedule(
             }
             // Insert the new kernel on the frontier.
             new_status.insert_set(current_gate_kernel);
+            new_status.absorbing_qubits = absorbing_qubits_search_stack.top();
             new_status.compute_hash();
             update_f(f[~i & 1], new_status, new_cost, local_schedule);
           } else {
@@ -418,6 +492,7 @@ bool Schedule::compute_kernel_schedule(
           if (!current_merging_kernel.empty()) {
             // Restore the merged kernel stack.
             local_schedule.sets.pop_back();
+            absorbing_qubits_search_stack.pop();
           }
           return;
         }

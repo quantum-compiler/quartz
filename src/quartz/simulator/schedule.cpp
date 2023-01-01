@@ -67,7 +67,7 @@ bool Schedule::compute_end_schedule(
     const std::vector<KernelCostType> &kernel_costs,
     const std::vector<std::vector<int>> &kernels,
     Schedule::KernelCostType &result_cost,
-    std::vector<std::vector<int>> &result_kernels) {
+    std::vector<std::vector<int>> *result_kernels) {
   const int num_kernels = kernels.size();
   const int max_kernel_size = (int)kernel_costs.size() - 1;
   std::vector<std::vector<int>> kernels_of_size(max_kernel_size + 1);
@@ -86,12 +86,16 @@ bool Schedule::compute_end_schedule(
       optimal_kernel_size_cost = tmp;
     }
   }
-  result_kernels.clear();
+  if (result_kernels != nullptr) {
+    result_kernels->clear();
+  }
   result_cost = 0;
   // Copy the large kernels to the result.
   for (int i = max_kernel_size; i >= optimal_kernel_size; i--) {
     for (auto &index : kernels_of_size[i]) {
-      result_kernels.emplace_back(kernels[index]);
+      if (result_kernels != nullptr) {
+        result_kernels->emplace_back(kernels[index]);
+      }
       result_cost += kernel_costs[i];
     }
   }
@@ -99,13 +103,17 @@ bool Schedule::compute_end_schedule(
   while (true) {
     bool has_any_remaining_kernel = false;
     std::vector<int> current_kernel;
+    int current_kernel_size = 0;
     for (int i = optimal_kernel_size - 1; i >= 1; i--) {
       while (!kernels_of_size[i].empty()) {
         if (current_kernel.size() + i <= optimal_kernel_size) {
           // Add a kernel of size i to the current kernel.
-          current_kernel.insert(current_kernel.end(),
-                                kernels[kernels_of_size[i].back()].begin(),
-                                kernels[kernels_of_size[i].back()].end());
+          if (result_kernels != nullptr) {
+            current_kernel.insert(current_kernel.end(),
+                                  kernels[kernels_of_size[i].back()].begin(),
+                                  kernels[kernels_of_size[i].back()].end());
+          }
+          current_kernel_size += i;
           kernels_of_size[i].pop_back();
         } else {
           has_any_remaining_kernel = true;
@@ -114,9 +122,11 @@ bool Schedule::compute_end_schedule(
       }
     }
     if (!current_kernel.empty()) {
-      result_cost += kernel_costs[current_kernel.size()];
-      std::sort(current_kernel.begin(), current_kernel.end());
-      result_kernels.emplace_back(std::move(current_kernel));
+      result_cost += kernel_costs[current_kernel_size];
+      if (result_kernels != nullptr) {
+        std::sort(current_kernel.begin(), current_kernel.end());
+        result_kernels->emplace_back(std::move(current_kernel));
+      }
     }
     if (!has_any_remaining_kernel) {
       break;
@@ -384,9 +394,8 @@ bool Schedule::compute_kernel_schedule(
         // TODO: profile the running time of |compute_end_schedule| and see
         //  if an approximation optimization is necessary.
         KernelCostType result_cost;
-        std::vector<std::vector<int>> result_kernels;
         compute_end_schedule(kernel_costs, it->first.sets, result_cost,
-                             result_kernels);
+                             /*result_kernels=*/nullptr);
         costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
         if (it == f[i & 1].begin() ||
             result_cost + it->second.first > highest_cost) {
@@ -656,7 +665,7 @@ bool Schedule::compute_kernel_schedule(
     // Compute the end schedule and get the one with minimal total cost.
     KernelCostType cost;
     std::vector<std::vector<int>> end_schedule;
-    compute_end_schedule(kernel_costs, it.first.sets, cost, end_schedule);
+    compute_end_schedule(kernel_costs, it.first.sets, cost, &end_schedule);
     if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;
       result_schedule = it.second.second;

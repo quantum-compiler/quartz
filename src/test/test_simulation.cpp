@@ -123,20 +123,19 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
-  std::vector<std::string> circuit_names = {"dj"/*,           "ghz",
-                                            "graphstate",   "qft",
-                                            "qftentangled", "realamprandom",
-                                            "su2random",    "twolocalrandom",
-                                            "wstate",       "ae",
-                                            "qpeexact",     "qpeinexact"*/};
-  std::vector<int> num_qubits = {40 /*, 41, 42*/};
+  std::vector<std::string> circuit_names = {
+      "qft"
+      // "realamprandom"
+  };
+  // 29 total qubits, 28 local qubits
+  std::vector<int> num_qubits = {29};
   std::vector<int> num_local_qubits;
   for (int i = 28; i <= 28; i++) {
     num_local_qubits.push_back(i);
   }
-  FILE *fout = fopen("result.txt", "w");
+  // FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
-    fprintf(fout, "\n", circuit.c_str());
+    // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
       auto seq = CircuitSeq::from_qasm_file(
           &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
@@ -165,7 +164,7 @@ int main() {
         std::vector<std::vector<bool>> local_qubits;
         int result =
             num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
-        fprintf(fout, " %d", result);
+        // fprintf(fout, " %d", result);
         auto schedules = get_schedules(*seq, local_qubits, &ctx);
         for (auto &schedule : schedules) {
           schedule.compute_kernel_schedule(
@@ -174,9 +173,9 @@ int main() {
           schedule.print_kernel_schedule();
         }
       }
-      fprintf(fout, "\n");
+      // fprintf(fout, "\n");
     }
   }
-  fclose(fout);
+  // fclose(fout);
   return 0;
 }

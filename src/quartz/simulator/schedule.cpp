@@ -158,6 +158,38 @@ bool Schedule::compute_kernel_schedule(
       }
       sets.insert(sets.begin() + insert_position, s);
     }
+    bool check_valid() const {
+      std::vector<bool> has_qubit;
+      for (int i = 0; i < (int)sets.size(); i++) {
+        for (int j = 0; j < (int)sets[i].size(); j++) {
+          while (sets[i][j] >= has_qubit.size()) {
+            has_qubit.push_back(false);
+          }
+          if (has_qubit[sets[i][j]]) {
+            std::cerr << "Invalid status: qubit " << sets[i][j]
+                      << " appears twice." << std::endl;
+            std::cerr << to_string() << std::endl;
+            return false;
+          }
+          has_qubit[sets[i][j]] = true;
+        }
+      }
+      for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
+        for (int j = 0; j < (int)absorbing_qubits[i].size(); j++) {
+          while (absorbing_qubits[i][j] >= has_qubit.size()) {
+            has_qubit.push_back(false);
+          }
+          if (has_qubit[absorbing_qubits[i][j]]) {
+            std::cerr << "Invalid status: qubit " << absorbing_qubits[i][j]
+                      << " appears twice." << std::endl;
+            std::cerr << to_string() << std::endl;
+            return false;
+          }
+          has_qubit[absorbing_qubits[i][j]] = true;
+        }
+      }
+      return true;
+    }
     bool operator==(const Status &b) const {
       if (sets.size() != b.sets.size()) {
         return false;
@@ -176,8 +208,13 @@ bool Schedule::compute_kernel_schedule(
         return false;
       }
       for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
-        if (absorbing_qubits[i] != b.absorbing_qubits[i]) {
+        if (absorbing_qubits[i].size() != b.absorbing_qubits[i].size()) {
           return false;
+        }
+        for (int j = 0; j < (int)absorbing_qubits[i].size(); j++) {
+          if (absorbing_qubits[i][j] != b.absorbing_qubits[i][j]) {
+            return false;
+          }
         }
       }
       return true;
@@ -203,9 +240,16 @@ bool Schedule::compute_kernel_schedule(
           result += ", ";
         }
         result += "absorbing {";
-        for (int j = 0; j < absorbing_qubits.size(); j++) {
-          result += std::to_string(absorbing_qubits[j]);
-          if (j != (int)absorbing_qubits.size() - 1) {
+        for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
+          result += "{";
+          for (int j = 0; j < (int)absorbing_qubits[i].size(); j++) {
+            result += std::to_string(absorbing_qubits[i][j]);
+            if (j != (int)absorbing_qubits[i].size() - 1) {
+              result += ", ";
+            }
+          }
+          result += "}";
+          if (i != (int)absorbing_qubits.size() - 1) {
             result += ", ";
           }
         }
@@ -215,11 +259,11 @@ bool Schedule::compute_kernel_schedule(
       return result;
     }
     std::vector<std::vector<int>> sets;
-    // The set of qubits such that although we have terminated some
-    // kernels operating on them, as long as there is a gate in the sequence
-    // that is not depending on any qubits not in this set, we can execute
-    // the gate at no cost.
-    std::vector<int> absorbing_qubits;
+    // The collection of sets of qubits such that although we have terminated
+    // some kernels operating on them, as long as there is a set in this
+    // collection and a gate in the sequence that is not depending on any
+    // qubits not in the set, we can execute the gate at no cost.
+    std::vector<std::vector<int>> absorbing_qubits;
     size_t hash;
   };
   class StatusHash {
@@ -228,6 +272,42 @@ bool Schedule::compute_kernel_schedule(
   };
   struct LocalSchedule {
   public:
+    bool check_valid() const {
+      std::vector<bool> has_qubit;
+      for (int i = 0; i < (int)sets.size(); i++) {
+        for (int j = 0; j < (int)sets[i].size(); j++) {
+          while (sets[i][j] >= has_qubit.size()) {
+            has_qubit.push_back(false);
+          }
+          if (has_qubit[sets[i][j]]) {
+            std::cerr << "Invalid local schedule: qubit " << sets[i][j]
+                      << " appears twice." << std::endl;
+            return false;
+          }
+          has_qubit[sets[i][j]] = true;
+        }
+      }
+      return true;
+    }
+    std::string to_string() const {
+      std::string result;
+      result += "{";
+      for (int i = 0; i < (int)sets.size(); i++) {
+        result += "{";
+        for (int j = 0; j < (int)sets[i].size(); j++) {
+          result += std::to_string(sets[i][j]);
+          if (j != (int)sets[i].size() - 1) {
+            result += ", ";
+          }
+        }
+        result += "}";
+        if (i != (int)sets.size() - 1) {
+          result += ", ";
+        }
+      }
+      result += "}";
+      return result;
+    }
     std::vector<std::vector<int>> sets;
   };
   const int num_qubits = sequence_.get_num_qubits();
@@ -284,8 +364,8 @@ bool Schedule::compute_kernel_schedule(
     //  |absorbed_qubits| set if they are partially in the set.
 
     // TODO: make these numbers configurable
-    constexpr int kMaxNumOfStatus = 1000000;
-    constexpr int kShrinkToNumOfStatus = 100000;
+    constexpr int kMaxNumOfStatus = 10000;
+    constexpr int kShrinkToNumOfStatus = 5000;
     if (f[i & 1].size() > kMaxNumOfStatus) {
       // Pruning.
       std::vector<std::pair<
@@ -339,14 +419,25 @@ bool Schedule::compute_kernel_schedule(
       auto &current_status = it.first;
       auto &current_cost = it.second.first;
       auto &current_local_schedule = it.second.second;
+      assert(current_status.check_valid());
 
+      int absorbing_set_index = -1;
       int absorb_count = 0;
-      for (auto &qubit : current_status.absorbing_qubits) {
-        if (current_index[qubit]) {
-          absorb_count++;
+      for (int j = 0; j < (int)current_status.absorbing_qubits.size(); j++) {
+        for (auto &qubit : current_status.absorbing_qubits[j]) {
+          if (current_index[qubit]) {
+            absorb_count++;
+            if (absorbing_set_index == -1) {
+              absorbing_set_index = j;
+            } else if (absorbing_set_index != j) {
+              // not absorb-able
+              absorbing_set_index = -2;
+              break;
+            }
+          }
         }
       }
-      if (absorb_count == current_indices.size()) {
+      if (absorbing_set_index >= 0 && absorb_count == current_indices.size()) {
         // Optimization:
         // The current gate absorbed by a previous kernel.
         // Directly update.
@@ -358,10 +449,12 @@ bool Schedule::compute_kernel_schedule(
       const int num_kernels = current_status.sets.size();
       std::vector<int> touching_set_indices, touching_size;
       for (int j = 0; j < num_kernels; j++) {
+        bool touching_set_has_j = false;
         for (auto &index : current_status.sets[j]) {
           if (current_index[index]) {
-            touching_set_indices.push_back(j);
-            if (touching_size.size() < touching_set_indices.size()) {
+            if (!touching_set_has_j) {
+              touching_set_has_j = true;
+              touching_set_indices.push_back(j);
               touching_size.push_back(1);
             } else {
               touching_size.back()++;
@@ -383,14 +476,25 @@ bool Schedule::compute_kernel_schedule(
       auto new_absorbing_qubits = current_status.absorbing_qubits;
       if (absorb_count != 0) {
         // Remove all qubits touching the current gate from the
-        // |absorbing_qubits| set.
+        // |absorbing_qubits| set collection.
         // Loop in reverse order so that we do not need to worry about
         // the index change during removal.
-        for (int j = (int)new_absorbing_qubits.size() - 1; j >= 0; j--) {
-          if (current_index[new_absorbing_qubits[j]]) {
-            new_absorbing_qubits.erase(new_absorbing_qubits.begin() + j);
+        for (int k = (int)new_absorbing_qubits.size() - 1; k >= 0; k--) {
+          // Loop in reverse order so that we do not need to worry about
+          // the index change during removal.
+          for (int j = (int)new_absorbing_qubits[k].size() - 1; j >= 0; j--) {
+            if (current_index[new_absorbing_qubits[k][j]]) {
+              new_absorbing_qubits[k].erase(new_absorbing_qubits[k].begin() +
+                                            j);
+            }
+          }
+          if (new_absorbing_qubits[k].empty()) {
+            new_absorbing_qubits.erase(new_absorbing_qubits.begin() + k);
           }
         }
+        // Sort the absorbing sets in ascending order.
+        std::sort(new_absorbing_qubits.begin(), new_absorbing_qubits.end(),
+                  [](auto &s1, auto &s2) { return s1[0] < s2[0]; });
       }
       if (touching_set_indices.empty()) {
         // Optimization:
@@ -405,8 +509,7 @@ bool Schedule::compute_kernel_schedule(
       }
       // Keep track of the schedule during the search.
       LocalSchedule local_schedule = current_local_schedule;
-      std::stack<std::vector<int>> absorbing_qubits_search_stack;
-      absorbing_qubits_search_stack.push(new_absorbing_qubits);
+      std::vector<std::vector<int>> absorbing_sets_stack;
       // Keep track of which kernels are merged during the search.
       std::vector<bool> kernel_merged(num_kernels, false);
       for (auto &index : touching_set_indices) {
@@ -430,18 +533,17 @@ bool Schedule::compute_kernel_schedule(
             std::sort(local_schedule.sets.back().begin(),
                       local_schedule.sets.back().end());
             new_cost += kernel_costs[current_merging_kernel.size()];
-            std::vector<int> absorbing_qubits =
-                absorbing_qubits_search_stack.top();
+            std::vector<int> absorbing_set;
             for (auto &index : current_merging_kernel) {
               if (!current_index[index]) {
                 // As long as the current gate does not block the qubit |index|,
                 // we can execute a gate at the qubit |index| later in the
                 // kernel |current_merging_kernel|.
-                absorbing_qubits.push_back(index);
+                absorbing_set.push_back(index);
               }
             }
-            std::sort(absorbing_qubits.begin(), absorbing_qubits.end());
-            absorbing_qubits_search_stack.push(absorbing_qubits);
+            std::sort(absorbing_set.begin(), absorbing_set.end());
+            absorbing_sets_stack.push_back(absorbing_set);
           }
           if (touching_set_index == (int)touching_set_indices.size()) {
             // We have searched everything.
@@ -454,8 +556,22 @@ bool Schedule::compute_kernel_schedule(
             }
             // Insert the new kernel on the frontier.
             new_status.insert_set(current_gate_kernel);
-            new_status.absorbing_qubits = absorbing_qubits_search_stack.top();
+            new_status.absorbing_qubits = new_absorbing_qubits;
+            new_status.absorbing_qubits.insert(
+                new_status.absorbing_qubits.end(), absorbing_sets_stack.begin(),
+                absorbing_sets_stack.end());
+            // Sort the absorbing sets in ascending order.
+            std::sort(new_status.absorbing_qubits.begin(),
+                      new_status.absorbing_qubits.end(),
+                      [](auto &s1, auto &s2) { return s1[0] < s2[0]; });
             new_status.compute_hash();
+            /*if (!new_status.check_valid()) {
+              for (int j = 0; j < (int)current_gate_kernel.size(); j++) {
+                std::cout << current_gate_kernel[j] << std::endl;
+              }
+              std::cout << current_status.to_string() << std::endl;
+              exit(1);
+            }*/
             update_f(f[~i & 1], new_status, new_cost, local_schedule);
           } else {
             // Start a new iteration of searching.
@@ -492,7 +608,7 @@ bool Schedule::compute_kernel_schedule(
           if (!current_merging_kernel.empty()) {
             // Restore the merged kernel stack.
             local_schedule.sets.pop_back();
-            absorbing_qubits_search_stack.pop();
+            absorbing_sets_stack.pop_back();
           }
           return;
         }

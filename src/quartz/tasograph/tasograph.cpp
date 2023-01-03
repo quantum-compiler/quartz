@@ -2898,6 +2898,7 @@ bool Graph::equal(const Graph &other) const {
         if(ops1[i].ptr->is_parametrized_gate()) {
             // make sure all the parameters are the same
             int num_params = ops1[i].ptr->get_num_parameters();
+            int num_qubits = ops1[i].ptr->get_num_qubits();
             std::vector<ParamType> params1(num_params);
             std::vector<ParamType> params2(num_params);
             // assume no parameter gates
@@ -2905,13 +2906,13 @@ bool Graph::equal(const Graph &other) const {
             auto edges1 = inEdges.find(ops1[i])->second;
             for(auto it = edges1.cbegin(); it != edges1.cend(); ++it) {
                 if(it->srcOp.ptr->tp == GateType::input_param) {
-                    params1[it->dstIdx] = constant_param_values.find(it->srcOp)->second;
+                    params1[it->dstIdx - num_qubits] = constant_param_values.find(it->srcOp)->second;
                 }
             }
             auto edges2 = other.inEdges.find(ops2[i])->second;
             for(auto it = edges2.cbegin(); it != edges2.cend(); ++it) {
                 if(it->srcOp.ptr->tp == GateType::input_param) {
-                    params2[it->dstIdx] = other.constant_param_values.find(it->srcOp)->second;
+                    params2[it->dstIdx - num_qubits] = other.constant_param_values.find(it->srcOp)->second;
                 }
             }
             for(int j = 0; j < num_params; j++) {

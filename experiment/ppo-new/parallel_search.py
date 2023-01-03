@@ -113,9 +113,7 @@ class ParallelSearchAgent:
                 if new_circ not in self.circ_set:
                     self.circ_set.add(new_circ)
 
-                    if new_circ.gate_count > self.min_gate_count + self.gate_count_increase:
-                        continue
-                    elif new_circ.gate_count not in self.circ_buffer:
+                    if new_circ.gate_count not in self.circ_buffer:
                         self.circ_buffer[new_circ.gate_count] = set()
                     self.circ_buffer[new_circ.gate_count].add(new_circ)
 
@@ -125,14 +123,18 @@ class ParallelSearchAgent:
                         self.circ_sample_set = set()
                         gate_count_to_pop: list[int] = []
                         for gate_count in self.circ_buffer:
-                            if gate_count > self.min_gate_count + self.gate_count_increase:
+                            # if gate_count > self.min_gate_count + self.gate_count_increase:
+                            #     gate_count_to_pop.append(gate_count)
+                            if gate_count > self.min_gate_count + 1:
                                 gate_count_to_pop.append(gate_count)
                             else:
                                 self.circ_sample_set.update(
                                     self.circ_buffer[gate_count])
                         for gate_count in gate_count_to_pop:
                             self.circ_buffer.pop(gate_count)
-                    else:
+                    # else:
+                    #     self.circ_sample_set.add(new_circ)
+                    elif new_circ.gate_count <= self.min_gate_count + 1:
                         self.circ_sample_set.add(new_circ)
 
         return new_circ_list
@@ -150,9 +152,12 @@ class ParallelSearchAgent:
                 )
             with torch.no_grad():
                 circuit_list = self.expand(circuit_list)
+            none_cnt: int = 0
             for i, circuit in enumerate(circuit_list):
                 if circuit is None:
                     circuit_list[i] = random.sample(self.circ_sample_set, 1)[0]
+                    none_cnt += 1
+            # print(f"new circuit count: {none_cnt}")
 
 
 @hydra.main(config_path='config', config_name='config')
@@ -170,9 +175,11 @@ def main(config: Config) -> None:
         filename='../ecc_set/nam_ecc.json')
 
     # Device
-    device = torch.device("cuda:2")
+    device = torch.device("cuda:3")
 
     # Use the best circuit found in the PPO training
+    # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
+    #     context=qtz, filename="../nam_circs/adder_8.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
         context=qtz, filename="best_graphs/barenco_tof_3_cost_58.qasm")
 

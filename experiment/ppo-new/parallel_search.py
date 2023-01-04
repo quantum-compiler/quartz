@@ -22,6 +22,7 @@ class ParallelSearchAgent:
         circuit: quartz.PyGraph,
         num_workers: int,
         gate_count_increase: int,
+        max_cost_ratio: float,
         actor_critic: ActorCritic,
         hit_rate: float,
         device: torch.device,
@@ -30,6 +31,7 @@ class ParallelSearchAgent:
         self.input_circuit: quartz.PyGraph = circuit
         self.init_gate_count: int = circuit.gate_count
         self.min_gate_count: int = self.init_gate_count
+        self.max_cost_ratio: float = max_cost_ratio
         self.actor_critic: ActorCritic = actor_critic
         self.actor_critic.eval()
         self.num_workers: int = num_workers
@@ -101,9 +103,9 @@ class ParallelSearchAgent:
             if xfer.is_nop:
                 new_circ_list.append(None)
                 self.none_count += 1
-            elif circ.gate_count + xfer.dst_gate_count - xfer.src_gate_count > self.min_gate_count + self.gate_count_increase:
-                new_circ_list.append(None)
-                self.none_count += 1
+            # elif circ.gate_count + xfer.dst_gate_count - xfer.src_gate_count > self.min_gate_count + self.gate_count_increase:
+            #     new_circ_list.append(None)
+            #     self.none_count += 1
             else:
                 new_circ: quartz.PyGraph = circ.apply_xfer(
                     xfer=xfer,
@@ -112,6 +114,9 @@ class ParallelSearchAgent:
                 new_circ_list.append(new_circ)
                 if new_circ not in self.circ_set:
                     self.circ_set.add(new_circ)
+
+                    if new_circ.gate_count > self.min_gate_count + 1:
+                        continue
 
                     if new_circ.gate_count not in self.circ_buffer:
                         self.circ_buffer[new_circ.gate_count] = set()
@@ -144,11 +149,14 @@ class ParallelSearchAgent:
         expansion_cnt: int = 0
         circuit_list: list[quartz.PyGraph
                            | None] = [self.input_circuit] * self.num_workers
+        init_gate_count_list: list[int] = [
+            circuit.gate_count for circuit in circuit_list
+        ]
         while True:
             expansion_cnt += 1
             if expansion_cnt % 100 == 0:
                 print(
-                    f'Expansion cnt: {expansion_cnt}, num circ: {len(self.circ_set)}, num sample circ: {len(self.circ_sample_set)}, none count: {self.none_count}, t: {time.time() - start}'
+                    f'Expansion cnt: {expansion_cnt}, num circ: {len(self.circ_set)}, num sample circ: {len(self.circ_sample_set)}, none count: {self.none_count}, t: {time.time() - start:.2f}'
                 )
             with torch.no_grad():
                 circuit_list = self.expand(circuit_list)
@@ -156,7 +164,14 @@ class ParallelSearchAgent:
             for i, circuit in enumerate(circuit_list):
                 if circuit is None:
                     circuit_list[i] = random.sample(self.circ_sample_set, 1)[0]
+                    init_gate_count_list[i] = circuit_list[i].gate_count
                     none_cnt += 1
+                elif circuit_list[i].gate_count > init_gate_count_list[
+                        i] * self.max_cost_ratio:
+                    circuit_list[i] = random.sample(self.circ_sample_set, 1)[0]
+                    init_gate_count_list[i] = circuit_list[i].gate_count
+                    none_cnt += 1
+
             # print(f"new circuit count: {none_cnt}")
 
 
@@ -181,10 +196,10 @@ def main(config: Config) -> None:
     # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
     #     context=qtz, filename="../nam_circs/adder_8.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
-        context=qtz, filename="best_graphs/barenco_tof_3_cost_58.qasm")
+        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
 
     # Load actor-critic network
-    ckpt_path = "ckpts/iter_153.pt"
+    ckpt_path = "ckpts/nam_iter_100.pt"
     actor_critic: ActorCritic = ActorCritic(
         gnn_type=cfg.gnn_type,
         num_gate_types=cfg.num_gate_types,
@@ -211,8 +226,9 @@ def main(config: Config) -> None:
     parallel_search_agent = ParallelSearchAgent(device=device,
                                                 actor_critic=actor_critic,
                                                 num_workers=128,
-                                                hit_rate=0.8,
+                                                hit_rate=0.9,
                                                 gate_count_increase=2,
+                                                max_cost_ratio=1.2,
                                                 qtz=qtz,
                                                 circuit=circ)
 

@@ -578,6 +578,8 @@ cdef class PyGraph:
         return self.gate_count <= other.gate_count
 
     def __eq__(self, other: PyGraph):
+        if other is None:
+            return False
         return deref(self.graph).equal(deref(other.graph))
 
     def __hash__(self):

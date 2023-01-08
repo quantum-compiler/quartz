@@ -109,5 +109,7 @@ install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
         DESTINATION include/quartz
         FILES_MATCHING PATTERN "*.h")
 
+add_subdirectory(src/sim)
+add_subdirectory(src/examples)
 add_subdirectory(src/test)
 add_subdirectory(src/benchmark)

@@ -9,7 +9,7 @@ CUQUANTUM_DIR=~/qs/cuquantum-linux-x86_64-22.11.0.13-archive
 CUDA_DIR=/usr/local/cuda-11.7
 
 # using simulator
-QUARTZ_USE_SIMULATOR = ON
+QUARTZ_USE_SIMULATOR=ON
 
 . $(dirname $0)/config.inc
 run_cmake $*

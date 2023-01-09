@@ -34,8 +34,6 @@ include_directories("src/quartz/")
 set(QUARTZ_LIBS "")
 set(QUARTZ_LINK_LIBS ${CMAKE_DL_LIBS})
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-# set(QSIM_INCLUDE_DIRS "")
-# set(QSIM_EXT_LIBRARIES "")
 
 file(GLOB_RECURSE QUARTZ_SRCS
         src/quartz/*.cpp
@@ -113,5 +111,9 @@ install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
 
 add_subdirectory(src/test)
 add_subdirectory(src/benchmark)
-add_subdirectory(src/sim)
+
+if(QUARTZ_USE_SIMULATOR)
+  add_subdirectory(src/sim)
+endif()
+
 

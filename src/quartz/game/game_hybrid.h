@@ -189,7 +189,8 @@ namespace quartz {
         Reward apply_action(const Action &action) {
             if (is_initial_phase) {
                 // In stage 1, we should have SearchFull action space
-                Assert(action.type == initial_phase_action_type, "Action should be the same as initial phase mapping type in phase 1!");
+                Assert(action.type == initial_phase_action_type,
+                       "Action should be the same as initial phase mapping type in phase 1!");
                 Assert(virtual_swaps_inserted < initial_phase_len, "Phase 1 termination error!");
                 virtual_swaps_inserted += 1;
                 if (virtual_swaps_inserted == initial_phase_len) is_initial_phase = false;
@@ -366,16 +367,34 @@ namespace quartz {
             return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
 
-        void save_execution_history_to_file(const std::string &eh_file_name,
-                                            const std::string &qasm_file_name,
-                                            bool include_swap = true) const {
+        void save_execution_history_to_file(const std::string &eh_file_name) const {
+            /* Execution History File Format:
+             *
+             *      [register count] [logical qubit count]
+             *      [initial physical->logical mapping (a list of numbers: p2l[p0], p2l[p1], ...)]
+             *      [initial logical->physical mapping (a list of numbers: l2p[l0], l2p[l1], ...)]
+             *      [number of entries (i.e. two-qubit gate count + all swap count)]
+             *      [guid] [gate type] [physical idx 0] [physical idx 1] [logical idx 0] [logical idx 1]
+             *      [guid] [gate type] [physical idx 0] [physical idx 1] [logical idx 0] [logical idx 1]
+             *      ...
+             *
+             * Entry Format Examples:
+             *
+             *      1. CNOT:             16400 cx 8 3 3 4
+             *      2. SWAP:             -1 swap 3 9 4 9
+             *      3. Virtual SWAP:     -2 swap 3 9 4 9
+             *      4. Phase Transition: -2 swap 0 0 0 0
+             *
+             * Notice that during RL mapping we only consider two-qubit gates, so the execution history file
+             * also only contains such information. To reconstruct a valid mapping plan for the original qasm
+             * file, call generated_mapping_plan().
+            */
+
             Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
             // initialize file
             std::ofstream eh_file;
-            std::ofstream qasm_file;
             eh_file.open(eh_file_name);
-            qasm_file.open(qasm_file_name);
 
             // output initial mapping table
             eh_file << logical2physical.size() << " " << logical_qubit_num << "\n";
@@ -399,19 +418,12 @@ namespace quartz {
                         << eh.logical1 << "\n";
             }
 
-            // output qasm file
-            // TODO: the qasm output is not well defined, fix this if necessary
-            qasm_file << "OPENQASM 2.0;" << "\n";
-            qasm_file << "include \"qelib1.inc\";" << "\n";
-            qasm_file << "qreg q[" << logical_qubit_num << "];\n";
-            for (const ExecutionHistory &eh: execution_history) {
-                if (!include_swap && eh.gate_type == GateType::swap) continue;
-                qasm_file << eh.gate_type << " q[" << eh.logical0 << "], q[" << eh.logical1 << "];\n";
-            }
-
             // clean up
             eh_file.close();
-            qasm_file.close();
+        }
+
+        void generated_mapping_plan() const {
+
         }
 
     public:

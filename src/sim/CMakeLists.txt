@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 project(qsim LANGUAGES C CXX CUDA)
 include(ExternalProject)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_LIST_DIR}/cmake)
@@ -40,19 +40,21 @@ message(STATUS "Using CUSTATEVEC_ROOT = ${CUSTATEVEC_ROOT}")
 # ##########################################
 
 # Global CXX flags/options
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Global CUDA CXX flags/options
 set(CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
-set(CMAKE_CUDA_STANDARD 11)
+set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
 set(CMAKE_CUDA_FLAGS_ARCH_SM70 "-gencode arch=compute_70,code=sm_70")
 set(CMAKE_CUDA_FLAGS_ARCH "${CMAKE_CUDA_FLAGS_ARCH_SM70} ${CMAKE_CUDA_FLAGS_ARCH_SM75} ${CMAKE_CUDA_FLAGS_ARCH_SM80} ${CMAKE_CUDA_FLAGS_ARCH_SM90}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CMAKE_CUDA_FLAGS_ARCH}")
+
+message(STATUS "cuda compiler: ${CMAKE_CUDA_COMPILER}")
 
 set(QSIM_INCLUDE_DIRS "")
 set(QSIM_EXT_LIBRARIES "")
@@ -81,9 +83,9 @@ set_property(TARGET quansim PROPERTY CUDA_ARCHITECTURES "70;75;80;90")
 target_include_directories(quansim PUBLIC ${QSIM_INCLUDE_DIRS})
 target_link_libraries(quansim quartz_runtime)
 
-# add_subdirectory(examples)
-
 set(INCLUDE_DEST "include")
 set(LIB_DEST "lib")
 install(FILES ${QSIM_HDR} DESTINATION ${INCLUDE_DEST})
 install(TARGETS quansim DESTINATION ${LIB_DEST})
+
+add_subdirectory(examples)

@@ -2,6 +2,8 @@
 
 #include "sim/circuit.h"
 
+using quartz::GateType;
+
 int main(int argc, char *argv[]) {
 
   std::string circuit_file;
@@ -31,8 +33,8 @@ int main(int argc, char *argv[]) {
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
   auto seq = quartz::CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit_file + "_indep_qiskit_" + std::to_string(num_q) +
+          &ctx, std::string("circuit/MQTBench_") + std::to_string(nqubits) +
+                    "q/" + circuit_file + "_indep_qiskit_" + std::to_string(nqubits) +
                     ".qasm");
   sim::qcircuit::Circuit<double> circuit(nqubits, nlocal);
   circuit.compile(seq.get(), &ctx);

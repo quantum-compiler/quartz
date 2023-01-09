@@ -3,6 +3,7 @@
 #include "../utils/utils.h"
 #include <cstring>
 #include <iostream>
+#include <vector>
 
 namespace quartz {
 class MatrixBase {

@@ -219,7 +219,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq, quartz::Context *ct
       std::cout << "], gates ";
       std::cout << schedule.kernels[i].to_string() << std::endl;
       // mat = FuseGates<DT>(kernels);
-      auto mat = FuseGates<DT>(schedule.kernels[i], schedule.kernel_qubits[i], ctx);
+      auto mat = FuseGates(schedule.kernels[i], schedule.kernel_qubits[i], ctx);
 
       // add fused gates kernels 
       Gate<DT> gate{g_type,
@@ -418,18 +418,68 @@ std::vector<std::complex<DT>> qcircuit::Circuit<DT>::FuseGates(const quartz::Cir
 
     if (seq.gates[i]->gate->is_parameter_gate()) {
       auto *m = seq.gates[i]->gate->get_matrix(params);
-      std::vector<std::complex<DT>> temp = m->flatten();
-      MatMut<DT>(mask, qubits.size(), res_mat, temp, qubit_indices.size());
+      std::vector<std::complex<double>> temp_d = m->flatten();
+      std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
+      MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
     } else {
       // A quantum gate. Update the distribution.
       assert(gates[i]->gate->is_quantum_gate());
       auto *m = seq.gates[i]->gate->get_matrix();
-      std::vector<std::complex<DT>> temp = m->flatten();
-      MatMul<DT>(mask, qubits.size(), res_mat, temp, qubit_indices.size());
+      std::vector<std::complex<double>> temp_d = m->flatten();
+      std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
+      MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
     }
   }
 
   return res_mat;
+}
+
+template <typename DT>
+void qcircuit::Circuit<DT>::MatMul(
+    unsigned mask, unsigned n_fused, M& res_mat, const M& m1, unsigned m_size) {
+    // expand m1
+    unsigned n1 = unsigned{1} << m_size;
+    unsigned n = unsigned{1} << n_fused;
+    // std::vector<std::complex<DT>> res_mat;
+    // res_mat.resize(n*n);
+    // for (unsigned i = 0; i < n; ++i) {
+    //   res_mat[(n * i + i)] = std::complex<DT> (1, 0);
+    // }
+    std::vector<std::complex<DT>> temp_mat = res_mat;
+
+    for (unsigned i = 0; i < n; ++i) {
+      unsigned i_ = i;
+      unsigned row_m1 = 0;
+      unsigned pos = 0;
+      for (unsigned q = 0; q < n; ++q) {
+        if ((mask >> q) & 1) {
+          row_m1 |= ((i_ >> q) & 1) << pos;
+          ++pos;
+        }
+      }
+
+      for (unsigned j = 0; j < n; ++j) {
+        std::complex<DT> re = std::complex<DT> (0, 0);
+        for (unsigned k = 0; k < n1; ++k) {
+          // row res_mat
+          unsigned row_res = 0;
+          unsigned k_ = k;
+          pos = 0;
+          for (unsigned q = 0; q < n; ++q) {
+            if ((mask >> q) & 1) {
+              row_res |= ((k_ >> pos) & 1) << q;
+              ++pos;
+            }
+          }
+          std::complex<DT> v1 = m1[(n1 * row_m1 + k)];
+          std::complex<DT> v2 = temp_mat[(n * row_res + j)];
+
+          re += v1 * v2;
+        }
+
+        res_mat[(n * i + j)] = re;
+      }
+    }
 }
 
 template class qcircuit::Circuit<double>;

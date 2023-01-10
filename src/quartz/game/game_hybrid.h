@@ -26,11 +26,19 @@ namespace quartz {
             is_initial_phase = true;
             initial_phase_action_type = ActionType::PhysicalFull;   // Type of initial phase action
 
-            // STEP 2: simplify circuit
+            // STEP 2: store the initial input guid -> logical idx mapping
+            // Notes: 1. input guid is the number written in the input qasm file
+            //        2. we need to store this because there might be unused qubits in the qasm file,
+            //           otherwise input guid will equal to logical idx
+            for (const auto &op_mapping: graph.qubit_mapping_table) {
+                initial_input_guid_to_logical.emplace_back(op_mapping.first.guid, op_mapping.second.first);
+            }
+
+            // STEP 3: simplify circuit
             original_gate_count = graph.gate_count();
             single_qubit_gate_count = simplify_circuit(graph);
 
-            // STEP 3: state related (mapping table)
+            // STEP 4: state related (mapping table)
             // initialize
             logical_qubit_num = static_cast<int>(graph.qubit_mapping_table.size());
             physical_qubit_num = device->get_num_qubits();
@@ -69,7 +77,7 @@ namespace quartz {
             initial_logical2physical = logical2physical;
             initial_physical2logical = physical2logical;
 
-            // STEP 4: save device edges
+            // STEP 5: save device edges
             for (int i = 0; i < device->get_num_qubits(); ++i) {
                 auto neighbor_list = device->get_input_neighbours(i);
                 for (int j: neighbor_list) {
@@ -77,7 +85,7 @@ namespace quartz {
                 }
             }
 
-            // STEP 5: record some extra statistics (we do not execute gates at the beginning)
+            // STEP 6: record some extra statistics (we do not execute gates at the beginning)
             executed_logical_gate_count = 0;
             swaps_inserted = 0;             // This is for real swaps (i.e. phase 2 swaps)
             virtual_swaps_inserted = 0;     // This is for virtual swaps (i.e. phase 1 swaps)
@@ -113,6 +121,7 @@ namespace quartz {
             // execution history
             initial_logical2physical = game.initial_logical2physical;
             initial_physical2logical = game.initial_physical2logical;
+            initial_input_guid_to_logical = game.initial_input_guid_to_logical;
             execution_history = game.execution_history;
         }
 
@@ -403,6 +412,10 @@ namespace quartz {
              *
              * 2. Single Qubit Gate File Format:
              *
+             *      [number of used qubits]
+             *      [guid] [logical idx]
+             *      [guid] [logical idx]
+             *      ...
              *      [number of entries]
              *      [guid] [number of single qubit gates after it]
              *      [gate type] [logical idx]
@@ -453,7 +466,13 @@ namespace quartz {
             std::ofstream single_qubit_gate_file;
             single_qubit_gate_file.open(single_qubit_gate_file_name);
 
-            // output single qubit gate file
+            // output the guid -> logical idx table
+            single_qubit_gate_file << initial_input_guid_to_logical.size() << "\n";
+            for (const auto &guid_logical_idx_pair: initial_input_guid_to_logical) {
+                single_qubit_gate_file << guid_logical_idx_pair.first << " " << guid_logical_idx_pair.second << "\n";
+            }
+
+            // output single qubit gate execution plan
             single_qubit_gate_file << graph.simplified_gates_after_op.size() << "\n";
             for (const auto &entry: graph.simplified_gates_after_op) {
                 single_qubit_gate_file << entry.first.guid << " " << entry.second.size() << "\n";
@@ -534,6 +553,11 @@ namespace quartz {
             int _swap_with_cost = 0, _two_qubit_gates = 0;
             for (const auto &eh_entry: execution_history) {
                 if (eh_entry.gate_type == GateType::swap) {
+                    // ignore the entry if it is state transition
+                    if (eh_entry.guid == -2 && eh_entry.logical0 == 0 && eh_entry.logical1 == 0 &&
+                        eh_entry.physical0 == 0 && eh_entry.physical1 == 0)
+                        continue;
+
                     // swap gate, check if it is virtual / free
                     int l0 = eh_entry.logical0;
                     int l1 = eh_entry.logical1;
@@ -581,7 +605,16 @@ namespace quartz {
             Assert(_swap_with_cost * SWAPCOST + _two_qubit_gates + single_qubit_gate_count == total_cost(),
                    "Cost function mismatch!");
 
-            // STEP 3: generate the output qasm file (with integrity checks)
+            // STEP 3: parse the single qubit execution plan (simplified_gates_after_op) into a map from
+            // guid -> a list of single qubit gates
+            std::unordered_map<int, std::deque<OutputGateRepresentation>> single_qubit_gate_plan;
+            for (const auto &op_gate_list_pair: graph.simplified_gates_after_op) {
+                Assert(single_qubit_gate_plan.find(static_cast<int>(op_gate_list_pair.first.guid)) ==
+                       single_qubit_gate_plan.end(), "Duplicate guid found in simplified_gates_after_op!");
+                single_qubit_gate_plan[static_cast<int>(op_gate_list_pair.first.guid)] = op_gate_list_pair.second;
+            }
+
+            // STEP 4: generate the output qasm file (with integrity checks)
             // Note that in the output qasm file, the indices are physical qubit indices.
 
             // open output file
@@ -598,6 +631,12 @@ namespace quartz {
             std::vector<int> real_final_l2p_mapping;  // will be assigned at the end
             std::vector<int> pending_cnot_coverage = std::vector<int>(physical_qubit_num, 0);
             std::deque<OutputGateRepresentation> pending_cnot_queue;
+
+            // output the initial single qubit gates (i.e. gates attached to input_qubits)
+            // this is guid range, so we use original_qasm_qubit_count instead of logical_qubit_num
+//            for (int _logical_qubit_guid = 0; _logical_qubit_guid < original_qasm_qubit_count; ++_logical_qubit_guid) {
+//                if (single_qubit_gate_plan.find(_logical_qubit_guid))
+//            }
 
             // walk through the history
             while (!output_execution_history.empty()) {
@@ -618,17 +657,20 @@ namespace quartz {
                     cur_l2p_mapping[l1] = cur_eh_entry.physical0;
                     cur_l2p_mapping[l0] = cur_eh_entry.physical1;
                 } else {
-                    // the gate is cnot or other two qubit gates, need to write into output and also
-                    // check single qubit gates (by comparing against original qasm file)
-                    // TODO: here
+                    // the gate is cnot or other two qubit gates, need to write the gate and the single-qubit
+                    // gates that follow this gate into the final qasm file. (integrity check is done by comparing
+                    // against the original qasm file)
 
-                    // check mapping integrity and write into output file
+                    // check mapping integrity and write the current gate into output file
                     int l0 = cur_eh_entry.logical0;
                     int l1 = cur_eh_entry.logical1;
                     Assert(cur_l2p_mapping[l0] == cur_eh_entry.physical0, "Mapping error!");
                     Assert(cur_l2p_mapping[l1] == cur_eh_entry.physical1, "Mapping error!");
                     output_qasm_file << cur_eh_entry.gate_type << " q[" << cur_eh_entry.physical0 << "], q["
                                      << cur_eh_entry.physical1 << "];\n";
+
+                    // write any single qubit gate that follows this gate into output file
+                    // TODO
 
                     // push into the pending queue for comparison against original qasm file
                     // this step is necessary because of independent gate reordering
@@ -650,7 +692,9 @@ namespace quartz {
                 }
             }
 
-            // STEP 4: some final integrity check and clean up
+            // STEP 5: output the guid -> logical mapping, initial & final logical -> physical mapping as notes
+
+            // STEP 6: some final integrity check and clean up
             output_qasm_file.close();
         }
 
@@ -685,6 +729,7 @@ namespace quartz {
         // execution history & initial mapping table
         std::vector<int> initial_logical2physical;
         std::vector<int> initial_physical2logical;
+        std::vector<std::pair<int, int>> initial_input_guid_to_logical;
         std::vector<ExecutionHistory> execution_history;
     };
 }

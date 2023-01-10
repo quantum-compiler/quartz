@@ -75,6 +75,11 @@ namespace quartz {
         int logical_idx1;
     };
 
+    bool operator==(const OutputGateRepresentation &g1, const OutputGateRepresentation &g2) {
+        return g1.is_single_qubit_gate == g2.is_single_qubit_gate && g1.gate_type == g2.gate_type &&
+               g1.logical_idx0 == g2.logical_idx0 && g1.logical_idx1 == g2.logical_idx1;
+    }
+
     std::ostream &operator<<(std::ostream &stream, GateType t) {
         const std::string name_list[] = {"h", "x", "y", "rx", "ry", "rz", "cx", "ccx", "add",
                                          "neg", "z", "s", "sdg", "t", "tdg", "ch", "swap", "p",

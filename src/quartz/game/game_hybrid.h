@@ -441,7 +441,7 @@ namespace quartz {
             // STEP 1: read original qasm file and parse it into a queue of gates (original_qasm_gates)
             std::ifstream original_qasm_file(original_qasm_file_path);
             std::string tmp_file_line;
-            std::vector<OutputGateRepresentation> original_qasm_gates;
+            std::deque<OutputGateRepresentation> original_qasm_gates;
             int original_qasm_qubit_count = -1;
             while (std::getline(original_qasm_file, tmp_file_line)) {
                 // ignore headings and annotations
@@ -523,6 +523,8 @@ namespace quartz {
                         real_initial_l2p_mapping[l1] = p0;
                     } else {
                         // swaps with cost will be recorded, and they will also mark the inputs as used
+                        // note that mapping table may be different from eh entry here, because there might be
+                        // other swaps-with-cost not executed (only recorded)
                         // mark the corresponding entry as used
                         initial_qubit_coverage[l0] = true;
                         initial_qubit_coverage[l1] = true;
@@ -533,6 +535,8 @@ namespace quartz {
                     }
                 } else {
                     // non-swap two-qubit gates will cover the input qubits
+                    // note that mapping table may be different from eh entry here, because there might be
+                    // other swaps-with-cost not executed (only recorded)
                     int l0 = eh_entry.logical0;
                     int l1 = eh_entry.logical1;
                     initial_qubit_coverage[l0] = true;
@@ -553,13 +557,13 @@ namespace quartz {
 
             // some structures for qasm generation and integrity check
             // cur_l2p_mapping: the current l2p mapping table, used to determine the physical index and integrity check.
+            // real_initial_l2p_mapping: the l2p mapping table after all virtual and free swaps are executed.
             // real_final_l2p_mapping: the l2p mapping table at the end of execution.
-            // pending_cnot_coverage: used in CNOT integrity check.
+            // pending_cnot_coverage: logical qubit coverage, used in CNOT integrity check.
             // pending_cnot_queue: used in CNOT integrity check and single qubit gate position determination.
-            std::vector<int> cur_l2p_mapping = initial_logical2physical;
-
-            std::vector<int> real_final_l2p_mapping;
-            std::vector<bool> pending_cnot_coverage = std::vector<bool>(physical_qubit_num, false);
+            std::vector<int> cur_l2p_mapping = real_initial_l2p_mapping;
+            std::vector<int> real_final_l2p_mapping;  // will be assigned at the end
+            std::vector<int> pending_cnot_coverage = std::vector<int>(physical_qubit_num, 0);
             std::deque<OutputGateRepresentation> pending_cnot_queue;
 
             // walk through the history
@@ -569,30 +573,51 @@ namespace quartz {
                 output_execution_history.pop_front();
 
                 if (cur_eh_entry.gate_type == GateType::swap) {
-                    // the gate is a swap gate, first check if this swap is free
-                    int swap_logical_idx_0 = cur_eh_entry.logical0;
-                    int swap_logical_idx_1 = cur_eh_entry.logical1;
-                    Assert(cur_l2p_mapping[swap_logical_idx_0] == cur_eh_entry.physical0, "Mapping error!");
-                    Assert(cur_l2p_mapping[swap_logical_idx_1] == cur_eh_entry.physical1, "Mapping error!");
-                    bool is_cur_swap_free =
-                            !initial_qubit_coverage[swap_logical_idx_0] && !initial_qubit_coverage[swap_logical_idx_1];
+                    // the gate is a swap gate, STEP 2 ensures that the swap must NOT be free
+                    int l0 = cur_eh_entry.logical0;
+                    int l1 = cur_eh_entry.logical1;
+                    Assert(cur_l2p_mapping[l0] == cur_eh_entry.physical0, "Mapping error!");
+                    Assert(cur_l2p_mapping[l1] == cur_eh_entry.physical1, "Mapping error!");
 
-                    // virtual swaps must be free
-                    if (cur_eh_entry.guid == -2) Assert(is_cur_swap_free, "Virtual swaps must be free!");
-
-                    // apply the swap
-                    if (is_cur_swap_free) {
-                        // free swaps only change cur_l2p_mapping (and real_initial_l2p_mapping)
-                        // it will not be written into the final qasm file
-                    } else {
-
-                    }
+                    // first write the swap into file and then change the mapping table
+                    output_qasm_file << cur_eh_entry.gate_type << " q[" << cur_eh_entry.physical0 << "], q["
+                                     << cur_eh_entry.physical1 << "];\n";
+                    cur_l2p_mapping[l1] = cur_eh_entry.physical0;
+                    cur_l2p_mapping[l0] = cur_eh_entry.physical1;
                 } else {
-                    // the gate is cnot or other two qubit gates
+                    // the gate is cnot or other two qubit gates, need to write into output and also
+                    // check single qubit gates (by comparing against original qasm file)
+                    // TODO: here
+
+                    // check mapping integrity and write into output file
+                    int l0 = cur_eh_entry.logical0;
+                    int l1 = cur_eh_entry.logical1;
+                    Assert(cur_l2p_mapping[l0] == cur_eh_entry.physical0, "Mapping error!");
+                    Assert(cur_l2p_mapping[l1] == cur_eh_entry.physical1, "Mapping error!");
+                    output_qasm_file << cur_eh_entry.gate_type << " q[" << cur_eh_entry.physical0 << "], q["
+                                     << cur_eh_entry.physical1 << "];\n";
+
+                    // push into the pending queue for comparison against original qasm file
+                    // this step is necessary because of independent gate reordering
+                    pending_cnot_coverage[l0] += 1;
+                    pending_cnot_coverage[l1] += 1;
+                    pending_cnot_queue.emplace_back(false, cur_eh_entry.gate_type, l0, l1);
+
+                    // advance our step in the original qasm file
+                    while (true) {
+                        OutputGateRepresentation cur_gate = original_qasm_gates.front();
+
+                        // parse the gate depend on the number of inputs
+                        if (cur_gate.is_single_qubit_gate) {
+                            // single qubit gates will
+                        } else {
+                            break;
+                        }
+                    }
                 }
             }
 
-            // clean up
+            // STEP 4: some final integrity check and clean up
             output_qasm_file.close();
         }
 

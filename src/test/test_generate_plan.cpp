@@ -48,5 +48,6 @@ int main() {
     cout << current_game.total_cost() << endl;
 
     // start test on final plan generation
+    current_game.save_context_to_file("../eh_file.txt", "../single_qubit.txt");
     current_game.generated_mapping_plan("../test_plan.qasm", circuit_file_name);
 }

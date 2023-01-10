@@ -378,8 +378,9 @@ namespace quartz {
             return original_gate_count + int(SWAPCOST) * swap_with_cost;
         }
 
-        void save_execution_history_to_file(const std::string &eh_file_name) const {
-            /* Execution History File Format:
+        void save_context_to_file(const std::string &eh_file_name,
+                                  const std::string &single_qubit_gate_file_name) const {
+            /* 1. Execution History File Format:
              *
              *      [register count] [logical qubit count]
              *      [initial physical->logical mapping (a list of numbers: p2l[p0], p2l[p1], ...)]
@@ -399,10 +400,25 @@ namespace quartz {
              * Notice that during RL mapping we only consider two-qubit gates, so the execution history file
              * also only contains such information. To reconstruct a valid mapping plan for the original qasm
              * file, call generated_mapping_plan().
+             *
+             * 2. Single Qubit Gate File Format:
+             *
+             *      [number of entries]
+             *      [guid] [number of single qubit gates after it]
+             *      [gate type] [logical idx]
+             *      [gate type] [logical idx]
+             *      ...
+             *      [guid] [number of single qubit gates after it]
+             *      [gate type] [logical idx]
+             *      [gate type] [logical idx]
+             *      ...
+             *
+             * This files records how the single qubit gates should be executed.
             */
 
             Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
+            // STEP 1: execution history file
             // initialize file
             std::ofstream eh_file;
             eh_file.open(eh_file_name);
@@ -431,6 +447,23 @@ namespace quartz {
 
             // clean up
             eh_file.close();
+
+            // STEP 2: single qubit gate file
+            // initialize file
+            std::ofstream single_qubit_gate_file;
+            single_qubit_gate_file.open(single_qubit_gate_file_name);
+
+            // output single qubit gate file
+            single_qubit_gate_file << graph.simplified_gates_after_op.size() << "\n";
+            for (const auto &entry: graph.simplified_gates_after_op) {
+                single_qubit_gate_file << entry.first.guid << " " << entry.second.size() << "\n";
+                for (const auto &gate: entry.second) {
+                    single_qubit_gate_file << gate.gate_type << " " << gate.logical_idx0 << "\n";
+                }
+            }
+
+            // clean up
+            single_qubit_gate_file.close();
         }
 
         void generated_mapping_plan(const std::string &output_qasm_file_path,

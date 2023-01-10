@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+#include <sstream>
 
 #include "../tasograph/tasograph.h"
 #include "../sabre/sabre_swap.h"
@@ -346,7 +347,17 @@ namespace quartz {
                     // only swaps with at least one logical input used have non-zero cost
                     int _logical0 = eh_item.logical0;
                     int _logical1 = eh_item.logical1;
-                    if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) swap_with_cost += 1;
+                    if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) {
+                        // the swap has cost, it also marks the input qubits as used.
+                        // Note: we think swap2 below has cost.
+                        // 1          swap2
+                        // 2    swap1 swap2
+                        // 3 cx swap1
+                        // 4 cx
+                        swap_with_cost += 1;
+                        is_qubit_used[_logical0] = true;
+                        is_qubit_used[_logical1] = true;
+                    }
 
                     // check if virtual swaps indeed have cost 0
                     if (eh_item.guid == -2) {
@@ -422,8 +433,167 @@ namespace quartz {
             eh_file.close();
         }
 
-        void generated_mapping_plan() const {
+        void generated_mapping_plan(const std::string &output_qasm_file_path,
+                                    const std::string &original_qasm_file_path) const {
+            // circuit must be finished in order to generate the plan
+            Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
+            // STEP 1: read original qasm file and parse it into a queue of gates (original_qasm_gates)
+            std::ifstream original_qasm_file(original_qasm_file_path);
+            std::string tmp_file_line;
+            std::vector<OutputGateRepresentation> original_qasm_gates;
+            int original_qasm_qubit_count = -1;
+            while (std::getline(original_qasm_file, tmp_file_line)) {
+                // ignore headings and annotations
+                if (tmp_file_line.rfind("//", 0) == 0) continue;
+                if (tmp_file_line.rfind("OPENQASM", 0) == 0) continue;
+                if (tmp_file_line.rfind("include", 0) == 0) continue;
+                if (tmp_file_line.rfind("qreg", 0) == 0) {
+                    size_t offset = tmp_file_line.find('[') + 1;
+                    size_t count = tmp_file_line.find(']') - offset;
+                    std::string qubit_count_str = tmp_file_line.substr(offset, count);
+                    original_qasm_qubit_count = std::stoi(qubit_count_str);
+                    continue;
+                }
+
+                // parse each line to get the gates
+                // gate type: first non-empty substring split by space
+                // qubit idx: numbers between []
+
+                // parse gate type
+                // we use string stream here to avoid parsing spaces and tabs
+                std::istringstream _tmp_iss(tmp_file_line);
+                std::string gate_type_str;
+                _tmp_iss >> gate_type_str;
+                GateType gate_type = to_gate_type(gate_type_str);
+
+                // parse the input of gates
+                auto left_bracket_occurrences = find_all_occurrences(tmp_file_line, '[');
+                auto right_bracket_occurrences = find_all_occurrences(tmp_file_line, ']');
+                Assert(left_bracket_occurrences.size() == right_bracket_occurrences.size(),
+                       "Bracket mismatch!");
+                Assert(left_bracket_occurrences.size() == 1 || left_bracket_occurrences.size() == 2,
+                       "We only support 1 / 2 qubit gates, found " + std::to_string(left_bracket_occurrences.size()));
+                std::vector<int> gate_inputs;
+                for (int _idx = 0; _idx < left_bracket_occurrences.size(); ++_idx) {
+                    size_t offset = left_bracket_occurrences[_idx] + 1;
+                    size_t count = right_bracket_occurrences[_idx] - offset;
+                    int input_idx = std::stoi(tmp_file_line.substr(offset, count));
+                    gate_inputs.emplace_back(input_idx);
+                }
+
+                // assemble them into OutputGateRepresentation
+                if (gate_inputs.size() == 1) {
+                    original_qasm_gates.emplace_back(true, gate_type, gate_inputs[0], -1);
+                } else {
+                    original_qasm_gates.emplace_back(false, gate_type, gate_inputs[0], gate_inputs[1]);
+                }
+            }
+            Assert(original_qasm_qubit_count != -1, "Missing qreg line in original qasm file!");
+
+            // STEP 2: parse the execution history into a queue and exclude all virtual and free swaps
+            // initial_qubit_coverage: used to determine free swaps.
+            // real_initial_l2p_mapping: the l2p mapping table after all virtual and free swaps are executed.
+            // output_execution_history: the execution history without virtual and free swaps.
+            std::vector<bool> initial_qubit_coverage = std::vector<bool>(physical_qubit_num, false);
+            std::vector<int> real_initial_l2p_mapping = initial_logical2physical;
+            std::deque<ExecutionHistory> output_execution_history;
+            int _swap_with_cost = 0, _two_qubit_gates = 0;
+            for (const auto &eh_entry: execution_history) {
+                if (eh_entry.gate_type == GateType::swap) {
+                    // swap gate, check if it is virtual / free
+                    int l0 = eh_entry.logical0;
+                    int l1 = eh_entry.logical1;
+                    bool is_swap_free = !initial_qubit_coverage[l0] && !initial_qubit_coverage[l1];
+
+                    // check that virtual swaps are indeed free
+                    if (eh_entry.guid == -2) Assert(is_swap_free, "Virtual swaps must be free!");
+
+                    // parse swap according to whether it is free
+                    if (is_swap_free) {
+                        // free swaps only changes the mapping table and will not be recorded
+                        // we can check mapping table here, they should match
+                        int p0 = eh_entry.physical0;
+                        int p1 = eh_entry.physical1;
+                        Assert(real_initial_l2p_mapping[l0] == p0 && real_initial_l2p_mapping[l1] == p1,
+                               "Free swap mapping mismatch!");
+
+                        // change the mapping table (real_initial_l2p_mapping)
+                        real_initial_l2p_mapping[l0] = p1;
+                        real_initial_l2p_mapping[l1] = p0;
+                    } else {
+                        // swaps with cost will be recorded, and they will also mark the inputs as used
+                        // mark the corresponding entry as used
+                        initial_qubit_coverage[l0] = true;
+                        initial_qubit_coverage[l1] = true;
+
+                        // record the swap
+                        output_execution_history.emplace_back(eh_entry);
+                        _swap_with_cost += 1;
+                    }
+                } else {
+                    // non-swap two-qubit gates will cover the input qubits
+                    int l0 = eh_entry.logical0;
+                    int l1 = eh_entry.logical1;
+                    initial_qubit_coverage[l0] = true;
+                    initial_qubit_coverage[l1] = true;
+                    output_execution_history.emplace_back(eh_entry);
+                    _two_qubit_gates += 1;
+                }
+            }
+            Assert(_swap_with_cost * SWAPCOST + _two_qubit_gates + single_qubit_gate_count == total_cost(),
+                   "Cost function mismatch!");
+
+            // STEP 3: generate the output qasm file (with integrity checks)
+            // Note that in the output qasm file, the indices are physical qubit indices.
+
+            // open output file
+            std::ofstream output_qasm_file;
+            output_qasm_file.open(output_qasm_file_path);
+
+            // some structures for qasm generation and integrity check
+            // cur_l2p_mapping: the current l2p mapping table, used to determine the physical index and integrity check.
+            // real_final_l2p_mapping: the l2p mapping table at the end of execution.
+            // pending_cnot_coverage: used in CNOT integrity check.
+            // pending_cnot_queue: used in CNOT integrity check and single qubit gate position determination.
+            std::vector<int> cur_l2p_mapping = initial_logical2physical;
+
+            std::vector<int> real_final_l2p_mapping;
+            std::vector<bool> pending_cnot_coverage = std::vector<bool>(physical_qubit_num, false);
+            std::deque<OutputGateRepresentation> pending_cnot_queue;
+
+            // walk through the history
+            while (!output_execution_history.empty()) {
+                // pop the first eh entry
+                auto cur_eh_entry = output_execution_history.front();
+                output_execution_history.pop_front();
+
+                if (cur_eh_entry.gate_type == GateType::swap) {
+                    // the gate is a swap gate, first check if this swap is free
+                    int swap_logical_idx_0 = cur_eh_entry.logical0;
+                    int swap_logical_idx_1 = cur_eh_entry.logical1;
+                    Assert(cur_l2p_mapping[swap_logical_idx_0] == cur_eh_entry.physical0, "Mapping error!");
+                    Assert(cur_l2p_mapping[swap_logical_idx_1] == cur_eh_entry.physical1, "Mapping error!");
+                    bool is_cur_swap_free =
+                            !initial_qubit_coverage[swap_logical_idx_0] && !initial_qubit_coverage[swap_logical_idx_1];
+
+                    // virtual swaps must be free
+                    if (cur_eh_entry.guid == -2) Assert(is_cur_swap_free, "Virtual swaps must be free!");
+
+                    // apply the swap
+                    if (is_cur_swap_free) {
+                        // free swaps only change cur_l2p_mapping (and real_initial_l2p_mapping)
+                        // it will not be written into the final qasm file
+                    } else {
+
+                    }
+                } else {
+                    // the gate is cnot or other two qubit gates
+                }
+            }
+
+            // clean up
+            output_qasm_file.close();
         }
 
     public:

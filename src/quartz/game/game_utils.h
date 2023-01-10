@@ -60,6 +60,21 @@ namespace quartz {
 
     using Reward = double;
 
+    struct OutputGateRepresentation {
+    public:
+        OutputGateRepresentation() = delete;
+
+        OutputGateRepresentation(bool _is_single_qubit_gate, GateType _gate_type, int _logical_idx0, int _logical_idx1)
+                : is_single_qubit_gate(_is_single_qubit_gate), gate_type(_gate_type),
+                  logical_idx0(_logical_idx0), logical_idx1(_logical_idx1) {}
+
+    public:
+        bool is_single_qubit_gate;
+        GateType gate_type;
+        int logical_idx0;
+        int logical_idx1;
+    };
+
     std::ostream &operator<<(std::ostream &stream, GateType t) {
         const std::string name_list[] = {"h", "x", "y", "rx", "ry", "rz", "cx", "ccx", "add",
                                          "neg", "z", "s", "sdg", "t", "tdg", "ch", "swap", "p",
@@ -429,5 +444,16 @@ namespace quartz {
         std::vector<int> chosen_mapping = *select_randomly(logical2physical.begin(), logical2physical.end(),
                                                            random_number);
         graph.set_physical_mapping(chosen_mapping);
+    }
+
+    std::vector<size_t> find_all_occurrences(const std::string &str, char target) {
+        // find all occurrences of target in str
+        std::vector<size_t> positions;
+        size_t pos = str.find(target, 0);
+        while (pos != std::string::npos) {
+            positions.push_back(pos);
+            pos = str.find(target, pos + 1);
+        }
+        return std::move(positions);
     }
 }

@@ -33,6 +33,11 @@ Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
 
 const Op Op::INVALID_OP = Op();
 
+bool operator==(const OutputGateRepresentation &g1, const OutputGateRepresentation &g2) {
+    return g1.is_single_qubit_gate == g2.is_single_qubit_gate && g1.gate_type == g2.gate_type &&
+        g1.logical_idx0 == g2.logical_idx0 && g1.logical_idx1 == g2.logical_idx1;
+}
+
 void Graph::_construct_pos_2_logical_qubit() {
   pos_2_logical_qubit.clear();
   // Construct pos_2_logical_qubit
@@ -167,6 +172,7 @@ Graph::Graph(const Graph &graph) {
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
   qubit_mapping_table = graph.qubit_mapping_table;
+  simplified_gates_after_op = graph.simplified_gates_after_op;
 }
 
 size_t Graph::get_next_special_op_guid() {

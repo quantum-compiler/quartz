@@ -60,26 +60,6 @@ namespace quartz {
 
     using Reward = double;
 
-    struct OutputGateRepresentation {
-    public:
-        OutputGateRepresentation() = delete;
-
-        OutputGateRepresentation(bool _is_single_qubit_gate, GateType _gate_type, int _logical_idx0, int _logical_idx1)
-                : is_single_qubit_gate(_is_single_qubit_gate), gate_type(_gate_type),
-                  logical_idx0(_logical_idx0), logical_idx1(_logical_idx1) {}
-
-    public:
-        bool is_single_qubit_gate;
-        GateType gate_type;
-        int logical_idx0;
-        int logical_idx1;
-    };
-
-    bool operator==(const OutputGateRepresentation &g1, const OutputGateRepresentation &g2) {
-        return g1.is_single_qubit_gate == g2.is_single_qubit_gate && g1.gate_type == g2.gate_type &&
-               g1.logical_idx0 == g2.logical_idx0 && g1.logical_idx1 == g2.logical_idx1;
-    }
-
     std::ostream &operator<<(std::ostream &stream, GateType t) {
         const std::string name_list[] = {"h", "x", "y", "rx", "ry", "rz", "cx", "ccx", "add",
                                          "neg", "z", "s", "sdg", "t", "tdg", "ch", "swap", "p",
@@ -355,16 +335,53 @@ namespace quartz {
 
     [[nodiscard]] int simplify_circuit(Graph &graph) {
         /// This function simplifies given graph by removing all single qubit gates.
-        /// Note that the circuit can be restored using execution history + find_executable_front_gates
         /// return: number of single qubit gates removed
-        auto tmp_in_edges = graph.inEdges;
+        auto tmp_in_edges = graph.inEdges;  // we need a copy here since delete invalidates iterators
         int removed_gate_cnt = 0;
         for (const auto &op_pair: tmp_in_edges) {
             if (op_pair.second.size() == 1) {
+                // STEP 1: collapse this gate forward and record it (and the gates it carries) in
+                // simplified_gates_after_op (this is necessary for final restoration of the circuit)
+                Op cur_op = op_pair.first;
+                Op op_before = graph.inEdges[cur_op].begin()->srcOp;  // must use this, since only this maintains the correct graph structure!
+
+                // put current gate into the list
+                if (graph.simplified_gates_after_op.find(op_before) == graph.simplified_gates_after_op.end())
+                    graph.simplified_gates_after_op[op_before] = std::deque<OutputGateRepresentation>();
+                graph.simplified_gates_after_op[op_before].emplace_back(false, cur_op.ptr->tp,
+                                                                        graph.inEdges[cur_op].begin()->logical_qubit_idx, -1);
+
+                // put gates that the current gate carries into the list (and remove corresponding entry
+                // from simplified_gates_after_op)
+                if (graph.simplified_gates_after_op.find(cur_op) != graph.simplified_gates_after_op.end()) {
+                    // move the contents
+                    std::deque<OutputGateRepresentation> &cur_op_gate_queue = graph.simplified_gates_after_op[cur_op];
+                    std::deque<OutputGateRepresentation> &op_before_gate_queue = graph.simplified_gates_after_op[op_before];
+                    while (!cur_op_gate_queue.empty()) {
+                        op_before_gate_queue.emplace_back(cur_op_gate_queue.front());
+                        cur_op_gate_queue.pop_front();
+                    }
+
+                    // delete the entry
+                    size_t removed_cnt = graph.simplified_gates_after_op.erase(cur_op);
+                    Assert(removed_cnt == 1, "Remove from simplified_gates_after_op failed!");
+                }
+
+                // STEP 2: remove the gate
                 removed_gate_cnt += 1;
                 remove_gate(graph, op_pair.first);
             }
         }
+
+        // some final integrity tests
+        size_t _gates_simplified = 0;
+        for (const auto& op_dequeue_pair : graph.simplified_gates_after_op) {
+            _gates_simplified += op_dequeue_pair.second.size();
+            Assert(op_dequeue_pair.first.ptr->tp == GateType::input_qubit || op_dequeue_pair.first.ptr->num_qubits == 2,
+                   "Gates remain in simplified_gates_after_op must be input qubits / two-qubit gates!");
+        }
+        Assert(_gates_simplified == removed_gate_cnt, "Number of gates removed mismatch!");
+
         return removed_gate_cnt;
     }
 

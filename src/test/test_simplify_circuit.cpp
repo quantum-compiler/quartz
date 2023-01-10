@@ -3,6 +3,7 @@
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/game/game_utils.h"
+#include "quartz/supported_devices/supported_devices.h"
 #include <iostream>
 
 using namespace quartz;
@@ -10,7 +11,8 @@ using namespace std;
 
 int main() {
     // tof_3_after_heavy.qasm / t_cx_tdg.qasm
-    string circuit_file_name = "../sabre.qasm";
+    // mod_adder_1024_before.qasm,
+    string circuit_file_name = "../circuit/nam-circuits/qasm_files/mod_adder_1024_before.qasm";
     cout << "This is test for add swap on " << circuit_file_name << ".\n";
 
     // prepare context
@@ -28,12 +30,7 @@ int main() {
     cout << "Circuit initialized\n";
 
     // initialize clique device
-    auto device = std::make_shared<quartz::SymmetricUniformDevice>(20);
-    for (int i = 0; i < 20; ++i) {
-        for (int j = i + 1; j < 20; ++j) {
-            device->add_edge(i, j);
-        }
-    }
+    auto device = GetDevice(BackendType::IBM_Q65_HUMMINGBIRD);
 
     // print gate count
     int total_gate_count = graph.gate_count();

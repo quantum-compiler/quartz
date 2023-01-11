@@ -348,7 +348,7 @@ namespace quartz {
                 // put current gate into the list
                 if (graph.simplified_gates_after_op.find(op_before) == graph.simplified_gates_after_op.end())
                     graph.simplified_gates_after_op[op_before] = std::deque<OutputGateRepresentation>();
-                graph.simplified_gates_after_op[op_before].emplace_back(false, cur_op.ptr->tp,
+                graph.simplified_gates_after_op[op_before].emplace_back(true, cur_op.ptr->tp,
                                                                         graph.inEdges[cur_op].begin()->logical_qubit_idx, -1);
 
                 // put gates that the current gate carries into the list (and remove corresponding entry

@@ -486,7 +486,8 @@ namespace quartz {
         }
 
         void generated_mapping_plan(const std::string &output_qasm_file_path,
-                                    const std::string &original_qasm_file_path) const {
+                                    const std::string &original_qasm_file_path,
+                                    bool debug_mode = false) const {
             // circuit must be finished in order to generate the plan
             Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
@@ -505,7 +506,12 @@ namespace quartz {
                     size_t count = tmp_file_line.find(']') - offset;
                     std::string qubit_count_str = tmp_file_line.substr(offset, count);
                     original_qasm_qubit_count = std::stoi(qubit_count_str);
-                    continue;
+                    // in debug mode we need the whole qasm file, otherwise we only need the heading
+                    if (debug_mode) {
+                        continue;
+                    } else {
+                        break;
+                    }
                 }
 
                 // parse each line to get the gates
@@ -625,18 +631,47 @@ namespace quartz {
             // cur_l2p_mapping: the current l2p mapping table, used to determine the physical index and integrity check.
             // real_initial_l2p_mapping: the l2p mapping table after all virtual and free swaps are executed.
             // real_final_l2p_mapping: the l2p mapping table at the end of execution.
-            // pending_cnot_coverage: logical qubit coverage, used in CNOT integrity check.
-            // pending_cnot_queue: used in CNOT integrity check and single qubit gate position determination.
+            // pending_gate_coverage: logical qubit coverage, used in integrity check.
+            // pending_gate_queue: used in integrity check.
             std::vector<int> cur_l2p_mapping = real_initial_l2p_mapping;
             std::vector<int> real_final_l2p_mapping;  // will be assigned at the end
-            std::vector<int> pending_cnot_coverage = std::vector<int>(physical_qubit_num, 0);
-            std::deque<OutputGateRepresentation> pending_cnot_queue;
+            std::vector<int> pending_gate_coverage = std::vector<int>(physical_qubit_num, 0);
+            std::deque<OutputGateRepresentation> pending_gate_queue;
+
+            // output the header
+            output_qasm_file << "OPENQASM 2.0;\n";
+            output_qasm_file << "include \"qelib1.inc\";\n";
+            output_qasm_file << "qreg q[" << original_qasm_qubit_count << "];\n";
 
             // output the initial single qubit gates (i.e. gates attached to input_qubits)
             // this is guid range, so we use original_qasm_qubit_count instead of logical_qubit_num
-//            for (int _logical_qubit_guid = 0; _logical_qubit_guid < original_qasm_qubit_count; ++_logical_qubit_guid) {
-//                if (single_qubit_gate_plan.find(_logical_qubit_guid))
-//            }
+            std::unordered_map<int, int> input_guid_to_logical;
+            for (const auto &guid2logical_pair: initial_input_guid_to_logical) {
+                Assert(input_guid_to_logical.find(guid2logical_pair.first) == input_guid_to_logical.end(),
+                       "Duplicate guid found!");
+                input_guid_to_logical[guid2logical_pair.first] = guid2logical_pair.second;
+            }
+            for (int _logical_qubit_guid = 0; _logical_qubit_guid < original_qasm_qubit_count; ++_logical_qubit_guid) {
+                // output the single qubit gates if corresponding entry exists
+                if (single_qubit_gate_plan.find(_logical_qubit_guid) != single_qubit_gate_plan.end()) {
+                    // input qubit with guid _logical_qubit_guid has single qubit gates after it
+                    int cur_input_qubit_logical_idx = input_guid_to_logical[_logical_qubit_guid];
+                    for (const auto &gate: single_qubit_gate_plan[_logical_qubit_guid]) {
+                        // check each gate's mapping and output
+                        Assert(gate.is_single_qubit_gate && cur_input_qubit_logical_idx == gate.logical_idx0,
+                               "Gate after input qubit has an error!");
+                        output_qasm_file << gate.gate_type << " q[" << cur_l2p_mapping[gate.logical_idx0] << "];\n";
+
+                        // put into pending gate list for integrity check
+                        pending_gate_coverage[gate.logical_idx0] += 1;
+                        pending_gate_queue.emplace_back(gate);
+                    }
+
+                    // remove the entry from plan
+                    size_t removed_cnt = single_qubit_gate_plan.erase(_logical_qubit_guid);
+                    Assert(removed_cnt == 1, "Erase failed!");
+                }
+            }
 
             // walk through the history
             while (!output_execution_history.empty()) {
@@ -670,31 +705,100 @@ namespace quartz {
                                      << cur_eh_entry.physical1 << "];\n";
 
                     // write any single qubit gate that follows this gate into output file
-                    // TODO
+                    if (single_qubit_gate_plan.find(cur_eh_entry.guid) != single_qubit_gate_plan.end()) {
+                        for (const auto &single_qubit_gate: single_qubit_gate_plan[cur_eh_entry.guid]) {
+                            // check and output the single qubit gate
+                            Assert(single_qubit_gate.is_single_qubit_gate, "Found non-single qubit gate simplified!");
+                            Assert(single_qubit_gate.logical_idx0 == l0 || single_qubit_gate.logical_idx0 == l1,
+                                   "Bad single qubit execution plan!");
+                            output_qasm_file << single_qubit_gate.gate_type << " q["
+                                             << cur_l2p_mapping[single_qubit_gate.logical_idx0] << "];\n";
+
+                            // put into pending gate list for integrity check
+                            pending_gate_coverage[single_qubit_gate.logical_idx0] += 1;
+                            pending_gate_queue.emplace_back(single_qubit_gate);
+                        }
+
+                        // remove the entry from plan
+                        size_t removed_cnt = single_qubit_gate_plan.erase(cur_eh_entry.guid);
+                        Assert(removed_cnt == 1, "Erase failed!");
+                    }
 
                     // push into the pending queue for comparison against original qasm file
                     // this step is necessary because of independent gate reordering
-                    pending_cnot_coverage[l0] += 1;
-                    pending_cnot_coverage[l1] += 1;
-                    pending_cnot_queue.emplace_back(false, cur_eh_entry.gate_type, l0, l1);
+                    pending_gate_coverage[l0] += 1;
+                    pending_gate_coverage[l1] += 1;
+                    pending_gate_queue.emplace_back(false, cur_eh_entry.gate_type, l0, l1);
 
-                    // advance our step in the original qasm file
-                    while (true) {
+                    // compare against the original qasm file only in debug mode
+                    while (debug_mode && !original_qasm_gates.empty()) {
                         OutputGateRepresentation cur_gate = original_qasm_gates.front();
 
-                        // parse the gate depend on the number of inputs
-                        if (cur_gate.is_single_qubit_gate) {
-                            // single qubit gates will
-                        } else {
+                        // check if this gate appears in the pending queue
+                        bool found = false;
+                        for (auto it = pending_gate_queue.begin(); it < pending_gate_queue.end(); ++it) {
+                            if (*it == cur_gate) {
+                                // erase the gate from pending queue and qasm queue and reduce ref
+                                pending_gate_queue.erase(it);
+                                original_qasm_gates.pop_front();
+                                pending_gate_coverage[cur_gate.logical_idx0] -= 1;
+                                if (!cur_gate.is_single_qubit_gate) pending_gate_coverage[cur_gate.logical_idx1] -= 1;
+
+                                // break
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        // if not found, then this gate must have no conflict with pending gates
+                        // we break here for check in later iterations
+                        if (!found) {
+                            Assert(pending_gate_coverage[cur_gate.logical_idx0] == 0, "Gate order conflicts!");
+                            if (!cur_gate.is_single_qubit_gate) {
+                                Assert(pending_gate_coverage[cur_gate.logical_idx1] == 0, "Gate order conflicts!");
+                            }
                             break;
                         }
                     }
                 }
             }
 
+            // after we have walked through the history, we can assign the real_final_l2p_mapping
+            real_final_l2p_mapping = cur_l2p_mapping;
+
             // STEP 5: output the guid -> logical mapping, initial & final logical -> physical mapping as notes
+            output_qasm_file << "\n// ***************************************** ADDITIONAL INFO"
+                                " ***************************************** //\n";
+            // save guid -> logical mapping
+            output_qasm_file << "// guid -> logical mapping (only useful when there are unused qubits)\n// ";
+            for (const auto &guid2logical: input_guid_to_logical) {
+                output_qasm_file << "(" << guid2logical.first << "->" << guid2logical.second << ") ";
+            }
+            output_qasm_file << "\n";
+            // save initial logical -> physical mapping
+            output_qasm_file << "// initial logical -> physical mapping\n// ";
+            for (int physical_idx: real_initial_l2p_mapping) {
+                output_qasm_file << physical_idx << " ";
+            }
+            output_qasm_file << "\n";
+            // save final logical -> physical mapping
+            output_qasm_file << "// final logical -> physical mapping\n// ";
+            for (int physical_idx: real_final_l2p_mapping) {
+                output_qasm_file << physical_idx << " ";
+            }
+            output_qasm_file << "\n";
+            output_qasm_file << "// *************************************************"
+                                "************************************************** //\n";
 
             // STEP 6: some final integrity check and clean up
+            Assert(original_qasm_gates.empty(), "Found unexecuted gates in original qasm!");
+            Assert(output_execution_history.empty(), "Execution history unfinished!");
+            Assert(single_qubit_gate_plan.empty(), "Single qubit plan unfinished!");
+            if (debug_mode) {
+                Assert(pending_gate_queue.empty(), "Pending gates found!");
+                Assert(std::all_of(pending_gate_coverage.begin(), pending_gate_coverage.end(),
+                                   [](int cnt) { return cnt == 0; }), "Pending gates found!");
+            }
             output_qasm_file.close();
         }
 

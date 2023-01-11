@@ -9,8 +9,8 @@ using namespace quartz;
 
 int main() {
     // initialize the environment
-    // "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm"
-    string circuit_file_name = "../tof_3_after_heavy.qasm";
+    // "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm" "../tof_3_after_heavy.qasm"
+    string circuit_file_name = "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm";
     // initialize context, graph and device
     auto context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
                                                       GateType::tdg, GateType::input_qubit, GateType::s,
@@ -49,5 +49,5 @@ int main() {
 
     // start test on final plan generation
     current_game.save_context_to_file("../eh_file.txt", "../single_qubit.txt");
-    current_game.generated_mapping_plan("../test_plan.qasm", circuit_file_name);
+    current_game.generated_mapping_plan("../test_plan.qasm", circuit_file_name, true);
 }

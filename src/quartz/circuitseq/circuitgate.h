@@ -15,7 +15,12 @@ class CircuitWire;
  */
 class CircuitGate {
 public:
-  int get_min_qubit_index() const;
+  // Get the minimum qubit index of the gate.
+  [[nodiscard]] int get_min_qubit_index() const;
+  // Get the qubit indices of the gate.
+  [[nodiscard]] std::vector<int> get_qubit_indices() const;
+  // Get the control qubit indices of the gate if it is a controlled gate.
+  [[nodiscard]] std::vector<int> get_control_qubit_indices() const;
   std::vector<CircuitWire *> input_wires; // Include parameters!
   std::vector<CircuitWire *> output_wires;
 

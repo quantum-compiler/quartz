@@ -487,7 +487,7 @@ namespace quartz {
 
         void generated_mapping_plan(const std::string &output_qasm_file_path,
                                     const std::string &original_qasm_file_path,
-                                    bool debug_mode = false) const {
+                                    bool debug_mode) const {
             // circuit must be finished in order to generate the plan
             Assert(is_circuit_finished(graph), "Circuit must be finished!");
 

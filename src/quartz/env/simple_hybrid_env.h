@@ -19,7 +19,7 @@ namespace quartz {
                 // GameHybrid settings
                 int _initial_phase_len, bool _allow_nop_in_initial, double _initial_phase_reward
         )
-                : game_buffer(_seed), random_generator(_seed) {
+                : game_buffer(_seed), random_generator(_seed), original_qasm_file_path(qasm_file_path) {
             /// A simple hybrid environment that does not use curriculum
             // initialize context, graph and device
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
@@ -85,6 +85,9 @@ namespace quartz {
             seed = old_env.seed;
             random_generator = old_env.random_generator;
             uniform01dist = old_env.uniform01dist;
+
+            // original qasm file path
+            original_qasm_file_path = old_env.original_qasm_file_path;
         }
 
         void reset() {
@@ -146,6 +149,20 @@ namespace quartz {
             return std::move(action_space);
         }
 
+        void save_context_to_file(const std::string &execution_history_file_path,
+                                  const std::string &single_qubit_gate_execution_plan_file_path) const {
+            // save execution history and single qubit execution plan to file
+            // assume the game is finished (otherwise an exception will be thrown)
+            cur_game_ptr->save_context_to_file(execution_history_file_path, single_qubit_gate_execution_plan_file_path);
+        }
+
+        void generate_mapped_qasm(const std::string &mapped_qasm_file_path, bool debug_mode) const {
+            // generate the final mapped qasm file
+            // Note: 1. assume the game is finished (otherwise an exception will be thrown)
+            //       2. debug mode will conduct some time-consuming checks, usually this is not necessary
+            cur_game_ptr->generated_mapping_plan(mapped_qasm_file_path, original_qasm_file_path, debug_mode);
+        }
+
     public:
         // basic parameters
         int device_reg_count;
@@ -168,5 +185,8 @@ namespace quartz {
         int seed;
         std::mt19937 random_generator;
         std::uniform_real_distribution<double> uniform01dist;
+
+        // qasm file path
+        std::string original_qasm_file_path;
     };
 }

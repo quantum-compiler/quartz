@@ -1052,3 +1052,31 @@ cdef class PySimpleHybridEnv:
             py_action.set_this(tmp_c_action)
             py_action_space.append(py_action)
         return py_action_space
+
+    def save_context(self,
+                     execution_history_file_path: str,
+                     single_qubit_gate_execution_plan_file_path: str,
+                     ) -> bool:
+        # parse input (must be at the beginning)
+        cdef string encoded_execution_history_file_path = execution_history_file_path.encode('utf-8')
+        cdef string encoded_single_qubit_gate_execution_plan_file_path = single_qubit_gate_execution_plan_file_path.encode('utf-8')
+
+        # return true if env is finished and saved, o.w. return false
+        if self.is_finished():
+            self.env.save_context_to_file(encoded_execution_history_file_path,
+                                          encoded_single_qubit_gate_execution_plan_file_path)
+            return True
+        else:
+            return False
+
+    def generate_mapped_qasm(self, mapped_qasm_file_path: str, debug_mode: bool) -> bool:
+        # parse input (must be at the beginning)
+        cdef string encoded_mapped_qasm_file_path = mapped_qasm_file_path.encode('utf-8')
+
+        # return true if env is finished and saved, o.w. return false
+        if self.is_finished():
+            self.env.generate_mapped_qasm(encoded_mapped_qasm_file_path, debug_mode)
+            return True
+        else:
+            return False
+

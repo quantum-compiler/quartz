@@ -229,3 +229,5 @@ cdef extern from "env/simple_hybrid_env.h" namespace "quartz":
         int total_cost()
         State get_state()
         vector[Action] get_action_space()
+        void save_context_to_file(const string &, const string &)
+        void generate_mapped_qasm(const string &, bool)

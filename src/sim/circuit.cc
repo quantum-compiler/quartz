@@ -414,14 +414,17 @@ std::vector<std::complex<DT>> qcircuit::Circuit<DT>::FuseGates(const quartz::Cir
     // currently assume the matrix from quartz is for increasing order
     // std::reverse(qubit_indices.begin(), qubit_indices.end());
     //getting mask and qubit perm
-    int min_qubit = std::min_element(qubit_indices.begin(), qubit_indices.end());
     std::vector<int> qperm;
+    qperm.resize(qubit_indices.size());
+    std::vector<int> ordered_qubit = qubit_indices;
+    std::sort(ordered_qubit.begin(), ordered_qubit.end());
     unsigned mask = 0;
     // get qubit mask for the gate to be fused
     for (int t = 0; t < qubit_indices.size(); t++){
       int it = std::find(qubits.begin(), qubits.end(), qubit_indices[t]) - qubits.begin();
       mask |= (1 << it);
-      qperm.push_back(qubit_indices[t] - min_qubit);
+      int it2 = std::find(qubit_indices.begin(), qubit_indices.end(), ordered_qubit[t]) - qubit_indices.begin();
+      qperm[it2] = t;
     }
 
     if (seq.gates[i]->gate->is_parameter_gate()) {

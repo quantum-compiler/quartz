@@ -394,8 +394,12 @@ std::vector<std::complex<DT>> qcircuit::Circuit<DT>::FuseGates(const quartz::Cir
   // expand all gates to 2^n_target * 2^n_target matrix: identity X mat => matrix shuffle
   unsigned ksize = unsigned(1) << qubits.size();
   unsigned vec_size = ksize * ksize;
-  std::vector<std::complex<DT>> res_mat(vec_size, std::complex<DT> (1, 0)); 
+  std::vector<std::complex<DT>> res_mat(vec_size, std::complex<DT> (1, 0));
+
   printf("Fused Kernel Size: %d\n", ksize);
+  //reorder qubits to increasing order
+  std::sort(qubits.begin(), qubits.end());
+
   for(int i = 0; i < seq.gates.size(); i++){
     std::vector<int> qubit_indices;
     std::vector<ParamType> params;
@@ -408,25 +412,32 @@ std::vector<std::complex<DT>> qcircuit::Circuit<DT>::FuseGates(const quartz::Cir
       }
     }
     // currently assume the matrix from quartz is for increasing order
-    std::reverse(qubit_indices.begin(), qubit_indices.end());
+    // std::reverse(qubit_indices.begin(), qubit_indices.end());
+    //getting mask and qubit perm
+    int min_qubit = std::min_element(qubit_indices.begin(), qubit_indices.end());
+    std::vector<int> qperm;
     unsigned mask = 0;
     // get qubit mask for the gate to be fused
     for (int t = 0; t < qubit_indices.size(); t++){
       int it = std::find(qubits.begin(), qubits.end(), qubit_indices[t]) - qubits.begin();
       mask |= (1 << it);
+      qperm.push_back(qubit_indices[t] - min_qubit);
     }
 
     if (seq.gates[i]->gate->is_parameter_gate()) {
       auto *m = seq.gates[i]->gate->get_matrix(params);
       std::vector<std::complex<double>> temp_d = m->flatten();
       std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
+      // matrix shuffle: to increasing order
+      MatShuffle(temp, qubit_indices.size(), qperm);
       MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
     } else {
-      // A quantum gate. Update the distribution.
       assert(gates[i]->gate->is_quantum_gate());
       auto *m = seq.gates[i]->gate->get_matrix();
       std::vector<std::complex<double>> temp_d = m->flatten();
       std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
+      // matrix shuffle: to increasing order
+      MatShuffle(temp, qubit_indices.size(), qperm);
       MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
     }
   }
@@ -480,6 +491,34 @@ void qcircuit::Circuit<DT>::MatMul(
         res_mat[(n * i + j)] = re;
       }
     }
+}
+
+template <typename DT>
+void qcircuit::Circuit<DT>::MatShuffle(M& res_mat, unsigned n_qubit, const std::vector<unsigned>& perm) {
+  
+  std::vector<std::complex<DT>> temp_mat = res_mat;
+
+  unsigned n = unsigned{1} << n_qubit;
+
+  for (unsigned i = 0; i < n; ++i) {
+    unsigned i_ = i;
+    unsigned row = 0;
+
+    for (unsigned q = 0; q < n; ++q) {
+      row |= ((i_ >> q) & 1) << perm[q];
+    }
+    
+    for (unsigned j = 0; j < n; ++j) {
+      unsigned j_ = j;
+      unsigned col = 0;
+
+      for (unsigned q = 0; q < n; ++q) {
+        col |= ((j_ >> q) & 1) << perm[q];
+      }
+
+      res_mat[n * i + j] = temp_mat[n * row + col];
+    }
+  }
 }
 
 template class qcircuit::Circuit<double>;

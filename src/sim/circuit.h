@@ -40,6 +40,7 @@ namespace sim
       bool parse_gate(std::stringstream &ss, std::string const &gate_name);
       void MatMul(
         unsigned mask, unsigned n_fused, M& res_mat, const M& m1, unsigned m_size);
+      void MatShuffle(M& res_mat, unsigned n_qubit, const std::vector<unsigned> &perm);
 
       // called inside compile
       std::vector<std::complex<DT>> FuseGates(const quartz::CircuitSeq& seq, const std::vector<int>& qubits, quartz::Context *ctx);

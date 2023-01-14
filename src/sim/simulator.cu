@@ -125,6 +125,8 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   }
   printf("]\n");
 
+  if(nGlobalSwaps==0) return true;
+
   cudaDataType_t data_type = cuDT;
   // move to class
   const custatevecDeviceNetworkType_t deviceNetworkType =

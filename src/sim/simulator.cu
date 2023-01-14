@@ -25,13 +25,17 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   std::vector<int> targets;
   std::vector<int> controls;
 
+  // TODO: check if targets should be ordered
+  printf("Targets: [");
   for(int i = 0; i < gate.target.size(); i++){
     auto it =
         find(permutation.begin(), permutation.end(), gate.target[i]);
     assert(it != permutation.end());
     int idx = it - permutation.begin();
     targets.push_back(idx);
+    printf("(%d, %d) ", gate.target[i], idx);
   }
+  printf("]\n");
 
   for(int i = 0; i < gate.control.size(); i++){
     auto it =
@@ -94,20 +98,32 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   int nGlobalSwaps = 0;
   for (int i = 0; i < n_global; i++) {
     int2 swap;
-    if (gate.target[n_global + i] == permutation[n_global + i])
+    if (gate.target[n_local + i] == permutation[n_local + i])
       continue;
     auto it =
-        find(permutation.begin(), permutation.end(), gate.target[n_global + i]);
+        find(permutation.begin(), permutation.end(), gate.target[n_local + i]);
     assert(it != permutation.end());
     int idx = it - permutation.begin();
     swap.x = idx;
-    swap.y = n_global + i;
+    swap.y = n_local + i;
     GlobalIndexBitSwaps.push_back(swap);
     nGlobalSwaps++;
     // update perm
-    permutation[idx] = permutation[n_global + i];
-    permutation[n_global + i] = gate.target[n_global + i];
+    permutation[idx] = permutation[n_local + i];
+    permutation[n_local + i] = gate.target[n_local + i];
+    printf("(%d, %d)\n", idx, n_local + i);
   }
+  printf("Current Perm: [");
+  for (int i = 0; i < n_local; i++) {
+    printf("%d,", permutation[i]);
+  }
+  printf("]\n");
+
+  printf("Shuffle: [");
+  for (int i = 0; i < n_local; i++) {
+    printf("%d,", gate.target[i]);
+  }
+  printf("]\n");
 
   cudaDataType_t data_type = cuDT;
   // move to class

@@ -35,14 +35,15 @@ public:
    * kernel.
    * @param kernels The non-intersecting kernels to be merged.
    * @param result_cost The sum of the cost of the resulting merged kernels.
-   * @param result_kernels The resulting merged kernels.
+   * @param result_kernels The resulting merged kernels, or nullptr if it is
+   * not necessary to record them.
    * @return True iff the computation succeeds.
    */
   static bool
   compute_end_schedule(const std::vector<KernelCostType> &kernel_costs,
                        const std::vector<std::vector<int>> &kernels,
                        KernelCostType &result_cost,
-                       std::vector<std::vector<int>> &result_kernels);
+                       std::vector<std::vector<int>> *result_kernels);
 
   /**
    * Compute the schedule using dynamic programming.

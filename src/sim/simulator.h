@@ -11,15 +11,14 @@
 #include <cuda_runtime_api.h> // cudaMalloc, cudaMemcpy, etc.
 #include <custatevec.h>       // custatevecApplyMatrix
 
-#include "simgate.h"
 #include "helper.h" // HANDLE_ERROR, HANDLE_CUDA_ERROR
+#include "simgate.h"
 
 #define MAX_DEVICES 4
 #define MAX_QUBIT 30
 
 namespace sim {
-template <typename DT>
-class SimulatorCuQuantum {
+template <typename DT> class SimulatorCuQuantum {
 private:
   static constexpr auto is_float = std::is_same<DT, float>::value;
 

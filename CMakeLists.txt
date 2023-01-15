@@ -115,5 +115,3 @@ add_subdirectory(src/benchmark)
 if(QUARTZ_USE_SIMULATOR)
   add_subdirectory(src/sim)
 endif()
-
-

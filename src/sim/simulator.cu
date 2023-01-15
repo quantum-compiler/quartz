@@ -1,8 +1,8 @@
+#include <assert.h>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <assert.h>
 
 #include "simulator.h"
 
@@ -27,9 +27,8 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
 
   // TODO: check if targets should be ordered
   printf("Targets: [");
-  for(int i = 0; i < gate.target.size(); i++){
-    auto it =
-        find(permutation.begin(), permutation.end(), gate.target[i]);
+  for (int i = 0; i < gate.target.size(); i++) {
+    auto it = find(permutation.begin(), permutation.end(), gate.target[i]);
     assert(it != permutation.end());
     int idx = it - permutation.begin();
     targets.push_back(idx);
@@ -37,9 +36,8 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   }
   printf("]\n");
 
-  for(int i = 0; i < gate.control.size(); i++){
-    auto it =
-        find(permutation.begin(), permutation.end(), gate.control[i]);
+  for (int i = 0; i < gate.control.size(); i++) {
+    auto it = find(permutation.begin(), permutation.end(), gate.control[i]);
     assert(it != permutation.end());
     int idx = it - permutation.begin();
     controls.push_back(idx);
@@ -125,7 +123,8 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   }
   printf("]\n");
 
-  if(nGlobalSwaps==0) return true;
+  if (nGlobalSwaps == 0)
+    return true;
 
   cudaDataType_t data_type = cuDT;
   // move to class
@@ -146,18 +145,10 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   // }
 
   // global bit swap
-  HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(handle_,
-                                                  n_devices,
-                                                  (void **)d_sv,
-                                                  data_type,
-                                                  n_global,
-                                                  n_local,
-                                                  GlobalIndexBitSwaps.data(),
-                                                  nGlobalSwaps,
-                                                  maskBitString,
-                                                  maskOrdering,
-                                                  maskLen,
-                                                  deviceNetworkType));
+  HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
+      handle_, n_devices, (void **)d_sv, data_type, n_global, n_local,
+      GlobalIndexBitSwaps.data(), nGlobalSwaps, maskBitString, maskOrdering,
+      maskLen, deviceNetworkType));
 
   return true;
 }
@@ -181,9 +172,8 @@ bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
   HANDLE_CUDA_ERROR(cudaGetDeviceCount(&nDevices));
   nDevices = min(nDevices, n_devices);
   printf("Simulating on %d devices\n", nDevices);
-  for (int i = 0; i < nDevices; i++)
-  {
-      devices[i] = i;
+  for (int i = 0; i < nDevices; i++) {
+    devices[i] = i;
   }
 
   // check if device ids do not duplicate
@@ -208,8 +198,7 @@ bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
           cudaDeviceCanAccessPeer(&canAccessPeer, devices[i0], devices[i1]));
       if (canAccessPeer == 0) {
         printf("P2P access between device id %d and %d is unsupported.\n",
-               devices[i0],
-               devices[i1]);
+               devices[i0], devices[i1]);
         return EXIT_SUCCESS;
       }
       HANDLE_CUDA_ERROR(cudaDeviceEnablePeerAccess(devices[i1], 0));
@@ -229,7 +218,8 @@ bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
 
   for (int iSv = 0; iSv < nDevices; iSv++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(subSvLayout[iSv]));
-    HANDLE_CUDA_ERROR(cudaMalloc(&d_sv[iSv], subSvSize * sizeof(cuDoubleComplex)));
+    HANDLE_CUDA_ERROR(
+        cudaMalloc(&d_sv[iSv], subSvSize * sizeof(cuDoubleComplex)));
     // TODO: add sv init
   }
 
@@ -241,8 +231,7 @@ bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
   return true;
 }
 
-template <typename DT>
-bool SimulatorCuQuantum<DT>::Destroy() {
+template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_ERROR(custatevecDestroy(handle_[i]));

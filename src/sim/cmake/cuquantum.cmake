@@ -1,17 +1,17 @@
 # find custatevec in CUSTATEVEC_ROOT
-find_library(CUSTATEVEC_LIBRARY 
+find_library(CUSTATEVEC_LIBRARY
   NAMES libcustatevec${LIBEXT}
   PATHS ${CUSTATEVEC_ROOT}
   PATH_SUFFIXES lib lib64
   DOC "CUSTATEVEC library." )
-  
-find_path(CUSTATEVEC_INCLUDE_DIR 
+
+find_path(CUSTATEVEC_INCLUDE_DIR
     NAMES custatevec.h
     HINTS ${CUSTATEVEC_ROOT}
-    PATH_SUFFIXES include 
+    PATH_SUFFIXES include
     DOC "CUSTATEVEC include directory." )
 
-# find custatevec, set custatevec lib and include    
+# find custatevec, set custatevec lib and include
 if(CUSTATEVEC_LIBRARY AND CUSTATEVEC_INCLUDE_DIR)
   set(CUSTATEVEC_FOUND ON)
   set(CUSTATEVEC_LIBRARIES ${CUSTATEVEC_LIBRARY})

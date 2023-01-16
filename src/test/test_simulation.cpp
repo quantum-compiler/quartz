@@ -1,6 +1,7 @@
 #include "quartz/context/context.h"
 #include "quartz/gate/gate_utils.h"
 #include "quartz/parser/qasm_parser.h"
+#include "quartz/pybind/pybind.h"
 #include "quartz/simulator/schedule.h"
 #include "quartz/tasograph/tasograph.h"
 
@@ -120,6 +121,7 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
 }
 
 int main() {
+  PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
@@ -162,9 +164,11 @@ int main() {
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
         std::vector<std::vector<bool>> local_qubits;
-        int result =
-            num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
+        // int result =
+        // num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
         // fprintf(fout, " %d", result);
+        local_qubits =
+            compute_local_qubits_with_ilp(*seq, local_q, &ctx, &interpreter);
         auto schedules = get_schedules(*seq, local_qubits, &ctx);
         for (auto &schedule : schedules) {
           schedule.compute_kernel_schedule(

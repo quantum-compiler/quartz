@@ -3,6 +3,27 @@ project(Quartz)
 
 SET(CMAKE_BUILD_TYPE "Release")
 
+# python
+# Could not find the "Development" component. Using the following commands
+# to get Python_INCLUDE_DIR and Python_LIBRARY_DIRS.
+find_package(Python COMPONENTS Interpreter)
+execute_process(COMMAND ${Python_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('include'))"
+        OUTPUT_VARIABLE Python_INCLUDE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${Python_EXECUTABLE} -c "import distutils.command.build_ext;
+d = distutils.core.Distribution();
+b = distutils.command.build_ext.build_ext(d);
+b.finalize_options();
+print(*b.library_dirs, sep=';')"
+        OUTPUT_VARIABLE Python_LIBRARY_DIRS OUTPUT_STRIP_TRAILING_WHITESPACE)
+include_directories(${Python_INCLUDE_DIR})
+link_directories(${Python_LIBRARY_DIRS})
+
+# pybind11
+execute_process(COMMAND ${Python_EXECUTABLE} -m pybind11 --cmake
+        OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+find_package(pybind11 CONFIG REQUIRED)
+include_directories(${pybind11_INCLUDE_DIR})
+
 if (EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
     include (${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
 else()

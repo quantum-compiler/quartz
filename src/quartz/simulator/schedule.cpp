@@ -1,4 +1,5 @@
 #include "schedule.h"
+#include "quartz/pybind/pybind.h"
 
 #include <queue>
 #include <stack>
@@ -812,5 +813,47 @@ get_schedules(const CircuitSeq &sequence,
     assert(false);
   }
   return result;
+}
+
+std::vector<std::vector<bool>>
+compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
+                              Context *ctx, PythonInterpreter *interpreter) {
+  const int num_qubits = sequence.get_num_qubits();
+  const int num_gates = sequence.get_num_gates();
+  std::vector<std::vector<int>> circuit_gate_qubits;
+  std::vector<bool> circuit_gate_is_sparse;
+  std::unordered_map<CircuitGate *, int> gate_index;
+  std::vector<std::vector<int>> out_gate(num_gates);
+  circuit_gate_qubits.reserve(num_gates);
+  circuit_gate_is_sparse.reserve(num_gates);
+  gate_index.reserve(num_gates);
+  for (int i = 0; i < num_gates; i++) {
+    circuit_gate_qubits.push_back(sequence.gates[i]->get_qubit_indices());
+    circuit_gate_is_sparse.push_back(sequence.gates[i]->gate->is_sparse());
+    gate_index[sequence.gates[i].get()] = i;
+  }
+  for (int i = 0; i < num_gates; i++) {
+    for (const auto &output_wire : sequence.gates[i]->output_wires) {
+      for (const auto &output_gate : output_wire->output_gates) {
+        out_gate[i].push_back(gate_index[output_gate]);
+      }
+    }
+  }
+  for (int num_iterations = 1; true; num_iterations++) {
+    auto result = interpreter->solve_ilp(
+        circuit_gate_qubits, circuit_gate_is_sparse, out_gate, num_qubits,
+        num_local_qubits, num_iterations);
+    if (!result.empty()) {
+      // convert vector<int> to vector<bool>
+      std::vector<std::vector<bool>> ret(result.size());
+      for (int i = 0; i < (int)result.size(); i++) {
+        ret[i] = std::vector<bool>(num_qubits, false);
+        for (auto j : result[i]) {
+          ret[i][j] = true;
+        }
+      }
+      return ret;
+    }
+  }
 }
 } // namespace quartz

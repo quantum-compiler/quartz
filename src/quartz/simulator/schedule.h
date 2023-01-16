@@ -79,4 +79,9 @@ private:
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<bool>> &local_qubits, Context *ctx);
+
+class PythonInterpreter;
+std::vector<std::vector<bool>>
+compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
+                              Context *ctx, PythonInterpreter *interpreter);
 } // namespace quartz

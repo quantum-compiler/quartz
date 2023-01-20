@@ -1,0 +1,3 @@
+[submodule "external/HiGHS"]
+	path = external/HiGHS
+	url = https://github.com/ERGO-Code/HiGHS.git

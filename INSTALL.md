@@ -59,3 +59,17 @@ export LD_LIBRARY_PATH=/your/path/:$LD_LIBRARY_PATH
 ```
 
 to `~/.bashrc`.
+
+### Dependencies for the simulator
+
+For the simulator, you need to install the HiGHS solver.
+
+```shell
+cd external/HiGHS
+mkdir build
+cd build
+cmake ..
+make
+```
+
+Then add `/your/path/to/quartz/external/HiGHS/build/bin` to `PATH`.

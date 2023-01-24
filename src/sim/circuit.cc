@@ -254,7 +254,7 @@ template <typename DT> void qcircuit::Circuit<DT>::simulate(int ndevices) {
   for (int i = 0; i < n_local + n_global; i++) {
     init_perm.push_back(i);
   }
-  simulator.InitState(init_perm);
+  simulator.InitStateSingle(init_perm);
   printf("Init State Vectors!\n");
   int index = 0;
   while (index < gates.size()) {

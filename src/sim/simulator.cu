@@ -90,10 +90,12 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
 template <typename DT>
 bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   std::vector<int2> GlobalIndexBitSwaps;
-  // std::vector<int2> GlobalIndexBitSwaps;
+  std::vector<int2> LocalIndexBitSwaps;
 
   // currently only global
   int nGlobalSwaps = 0;
+  int nLocalSwaps = 0;
+  int maxGlobal = 0;
   for (int i = 0; i < n_global; i++) {
     int2 swap;
     if (gate.target[n_local + i] == permutation[n_local + i])
@@ -106,6 +108,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     swap.y = n_local + i;
     GlobalIndexBitSwaps.push_back(swap);
     nGlobalSwaps++;
+    maxGlobal = maxGlobal > i ? maxGlobal : i;
     // update perm
     permutation[idx] = permutation[n_local + i];
     permutation[n_local + i] = gate.target[n_local + i];
@@ -135,27 +138,93 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   int maskBitString[] = {};
   int maskOrdering[] = {};
 
-  // // local bit swap
-  // for (int i = 0; i < n_device; i++)
-  // {
-  //     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
-  //     HANDLE_ERROR(custatevecSwapIndexBits(
-  //         handle_[i], d_sv[i], compute_type, n_local, LocallIndexBitSwaps,
-  //         nLocalSwaps, maskBitString, maskOrdering, maskLen));
+  // global bit swap within a node
+  if (1 << (maxGlobal - n_local) < n_devices) {
+    HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
+        handle_, n_devices, (void **)d_sv, data_type, n_global, n_local,
+        GlobalIndexBitSwaps.data(), nGlobalSwaps, maskBitString, maskOrdering,
+        maskLen, deviceNetworkType));
+  } else { // else transpose + all2all + update curr perm
+    // get curr highest nGlobalSwaps qubits
+    for (int i = 0; i < nGlobalSwaps; i++) {
+      int2 swap;
+      swap.x = GlobalIndexBitSwaps[i].x;
+      swap.y = n_local - nGlobalSwaps + i;
+      LocalIndexBitSwaps.push_back(swap);
+      nLocalSwaps++;
+      // update perm
+      unsigned temp = permutation[swap.x];
+      permutation[swap.x] = permutation[swap.y];
+      permutation[swap.y] = temp;
+      printf("(%d, %d)\n", swap.x, swap.y);
+    }
+    // local bit swap
+    for (int i = 0; i < n_device; i++) {
+      HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+      HANDLE_ERROR(custatevecSwapIndexBits(
+          handle_[i], d_sv[i], compute_type, n_local, LocalIndexBitSwaps,
+          nLocalSwaps, maskBitString, maskOrdering, maskLen));
+    }
+
+    int sendsize = subSvSize / (1 << GlobalIndexBitSwaps.size());
+    printf("MyRank %d, sendsize %d\n", myRank, sendsize);
+    for (int i = 0; i < n_devices; i++) {
+      HANDLE_CUDA_ERROR(cudaSetDevice(i));
+      HANDLE_CUDA_ERROR(
+          cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
+    }
+
+    unsigned mask = 0;
+
+    NCCLCHECK(ncclGroupStart());
+    for (int i = 0; i < n_devices; ++i) {
+      unsigned myncclrank = myRank * n_devices + i;
+      all2all(d_sv[i], sendsize, ncclFloat, recv_buf[i], sendsize, ncclFloat,
+              comms[i], s[i], mask, myncclrank);
+    }
+    NCCLCHECK(ncclGroupEnd());
+
+    for (int i = 0; i < n_devices; i++)
+      HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+
+    for (int i = 0; i < n_devices; i++) {
+      HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
+    }
+  }
+
+  // all2all
+  // int sendsize = subSvSize / (1 << GlobalIndexBitSwaps.size());
+  // printf("MyRank %d, sendsize %d\n", myRank, sendsize);
+  // for (int i = 0; i < n_devices; i++) {
+  //   HANDLE_CUDA_ERROR(cudaSetDevice(i));
+  //   HANDLE_CUDA_ERROR(
+  //       cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
   // }
 
-  // global bit swap
-  HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
-      handle_, n_devices, (void **)d_sv, data_type, n_global, n_local,
-      GlobalIndexBitSwaps.data(), nGlobalSwaps, maskBitString, maskOrdering,
-      maskLen, deviceNetworkType));
+  // unsigned mask = 0;
+
+  // NCCLCHECK(ncclGroupStart());
+  // for(int i = 0; i < n_devices; ++i){
+  //   unsigned myncclrank =  myRank * n_devices + i;
+  //   all2all(d_sv[i], sendsize, ncclFloat, recv_buf[i], sendsize, ncclFloat,
+  //   comms[i], s[i], mask, myncclrank);
+  // }
+  // NCCLCHECK(ncclGroupEnd());
+
+  // for (int i = 0; i < n_devices; i++)
+  //   HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+
+  // for (int i = 0; i < n_devices; i++) {
+  //    HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
+  // }
 
   return true;
 }
 
-// create sv handles and statevectors for each device
+// create sv handles and statevectors for each device on single node
 template <typename DT>
-bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
+bool SimulatorCuQuantum<DT>::InitStateSingle(
+    std::vector<unsigned> const &init_perm) {
   int size = init_perm.size();
   for (int i = 0; i < size; i++) {
     permutation.push_back(init_perm[i]);
@@ -231,14 +300,95 @@ bool SimulatorCuQuantum<DT>::InitState(std::vector<unsigned> const &init_perm) {
   return true;
 }
 
+// init for multinode setting
+template <typename DT>
+bool SimulatorCuQuantum<DT>::InitStateMulti(
+    std::vector<unsigned> const &init_perm) {
+
+  MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &myRank));
+  MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &nRanks));
+
+  subSvSize = (1 << n_local);
+  int size = init_perm.size();
+  for (int i = 0; i < size; i++) {
+    permutation.push_back(init_perm[i]);
+  }
+
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(i));
+    HANDLE_CUDA_ERROR(
+        cudaMalloc(&d_sv[i], subSvSize * sizeof(cuDoubleComplex)));
+    HANDLE_ERROR(custatevecCreate(&handle_[i]));
+    HANDLE_CUDA_ERROR(cudaStreamCreate(&s[i]));
+  }
+
+  if (myRank == 0)
+    ncclGetUniqueId(&id);
+  MPICHECK(MPI_Bcast((void *)&id, sizeof(id), MPI_BYTE, 0, MPI_COMM_WORLD));
+
+  // init NCCL
+  NCCLCHECK(ncclGroupStart());
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(i));
+    NCCLCHECK(ncclCommInitRank(&comms[i], nRanks * n_devices, id,
+                               myRank * n_devices + i));
+  }
+  NCCLCHECK(ncclGroupEnd());
+}
+
 template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_ERROR(custatevecDestroy(handle_[i]));
     HANDLE_CUDA_ERROR(cudaFree(d_sv[i]));
+    ncclCommDestroy(comms[i]);
   }
 
   return true;
+}
+
+// private
+template <typename DT>
+ncclResult_t SimulatorCuQuantum<DT>::all2all(
+    void *sendbuff, size_t sendcount, ncclDataType_t senddatatype,
+    void *recvbuff, size_t recvcount, ncclDataType_t recvdatatype,
+    ncclComm_t comm, cudaStream_t stream, unsigned mask, unsigned myncclrank) {
+  ncclGroupStart();
+  int ncclnRanks;
+  ncclCommCount(comm, &ncclnRanks);
+  printf("NCCL comm nRanks: %d, i am %d\n", nRanks, myncclrank);
+  for (int i = 0; i < subSvSize / sendcount; ++i) {
+    unsigned peer_idx = 0;
+
+    peer_idx = (myncclrank & (~mask)) | i;
+
+    auto a = NCCLSendrecv(static_cast<std::byte *>(sendbuff) +
+                              i * ncclTypeSize(senddatatype) * sendcount,
+                          sendcount, senddatatype, peer_idx,
+                          static_cast<std::byte *>(recvbuff) +
+                              i * ncclTypeSize(recvdatatype) * recvcount,
+                          recvcount, comm, stream);
+    if (a)
+      return a;
+  }
+  ncclGroupEnd();
+  return ncclSuccess;
+}
+
+template <typename DT>
+ncclResult_t SimulatorCuQuantum<DT>::NCCLSendrecv(
+    void *sendbuff, size_t sendcount, ncclDataType_t datatype, int peer,
+    void *recvbuff, size_t recvcount, ncclComm_t comm, cudaStream_t stream) {
+  ncclGroupStart();
+  auto a = ncclSend(sendbuff, sendcount, datatype, peer, comm, stream);
+  auto b = ncclRecv(recvbuff, recvcount, datatype, peer, comm, stream);
+  ncclGroupEnd();
+  if (a || b) {
+    if (a)
+      return a;
+    return b;
+  }
+  return ncclSuccess;
 }
 
 template class SimulatorCuQuantum<double>;

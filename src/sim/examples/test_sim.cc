@@ -6,6 +6,8 @@ using quartz::GateType;
 
 int main(int argc, char *argv[]) {
 
+  MPICHECK(MPI_Init(&argc, &argv));
+
   std::string circuit_file;
   unsigned nqubits;
   unsigned nlocal;
@@ -40,6 +42,8 @@ int main(int argc, char *argv[]) {
   sim::qcircuit::Circuit<double> circuit(nqubits, nlocal);
   circuit.compile(seq.get(), &ctx);
   circuit.simulate(ndevice);
+
+  MPICHECK(MPI_Finalize());
 
   return true;
 }

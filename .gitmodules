@@ -1,0 +1,3 @@
+[submodule "src/sim/nccl"]
+	path = src/sim/nccl
+	url = https://github.com/NVIDIA/nccl.git

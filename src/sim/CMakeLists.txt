@@ -63,6 +63,10 @@ include(cuda)
 
 include(cuquantum)
 
+include(nccl)
+
+include(mpi)
+
 list(APPEND QSIM_INCLUDE_DIRS
   ${QSIM_ROOT})
 

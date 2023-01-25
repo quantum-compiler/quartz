@@ -244,17 +244,23 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     idx++;
   }
 
+  printf("Compilation Done! Start simulating...\n");
+
   return true;
 }
 
-template <typename DT> void qcircuit::Circuit<DT>::simulate(int ndevices) {
+template <typename DT> void qcircuit::Circuit<DT>::simulate(int ndevices, bool use_mpi) {
   using Simulator = SimulatorCuQuantum<DT>;
   Simulator simulator(n_local, n_global, ndevices);
   std::vector<unsigned> init_perm;
   for (int i = 0; i < n_local + n_global; i++) {
     init_perm.push_back(i);
   }
-  simulator.InitStateSingle(init_perm);
+  if(!use_mpi)
+    simulator.InitStateSingle(init_perm);
+  else
+    simulator.InitStateMulti(init_perm);
+
   printf("Init State Vectors!\n");
   int index = 0;
   while (index < gates.size()) {

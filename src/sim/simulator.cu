@@ -141,16 +141,19 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
 
   // global bit swap within a node
   if (1 << (maxGlobal - n_local) < n_devices) {
+    printf("Using cuQuantum for swaps within a node\n");
     HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
         handle_, n_devices, (void **)d_sv, data_type, n_global, n_local,
         GlobalIndexBitSwaps.data(), nGlobalSwaps, maskBitString, maskOrdering,
         maskLen, deviceNetworkType));
   } else { // else transpose + all2all + update curr perm
+    printf("Using NCCL for cross-node shuffle\n");
     // get curr highest nGlobalSwaps qubits
     for (int i = 0; i < nGlobalSwaps; i++) {
       int2 swap;
       swap.x = GlobalIndexBitSwaps[i].x;
       swap.y = n_local - nGlobalSwaps + i;
+      if(swap.x == swap.y) continue;
       LocalIndexBitSwaps.push_back(swap);
       nLocalSwaps++;
       // update perm
@@ -161,6 +164,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
     // local bit swap
     for (int i = 0; i < n_devices; i++) {
+      if(nLocalSwaps == 0) break;
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
       HANDLE_ERROR(custatevecSwapIndexBits(
           handle_[i], d_sv[i], data_type, n_local, LocalIndexBitSwaps.data(),
@@ -170,7 +174,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     int sendsize = subSvSize / (1 << GlobalIndexBitSwaps.size());
     printf("MyRank %d, sendsize %d\n", myRank, sendsize);
     for (int i = 0; i < n_devices; i++) {
-      HANDLE_CUDA_ERROR(cudaSetDevice(i));
+      HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
       HANDLE_CUDA_ERROR(
           cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
     }
@@ -308,6 +312,8 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
 
   MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &myRank));
   MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &nRanks));
+  printf("Num ranks: %d, myrank: %d\n", nRanks, myRank);
+  // assert((1<<n_global)== nRanks*n_devices);
 
   subSvSize = (1 << n_local);
   int size = init_perm.size();
@@ -316,7 +322,11 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   }
 
   for (int i = 0; i < n_devices; i++) {
-    HANDLE_CUDA_ERROR(cudaSetDevice(i));
+    devices[i] = i;
+  }
+
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_CUDA_ERROR(
         cudaMalloc(&d_sv[i], subSvSize * sizeof(cuDoubleComplex)));
     HANDLE_ERROR(custatevecCreate(&handle_[i]));
@@ -330,11 +340,13 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   // init NCCL
   NCCLCHECK(ncclGroupStart());
   for (int i = 0; i < n_devices; i++) {
-    HANDLE_CUDA_ERROR(cudaSetDevice(i));
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     NCCLCHECK(ncclCommInitRank(&comms[i], nRanks * n_devices, id,
                                myRank * n_devices + i));
   }
   NCCLCHECK(ncclGroupEnd());
+
+  return true;
 }
 
 template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {

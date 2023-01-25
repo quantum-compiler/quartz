@@ -30,7 +30,7 @@ public:
   // void compile();
 
   // API for running simulation
-  void simulate(int ndevices);
+  void simulate(int ndevices, bool use_mpi);
 
 private:
   // called inside load_circuit_from_file

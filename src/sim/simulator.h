@@ -93,9 +93,9 @@ private:
                             size_t recvcount, ncclComm_t comm,
                             cudaStream_t stream);
 
-      public :
+public:
 
-      custatevecHandle_t handle_[MAX_DEVICES];
+  custatevecHandle_t handle_[MAX_DEVICES];
   void *d_sv[MAX_DEVICES];
   // num_devices per node
   int n_devices;

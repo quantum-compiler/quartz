@@ -41,9 +41,9 @@ int main(int argc, char *argv[]) {
                 "_indep_qiskit_" + std::to_string(nqubits) + ".qasm");
   sim::qcircuit::Circuit<double> circuit(nqubits, nlocal);
   circuit.compile(seq.get(), &ctx);
-  circuit.simulate(ndevice);
+  circuit.simulate(ndevice, true);
 
   MPICHECK(MPI_Finalize());
 
-  return true;
+  return 0;
 }

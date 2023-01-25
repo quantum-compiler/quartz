@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 #include "simulator.h"
 
@@ -159,10 +160,10 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       printf("(%d, %d)\n", swap.x, swap.y);
     }
     // local bit swap
-    for (int i = 0; i < n_device; i++) {
+    for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
       HANDLE_ERROR(custatevecSwapIndexBits(
-          handle_[i], d_sv[i], compute_type, n_local, LocalIndexBitSwaps,
+          handle_[i], d_sv[i], data_type, n_local, LocalIndexBitSwaps.data(),
           nLocalSwaps, maskBitString, maskOrdering, maskLen));
     }
 

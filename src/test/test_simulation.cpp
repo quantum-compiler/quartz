@@ -121,6 +121,7 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
 }
 
 int main() {
+  init_python_interpreter();
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
@@ -140,8 +141,8 @@ int main() {
     // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
       auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
+          &ctx, std::string("MQTBench_") + std::to_string(num_q) + "q/" +
+                    circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
 
       /*

@@ -183,10 +183,15 @@ bool qcircuit::Circuit<DT>::load_circuit_from_file(
 // TODO: add mode to use heuristics or ILP
 template <typename DT>
 bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
-                                    quartz::Context *ctx) {
+                                    quartz::Context *ctx, quartz::PythonInterpreter *interpreter, bool use_ilp) {
   // 1. ILP/heuristics
   std::vector<std::vector<bool>> local_qubits;
-  int result = num_iterations_by_heuristics(seq, n_local, local_qubits);
+  if(!use_ilp)
+    int result = num_iterations_by_heuristics(seq, n_local, local_qubits);
+  else{
+    local_qubits =
+            compute_local_qubits_with_ilp(*seq, n_local, ctx, interpreter);
+  }
   // fprintf(fout, " %d", result);
 
   // 2. DP, fuse gates and add shuffle gates

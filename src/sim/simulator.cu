@@ -183,6 +183,13 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     for(int i = 0; i < nGlobalSwaps; i++){
       mask |= (1 << (GlobalIndexBitSwaps[i].y - n_local));
     }
+    
+    cudaEvent_t t_start[MAX_DEVICES], t_end[MAX_DEVICES];
+    for (int i = 0; i < n_devices; ++i) {
+      cudaEventCreate(&t_start[i]);
+      cudaEventCreate(&t_end[i]);
+      cudaEventRecord(t_start[i], s[i]);
+    }
 
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
@@ -192,8 +199,18 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
     NCCLCHECK(ncclGroupEnd());
 
-    for (int i = 0; i < n_devices; i++)
+    for (int i = 0; i < n_devices; i++){
       HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+      // profiling
+      cudaEventRecord(t_end[i], s[i]);
+      HANDLE_CUDA_ERROR(cudaEventSynchronize(t_end[i]));
+      float elapsed = 0;
+      HANDLE_CUDA_ERROR(cudaEventElapsedTime(&elapsed, t_start[i], t_end[i]));
+      cudaEventDestroy(t_start[i]);
+      cudaEventDestroy(t_end[i]);
+      printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", myRank * n_devices + i, elapsed);
+    }
+      
 
     for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
@@ -349,16 +366,37 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   }
   NCCLCHECK(ncclGroupEnd());
 
+  // for profiling
+  for (int i = 0; i < n_devices; ++i) {
+    cudaEventCreate(&start[i]);
+    cudaEventCreate(&end[i]);
+    cudaEventRecord(start[i], s[i]);
+  }
+
   return true;
 }
 
 template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
+  
+  // profiling
+  for (int i = 0; i < n_devices; i++){
+    cudaEventRecord(end[i], s[i]);
+    HANDLE_CUDA_ERROR(cudaEventSynchronize(end[i]));
+    float elapsed = 0;
+    HANDLE_CUDA_ERROR(cudaEventElapsedTime(&elapsed, start[i], end[i]));
+    cudaEventDestroy(start[i]);
+    cudaEventDestroy(end[i]);
+    printf("[NCCL Rank %d] Total Simulation Time: %.2fms\n", myRank * n_devices + i, elapsed);
+  }
+
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_ERROR(custatevecDestroy(handle_[i]));
     HANDLE_CUDA_ERROR(cudaFree(d_sv[i]));
     ncclCommDestroy(comms[i]);
   }
+  
+  HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
 
   printf("[MPI Rank %d]: Destroyed everthing!\n", myRank);
 

@@ -111,6 +111,8 @@ private:
   void *recv_buf[MAX_DEVICES];
   ncclUniqueId id;
   ncclComm_t comms[MAX_DEVICES];
+  // timing metrics
+  cudaEvent_t start[MAX_DEVICES], end[MAX_DEVICES];
 };
 
 } // namespace sim

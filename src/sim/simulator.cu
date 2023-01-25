@@ -180,6 +180,9 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
 
     unsigned mask = 0;
+    for(int i = 0; i < nGlobalSwaps; i++){
+      mask |= (1 << (GlobalIndexBitSwaps[i].y - n_local));
+    }
 
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
@@ -357,6 +360,8 @@ template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
     ncclCommDestroy(comms[i]);
   }
 
+  printf("[MPI Rank %d]: Destroyed everthing!\n", myRank);
+
   return true;
 }
 
@@ -374,6 +379,7 @@ ncclResult_t SimulatorCuQuantum<DT>::all2all(
     unsigned peer_idx = 0;
 
     peer_idx = (myncclrank & (~mask)) | i;
+    printf("I am %d, mask %d, I am sending to %d\n", myncclrank, mask, peer_idx);
 
     auto a = NCCLSendrecv(static_cast<std::byte *>(sendbuff) +
                               i * ncclTypeSize(senddatatype) * sendcount,

@@ -18,10 +18,19 @@ void init_python_interpreter() {
   std::string new_python_path;
   if (current_python_path) {
     new_python_path = current_python_path;
+#ifdef WIN32
+    new_python_path += ";";
+#else
     new_python_path += ":";
+#endif
   }
-  new_python_path += python_module_path;
+  new_python_path += python_module_path.string();
+#ifdef WIN32
+  std::string python_path = "PYTHONPATH=" + new_python_path;
+  _putenv(python_path.c_str());
+#else
   setenv("PYTHONPATH", new_python_path.c_str(), 1);
+#endif
 }
 
 std::vector<std::vector<int>> PythonInterpreter::solve_ilp(

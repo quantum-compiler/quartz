@@ -141,8 +141,8 @@ int main() {
     // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
       auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("MQTBench_") + std::to_string(num_q) + "q/" +
-                    circuit + "_indep_qiskit_" + std::to_string(num_q) +
+          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
+                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
 
       /*

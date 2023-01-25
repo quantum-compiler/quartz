@@ -140,7 +140,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   int maskOrdering[] = {};
 
   // global bit swap within a node
-  if (1 << (maxGlobal - n_local) < n_devices) {
+  if ((1 << maxGlobal + 1) <= n_devices) {
     printf("Using cuQuantum for swaps within a node\n");
     HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
         handle_, n_devices, (void **)d_sv, data_type, n_global, n_local,
@@ -186,8 +186,11 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     
     cudaEvent_t t_start[MAX_DEVICES], t_end[MAX_DEVICES];
     for (int i = 0; i < n_devices; ++i) {
-      cudaEventCreate(&t_start[i]);
-      cudaEventCreate(&t_end[i]);
+      // cudaEventCreate(&t_start[i]);
+      // cudaEventCreate(&t_end[i]);
+      HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+      cudaEventCreateWithFlags(&t_start[i], cudaEventBlockingSync);
+      cudaEventCreateWithFlags(&t_end[i], cudaEventBlockingSync);
       cudaEventRecord(t_start[i], s[i]);
     }
 
@@ -345,6 +348,24 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
     devices[i] = i;
   }
 
+  for (int i0 = 0; i0 < n_devices; i0++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i0]));
+    for (int i1 = 0; i1 < n_devices; i1++) {
+      if (i0 == i1) {
+        continue;
+      }
+      int canAccessPeer;
+      HANDLE_CUDA_ERROR(
+          cudaDeviceCanAccessPeer(&canAccessPeer, devices[i0], devices[i1]));
+      if (canAccessPeer == 0) {
+        printf("P2P access between device id %d and %d is unsupported.\n",
+               devices[i0], devices[i1]);
+        continue;
+      }
+      HANDLE_CUDA_ERROR(cudaDeviceEnablePeerAccess(devices[i1], 0));
+    }
+  }
+
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_CUDA_ERROR(
@@ -366,10 +387,13 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   }
   NCCLCHECK(ncclGroupEnd());
 
-  // for profiling
+  // for profiling TODO: considering using openmp for this parts
   for (int i = 0; i < n_devices; ++i) {
-    cudaEventCreate(&start[i]);
-    cudaEventCreate(&end[i]);
+    // cudaEventCreate(&start[i]);
+    // cudaEventCreate(&end[i]);
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+    cudaEventCreateWithFlags(&start[i], cudaEventBlockingSync);
+    cudaEventCreateWithFlags(&end[i], cudaEventBlockingSync);
     cudaEventRecord(start[i], s[i]);
   }
 

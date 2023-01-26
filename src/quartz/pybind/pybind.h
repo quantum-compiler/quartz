@@ -5,6 +5,11 @@
 
 namespace quartz {
 
+// This function needed to be called exactly once before any PythonInterpreter
+// object is constructed.
+void init_python_interpreter();
+
+// There can only be one alive PythonInterpreter object at any time.
 class PythonInterpreter {
 public:
   std::vector<std::vector<int>>

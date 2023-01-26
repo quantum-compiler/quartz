@@ -121,6 +121,7 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
 }
 
 int main() {
+  init_python_interpreter();
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,

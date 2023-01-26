@@ -21,30 +21,32 @@ class ParallelSearchAgent:
         qtz: quartz.QuartzContext,
         circuit: quartz.PyGraph,
         num_workers: int,
-        gate_count_increase: int,
         max_cost_ratio: float,
+        max_cost_increase: int,
+        max_trajectory_len: int,
         actor_critic: ActorCritic,
         hit_rate: float,
         device: torch.device,
     ) -> None:
         self.qtz: quartz.QuartzContext = qtz
         self.input_circuit: quartz.PyGraph = circuit
-        self.init_gate_count: int = circuit.gate_count
-        self.min_gate_count: int = self.init_gate_count
+        self.init_cost: int = circuit.gate_count
+        self.min_cost: int = self.init_cost
         self.max_cost_ratio: float = max_cost_ratio
         self.actor_critic: ActorCritic = actor_critic
         self.actor_critic.eval()
         self.num_workers: int = num_workers
-        self.gate_count_increase: int = gate_count_increase
         self.hit_rate: float = hit_rate
+        self.max_cost_increase: int = max_cost_increase
+        self.max_trajectory_len: int = max_trajectory_len
         self.device: torch.device = device
 
-        self.circ_set: set[quartz.PyGraph] = set()
-        self.circ_set.add(circuit)
-        self.circ_buffer: dict[int, set[quartz.PyGraph]] = {}
-        self.circ_buffer[self.init_gate_count] = set([circuit])
-        self.circ_sample_set: set[quartz.PyGraph] = set()
-        self.circ_sample_set.add(circuit)
+        self.circ_sample_set: set[quartz.PyGraph] = set([circuit])
+        self.circ_list: list[quartz.PyGraph] = [circuit]
+        self.visit_cnt: dict[quartz.PyGraph, int] = {circuit: 1}
+        self.node_soft_masks: dict[quartz.PyGraph, torch.Tensor] = {}
+        self.node_hard_masks: dict[quartz.PyGraph, torch.Tensor] = {}
+        # self.circ_seen: set[quartz.PyGraph] = set([circuit])
 
         self.none_count: int = 0
 
@@ -66,11 +68,41 @@ class ParallelSearchAgent:
             b_node_values, num_nodes.tolist())
         temperatures = 1 / (torch.log(self.hit_rate * (num_nodes - 1) /
                                       (1 - self.hit_rate)))
+        # Fetch node masks
+        node_soft_masks: list[torch.Tensor] = []
+        node_hard_masks: list[torch.Tensor] = []
+        for circ in circuit_list:
+            if circ not in self.node_soft_masks:
+                self.node_soft_masks[circ] = torch.zeros(
+                    (circ.gate_count, ), dtype=torch.bool).to(self.device)
+            if circ not in self.node_hard_masks:
+                self.node_hard_masks[circ] = torch.zeros(
+                    (circ.gate_count, ), dtype=torch.bool).to(self.device)
+            node_hard_masks.append(self.node_hard_masks[circ])
+            if self.node_soft_masks[circ].all():
+                node_soft_masks.append(~self.node_soft_masks[circ])
+            else:
+                node_soft_masks.append(self.node_soft_masks[circ])
+
+        # nodes: list[int] = [
+        #     torch.multinomial(F.softmax(node_values / temperature, dim=0),
+        #                       1)[0].item()
+        #     for node_values, temperature in zip(node_values_list, temperatures)
+        # ]
+
         nodes: list[int] = [
-            torch.multinomial(F.softmax(node_values / temperature, dim=0),
-                              1)[0].item()
-            for node_values, temperature in zip(node_values_list, temperatures)
+            torch.multinomial(
+                F.softmax(node_values / temperature -
+                          (node_hard_mask | node_soft_mask) * 1e10,
+                          dim=0), 1)[0].item()
+            for node_values, temperature, node_hard_mask, node_soft_mask in
+            zip(node_values_list, temperatures, node_hard_masks,
+                node_soft_masks)
         ]
+
+        # Maintain node masks
+        for node, circ in zip(nodes, circuit_list):
+            self.node_soft_masks[circ][node] = True
 
         # Construct masks
         mask: torch.Tensor = torch.zeros(
@@ -80,7 +112,7 @@ class ParallelSearchAgent:
                 context=self.qtz, node=circ.get_node_from_id(id=n))
             mask[i][appliable_xfers] = True
 
-        # Sample xfers
+        # Select xfers
         selected_node_embeds: list[torch.Tensor] = [
             node_embeds[node]
             for node_embeds, node in zip(node_embeds_list, nodes)
@@ -90,11 +122,7 @@ class ParallelSearchAgent:
         b_xfer_logits: torch.Tensor = self.actor_critic.actor(
             b_selected_node_embeds)
         b_xfer_probs: torch.Tensor = masked_softmax(b_xfer_logits, mask)
-        dist: Categorical = Categorical(b_xfer_probs)
-        xfers: list[int] = dist.sample().tolist()
-
-        # print(f'Nodes: {nodes}')
-        # print(f'Xfers: {xfers}')
+        xfers: list[int] = torch.max(b_xfer_probs, dim=1)[1].tolist()
 
         # Construct new circuits
         new_circ_list: list[quartz.PyGraph] = []
@@ -102,45 +130,36 @@ class ParallelSearchAgent:
             xfer: quartz.PyXfer = self.qtz.get_xfer_from_id(id=x)
             if xfer.is_nop:
                 new_circ_list.append(None)
-                self.none_count += 1
-            # elif circ.gate_count + xfer.dst_gate_count - xfer.src_gate_count > self.min_gate_count + self.gate_count_increase:
-            #     new_circ_list.append(None)
-            #     self.none_count += 1
+                self.node_hard_masks[circ][n] = True
+            elif circ.gate_count - xfer.src_gate_count + xfer.dst_gate_count > self.min_cost + self.max_cost_increase:
+                new_circ_list.append(None)
+                self.node_hard_masks[circ][n] = True
             else:
                 new_circ: quartz.PyGraph = circ.apply_xfer(
                     xfer=xfer,
                     node=circ.get_node_from_id(id=n),
                     eliminate_rotation=True)
                 new_circ_list.append(new_circ)
-                if new_circ not in self.circ_set:
-                    self.circ_set.add(new_circ)
+                # self.circ_seen.add(new_circ)
 
-                    if new_circ.gate_count > self.min_gate_count + 1:
-                        continue
+                # If the circuit is large, it is not added to data structures
+                if new_circ.gate_count > self.min_cost:
+                    continue
 
-                    if new_circ.gate_count not in self.circ_buffer:
-                        self.circ_buffer[new_circ.gate_count] = set()
-                    self.circ_buffer[new_circ.gate_count].add(new_circ)
-
-                    if new_circ.gate_count < self.min_gate_count:
-                        self.min_gate_count = new_circ.gate_count
-                        print(f'New min gate count: {self.min_gate_count}')
-                        self.circ_sample_set = set()
-                        gate_count_to_pop: list[int] = []
-                        for gate_count in self.circ_buffer:
-                            # if gate_count > self.min_gate_count + self.gate_count_increase:
-                            #     gate_count_to_pop.append(gate_count)
-                            if gate_count > self.min_gate_count + 1:
-                                gate_count_to_pop.append(gate_count)
-                            else:
-                                self.circ_sample_set.update(
-                                    self.circ_buffer[gate_count])
-                        for gate_count in gate_count_to_pop:
-                            self.circ_buffer.pop(gate_count)
-                    # else:
-                    #     self.circ_sample_set.add(new_circ)
-                    elif new_circ.gate_count <= self.min_gate_count + 1:
-                        self.circ_sample_set.add(new_circ)
+                if new_circ.gate_count < self.min_cost:
+                    # New min is found, update data structures
+                    self.min_cost = new_circ.gate_count
+                    print(f'New min gate count: {self.min_cost}')
+                    self.circ_sample_set = set([new_circ])
+                    self.circ_list = [new_circ]
+                    self.visit_cnt = {new_circ: 1}
+                    return [None] * self.num_workers
+                elif new_circ not in self.circ_sample_set:
+                    self.circ_sample_set.add(new_circ)
+                    self.circ_list.append(new_circ)
+                    self.visit_cnt[new_circ] = 1
+                else:
+                    self.visit_cnt[new_circ] += 1
 
         return new_circ_list
 
@@ -149,35 +168,36 @@ class ParallelSearchAgent:
         expansion_cnt: int = 0
         circuit_list: list[quartz.PyGraph
                            | None] = [self.input_circuit] * self.num_workers
-        init_gate_count_list: list[int] = [
-            circuit.gate_count for circuit in circuit_list
-        ]
+        trajectory_len_list: list[int] = [0] * self.num_workers
         while True:
             expansion_cnt += 1
             if expansion_cnt % 100 == 0:
                 print(
-                    f'Expansion cnt: {expansion_cnt}, num circ: {len(self.circ_set)}, num sample circ: {len(self.circ_sample_set)}, none count: {self.none_count}, t: {time.time() - start:.2f}'
+                    f'Expansion cnt: {expansion_cnt}, num sample circ: {len(self.circ_sample_set)}, none count: {self.none_count}, t: {time.time() - start:.2f}'
                 )
+                # print(self.visit_cnt)
             with torch.no_grad():
                 circuit_list = self.expand(circuit_list)
-            none_cnt: int = 0
-            for i, circuit in enumerate(circuit_list):
-                if circuit is None:
-                    circuit_list[i] = random.sample(self.circ_sample_set, 1)[0]
-                    init_gate_count_list[i] = circuit_list[i].gate_count
-                    none_cnt += 1
-                elif circuit_list[i].gate_count > init_gate_count_list[
-                        i] * self.max_cost_ratio:
-                    circuit_list[i] = random.sample(self.circ_sample_set, 1)[0]
-                    init_gate_count_list[i] = circuit_list[i].gate_count
-                    none_cnt += 1
+            visit_cnt_reversed = [
+                1 / self.visit_cnt[circ] for circ in self.circ_list
+            ]
 
-            # print(f"new circuit count: {none_cnt}")
+            for i, circuit in enumerate(circuit_list):
+                if circuit is not None and trajectory_len_list[
+                        i] + 1 > self.max_trajectory_len:
+                    circuit = None
+
+                if circuit is None:
+                    circuit_list[i] = random.choices(self.circ_list,
+                                                     visit_cnt_reversed,
+                                                     k=1)[0]
+                    self.visit_cnt[circuit_list[i]] += 1
+                    self.none_count += 1
+                    trajectory_len_list[i] = 0
 
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
-    output_dir = os.path.abspath(os.curdir)  # get hydra output dir
     os.chdir(
         hydra.utils.get_original_cwd())  # set working dir to the original one
 
@@ -190,16 +210,15 @@ def main(config: Config) -> None:
         filename='../ecc_set/nam_ecc.json')
 
     # Device
-    device = torch.device("cuda:3")
+    device = torch.device("cuda:2")
 
-    # Use the best circuit found in the PPO training
     # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
     #     context=qtz, filename="../nam_circs/adder_8.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
         context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
 
     # Load actor-critic network
-    ckpt_path = "ckpts/nam_iter_100.pt"
+    ckpt_path = "ckpts/iter_133.pt"
     actor_critic: ActorCritic = ActorCritic(
         gnn_type=cfg.gnn_type,
         num_gate_types=cfg.num_gate_types,
@@ -222,19 +241,20 @@ def main(config: Config) -> None:
                             ckpt['model_state_dict'])
     actor_critic.load_state_dict(model_state_dict)
 
-    # TODO: tune the hyperparameters
-    parallel_search_agent = ParallelSearchAgent(device=device,
-                                                actor_critic=actor_critic,
-                                                num_workers=128,
-                                                hit_rate=0.9,
-                                                gate_count_increase=2,
-                                                max_cost_ratio=1.2,
-                                                qtz=qtz,
-                                                circuit=circ)
+    parallel_search_agent = ParallelSearchAgent(
+        device=device,
+        actor_critic=actor_critic,
+        num_workers=64,
+        hit_rate=0.95,
+        max_cost_ratio=1.2,
+        max_cost_increase=6,
+        max_trajectory_len=600,
+        qtz=qtz,
+        circuit=circ,
+    )
 
     parallel_search_agent.run()
 
 
 if __name__ == "__main__":
-    # os.environ['OMP_NUM_THREADS'] = str(16)
     main()

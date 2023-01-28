@@ -46,14 +46,19 @@ class MCTSAgent:
         qtz: quartz.QuartzContext,
         circuit: quartz.PyGraph,
         actor_critic: ActorCritic,
+        max_cost_increase: int,
+        hit_rate: float,
         device: torch.device,
     ) -> None:
         self.gamma: float = gamma
+        self.c_0 = 0.0001  # debug use
         self.c_1: float = c_1
         self.c_2: float = c_2
         self.qtz: quartz.QuartzContext = qtz
         self.input_circuit: quartz.PyGraph = circuit
-        self.init_gate_count: int = circuit.gate_count
+        self.init_cost: int = circuit.gate_count
+        self.max_cost_increase: int = max_cost_increase
+        self.hit_rate: float = hit_rate
         self.actor_critic: ActorCritic = actor_critic
         self.actor_critic.eval()
         self.device: torch.device = device
@@ -61,14 +66,26 @@ class MCTSAgent:
         self.root: Node = Node(circuit=circuit)
         self.circ_set: set[quartz.PyGraph] = set()
         self.circ_set.add(circuit)
-        self.min_gate_count: int = self.init_gate_count
+        self.min_cost: int = self.init_cost
         self.longest_path: int = 0
 
     def select_child(self, node: Node) -> tuple[Node, int]:
+        # Naive UCB
+        # for child_node, value in zip(node.child_nodes, node.Q):
+        #     print(child_node.gate_count, value)
+        # ucb_scores: torch.Tensor = node.P + self.c_0 * torch.sqrt(
+        #     math.log(node.total_visit_count) /
+        #     (1 + node.N)) - node.terminal_mask * 1e10
         ucb_scores: torch.Tensor = node.Q + node.P * math.sqrt(
             node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
                 (node.total_visit_count + self.c_2 + 1) /
                 self.c_2)) - node.terminal_mask * 1e10
+        # print(node.Q)
+        # print(node.P * math.sqrt(node.total_visit_count) / (1 + node.N) *
+        #       (self.c_1 + math.log(
+        #           (node.total_visit_count + self.c_2 + 1) / self.c_2)))
+        # print(node.N)
+        # Muzero UCB
         # ucb_scores: torch.Tensor = node.P * math.sqrt(
         #     node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
         #         (node.total_visit_count + self.c_2 + 1) /
@@ -76,6 +93,7 @@ class MCTSAgent:
         # print(ucb_scores)
         # print(ucb_scores.max())
         idx: int = torch.argmax(ucb_scores).item()
+        # print(node.child_nodes[idx].gate_count, ucb_scores[idx])
         return node.child_nodes[idx], idx
 
     def select(self) -> tuple[list[Node], list[tuple[int, int]]]:
@@ -90,54 +108,64 @@ class MCTSAgent:
         node_sequence.append(curr_node)
         return node_sequence, path
 
-    def expand(self, node: Node, gate_count_increase: int = 1) -> bool:
-        # Returns False if the node is terminal
-
-        # During expansion, we expand a node to get all of its child nodes
-        # we construct a mask to indicate which actions are appliable
-        # for the appliable actions, there is a reward
-        # N and Q corresponding to a child node is initialized to 0
-        # we also compute the policy
-        # which is, basically, a probability distribution over all the child nodes
+    def expand(self, node: Node) -> bool:
+        # Returns False if the node has no legal child
 
         # Initialize node attributes
         node.child_nodes = []
-        idx_2_g_xfer: list[tuple[int, int]] = []
-        R_: list[float] = []
+        R_: list[torch.Tensor] = []
         P_: list[torch.Tensor] = []
 
+        # Compute mask
         mask: torch.Tensor = torch.zeros((node.gate_count, self.qtz.num_xfers),
                                          dtype=torch.bool)
         for g in range(node.gate_count):
             appliable_xfers: list[int] = node.circuit.available_xfers_parallel(
                 context=self.qtz, node=node.circuit.get_node_from_id(id=g))
-            appliable_xfers = appliable_xfers[:-1]  # remove NOP
+            # appliable_xfers = appliable_xfers[:-1]  # remove NOP
             mask[g, appliable_xfers] = True
-            # construct child nodes
-            for xfer in appliable_xfers:
-                child_circuit: quartz.PyGraph = node.circuit.apply_xfer(
-                    xfer=self.qtz.get_xfer_from_id(id=xfer),
+
+        # Compute policy
+        # Policy here is the probability of selecting a node (or gate)
+        # In evaluation, we use the argmax of the xfer policy
+        dgl_graph: dgl.DGLGraph = node.circuit.to_dgl_graph().to(self.device)
+        node_embeds: torch.Tensor = self.actor_critic.gnn(dgl_graph)
+        node_values: torch.Tensor = self.actor_critic.critic(
+            node_embeds).squeeze()
+        temperatures = 1 / (math.log(self.hit_rate * (node.gate_count - 1) /
+                                     (1 - self.hit_rate)))
+        softmax_node_values = F.softmax(node_values / temperatures, dim=0)
+
+        # Decide which xfer to take at each node
+        xfer_logits: torch.Tensor = self.actor_critic.actor(node_embeds)
+        xfer_probs: torch.Tensor = masked_softmax(xfer_logits, mask)
+        xfers: list[int] = torch.argmax(xfer_probs, dim=1).tolist()
+
+        # Construct child nodes
+        for g, x in enumerate(xfers):
+            xfer: quartz.PyXfer = self.qtz.get_xfer_from_id(id=x)
+            if xfer.is_nop:
+                continue
+            else:
+                reward: int = xfer.src_gate_count - xfer.dst_gate_count
+                if node.gate_count - reward > self.min_cost + self.max_cost_increase:
+                    continue
+                new_circ: quartz.PyGraph = node.circuit.apply_xfer(
+                    xfer=xfer,
                     node=node.circuit.get_node_from_id(id=g),
                     eliminate_rotation=True)
-                # Eliminate circuits that has been seen
-                if child_circuit in self.circ_set:
-                    continue
-                if child_circuit.gate_count > self.init_gate_count + gate_count_increase:
-                    continue
-
-                self.circ_set.add(child_circuit)
-                idx_2_g_xfer.append((g, xfer))
-                node.child_nodes.append(Node(circuit=child_circuit))
-                R_.append(node.gate_count - child_circuit.gate_count)
-                if child_circuit.gate_count < self.min_gate_count:
-                    self.min_gate_count = child_circuit.gate_count
-                    print(f"min gate count: {self.min_gate_count}")
+                if new_circ.gate_count < self.min_cost:
+                    print("New min cost: ", new_circ.gate_count)
                     exit(1)
-        node.R = torch.tensor(R_, dtype=torch.float32)
-        node.terminal_mask = torch.zeros(node.R.shape, dtype=torch.bool)
-        # print("in expansion")
-        # print(f"num nodes: {node.gate_count}")
-        # print(f"num childs: {len(node.child_nodes)}")
+                # Eliminate duplication
+                if new_circ in self.circ_set:
+                    continue
+                self.circ_set.add(new_circ)
+
+                # Construct new node
+                node.child_nodes.append(Node(circuit=new_circ))
+                R_.append(reward)
+                P_.append(softmax_node_values[g])
 
         # No child, a terminal node
         if len(R_) == 0:
@@ -145,28 +173,11 @@ class MCTSAgent:
             node.is_leaf = False
             return False
 
-        # Compute policy
-        # Policy should take into consideration of gate values
-        policy_table: torch.Tensor = torch.zeros(
-            (node.gate_count, self.qtz.num_xfers))
-        with torch.no_grad():
-            dgl_graph: dgl.DGLGraph = node.circuit.to_dgl_graph().to(
-                self.device)
-            node_embeds: torch.Tensor = self.actor_critic.gnn(dgl_graph)
-            node_values: torch.Tensor = self.actor_critic.critic(
-                node_embeds).squeeze()
-            softmax_node_values = F.softmax(node_values, dim=0)
-            xfer_logits: torch.Tensor = self.actor_critic.actor(node_embeds)
-            xfer_probs: torch.Tensor = masked_softmax(xfer_logits, mask)
-            for g, (node_prob, xfer_prob_list) in enumerate(
-                    zip(softmax_node_values, xfer_probs)):
-                policy_table[g] = node_prob * xfer_prob_list
-
-        # Construct node.P
-        for g, xfer in idx_2_g_xfer:
-            P_.append(policy_table[g, xfer])
+        node.R = torch.Tensor(R_).to(self.device)
         node.P = torch.stack(P_)
-
+        node.terminal_mask = torch.zeros(node.R.shape,
+                                         dtype=torch.bool).to(self.device)
+        # print(f"Expanding node with {len(node.child_nodes)} children")
         # Modify leaf flag
         node.is_leaf = False
         return True
@@ -178,22 +189,20 @@ class MCTSAgent:
         Q_: list[torch.Tensor] = []
         child_visit_count: int = len(node.child_nodes)
         total_value: torch.Tensor = 0
-        with torch.no_grad():
-            b_dgl_graph = dgl.batch([
-                n.circuit.to_dgl_graph().to(self.device)
-                for n in node.child_nodes
-            ])
-            num_nodes: list[int] = [n.gate_count for n in node.child_nodes]
-            b_node_embeds: torch.Tensor = self.actor_critic.gnn(b_dgl_graph)
-            b_values: torch.Tensor = self.actor_critic.critic(
-                b_node_embeds).squeeze().cpu()
-            values: list[torch.Tensor] = torch.split(b_values, num_nodes)
+        b_dgl_graph = dgl.batch([
+            n.circuit.to_dgl_graph().to(self.device) for n in node.child_nodes
+        ])
+        num_nodes: list[int] = [n.gate_count for n in node.child_nodes]
+        b_node_embeds: torch.Tensor = self.actor_critic.gnn(b_dgl_graph)
+        b_values: torch.Tensor = self.actor_critic.critic(
+            b_node_embeds).squeeze()
+        values: list[torch.Tensor] = torch.split(b_values, num_nodes)
         for n, v in zip(node.child_nodes, values):
-            Q_.append(torch.sum(v) - n.gate_count + self.init_gate_count)
+            Q_.append(torch.sum(v) - (n.gate_count - self.init_cost) * 10)
 
         node.Q = torch.stack(Q_)
-        node.N = torch.ones(node.Q.shape, dtype=torch.int32)
-        total_value = torch.sum(node.Q) + torch.sum(node.R)
+        node.N = torch.ones(node.Q.shape, dtype=torch.int32).to(self.device)
+        total_value = torch.sum((node.Q + node.R) * node.P) * child_visit_count
         node.total_visit_count = child_visit_count
         return child_visit_count, total_value
 
@@ -211,34 +220,29 @@ class MCTSAgent:
         # print(f"total nodes: {len(self.circ_set)}")
 
     def run(self):
-        # TODO: use the budget to stop the search
-        budget = None
-        expansion_cnt: int = 0
-        start = time.time()
-        while True:
-            expansion_cnt += 1
-            if expansion_cnt % 100 == 0:
-                print(
-                    f'Expansion count: {expansion_cnt}, num circuits: {len(self.circ_set)}, longest path: {self.longest_path}, time: {time.time() - start}'
-                )
-            node_sequence, path = self.select()
-            if len(path) > self.longest_path:
-                self.longest_path = len(path)
-            not_terminated: bool = self.expand(node_sequence[-1])
-            if not not_terminated:
-                not_terminated: bool = self.expand(node_sequence[-1],
-                                                   gate_count_increase=2)
-            if not not_terminated:
-                for node, idx in zip(reversed(node_sequence[:-1]),
-                                     reversed(path)):
-                    node.terminal_mask[idx] = True
-                    node.child_nodes[idx] = None
-                    if not torch.all(node.terminal_mask):
-                        break
-                continue
-            visit_count, value = self.simulate(node_sequence[-1])
-            self.backpropagate(node_sequence, path, value, visit_count)
-            # TODO: print more messages
+        with torch.no_grad():
+            expansion_cnt: int = 0
+            start = time.time()
+            while True:
+                expansion_cnt += 1
+                if expansion_cnt % 100 == 0:
+                    print(
+                        f'Expansion count: {expansion_cnt}, num circuits: {len(self.circ_set)}, longest path: {self.longest_path}, time: {time.time() - start}'
+                    )
+                node_sequence, path = self.select()
+                if len(path) > self.longest_path:
+                    self.longest_path = len(path)
+                not_terminated: bool = self.expand(node_sequence[-1])
+                if not not_terminated:
+                    for node, idx in zip(reversed(node_sequence[:-1]),
+                                         reversed(path)):
+                        node.terminal_mask[idx] = True
+                        node.child_nodes[idx] = None
+                        if not torch.all(node.terminal_mask):
+                            break
+                    continue
+                visit_count, value = self.simulate(node_sequence[-1])
+                self.backpropagate(node_sequence, path, value, visit_count)
 
 
 @hydra.main(config_path='config', config_name='config')
@@ -289,10 +293,12 @@ def main(config: Config) -> None:
     # Initialize MCTS and run
     # TODO: tune the hyperparameters
     mcts = MCTSAgent(gamma=1.00,
-                     c_1=8,
+                     c_1=32,
                      c_2=19625,
                      device=device,
                      actor_critic=actor_critic,
+                     max_cost_increase=6,
+                     hit_rate=0.95,
                      qtz=qtz,
                      circuit=circ)
 
@@ -300,5 +306,4 @@ def main(config: Config) -> None:
 
 
 if __name__ == "__main__":
-    # os.environ['OMP_NUM_THREADS'] = str(16)
     main()

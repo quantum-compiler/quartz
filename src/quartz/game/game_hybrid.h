@@ -19,11 +19,11 @@ namespace quartz {
             /// GameHybrid expects that the input graph has been initialized !!!
 
             // STEP 1: record phase info
-            Assert(_initial_phase_len > 0, "Initial phase must have length > 0!");
+            Assert(_initial_phase_len >= 0, "Initial phase must have length >= 0!");
             initial_phase_len = _initial_phase_len;
             allow_nop_in_initial = _allow_nop_in_initial;
             initial_phase_reward = _initial_phase_reward;
-            is_initial_phase = true;
+            is_initial_phase = (initial_phase_len != 0);            // If initial_phase_len !=0, then we are initial!
             initial_phase_action_type = ActionType::PhysicalFull;   // Type of initial phase action
 
             // STEP 2: store the initial input guid -> logical idx mapping
@@ -85,8 +85,13 @@ namespace quartz {
                 }
             }
 
-            // STEP 6: record some extra statistics (we do not execute gates at the beginning)
+            // STEP 6: record some extra statistics and execute all executable gates if initial phase has
+            // length 0 (i.e. is_initial_phase == false)
             executed_logical_gate_count = 0;
+            if (!is_initial_phase) {
+                int executed_gate_count = _execute_all_executable_gates();
+                executed_logical_gate_count += executed_gate_count;
+            }
             swaps_inserted = 0;             // This is for real swaps (i.e. phase 2 swaps)
             virtual_swaps_inserted = 0;     // This is for virtual swaps (i.e. phase 1 swaps)
             imp_cost = graph.circuit_implementation_cost(device);

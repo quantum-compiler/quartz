@@ -582,10 +582,6 @@ cdef class PyGraph:
             return False
         return deref(self.graph).equal(deref(other.graph))
 
-    def __hash__(self):
-        # Use the truncated hash as the hash value
-        return self.hash() & 0xFFFFFFFF
-
     @property
     def gate_count(self):
         return deref(self.graph).gate_count()

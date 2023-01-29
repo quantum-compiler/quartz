@@ -68,36 +68,29 @@ class ParallelSearchAgent:
             b_node_values, num_nodes.tolist())
         temperatures = 1 / (torch.log(self.hit_rate * (num_nodes - 1) /
                                       (1 - self.hit_rate)))
+
         # Fetch node masks
-        node_soft_masks: list[torch.Tensor] = []
-        node_hard_masks: list[torch.Tensor] = []
-        for circ in circuit_list:
+        node_masks: list[torch.Tensor] = []
+        for circ, node_value in zip(circuit_list, node_values_list):
             if circ not in self.node_soft_masks:
                 self.node_soft_masks[circ] = torch.zeros(
                     (circ.gate_count, ), dtype=torch.bool).to(self.device)
             if circ not in self.node_hard_masks:
                 self.node_hard_masks[circ] = torch.zeros(
                     (circ.gate_count, ), dtype=torch.bool).to(self.device)
-            node_hard_masks.append(self.node_hard_masks[circ])
-            if self.node_soft_masks[circ].all():
-                node_soft_masks.append(~self.node_soft_masks[circ])
+                # self.node_hard_masks[circ] = node_value < 1e-2
+            node_soft_mask = self.node_soft_masks[circ]
+            node_hard_mask = self.node_hard_masks[circ]
+            if (node_hard_mask | node_soft_mask).all():
+                node_masks.append(node_hard_mask)
             else:
-                node_soft_masks.append(self.node_soft_masks[circ])
-
-        # nodes: list[int] = [
-        #     torch.multinomial(F.softmax(node_values / temperature, dim=0),
-        #                       1)[0].item()
-        #     for node_values, temperature in zip(node_values_list, temperatures)
-        # ]
+                node_masks.append(node_hard_mask | node_soft_mask)
 
         nodes: list[int] = [
             torch.multinomial(
-                F.softmax(node_values / temperature -
-                          (node_hard_mask | node_soft_mask) * 1e10,
-                          dim=0), 1)[0].item()
-            for node_values, temperature, node_hard_mask, node_soft_mask in
-            zip(node_values_list, temperatures, node_hard_masks,
-                node_soft_masks)
+                F.softmax(node_values / temperature - node_mask * 1e10, dim=0),
+                1)[0].item() for node_values, temperature, node_mask in zip(
+                    node_values_list, temperatures, node_masks)
         ]
 
         # Maintain node masks
@@ -140,7 +133,6 @@ class ParallelSearchAgent:
                     node=circ.get_node_from_id(id=n),
                     eliminate_rotation=True)
                 new_circ_list.append(new_circ)
-                # self.circ_seen.add(new_circ)
 
                 # If the circuit is large, it is not added to data structures
                 if new_circ.gate_count > self.min_cost:
@@ -183,8 +175,9 @@ class ParallelSearchAgent:
             ]
 
             for i, circuit in enumerate(circuit_list):
+                trajectory_len_list[i] += 1
                 if circuit is not None and trajectory_len_list[
-                        i] + 1 > self.max_trajectory_len:
+                        i] > self.max_trajectory_len:
                     circuit = None
 
                 if circuit is None:
@@ -210,10 +203,10 @@ def main(config: Config) -> None:
         filename='../ecc_set/nam_ecc.json')
 
     # Device
-    device = torch.device("cuda:2")
+    device = torch.device("cuda:1")
 
     # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
-    #     context=qtz, filename="../nam_circs/adder_8.qasm")
+    #     context=qtz, filename="../nam_circs/barenco_tof_10.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
         context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
 

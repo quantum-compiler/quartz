@@ -61,6 +61,7 @@ def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "ry3": return GateType.ry3
     if gate_type_str == "rxx1": return GateType.rxx1
     if gate_type_str == "rxx3": return GateType.rxx3
+    if gate_type_str == "sx": return GateType.sx
 
 cdef class PyQASMParser:
     cdef QASMParser *parser

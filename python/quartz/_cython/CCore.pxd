@@ -42,7 +42,8 @@ cdef extern from "gate/gate_utils.h" namespace "quartz":
         ry1,
         ry3,
         rxx1,
-        rxx3
+        rxx3,
+        sx
 
 cdef extern from "math/matrix.h" namespace "quartz":
     cdef cppclass MatrixBase:

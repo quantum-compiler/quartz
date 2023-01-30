@@ -1372,6 +1372,8 @@ Graph::_from_qasm_stream(Context *ctx,
   std::string line;
   GateType gate_type;
   std::vector<Pos> pos_on_qubits;
+  std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
+  size_t total_num_qubits = 0;
   while (std::getline(qasm_stream, line)) {
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
@@ -1391,14 +1393,17 @@ Graph::_from_qasm_stream(Context *ctx,
     } else if (command == "qreg") {
       std::string token;
       getline(ss, token, ' ');
+      std::string qreg_name = token.substr(0, token.find('['));
+      qreg_name_2_start_idx[qreg_name] = total_num_qubits;
       size_t num_qubits = string_to_number(token);
-      pos_on_qubits.resize(num_qubits);
-      for (int i = 0; i < num_qubits; ++i) {
+      pos_on_qubits.resize(total_num_qubits + num_qubits);
+      for (int i = total_num_qubits; i < total_num_qubits + num_qubits; ++i) {
         auto op = graph->add_qubit(i);
         pos_on_qubits[i] = Pos(op, 0);
         // Construct input_qubit_op_2_qubit_idx
         graph->input_qubit_op_2_qubit_idx[op] = i;
       }
+      total_num_qubits += num_qubits;
       assert(!ss.good());
     } else if (is_gate_string(command, gate_type)) {
       Gate *gate = graph->context->get_gate(gate_type);
@@ -1420,6 +1425,7 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123*pi,
           // 0.123*pi/2,
           // 0.123
+          // pi/2
           // pi
           ParamType p;
           bool negative = token[0] == '-';
@@ -1467,7 +1473,9 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx = qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;
@@ -1485,7 +1493,9 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx = qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;

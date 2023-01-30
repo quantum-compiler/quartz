@@ -6,6 +6,7 @@
 #include "quartz/tasograph/tasograph.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
@@ -121,6 +122,7 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
 }
 
 int main() {
+  auto start = std::chrono::steady_clock::now();
   init_python_interpreter();
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
@@ -182,5 +184,9 @@ int main() {
     }
   }
   // fclose(fout);
+  auto end = std::chrono::steady_clock::now();
+  std::cout
+      << std::chrono::duration_cast<std::chrono::seconds>(end - start).count()
+      << " seconds." << std::endl;
   return 0;
 }

@@ -12,8 +12,8 @@ int main() {
     SimpleHybridEnv env = SimpleHybridEnv(
             // basic settings
             circuit_file_name, BackendType::IBM_Q27_FALCON, "../test_mapping_file.txt",
-            // randomness
-            0, 0.8,
+            // GameBuffer
+            0, 0.8, 5, 3,
             // GameHybrid
             5, true, -0.3);
 

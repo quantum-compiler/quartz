@@ -222,7 +222,7 @@ cdef extern from "env/simple_search_env.h" namespace "quartz":
 cdef extern from "env/simple_hybrid_env.h" namespace "quartz":
     cdef cppclass SimpleHybridEnv:
         SimpleHybridEnv()
-        SimpleHybridEnv(const string &, BackendType, const string &, int, double, int, bool, double)
+        SimpleHybridEnv(const string &, BackendType, const string &, int, double, int, int, int, bool, double)
         void reset()
         Reward step(Action)
         bool is_finished()

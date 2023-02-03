@@ -15,11 +15,12 @@ namespace quartz {
                 const std::string &qasm_file_path, BackendType backend_type,
                 const std::string &_initial_mapping_file,
                 // Game buffer settings
-                int _seed, double _start_from_internal_prob,
+                int _seed, double _start_from_internal_prob, int _game_buffer_size, int _save_interval,
                 // GameHybrid settings
                 int _initial_phase_len, bool _allow_nop_in_initial, double _initial_phase_reward
         )
-                : game_buffer(_seed), random_generator(_seed), original_qasm_file_path(qasm_file_path) {
+                : game_buffer(_seed, _game_buffer_size), random_generator(_seed),
+                  original_qasm_file_path(qasm_file_path) {
             /// A simple hybrid environment that does not use curriculum
             // initialize context, graph and device
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
@@ -54,12 +55,15 @@ namespace quartz {
             Assert(!is_circuit_finished(cur_game_ptr->graph), "Empty GameHybrid found!");
 
             // initialize game buffer (game_buffer is initialize above)
+            game_buffer_size = _game_buffer_size;
+            save_interval = _save_interval;
+            cur_save_step = 0;
             start_from_internal_prob = _start_from_internal_prob;
             game_buffer.save(*cur_game_ptr);
         }
 
         SimpleHybridEnv(const SimpleHybridEnv &old_env)
-                : game_buffer(old_env.seed), random_generator(old_env.seed) {
+                : game_buffer(old_env.seed, old_env.game_buffer_size), random_generator(old_env.seed) {
             // basic parameters
             // TODO: context here refer to the same object when copy, consider changing it if necessary
             device_reg_count = old_env.device_reg_count;
@@ -72,6 +76,9 @@ namespace quartz {
             graph = std::make_shared<Graph>(graph_copy);
 
             // game buffer
+            game_buffer_size = old_env.game_buffer_size;
+            save_interval = old_env.save_interval;
+            cur_save_step = old_env.cur_save_step;
             start_from_internal_prob = old_env.start_from_internal_prob;
             game_buffer.random_generator = old_env.game_buffer.random_generator;
             game_buffer.buffer = old_env.game_buffer.buffer;
@@ -118,8 +125,11 @@ namespace quartz {
             // apply action
             Reward reward = cur_game_ptr->apply_action(action);
 
-            // save game to buffer
-            if (!is_finished()) game_buffer.save(*cur_game_ptr);
+            // save game to buffer every #save_interval steps
+            cur_save_step += 1;
+            if (cur_save_step % save_interval == 0) {
+                if (!is_finished()) game_buffer.save(*cur_game_ptr);
+            }
 
             // return reward
             return reward;
@@ -173,6 +183,9 @@ namespace quartz {
         std::shared_ptr<GameHybrid> cur_game_ptr;
 
         // game buffer
+        int game_buffer_size;
+        int save_interval;
+        int cur_save_step;
         double start_from_internal_prob;
         GameHybridBuffer game_buffer;
 

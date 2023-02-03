@@ -64,11 +64,11 @@ namespace quartz {
     public:
         GameHybridBuffer() = delete;
 
-        explicit GameHybridBuffer(int seed) : random_generator(seed) {}
+        explicit GameHybridBuffer(int seed, int _buffer_size) : random_generator(seed), buffer_size(_buffer_size) {}
 
         void save(const GameHybrid& game) {
             buffer.emplace_back(game);
-            if (buffer.size() > 1000) {
+            if (buffer.size() > buffer_size) {
                 buffer.pop_front();
             }
         }
@@ -85,5 +85,6 @@ namespace quartz {
     public:
         std::mt19937 random_generator;
         std::deque<GameHybrid> buffer;
+        int buffer_size;
     };
 }

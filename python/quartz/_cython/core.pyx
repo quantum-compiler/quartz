@@ -997,14 +997,14 @@ cdef class PySimpleHybridEnv:
                   # basic parameters
                   qasm_file_path: str, backend_type_str: str, initial_mapping_file_path: str,
                   # randomness and buffer
-                  seed: int, start_from_internal_prob: float,
+                  seed: int, start_from_internal_prob: float, game_buffer_size: int, save_interval: int,
                   # GameHybrid
                   initial_phase_len: int, allow_nop_in_initial: bool, initial_phase_reward: double):
         cdef string encoded_path = qasm_file_path.encode('utf-8')
         cdef BackendType cur_backend_type = ToBackendType(backend_type_str)
         cdef string encoded_initial_mapping_path = initial_mapping_file_path.encode('utf-8')
         self.env = new SimpleHybridEnv(encoded_path, cur_backend_type, encoded_initial_mapping_path,
-                                       seed, start_from_internal_prob,
+                                       seed, start_from_internal_prob, game_buffer_size, save_interval,
                                        initial_phase_len, allow_nop_in_initial, initial_phase_reward)
 
     def __dealloc__(self):

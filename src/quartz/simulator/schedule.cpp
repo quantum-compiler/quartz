@@ -69,7 +69,7 @@ bool Schedule::compute_end_schedule(
     const std::vector<std::vector<int>> &kernels,
     Schedule::KernelCostType &result_cost,
     std::vector<std::vector<int>> *result_kernels) {
-  const int num_kernels = kernels.size();
+  const int num_kernels = (int)kernels.size();
   const int max_kernel_size = (int)kernel_costs.size() - 1;
   std::vector<std::vector<int>> kernels_of_size(max_kernel_size + 1);
   for (int i = 0; i < num_kernels; i++) {
@@ -122,7 +122,7 @@ bool Schedule::compute_end_schedule(
         }
       }
     }
-    if (!current_kernel.empty()) {
+    if (current_kernel_size != 0) {
       result_cost += kernel_costs[current_kernel_size];
       if (result_kernels != nullptr) {
         std::sort(current_kernel.begin(), current_kernel.end());
@@ -169,7 +169,7 @@ bool Schedule::compute_kernel_schedule(
       }
       sets.insert(sets.begin() + insert_position, s);
     }
-    bool check_valid() const {
+    [[nodiscard]] bool check_valid() const {
       std::vector<bool> has_qubit;
       for (int i = 0; i < (int)sets.size(); i++) {
         for (int j = 0; j < (int)sets[i].size(); j++) {
@@ -230,7 +230,7 @@ bool Schedule::compute_kernel_schedule(
       }
       return true;
     }
-    std::string to_string() const {
+    [[nodiscard]] std::string to_string() const {
       std::string result;
       result += "{";
       for (int i = 0; i < (int)sets.size(); i++) {
@@ -283,7 +283,7 @@ bool Schedule::compute_kernel_schedule(
   };
   struct LocalSchedule {
   public:
-    bool check_valid() const {
+    [[nodiscard]] bool check_valid() const {
       std::vector<bool> has_qubit;
       for (int i = 0; i < (int)sets.size(); i++) {
         for (int j = 0; j < (int)sets[i].size(); j++) {
@@ -300,7 +300,7 @@ bool Schedule::compute_kernel_schedule(
       }
       return true;
     }
-    std::string to_string() const {
+    [[nodiscard]] std::string to_string() const {
       std::string result;
       result += "{";
       for (int i = 0; i < (int)sets.size(); i++) {
@@ -347,11 +347,22 @@ bool Schedule::compute_kernel_schedule(
           }
         }
       };
-  // debug
-  std::cout << sequence_.to_string() << std::endl;
+  constexpr bool debug = true;
+  if (debug) {
+    std::cout << "Start DP:" << std::endl;
+    std::cout << "Local qubits: ";
+    for (int i = 0; i < num_qubits; i++) {
+      if (is_local_qubit(i)) {
+        std::cout << i << ", ";
+      }
+    }
+    std::cout << std::endl;
+    std::cout << sequence_.to_string() << std::endl;
+  }
   for (int i = 0; i < num_gates; i++) {
-    // debug
-    std::cout << "DP: " << i << " " << f[i & 1].size() << std::endl;
+    if (debug) {
+      std::cout << "DP: i=" << i << " size=" << f[i & 1].size() << std::endl;
+    }
     // Update from f[i & 1] to f[~i & 1].
     f[~i & 1].clear();
     // Get the qubit indices of the current gate.
@@ -364,8 +375,9 @@ bool Schedule::compute_kernel_schedule(
       if (input_wire->is_qubit() && is_local_qubit(input_wire->index)) {
         current_index[input_wire->index] = true;
         current_indices.push_back(input_wire->index);
-        // debug
-        std::cout << "current index " << input_wire->index << std::endl;
+        if (debug) {
+          std::cout << "current index " << input_wire->index << std::endl;
+        }
       }
     }
     std::sort(current_indices.begin(), current_indices.end());
@@ -375,8 +387,8 @@ bool Schedule::compute_kernel_schedule(
     //  |absorbed_qubits| set if they are partially in the set.
 
     // TODO: make these numbers configurable
-    constexpr int kMaxNumOfStatus = 10000;
-    constexpr int kShrinkToNumOfStatus = 5000;
+    constexpr int kMaxNumOfStatus = 4000;
+    constexpr int kShrinkToNumOfStatus = 2000;
     if (f[i & 1].size() > kMaxNumOfStatus) {
       // Pruning.
       std::vector<std::pair<
@@ -384,10 +396,11 @@ bool Schedule::compute_kernel_schedule(
           std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
                              StatusHash>::iterator>>
           costs;
-      // debug
-      std::cout << "Shrink f[" << i << "] from " << f[i & 1].size()
-                << " elements to " << kShrinkToNumOfStatus << " elements."
-                << std::endl;
+      if (debug) {
+        std::cout << "Shrink f[" << i << "] from " << f[i & 1].size()
+                  << " elements to " << kShrinkToNumOfStatus << " elements."
+                  << std::endl;
+      }
       costs.reserve(f[i & 1].size());
       KernelCostType lowest_cost, highest_cost; // for debugging
       for (auto it = f[i & 1].begin(); it != f[i & 1].end(); it++) {
@@ -398,13 +411,15 @@ bool Schedule::compute_kernel_schedule(
         compute_end_schedule(kernel_costs, it->first.sets, result_cost,
                              /*result_kernels=*/nullptr);
         costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
-        if (it == f[i & 1].begin() ||
-            result_cost + it->second.first > highest_cost) {
-          highest_cost = result_cost + it->second.first;
-        }
-        if (it == f[i & 1].begin() ||
-            result_cost + it->second.first < lowest_cost) {
-          lowest_cost = result_cost + it->second.first;
+        if (debug) {
+          if (it == f[i & 1].begin() ||
+              result_cost + it->second.first > highest_cost) {
+            highest_cost = result_cost + it->second.first;
+          }
+          if (it == f[i & 1].begin() ||
+              result_cost + it->second.first < lowest_cost) {
+            lowest_cost = result_cost + it->second.first;
+          }
         }
       }
       // Retrieve the first |kShrinkToNumOfStatus| lowest cost.
@@ -419,17 +434,33 @@ bool Schedule::compute_kernel_schedule(
         new_f.insert(f[i & 1].extract(costs[j].second));
       }
       f[i & 1] = new_f;
-      // debug
-      std::cout << "Costs shrank from [" << lowest_cost << ", " << highest_cost
-                << "] to [" << lowest_cost << ", "
-                << costs[kShrinkToNumOfStatus - 1].first << "]." << std::endl;
+      if (debug) {
+        std::cout << "Costs shrank from [" << lowest_cost << ", "
+                  << highest_cost << "] to [" << lowest_cost << ", "
+                  << costs[kShrinkToNumOfStatus - 1].first << "]." << std::endl;
+      }
     }
+
+    // for debugging
+    KernelCostType tmp_best_cost = 1e100;
+    Status tmp_status;
+    LocalSchedule tmp_schedule;
 
     for (auto &it : f[i & 1]) {
       auto &current_status = it.first;
       auto &current_cost = it.second.first;
       auto &current_local_schedule = it.second.second;
       assert(current_status.check_valid());
+      if (debug) {
+        KernelCostType tmp;
+        compute_end_schedule(kernel_costs, current_status.sets, tmp, nullptr);
+        tmp += current_cost;
+        if (tmp < tmp_best_cost) {
+          tmp_best_cost = tmp;
+          tmp_status = current_status;
+          tmp_schedule = current_local_schedule;
+        }
+      }
 
       int absorbing_set_index = -1;
       int absorb_count = 0;
@@ -656,7 +687,13 @@ bool Schedule::compute_kernel_schedule(
           /*current_merging_kernel=*/std::vector<int>(), /*cost=*/current_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
-  }
+    if (debug) {
+      std::cout << "best cost before i=" << i << ": " << tmp_best_cost
+                << std::endl;
+      std::cout << "open kernels: " << tmp_status.to_string() << std::endl;
+      std::cout << "closed kernels: " << tmp_schedule.to_string() << std::endl;
+    }
+  } // end of for (int i = 0; i < num_gates; i++)
   if (f[num_gates & 1].empty()) {
     return false;
   }

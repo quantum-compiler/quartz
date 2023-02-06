@@ -51,9 +51,9 @@ def solve_ilp(
     # minimize the total number of swaps
     prob += sum([s[i, j] for i in range(num_qubits) for j in range(num_iterations - 1)])
 
-    # For each iteration, we have at most k local qubits.
+    # For each iteration, we have exactly k local qubits.
     for j in range(num_iterations):
-        prob += sum([a[i, j] for i in range(num_qubits)]) <= num_local_qubits
+        prob += sum([a[i, j] for i in range(num_qubits)]) == num_local_qubits
 
     # The definition of |s|.
     for i in range(num_qubits):

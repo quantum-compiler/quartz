@@ -39,11 +39,26 @@ def solve_ilp(
         pulp.LpInteger,
     )
 
-    prob += 0  # minimize nothing
+    # s[i, j] = 1 iff a[i, j + 1] = 1 and a[i, j] = 0
+    s = pulp.LpVariable.dicts(
+        "s",
+        [(i, j) for i in range(num_qubits) for j in range(num_iterations - 1)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
 
-    # For each iteration, we have at most k local qubits.
+    # minimize the total number of swaps
+    prob += sum([s[i, j] for i in range(num_qubits) for j in range(num_iterations - 1)])
+
+    # For each iteration, we have exactly k local qubits.
     for j in range(num_iterations):
-        prob += sum([a[i, j] for i in range(num_qubits)]) <= num_local_qubits
+        prob += sum([a[i, j] for i in range(num_qubits)]) == num_local_qubits
+
+    # The definition of |s|.
+    for i in range(num_qubits):
+        for j in range(num_iterations - 1):
+            prob += a[i, j + 1] <= a[i, j] + s[i, j]
 
     # If a gate is executed before or at the j-th iteration,
     # this should also hold in the (j+1)-th iteration.

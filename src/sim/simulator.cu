@@ -189,8 +189,10 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       // cudaEventCreate(&t_start[i]);
       // cudaEventCreate(&t_end[i]);
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
-      cudaEventCreateWithFlags(&t_start[i], cudaEventBlockingSync);
-      cudaEventCreateWithFlags(&t_end[i], cudaEventBlockingSync);
+      // cudaEventCreateWithFlags(&t_start[i], cudaEventBlockingSync);
+      // cudaEventCreateWithFlags(&t_end[i], cudaEventBlockingSync);
+      cudaEventCreate(&t_start[i]);
+      cudaEventCreate(&t_end[i]);
       cudaEventRecord(t_start[i], s[i]);
     }
 

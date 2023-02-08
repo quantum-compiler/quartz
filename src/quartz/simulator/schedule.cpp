@@ -107,7 +107,7 @@ bool Schedule::compute_end_schedule(
     int current_kernel_size = 0;
     for (int i = optimal_kernel_size - 1; i >= 1; i--) {
       while (!kernels_of_size[i].empty()) {
-        if (current_kernel.size() + i <= optimal_kernel_size) {
+        if (current_kernel_size + i <= optimal_kernel_size) {
           // Add a kernel of size i to the current kernel.
           if (result_kernels != nullptr) {
             current_kernel.insert(current_kernel.end(),

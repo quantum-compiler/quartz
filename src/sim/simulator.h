@@ -101,6 +101,7 @@ public:
   int n_devices;
   int subSvSize;
   unsigned n_qubits, n_local, n_global;
+  unsigned n_global_within_node = 0;
   int devices[MAX_DEVICES];
   std::vector<unsigned> permutation;
   cudaStream_t s[MAX_DEVICES];

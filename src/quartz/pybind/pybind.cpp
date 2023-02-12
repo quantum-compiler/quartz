@@ -2,8 +2,8 @@
 
 #include <cstdlib>
 #include <filesystem>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 
@@ -35,7 +35,8 @@ void init_python_interpreter() {
   fin.close();
   std::string python_home_env = "PYTHONHOME=" + python_home_path;
   _putenv(python_home_env.c_str());
-  std::string python_path = "PYTHONPATH=" + python_home_path + "\\Lib\\site-packages;" + new_python_path;
+  std::string python_path = "PYTHONPATH=" + python_home_path +
+                            "\\Lib\\site-packages;" + new_python_path;
   _putenv(python_path.c_str());
 #else
   setenv("PYTHONPATH", new_python_path.c_str(), 1);

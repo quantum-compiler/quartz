@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 
@@ -26,7 +27,15 @@ void init_python_interpreter() {
   }
   new_python_path += python_module_path.string();
 #ifdef WIN32
-  std::string python_path = "PYTHONPATH=" + new_python_path;
+  system("python -c \"import sys;"
+         "print(sys.prefix)\" > tmp.txt");
+  std::ifstream fin("tmp.txt");
+  std::string python_home_path;
+  std::getline(fin, python_home_path);
+  fin.close();
+  std::string python_home_env = "PYTHONHOME=" + python_home_path;
+  _putenv(python_home_env.c_str());
+  std::string python_path = "PYTHONPATH=" + python_home_path + "\\Lib\\site-packages;" + new_python_path;
   _putenv(python_path.c_str());
 #else
   setenv("PYTHONPATH", new_python_path.c_str(), 1);

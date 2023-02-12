@@ -10,8 +10,8 @@ import math
 import multiprocessing as mp
 import os
 import sys
-
 import z3
+
 from .gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

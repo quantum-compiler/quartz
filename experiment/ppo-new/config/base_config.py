@@ -95,7 +95,6 @@ class BaseConfig:
 
     # multiprocessing
     mp_start_method: str = 'spawn'  # fork
-    obs_per_agent: int = 0
 
     # exp collection
     cost_type: str = 'gate_count'

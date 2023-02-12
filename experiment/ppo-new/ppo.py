@@ -13,7 +13,6 @@ import hydra
 import qtz
 import torch
 import torch.distributed as dist
-import torch.distributed.rpc as rpc
 import torch.multiprocessing as mp
 import wandb
 from actor import PPOAgent
@@ -72,7 +71,11 @@ class PPOMod:
         print(f'output_dir : {self.output_dir}')
         print('=========================================')
 
-    def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
+    def init_process(
+        self,
+        rank: int,
+        tot_processes: int,
+    ) -> None:
         seed_all(self.cfg.seed + rank)
         """init Quartz for each process"""
         self.init_quartz_context_func()
@@ -82,46 +85,30 @@ class PPOMod:
             os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
         # otherwise we don't limit it
 
-        """RPC and DDP initialization"""
+        """DDP initialization"""
         # Ref: https://pytorch.org/tutorials/advanced/rpc_ddp_tutorial.html
         self.rank = rank
-        self.ddp_processes = ddp_processes
-        tot_processes = ddp_processes + obs_processes
-        rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            init_method=f'tcp://localhost:{self.cfg.ddp_port + 1}',
-            rpc_timeout=0,
-        )
+        self.tot_processes = tot_processes
+        self.ddp_processes = tot_processes - 1
 
-        if rank < ddp_processes:
+        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
+            self.device = torch.device('cpu')
+        else:
+            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
+        torch.cuda.set_device(self.device)
+
+        if rank < self.ddp_processes:
             """init agent processes"""
-            agent_name = get_agent_name(rank)
-            rpc.init_rpc(
-                name=agent_name,
-                rank=rank,
-                world_size=tot_processes,
-                rpc_backend_options=rpc_backend_options,
-            )
             dist.init_process_group(
                 backend='nccl',
                 init_method=f'tcp://localhost:{self.cfg.ddp_port}',
                 rank=rank,
-                world_size=ddp_processes,
+                world_size=self.ddp_processes,
             )
             self.train()
         else:
-            """init observer processes"""
-            obs_rank = rank - ddp_processes
-            agent_rref_id = obs_rank // self.cfg.obs_per_agent
-            obs_in_agent_rank = obs_rank % self.cfg.obs_per_agent
-            obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
-            rpc.init_rpc(
-                name=obs_name,
-                rank=rank,
-                world_size=tot_processes,
-                rpc_backend_options=rpc_backend_options,
-            )
-        # block until all rpcs finish
-        rpc.shutdown()
+            """init search processes"""
+            self.search()
 
     def _make_actor_critic(
         self,
@@ -143,13 +130,35 @@ class PPOMod:
             device=self.device,
         ).to(self.device)
 
+    @torch.no_grad()
+    def search(self) -> None:
+        self.ac_net: ActorCritic = self._make_actor_critic()
+        self.searcher = Searcher(
+            agent_id=self.rank,
+            num_agents=self.ddp_processes,
+            device=self.device,
+            batch_inference=self.cfg.batch_inference,
+            invalid_reward=self.cfg.invalid_reward,
+            limit_total_gate_count=self.cfg.limit_total_gate_count,
+            cost_type=CostType.from_str(self.cfg.cost_type),
+            ac_net=self.ac_net_old,
+            input_graphs=self.input_graphs,
+            softmax_temp_en=self.cfg.softmax_temp_en,
+            hit_rate=self.cfg.hit_rate,
+            dyn_eps_len=self.cfg.dyn_eps_len,
+            max_eps_len=self.cfg.max_eps_len,
+            min_eps_len=self.cfg.min_eps_len,
+            subgraph_opt=self.cfg.subgraph_opt,
+            output_full_seq=self.cfg.output_full_seq,
+            output_dir=self.output_dir,
+        )
+        printfl(
+            f'(searcher) rank {self.rank} / {self.ddp_processes} on {self.device} initialized'
+        )
+        self.searcher.search()
+
     def train(self) -> None:
         """init agent and network"""
-        if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-            self.device = torch.device('cpu')
-        else:
-            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
-        torch.cuda.set_device(self.device)
         self.ac_net: ActorCritic = self._make_actor_critic()
         self.ac_net = cast(
             ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
@@ -158,7 +167,6 @@ class PPOMod:
         self.agent = PPOAgent(
             agent_id=self.rank,
             num_agents=self.ddp_processes,
-            num_observers=self.cfg.obs_per_agent,
             device=self.device,
             batch_inference=self.cfg.batch_inference,
             invalid_reward=self.cfg.invalid_reward,
@@ -275,21 +283,6 @@ class PPOMod:
                 self.cfg.nop_stop,
                 self.cfg.greedy_sample,
             )
-        else:  # use observers to collect data
-            collect_fn = partial(
-                self.agent.collect_data,
-                self.cfg.max_cost_ratio,
-                self.cfg.nop_stop,
-                self.cfg.greedy_sample,
-            )
-            exp_list = collect_fn()
-            # support the case that (self.agent_batch_size > self.cfg.obs_per_agent)
-            for i in range(
-                self.cfg.num_eps_per_iter
-                // (self.ddp_processes * self.cfg.obs_per_agent)
-                - 1
-            ):
-                exp_list += collect_fn()
         e_time_collect = get_time_ns()
         dur_s_collect = dur_ms(e_time_collect, s_time_collect) / 1e3
         self.tot_exps_collected += len(exp_list)
@@ -651,28 +644,23 @@ def main(config: Config) -> None:
 
     ppo_mod = PPOMod(cfg, output_dir)
 
-    ddp_processes = 1
+    tot_processes = 1
     if len(cfg.gpus) > 1:
-        ddp_processes = len(cfg.gpus)
+        tot_processes = len(cfg.gpus)
     mp.set_start_method(cfg.mp_start_method)
     if cfg.mode == 'train':
-        obs_processes = ddp_processes * cfg.obs_per_agent
-        tot_processes = ddp_processes + obs_processes
         print(f'spawning {tot_processes} processes...')
         mp.spawn(
             fn=ppo_mod.init_process,
-            args=(
-                ddp_processes,
-                obs_processes,
-            ),
+            args=(tot_processes,),
             nprocs=tot_processes,
             join=True,
         )
     elif cfg.mode == 'test':
         mp.spawn(
             fn=ppo_mod.test,
-            args=(ddp_processes,),
-            nprocs=ddp_processes,
+            args=(tot_processes,),
+            nprocs=tot_processes,
             join=True,
         )
     elif cfg.mode == 'convert':

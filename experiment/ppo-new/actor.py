@@ -29,138 +29,11 @@ from utils import *
 # import quartz # type: ignore
 
 
-class Observer:
-    def __init__(
-        self,
-        obs_id: int,
-        agent_id: int,
-        batch_inference: bool,
-        invalid_reward: float,
-        cost_type: CostType,
-    ) -> None:
-        self.id = obs_id
-        self.agent_id = agent_id
-        self.batch_inference = batch_inference
-        self.invalid_reward = invalid_reward
-        self.cost_type = cost_type
-
-    def run_episode(
-        self,
-        agent_rref: rpc.RRef[PPOAgent],
-        init_state_str: str,
-        original_state_str: str,  # input graph, used to limit the cost
-        max_eps_len: int,
-        max_cost_ratio: float,
-        nop_stop: bool,
-    ) -> List[SerializableExperience]:
-        """Interact with env for many steps to collect data.
-        If `batch_inference` is `True`, we call `select_action_batch` of the agent,
-        so we have to run a fixed number of steps.
-        If an episode stops in advance, we start a new one to continue running.
-
-        If `batch_inference` is `False`, we can run just one episode.
-
-        Returns:
-            List[SerializableExperience]: a list of experiences collected in this function
-        """
-        init_graph = qtz.qasm_to_graph(init_state_str)
-        original_graph = qtz.qasm_to_graph(original_state_str)
-        original_cost = get_cost(init_graph, self.cost_type)
-        exp_list: List[SerializableExperience] = []
-
-        graph = init_graph
-        graph_str = init_state_str
-        info: Dict[str, Any] = {'start': True}
-        last_eps_end: int = -1
-        for i_step in range(max_eps_len):
-            """get action (action_node, xfer_dist) from agent"""
-            actmp: ActionTmp
-            if self.batch_inference:
-                actmp = agent_rref.rpc_sync().select_action_batch(
-                    self.id,
-                    graph.to_qasm_str(),
-                )
-            else:
-                actmp = agent_rref.rpc_sync().select_action(
-                    self.id,
-                    graph.to_qasm_str(),
-                )
-            """sample action_xfer with mask"""
-            av_xfers = graph.available_xfers_parallel(
-                context=qtz.quartz_context, node=graph.get_node_from_id(id=actmp.node)
-            )
-            av_xfer_mask = torch.BoolTensor([0] * qtz.quartz_context.num_xfers)
-            av_xfer_mask[av_xfers] = True
-            # (action_dim, )  only sample from available xfers
-            softmax_xfer = masked_softmax(actmp.xfer_dist, av_xfer_mask)
-            xfer_dist = Categorical(softmax_xfer)
-            action_xfer = xfer_dist.sample()
-            action_xfer_logp: torch.Tensor = xfer_dist.log_prob(action_xfer)
-
-            """apply action"""
-            action = Action(actmp.node, action_xfer.item())
-            next_nodes: List[int]
-            next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
-                xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                node=graph.get_node_from_id(id=action.node),
-                eliminate_rotation=qtz.has_parameterized_gate,
-            )
-            """parse result, compute reward"""
-            if next_graph is None:
-                reward = self.invalid_reward
-                game_over = True
-                next_graph_str = graph_str  # CONFIRM placeholder?
-            elif qtz.is_nop(action.xfer):
-                reward = 0
-                game_over = nop_stop
-                next_graph_str = graph_str  # unchanged
-                next_nodes = [action.node]  # CONFIRM
-            else:
-                graph_cost = get_cost(graph, self.cost_type)
-                next_graph_cost = get_cost(next_graph, self.cost_type)
-                reward = graph_cost - next_graph_cost
-                game_over = (graph_cost > original_cost * max_cost_ratio) or (
-                    graph.gate_count > original_graph.gate_count * max_cost_ratio
-                )
-                next_graph_str = next_graph.to_qasm_str()
-
-            exp = SerializableExperience(
-                graph_str,
-                action,
-                reward,
-                next_graph_str,
-                game_over,
-                actmp.node_value,
-                next_nodes,
-                av_xfer_mask,
-                action_xfer_logp.item(),
-                copy.deepcopy(info),
-            )
-            exp_list.append(exp)
-            info['start'] = False
-            if game_over:
-                if self.batch_inference:
-                    graph = init_graph
-                    graph_str = init_state_str
-                    info['start'] = True
-                    last_eps_end = i_step
-                else:
-                    break
-            else:
-                graph = next_graph
-                graph_str = next_graph_str
-        # end for
-        if i_step - last_eps_end >= max_eps_len:
-            exp_list[-1].game_over = True  # eps len exceeds limit
-        return exp_list
-
-
 class PPOAgent:
     def __init__(
         self,
         agent_id: int,
         num_agents: int,
-        num_observers: int,
         device: torch.device,
         batch_inference: bool,
         invalid_reward: float,
@@ -196,24 +69,6 @@ class PPOAgent:
         self.softmax_temp_en = softmax_temp_en
         self.hit_rate = hit_rate
 
-        """init Observers on the other processes and hold the refs to them"""
-        self.obs_rrefs: List[rpc.RRef] = []
-        for obs_rank in range(0, num_observers):
-            ob_info = rpc.get_worker_info(get_obs_name(self.id, obs_rank))
-            self.obs_rrefs.append(
-                rpc.remote(
-                    ob_info,
-                    Observer,
-                    args=(
-                        obs_rank,
-                        self.id,
-                        batch_inference,
-                        invalid_reward,
-                        self.cost_type,
-                    ),
-                )
-            )
-
         self.graph_buffers: List[GraphBuffer] = [
             GraphBuffer(
                 input_graph['name'],
@@ -224,12 +79,6 @@ class PPOAgent:
             for input_graph in input_graphs
         ]
         self.init_buffer_turn: int = 0
-
-        """helper vars for select_action"""
-        self.future_actions: Future[List[ActionTmp]] = Future()
-        self.pending_states = len(self.obs_rrefs)
-        self.states_buf: List[dgl.DGLGraph] = [None] * len(self.obs_rrefs)
-        self.lock = threading.Lock()
 
     @torch.no_grad()
     def select_action(self, obs_id: int, state_str: str) -> ActionTmp:

@@ -393,7 +393,7 @@ class GraphBuffer:
         self.shrink()
 
     def shrink(self) -> None:
-        mem_perct_th = 82.5
+        mem_perct_th = 80
         vmem_perct = vmem_used_perct()
         old_len = len(self)
         if vmem_perct > mem_perct_th:
@@ -403,7 +403,7 @@ class GraphBuffer:
         if old_len > self.max_len:
             printfl(f'Buffer {self.name} starts to shrink.')
             while len(self) > self.max_len:
-                self.pop_some(len(self) - int(self.max_len))
+                self.pop_some(min(2 * (len(self) - int(self.max_len)), len(self) - 2))
             printfl(
                 f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).'
             )
@@ -427,7 +427,7 @@ class GraphBuffer:
                 graphs = self.cost_to_graph[gcost]
             graphs.append(graph)
             idx_to_pop = 0 if gcost != self.original_cost else 1
-            while len(graphs) > int(500):  # NOTE: limit num of graphs of each kind
+            while len(graphs) > int(2000):  # NOTE: limit num of graphs of each kind
                 popped_graph = graphs.pop(idx_to_pop)
                 self.hashset.remove(hash(popped_graph))
             # while len(self) > self.max_len:

@@ -929,7 +929,8 @@ class PPOAgent:
                     and not qtz.is_nop(action.xfer)
                     and next_graph_cost <= get_cost(graph_seq[0], self.cost_type)
                 ):
-                    graph_buffer.push_back(next_graph)
+                    if not greedy_sample or next_graph_cost < cur_best_cost + 6:
+                        graph_buffer.push_back(next_graph)
                     """best graph maintenance"""
                     if next_graph_cost < cur_best_cost:
                         # create a list of tuple: (graph, action taken on this graph, reward of action)

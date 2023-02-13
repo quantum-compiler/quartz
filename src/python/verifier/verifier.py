@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 """
-We represent a matrix as list of list of pairs, where a pair
+We represent a matrix as list of pairs, where a pair
 is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
@@ -12,7 +12,8 @@ import os
 import sys
 
 import z3
-from gates import add, compute, get_matrix, neg  # for searching phase factors
+
+from .gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))

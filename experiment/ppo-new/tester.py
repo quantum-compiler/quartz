@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import heapq
+import json
 import os
+from typing import Dict, List, Optional
 
 import hydra
 import qtz
@@ -11,6 +13,7 @@ import wandb
 from config.config import *
 from ds import *
 from model.actor_critic import ActorCritic
+from natsort import natsorted
 from torch.distributions import Categorical
 from tqdm import tqdm  # type: ignore
 from utils import *
@@ -59,146 +62,314 @@ class Tester:
         ac_net: ActorCritic,
         device: torch.device,
         output_dir: str,
-        rank: int,
+        sync_tuning_dir: bool,
+        # rank: int,
+        hit_rate: float,
+        batch_size: int,
+        max_loss_tolerance: float,
+        max_search_sec: float,
     ) -> None:
         self.cost_type = cost_type
         self.ac_net = ac_net
         self.device = device
         self.output_dir = output_dir
-        self.rank = rank
+        self.sync_tuning_dir = sync_tuning_dir
+        # self.rank = rank
+        self.hit_rate = hit_rate
+        self.batch_size = batch_size
+        self.max_loss_tolerance = max_loss_tolerance
+        self.max_search_sec = max_search_sec
 
-    def beam_search(
+    def search(
         self,
-        input_graph: quartz.PyGraph,
-        topk: int,
-        max_eps_len: int,
-        name: str,
-        budget: int = int(1e6),
-    ) -> Tuple[int, float]:
+        input_graphs: Dict[str, quartz.PyGraph],
+    ) -> None:
+        best_graphs = input_graphs
+        while True:
+            """update model from ckpt"""
+            latest_info_path = os.path.join(self.output_dir, 'ckpts', 'latest.json')
+            if self.sync_tuning_dir and os.path.exists(latest_info_path):
+                while True:
+                    try:
+                        with open(latest_info_path, 'r') as f:
+                            latest_info = json.load(f)
+                        break
+                    except json.decoder.JSONDecodeError as e:
+                        time.sleep(1)
+                        continue
+                loss: float = latest_info['loss']
+                ckpt_path: str = latest_info['path']
+                if loss < self.max_loss_tolerance:
+                    ckpt = torch.load(ckpt_path, map_location=self.device)
+                    model_state_dict = ckpt['model_state_dict']
+                    self.ac_net.load_state_dict(model_state_dict)
+                    printfl(f'Test: use {loss = } , {ckpt_path = }')
+                else:
+                    printfl(f'Test: ignore {loss = } , {ckpt_path = }')
 
-        cur_graph: quartz.PyGraph = input_graph
-        cur_cost = get_cost(cur_graph, self.cost_type)
-        cur_hash = hash(cur_graph)
-        prev_exp = PrevExp(cur_graph, cur_hash, 0, cur_cost, Action(0, 0), 0, 0, 0)
-
-        hash_prevexp: Dict[int, PrevExp] = {cur_hash: prev_exp}
-        q: List[PrevExp] = [prev_exp]
-        best_graph, best_cost, best_hash, best_time = (
-            cur_graph,
-            cur_cost,
-            cur_hash,
-            time.time(),
-        )
-
-        with tqdm(
-            total=cur_cost,
-            desc=f'rank {self.rank} cost reduced',
-            bar_format='{desc}: {n}/{total} |{bar}| {elapsed} {postfix}',
-        ) as pbar:
-            start_time = time.time()
-            while len(q) > 0 and budget > 0:
-                popped_exp = heapq.heappop(q)
-                budget -= 1
-                cur_graph = popped_exp.cur_graph
-
-                dgl_graph = cur_graph.to_dgl_graph().to(self.device)
-                node_embeds: torch.Tensor = self.ac_net.graph_embedding(dgl_graph)
-                node_values: torch.Tensor = self.ac_net.critic(node_embeds).squeeze()
-                topk_node_values, topk_nodes = torch.topk(node_values, topk)
-                for action_node_value, action_node in zip(topk_node_values, topk_nodes):
-                    action_node_embed = node_embeds[action_node]
-                    xfer_logits: torch.Tensor = self.ac_net.actor(action_node_embed)
-                    av_xfers = cur_graph.available_xfers_parallel(
-                        context=qtz.quartz_context,
-                        node=cur_graph.get_node_from_id(id=action_node),
+            """search better circs"""
+            for circ_name, circ in best_graphs.items():
+                ret_circ = self.random_search(circ_name, circ)
+                if ret_circ:  # better
+                    best_graphs[circ_name] = ret_circ
+                    printfl(
+                        f'Test: better circ: cost = {get_cost(ret_circ, self.cost_type)}'
                     )
-                    av_mask = torch.BoolTensor([0] * qtz.quartz_context.num_xfers).to(
-                        self.device
-                    )
-                    av_mask[av_xfers] = True
-                    xfer_logits[~av_mask] -= 1e10
-                    topk_xfer_logits, topk_xfers = torch.topk(xfer_logits, k=topk)
-                    for action_xfer_logit, action_xfer in zip(
-                        topk_xfer_logits, topk_xfers
-                    ):
-                        action = Action(int(action_node), int(action_xfer))
-                        (
-                            next_graph,
-                            next_nodes,
-                        ) = cur_graph.apply_xfer_with_local_state_tracking(
-                            xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
-                            node=cur_graph.get_node_from_id(id=action.node),
-                            eliminate_rotation=qtz.has_parameterized_gate,
-                        )
-                        if next_graph is not None:
-                            next_hash = hash(next_graph)
-                            if (
-                                next_hash not in hash_prevexp
-                                and popped_exp.depth + 1 < max_eps_len
-                            ):
-                                next_cost = get_cost(next_graph, self.cost_type)
-                                action_node_value = float(action_node_value)
-                                action_xfer_logit = float(action_xfer_logit)
-                                prev_exp = PrevExp(
-                                    next_graph,
-                                    next_hash,
-                                    popped_exp.cur_hash,
-                                    next_cost,
-                                    action,
-                                    action_node_value,
-                                    action_xfer_logit,
-                                    popped_exp.depth + 1,
-                                )
-                                hash_prevexp[next_hash] = prev_exp
-                                heapq.heappush(q, prev_exp)
 
-                                if next_cost < best_cost:
-                                    pbar.update(best_cost - next_cost)
-                                    best_graph, best_cost, best_hash, best_time = (
-                                        next_graph,
-                                        next_cost,
-                                        next_hash,
-                                        time.time(),
-                                    )
-                                    time_delta_sec = best_time - start_time
-                                    printfl(
-                                        f'rank {self.rank} Better graph with cost {best_cost} is found in {time_delta_sec} s ({sec_to_hms(time_delta_sec)})!'
-                                        f' node_value: {action_node_value}'
-                                        f' xfer_logits: {action_xfer_logit} ({action_xfer_logit / float(xfer_logits.sum())})'
-                                    )
-                                # end if
-                            # end if
-                        # end if
-                    # end for xfer
-                # end for node
-                pbar.set_postfix(
+            """dump best circs"""
+            if self.sync_tuning_dir:
+                sync_dir = os.path.join(self.output_dir, 'sync_dir')
+                os.makedirs(sync_dir, exist_ok=True)
+                best_info = [
                     {
-                        'cur_cost': popped_exp.cur_cost,
-                        'best_cost': best_cost,
-                        '|q|': len(q),
-                        '|hash_prevexp|': len(hash_prevexp),
-                        'budget': budget,
+                        'name': name,
+                        'best_cost': get_cost(circ, self.cost_type),
+                        'qasm': circ.to_qasm_str(),
                     }
+                    for name, circ in best_graphs.items()
+                ]
+                with open(os.path.join(sync_dir, f'best_info_search.json'), 'w') as f:
+                    json.dump(best_info, fp=f, indent=2)
+        # end while
+
+    @torch.no_grad()
+    def random_search(
+        self, circ_name: str, circ: quartz.PyGraph
+    ) -> Optional[quartz.PyGraph]:
+        circ_to_vis: Dict[quartz.PyGraph, int] = {circ: 1}
+        circ_to_softmask: Dict[quartz.Graph, torch.Tensor] = {}
+        circ_to_hardmask: Dict[quartz.Graph, torch.Tensor] = {}
+
+        def sample_start_circs(k: int) -> List[quartz.PyGraph]:
+            circs, weights = [], []
+            for circ, vis in circ_to_vis.items():
+                circs.append(circ)
+                weights.append(1 / vis)
+            sampled_circs = random.choices(circs, weights=weights, k=k)
+            return sampled_circs
+
+        best_circ = circ
+        cur_circs: List[quartz.PyGraph] = [best_circ] * self.batch_size
+        traj_lens: List[int] = [0] * self.batch_size
+        expand_times: int = 0
+        start_time = time.time()
+        while time.time() - start_time < self.max_search_sec:
+            """fetch best circ from tuning"""
+            if False:
+                best_info_dir = os.path.join(self.output_dir, 'sync_dir')
+                best_info_path = os.path.join(best_info_dir, 'best_info_0.json')
+                if self.sync_tuning_dir and os.path.exists(best_info_path):
+                    while True:
+                        try:
+                            with open(best_info_path, 'r') as f:
+                                best_info: list = json.load(f)
+                            break
+                        except json.decoder.JSONDecodeError as e:
+                            time.sleep(1)
+                            continue
+                    for circ_best_info in best_info:
+                        if circ_best_info['name'] == circ_name and circ_best_info[
+                            'best_cost'
+                        ] < get_cost(best_circ, self.cost_type):
+                            better_circ = qtz.qasm_to_graph(circ_best_info['qasm'])
+                            printfl(
+                                f'Test: get better circ from tuning, cost = {circ_best_info["best_cost"]}'
+                            )
+                            return better_circ
+            cir_dir = os.path.join(self.output_dir, circ_name)
+            if self.sync_tuning_dir and os.path.exists(cir_dir):
+                cir_seq_dirs = natsorted(os.listdir(cir_dir))
+                if len(cir_seq_dirs):
+                    better_seq = cir_seq_dirs[0]
+                    _better_cost = int(better_seq.split('_')[0])
+                    better_seq_dir = os.path.join(
+                        cir_dir, better_seq
+                    )  # outputs/2023-02-13/11-55-57/gf2^8_mult/859_0
+                    better_cost = 0
+                    while better_cost != _better_cost:
+                        better_circ_name: str = natsorted(
+                            os.listdir(better_seq_dir), reverse=True
+                        )[
+                            0
+                        ]  # 74_859_0_0_0.qasm
+                        better_cost = int(better_circ_name.split('_')[1])
+                    better_circ_path = os.path.join(better_seq_dir, better_circ_name)
+                    while better_cost < get_cost(best_circ, self.cost_type):
+                        time.sleep(2)
+                        try:
+                            with open(better_circ_path) as f:
+                                better_qasm = f.read()
+                            better_circ = qtz.qasm_to_graph(better_qasm)
+                            assert (
+                                get_cost(better_circ, self.cost_type) == better_cost
+                            ), f'{better_cost = }, {get_cost(better_circ, self.cost_type) = }'
+                            printfl(
+                                f'Test: get better circ from tuning, cost = {better_cost}'
+                            )
+                            return better_circ
+                        except Exception as e:
+                            printfl(f'Error when reading better circ from tuning: {e}')
+                            continue
+            """step forward"""
+            cur_circs = self.random_expand(
+                cur_circs,
+                circ_to_softmask,
+                circ_to_hardmask,
+                get_cost(best_circ, self.cost_type) + 6,
+            )
+            """prepare for next step"""
+            indices_to_sample: List[int] = []
+            tmp_best_circ = best_circ
+            for i, cur_circ in enumerate(cur_circs):
+                if (
+                    cur_circ is None
+                ):  # or get_cost(cur_circ, self.cost_type) > get_cost(best_circ, self.cost_type) + 6:
+                    indices_to_sample.append(i)
+                    traj_lens[i] = 0
+                elif get_cost(cur_circ, self.cost_type) < get_cost(
+                    tmp_best_circ, self.cost_type
+                ):
+                    tmp_best_circ = cur_circ
+                elif (
+                    get_cost(tmp_best_circ, self.cost_type)
+                    == get_cost(best_circ, self.cost_type)
+                    == get_cost(cur_circ, self.cost_type)
+                ):
+                    cur_circ_vis = circ_to_vis.get(cur_circ, 0)
+                    circ_to_vis[cur_circ] = cur_circ_vis + 1
+                    traj_lens[i] += 1
+
+            if get_cost(tmp_best_circ, self.cost_type) < get_cost(
+                best_circ, self.cost_type
+            ):
+                printfl(
+                    f'Test: get better circ by search, cost = {get_cost(tmp_best_circ, self.cost_type)}'
                 )
-                if budget % 1000 == 0:
-                    pbar.refresh()
-            # end while
-        # end with
-        """output seq"""
-        out_dir = os.path.join(self.output_dir, 'out_graphs', name)
-        os.makedirs(out_dir, exist_ok=True)
-        printfl(f'rank {self.rank} saving the path to {out_dir} ...')
-        prevexp_list: List[PrevExp] = []
+                return tmp_best_circ
 
-        cur_hash = best_hash
-        while cur_hash is not None and cur_hash != 0:
-            prev_exp = hash_prevexp[cur_hash]
-            prevexp_list.append(prev_exp)
-            cur_hash = prev_exp.prev_hash
+            sampled_circs = sample_start_circs(k=len(indices_to_sample))
+            for idx, sampled_circs in zip(indices_to_sample, sampled_circs):
+                cur_circs[idx] = sampled_circs
 
-        for i_step, prev_exp in enumerate(reversed(prevexp_list)):
-            file_name = f'{i_step}_{prev_exp.cur_cost}_{prev_exp.action.node}_{prev_exp.action.xfer}.qasm'
-            with open(os.path.join(out_dir, file_name), 'w') as f:
-                f.write(prev_exp.cur_graph.to_qasm_str())
+            expand_times += 1
+        # end while
+        printfl(
+            f'Test: did not find better circ in {self.max_search_sec} sec. Try to load new ckpt and restart...'
+        )
+        return None
 
-        return best_cost, best_time - start_time
+    def random_expand(
+        self,
+        cur_circs: List[quartz.PyGraph],
+        circ_to_soft_valid: Dict[quartz.Graph, torch.Tensor],
+        circ_to_hard_valid: Dict[quartz.Graph, torch.Tensor],
+        max_cost: int,
+    ) -> List[quartz.PyGraph]:
+        self.ac_net.eval()
+        num_eps = len(cur_circs)
+        """compute embeds and use Critic to evaluate each node"""
+        b_circs: dgl.DGLGraph = dgl.batch(
+            [circuit.to_dgl_graph() for circuit in cur_circs]
+        ).to(self.device)
+        num_nodes: torch.LongTensor = (
+            b_circs.batch_num_nodes()
+        )  # (num_graphs, ) assert each elem > 0
+        # (batch_num_nodes, embed_dim)
+        b_node_embeds: torch.Tensor = self.ac_net.gnn(b_circs)
+        # (batch_num_nodes, )
+        b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
+        # list with length num_graphs; each member is a tensor of node values in a graph
+        node_values_list: List[torch.Tensor] = torch.split(
+            b_node_values, num_nodes.tolist()
+        )
+        # (num_graphs, max_num_nodes)
+        b_node_values_pad = nn.utils.rnn.pad_sequence(
+            node_values_list,
+            batch_first=True,
+            padding_value=-math.inf,
+        )
+        """fetch node masks"""
+        nodes_valid_list: List[torch.Tensor] = []
+        for i_circ, circ in enumerate(cur_circs):
+            soft_valid_pad = torch.zeros(
+                (b_node_values_pad.shape[-1],), dtype=torch.bool
+            ).to(self.device)
+            soft_valid = circ_to_soft_valid.get(
+                circ, torch.ones((circ.gate_count,), dtype=torch.bool).to(self.device)
+            )
+            circ_to_soft_valid[circ] = soft_valid
+            soft_valid_pad[: circ.gate_count] = soft_valid
+
+            hard_valid_pad = torch.zeros(
+                (b_node_values_pad.shape[-1],), dtype=torch.bool
+            ).to(self.device)
+            hard_valid = circ_to_hard_valid.get(
+                circ, torch.ones((circ.gate_count,), dtype=torch.bool).to(self.device)
+            )
+            circ_to_hard_valid[circ] = hard_valid
+            hard_valid_pad[: circ.gate_count] = hard_valid
+
+            valid = soft_valid_pad & hard_valid_pad
+            if torch.any(valid):
+                nodes_valid_list.append(valid)
+            else:
+                nodes_valid_list.append(hard_valid_pad)
+        b_nodes_valid = torch.stack(nodes_valid_list)  # (num_graphs, max_num_nodes)
+        """sample node by softmax with temperature for each graph"""
+        temperatures = 1 / (
+            torch.log(self.hit_rate * (num_nodes - 1) / (1 - self.hit_rate))
+        )
+        node_logits = masked_softmax(
+            b_node_values_pad / temperatures.unsqueeze(1), b_nodes_valid
+        )
+        b_sampled_nodes = torch.multinomial(node_logits, 1).flatten()
+        action_nodes: List[int] = b_sampled_nodes.tolist()
+        node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(
+            self.device
+        )
+        node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
+        sampled_node_b_ids = b_sampled_nodes + node_offsets
+        # (num_graphs, embed_dim)
+        sampled_node_embeds = b_node_embeds[sampled_node_b_ids]
+        """use Actor to evaluate xfers for sampled nodes"""
+        # (num_graphs, action_dim)
+        xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
+        """sample action_xfer with mask"""
+        av_xfer_masks = torch.zeros_like(
+            xfer_logits, dtype=torch.bool
+        )  # device is the same with xfer_logits
+        av_xfer_masks = cast(torch.BoolTensor, av_xfer_masks)
+        for i_circ, circ in enumerate(cur_circs):
+            circ = cur_circs[i_circ]
+            av_xfers = circ.available_xfers_parallel(
+                context=qtz.quartz_context,
+                node=circ.get_node_from_id(id=action_nodes[i_circ]),
+            )
+            av_xfer_masks[i_circ][av_xfers] = True
+        # end for
+        # (num_graphs, action_dim)
+        softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
+        action_xfers: List[int] = (
+            torch.multinomial(softmax_xfer_logits, num_samples=1).flatten().tolist()
+        )
+        next_circs: List[quartz.PyGraph] = []
+        for i_circ, circ in enumerate(cur_circs):
+            xfer: quartz.PyXfer = qtz.quartz_context.get_xfer_from_id(
+                id=action_xfers[i_circ]
+            )
+            if (
+                xfer.is_nop
+                or circ.gate_count - xfer.src_gate_count + xfer.dst_gate_count
+                > max_cost
+            ):
+                next_circs.append(None)
+                circ_to_hard_valid[circ][action_nodes[i_circ]] = False
+            else:
+                next_circ: quartz.PyGraph = circ.apply_xfer(
+                    node=circ.get_node_from_id(id=action_nodes[i_circ]),
+                    xfer=xfer,
+                    eliminate_rotation=True,
+                )
+                next_circs.append(next_circ)
+        # end for
+        return next_circs

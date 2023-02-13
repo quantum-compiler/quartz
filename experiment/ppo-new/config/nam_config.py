@@ -132,6 +132,7 @@ class NamTestConfig(TestConfig):
             # ),
         ]
     )
+    num_gate_types: int = 29
 
 
 @dataclass

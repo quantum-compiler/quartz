@@ -117,9 +117,10 @@ def get_quartz_context(
     return quartz_context, quartz_parser
 
 
-def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor:
-    logits[~mask] -= 1e10
-    return F.softmax(logits, dim=-1)
+def masked_softmax(logits: torch.Tensor, valid_mask: torch.BoolTensor) -> torch.Tensor:
+    masked_logits = logits.clone()
+    masked_logits[~valid_mask] -= 1e10
+    return F.softmax(masked_logits, dim=-1)
 
 
 def split_reduce_mean(x: torch.Tensor, sizes: torch.LongTensor) -> torch.Tensor:

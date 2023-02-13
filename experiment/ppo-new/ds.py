@@ -500,17 +500,18 @@ class GraphBuffer:
 
     """Note that it's not concurrency-safe to call these functions."""
 
-    def push_nonexist_best(self, qasm: str) -> bool:
-        graph = qtz.qasm_to_graph(qasm)
-        if self.push_back(graph):  # non-exist
-            """update best graph and return whether the best info is updated"""
-            if get_cost(graph, self.cost_type) < get_cost(
-                self.best_graph, self.cost_type
-            ):
-                self.best_graph = graph
-                return True
-        # end if
-        return False
+    # def push_nonexist_best(self, qasm: str) -> bool:
+
+    #     graph = qtz.qasm_to_graph(qasm)
+    #     if self.push_back(graph):  # non-exist
+    #         """update best graph and return whether the best info is updated"""
+    #         if get_cost(graph, self.cost_type) < get_cost(
+    #             self.best_graph, self.cost_type
+    #         ):
+    #             self.best_graph = graph
+    #             return True
+    #     # end if
+    #     return False
 
     def append_costs_from_graph(self, graph: quartz.PyGraph):
         self.graph_gcs.append(graph.gate_count)

@@ -579,7 +579,10 @@ class PPOAgent:
             buffer = self.graph_buffers[i]
             info = best_info[i]
             assert buffer.name == info['name']
-            if buffer.push_nonexist_best(info['qasm']):
+            if info['best_cost'] < get_cost(buffer.best_graph, self.cost_type):
+                graph = qtz.qasm_to_graph(info['qasm'])
+                buffer.push_back(graph)
+                buffer.best_graph = graph
                 printfl(
                     f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
                 )
@@ -629,7 +632,9 @@ class PPOAgent:
         """sample node by softmax with temperature for each graph as a batch"""
         # (num_graphs, max_num_nodes)
         b_node_values_pad = nn.utils.rnn.pad_sequence(
-            node_values_list, batch_first=True, padding_value=-math.inf
+            node_values_list,
+            batch_first=True,
+            padding_value=-math.inf,
         )
         # (num_graphs, )
         temperature: torch.Tensor
@@ -654,9 +659,9 @@ class PPOAgent:
             self.device
         )
         node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-        sampled_node_ids = b_sampled_nodes + node_offsets
+        sampled_node_b_ids = b_sampled_nodes + node_offsets
         # (num_graphs, embed_dim)
-        sampled_node_embeds = b_node_embeds[sampled_node_ids]
+        sampled_node_embeds = b_node_embeds[sampled_node_b_ids]
         """use Actor to evaluate xfers for sampled nodes"""
         # (num_graphs, action_dim)
         xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)

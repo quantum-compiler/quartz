@@ -114,7 +114,7 @@ class BaseConfig:
 
     # training
     max_iterations: int = int(1e8)
-    num_eps_per_iter: int = 128  # 30
+    num_eps_per_iter: int = 64  # 30
     mini_batch_size: int = 3840  # per DDP process; < num_eps_per_iter * len_episode
     k_epochs: int = 25
     lr_gnn: float = 3e-4
@@ -141,7 +141,10 @@ class TestConfig(BaseConfig):
     resume: bool = True
     budget: int = int(1e8)
     input_graphs: List[InputGraph] = field(default_factory=lambda: [])
-    input_graph_dir: str = '../nam_circs'
+    auto_tuning_dir: bool = True
+    tuning_dir: str = ''  # 'outputs/2023-02-06/12-02-12'
+    max_loss_tolerance: float = 0.15
+    max_search_sec: float = 60 * 10
 
 
 @dataclass

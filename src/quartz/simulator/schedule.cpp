@@ -791,14 +791,15 @@ void Schedule::print_kernel_schedule() const {
 
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<bool>> &local_qubits,
-              Context *ctx) {
+              const std::vector<std::vector<bool>> &local_qubits, Context *ctx,
+              bool absorb_single_qubit_gates) {
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
+  std::vector<int> single_qubit_gate_indices;
   for (auto &local_qubit : local_qubits) {
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
@@ -827,7 +828,24 @@ get_schedules(const CircuitSeq &sequence,
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        current_seq.add_gate(sequence.gates[i].get());
+        if (absorb_single_qubit_gates) {
+          // Count the number of local qubits.
+          int num_local_qubit = 0;
+          for (auto &wire : sequence.gates[i]->input_wires) {
+            if (wire->is_qubit() && local_qubit[wire->index]) {
+              num_local_qubit++;
+            }
+          }
+          assert(num_local_qubit > 0);
+          if (num_local_qubit == 1) {
+            // Do not put single-qubit gates into |current_seq|.
+            single_qubit_gate_indices.push_back(i);
+          } else {
+            current_seq.add_gate(sequence.gates[i].get());
+          }
+        } else {
+          current_seq.add_gate(sequence.gates[i].get());
+        }
       } else {
         // Block the qubits.
         for (auto &wire : sequence.gates[i]->input_wires) {

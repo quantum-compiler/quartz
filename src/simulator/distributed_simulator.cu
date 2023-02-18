@@ -1,12 +1,11 @@
 using namespace sim;
 
 DistributedSimulator::DSHandler
-    DistributedSimulator::cuda_init_task(Task const *task,
-                                         std::vector<PhysicalRegion> const &regions,
-                                         Context ctx,
-                                         Runtime *runtime) {
+DistributedSimulator::cuda_init_task(Task const *task,
+                                     std::vector<PhysicalRegion> const &regions,
+                                     Context ctx, Runtime *runtime) {
   DSHandler handle;
-  handle.workSpaceSize = (size_t) 1 * 1024 * 1024 * 1024; // 1GB work space
+  handle.workSpaceSize = (size_t)1 * 1024 * 1024 * 1024; // 1GB work space
   HANDLE_ERROR(custatevecCreate(&handle.cuquantum));
   {
     // allocate memory for workspace
@@ -20,11 +19,8 @@ DistributedSimulator::DSHandler
     std::vector<size_t> field_sizes;
     field_sizes.push_back(sizeof(char));
     Realm::RegionInstance workspaceInst;
-    Realm::RegionInstance::create_instance(workspaceInst,
-                                           gpu_mem,
-                                           bounds,
-                                           field_sizes,
-                                           0,
+    Realm::RegionInstance::create_instance(workspaceInst, gpu_mem, bounds,
+                                           field_sizes, 0,
                                            Realm::ProfilingRequestSet())
         .wait();
     handle.workSpace = workspaceInst.pointer_untyped(0, sizeof(char));
@@ -33,17 +29,15 @@ DistributedSimulator::DSHandler
   return handle;
 }
 
-void DistributedSimulator::sv_init_task(Task const *task,
-                                        std::vector<PhysicalRegion> const &regions,
-                                        Context ctx,
-                                        Runtime *runtime) {
-  //TODO: implement this function
+void DistributedSimulator::sv_init_task(
+    Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
+    Runtime *runtime) {
+  // TODO: implement this function
 }
 
-void DistributedSimulator::sv_comp_task(Task const *task,
-                                        std::vector<PhysicalRegion> const &regions,
-                                        Context ctx,
-                                        Runtime *runtime) {
+void DistributedSimulator::sv_comp_task(
+    Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
+    Runtime *runtime) {
   DSHandler const *handler = *((DSHandler **)task->local_args);
   GateInfo const *info = (GateInfo *)task->args;
   cudaDataType_t data_type = cuDT;
@@ -62,7 +56,8 @@ void DistributedSimulator::sv_comp_task(Task const *task,
   printf("Targets: [");
   for (int i = 0; i < info->num_targets; i++) {
     int idx = 0;
-    while (info->permutation[idx] != info->target[i]) idx++;
+    while (info->permutation[idx] != info->target[i])
+      idx++;
     targets.push_back(idx);
     printf("(%d, %d) ", gate->target[i], idx);
   }
@@ -70,7 +65,8 @@ void DistributedSimulator::sv_comp_task(Task const *task,
 
   for (int i = 0; i < gate->num->controls; i++) {
     int idx = 0;
-    while (info->permutation[idx] != info->target[i]) idx++;
+    while (info->permutation[idx] != info->target[i])
+      idx++;
     controls.push_back(idx);
   }
 

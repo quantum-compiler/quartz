@@ -136,8 +136,8 @@ install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
         DESTINATION include/quartz
         FILES_MATCHING PATTERN "*.h")
 
-# add_subdirectory(src/test)
-# add_subdirectory(src/benchmark)
+add_subdirectory(src/test)
+add_subdirectory(src/benchmark)
 
 if(QUARTZ_USE_SIMULATOR)
   add_subdirectory(src/sim)

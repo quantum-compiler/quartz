@@ -11,6 +11,7 @@ numpy==1.22.1
 pbr==5.8.0
 ply==3.11
 psutil==5.9.0
+pulp==2.7.0
 pybind11>=2.6.2
 pycparser==2.21
 python-constraint==1.4.0

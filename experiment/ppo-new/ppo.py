@@ -175,6 +175,7 @@ class PPOMod:
             subgraph_opt=self.cfg.subgraph_opt,
             output_full_seq=self.cfg.output_full_seq,
             output_dir=self.output_dir,
+            vmem_perct_limit=self.cfg.vmem_perct_limit,
         )
         """use a holder class for convenience but split the model into 3 modules
         to avoid issue with BN + DDP
@@ -248,7 +249,11 @@ class PPOMod:
                 f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.'
             )
         self.start_time_sec = time.time()
+        # from pympler import muppy
+        # from pympler import summary
+        # sum0 = summary.summarize(muppy.get_objects())
         while self.i_iter < max_iterations:
+            # summary.print_(summary.get_diff(sum0, summary.summarize(muppy.get_objects())))
             loss = self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ac_net.state_dict())
@@ -312,6 +317,7 @@ class PPOMod:
                 'tot_exps_collected_all_rank': self.tot_exps_collected
                 * self.ddp_processes,
                 **lr_dict,
+                'vmem_perct': cur_proc_vmem_perct(),
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(
@@ -620,6 +626,7 @@ class PPOMod:
             batch_size=self.cfg.num_eps_per_iter,
             max_loss_tolerance=self.cfg.max_loss_tolerance,
             max_search_sec=self.cfg.max_search_sec,
+            vmem_perct_limit=self.cfg.vmem_perct_limit,
         )
         """get input graphs"""
         input_graphs: Dict[str, quartz.PyGraph] = {}

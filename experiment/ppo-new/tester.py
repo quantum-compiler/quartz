@@ -1,6 +1,7 @@
 # this file is under mypy's checking
 from __future__ import annotations
 
+import gc
 import heapq
 import json
 import os
@@ -68,6 +69,7 @@ class Tester:
         batch_size: int,
         max_loss_tolerance: float,
         max_search_sec: float,
+        vmem_perct_limit: float,
     ) -> None:
         self.cost_type = cost_type
         self.ac_net = ac_net
@@ -79,13 +81,20 @@ class Tester:
         self.batch_size = batch_size
         self.max_loss_tolerance = max_loss_tolerance
         self.max_search_sec = max_search_sec
+        self.vmem_perct_limit = vmem_perct_limit
 
     def search(
         self,
         input_graphs: Dict[str, quartz.PyGraph],
     ) -> None:
+        # from pympler import muppy
+        # from pympler import summary
+        # sum0 = summary.summarize(muppy.get_objects())
         best_graphs = input_graphs
         while True:
+            # gc.collect()
+            # summary.print_(summary.get_diff(sum0, summary.summarize(muppy.get_objects())))
+            printfl(f'==== Tester: mem usage: {cur_proc_vmem_perct()}')
             """update model from ckpt"""
             latest_info_path = os.path.join(self.output_dir, 'ckpts', 'latest.json')
             if self.sync_tuning_dir and os.path.exists(latest_info_path):
@@ -136,13 +145,13 @@ class Tester:
     def random_search(
         self, circ_name: str, circ: quartz.PyGraph
     ) -> Optional[quartz.PyGraph]:
-        circ_to_vis: Dict[quartz.PyGraph, int] = {circ: 1}
+        start_circ_to_vis: Dict[quartz.PyGraph, int] = {circ: 1}
         circ_to_softmask: Dict[quartz.Graph, torch.Tensor] = {}
         circ_to_hardmask: Dict[quartz.Graph, torch.Tensor] = {}
 
         def sample_start_circs(k: int) -> List[quartz.PyGraph]:
             circs, weights = [], []
-            for circ, vis in circ_to_vis.items():
+            for circ, vis in start_circ_to_vis.items():
                 circs.append(circ)
                 weights.append(1 / vis)
             sampled_circs = random.choices(circs, weights=weights, k=k)
@@ -187,12 +196,10 @@ class Tester:
                     )  # outputs/2023-02-13/11-55-57/gf2^8_mult/859_0
                     better_cost = 0
                     while better_cost != _better_cost:
-                        better_circ_name: str = natsorted(
-                            os.listdir(better_seq_dir), reverse=True
-                        )[
-                            0
-                        ]  # 74_859_0_0_0.qasm
-                        better_cost = int(better_circ_name.split('_')[1])
+                        circ_names = natsorted(os.listdir(better_seq_dir), reverse=True)
+                        if circ_names:
+                            better_circ_name = circ_names[0]  # 74_859_0_0_0.qasm
+                            better_cost = int(better_circ_name.split('_')[1])
                     better_circ_path = os.path.join(better_seq_dir, better_circ_name)
                     while better_cost < get_cost(best_circ, self.cost_type):
                         time.sleep(2)
@@ -206,6 +213,7 @@ class Tester:
                             printfl(
                                 f'Test: get better circ from tuning, cost = {better_cost}'
                             )
+                            # del start_circ_to_vis, circ_to_softmask, circ_to_hardmask
                             return better_circ
                         except Exception as e:
                             printfl(f'Error when reading better circ from tuning: {e}')
@@ -217,6 +225,7 @@ class Tester:
                 circ_to_hardmask,
                 get_cost(best_circ, self.cost_type) + 6,
             )
+            expand_times += 1
             """prepare for next step"""
             indices_to_sample: List[int] = []
             tmp_best_circ = best_circ
@@ -235,27 +244,38 @@ class Tester:
                     == get_cost(best_circ, self.cost_type)
                     == get_cost(cur_circ, self.cost_type)
                 ):
-                    cur_circ_vis = circ_to_vis.get(cur_circ, 0)
-                    circ_to_vis[cur_circ] = cur_circ_vis + 1
+                    # add circ into starting circ buffer
+                    # if vmem_used_perct() > self.vmem_perct_limit and start_circ_to_vis:
+                    #     pop_dict_first(start_circ_to_vis)
+                    cur_circ_vis = start_circ_to_vis.get(cur_circ, 0)
+                    start_circ_to_vis[cur_circ] = cur_circ_vis + 1
                     traj_lens[i] += 1
 
             if get_cost(tmp_best_circ, self.cost_type) < get_cost(
                 best_circ, self.cost_type
             ):
                 printfl(
+                    f'Test: {expand_times = }, {len(start_circ_to_vis) = }, lasted {time.time() - start_time:.2f} secs'
+                )
+                printfl(
                     f'Test: get better circ by search, cost = {get_cost(tmp_best_circ, self.cost_type)}'
                 )
+                # del start_circ_to_vis, circ_to_softmask, circ_to_hardmask
                 return tmp_best_circ
 
             sampled_circs = sample_start_circs(k=len(indices_to_sample))
             for idx, sampled_circs in zip(indices_to_sample, sampled_circs):
                 cur_circs[idx] = sampled_circs
 
-            expand_times += 1
+            if expand_times % 20 == 0:
+                printfl(
+                    f'Test: best_cost = {get_cost(best_circ, self.cost_type)}, {expand_times = }, {len(start_circ_to_vis) = }, lasted {time.time() - start_time:.2f} secs'
+                )
         # end while
         printfl(
             f'Test: did not find better circ in {self.max_search_sec} sec. Try to load new ckpt and restart...'
         )
+        del start_circ_to_vis, circ_to_softmask, circ_to_hardmask
         return None
 
     def random_expand(
@@ -291,6 +311,12 @@ class Tester:
         """fetch node masks"""
         nodes_valid_list: List[torch.Tensor] = []
         for i_circ, circ in enumerate(cur_circs):
+            # if vmem_used_perct() > self.vmem_perct_limit:
+            #     if circ_to_soft_valid:
+            #         pop_dict_first(circ_to_soft_valid)
+            #     if circ_to_hard_valid:
+            #         pop_dict_first(circ_to_hard_valid)
+
             soft_valid_pad = torch.zeros(
                 (b_node_values_pad.shape[-1],), dtype=torch.bool
             ).to(self.device)
@@ -314,6 +340,7 @@ class Tester:
                 nodes_valid_list.append(valid)
             else:
                 nodes_valid_list.append(hard_valid_pad)
+        # end for
         b_nodes_valid = torch.stack(nodes_valid_list)  # (num_graphs, max_num_nodes)
         """sample node by softmax with temperature for each graph"""
         temperatures = 1 / (
@@ -346,9 +373,16 @@ class Tester:
                 node=circ.get_node_from_id(id=action_nodes[i_circ]),
             )
             av_xfer_masks[i_circ][av_xfers] = True
+            circ_to_soft_valid[circ][action_nodes[i_circ]] = False
+            # soft_valid = circ_to_soft_valid.get(
+            #     circ, torch.ones((circ.gate_count,), dtype=torch.bool).to(self.device)
+            # )
+            # soft_valid[action_nodes[i_circ]] = False
+            # circ_to_soft_valid[circ] = soft_valid
         # end for
         # (num_graphs, action_dim)
         softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
+        # NOTE: sample or max ?
         action_xfers: List[int] = (
             torch.multinomial(softmax_xfer_logits, num_samples=1).flatten().tolist()
         )
@@ -364,6 +398,11 @@ class Tester:
             ):
                 next_circs.append(None)
                 circ_to_hard_valid[circ][action_nodes[i_circ]] = False
+                # hard_valid = circ_to_hard_valid.get(
+                #     circ, torch.ones((circ.gate_count,), dtype=torch.bool).to(self.device)
+                # )
+                # hard_valid[action_nodes[i_circ]] = False
+                # circ_to_hard_valid[circ] = hard_valid
             else:
                 next_circ: quartz.PyGraph = circ.apply_xfer(
                     node=circ.get_node_from_id(id=action_nodes[i_circ]),

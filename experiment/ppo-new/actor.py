@@ -176,6 +176,7 @@ class PPOAgent:
         subgraph_opt: bool,
         output_full_seq: bool,
         output_dir: str,
+        vmem_perct_limit: float,
     ) -> None:
         self.id = agent_id
         self.num_agents = num_agents
@@ -220,6 +221,7 @@ class PPOAgent:
                 input_graph['qasm'],
                 self.cost_type,
                 self.device,
+                vmem_perct_limit=vmem_perct_limit,
             )
             for input_graph in input_graphs
         ]

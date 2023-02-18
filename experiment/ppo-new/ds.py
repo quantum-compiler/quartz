@@ -337,6 +337,7 @@ class GraphBuffer:
         cost_type: CostType,
         device: torch.device = torch.device('cpu'),
         max_len: int | float = math.inf,
+        vmem_perct_limit: float = 80.0,
     ) -> None:
         self.name = name
         self.max_len = max_len
@@ -344,6 +345,7 @@ class GraphBuffer:
         self.cost_type = cost_type
         self.original_graph = qtz.qasm_to_graph(original_graph_qasm)
         self.original_cost = get_cost(self.original_graph, self.cost_type)
+        self.vmem_perct_limit = vmem_perct_limit
 
         self.cost_to_graph: SortedDict[int, List[quartz.PyGraph]] = SortedDict(
             {
@@ -393,22 +395,27 @@ class GraphBuffer:
         self.shrink()
 
     def shrink(self) -> None:
-        mem_perct_th = 80
-        vmem_perct = vmem_used_perct()
+        vmem_perct = cur_proc_vmem_perct()
         old_len = len(self)
-        if vmem_perct > mem_perct_th:
+        if vmem_perct + 0.5 > self.vmem_perct_limit:
             if self.max_len == math.inf:  # the first time mem usage exceeds threshold
-                self.max_len = old_len  # don't use more memory
+                self.max_len = int(
+                    old_len * (self.vmem_perct_limit / vmem_perct)
+                )  # don't use more memory
 
         if old_len > self.max_len:
             printfl(f'Buffer {self.name} starts to shrink.')
             while len(self) > self.max_len:
-                self.pop_some(min(2 * (len(self) - int(self.max_len)), len(self) - 2))
+                self.pop_some(min(len(self) - self.max_len // 2, len(self) - 2))
             printfl(
-                f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {vmem_used_perct()} %).'
+                f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {cur_proc_vmem_perct()} %).'
             )
 
-        if vmem_used_perct() > 95.0:
+        if vmem_used_perct() > 96.0:
+            printfl(
+                f'{vmem_used_perct()} % memory are used. Pause to avoid system crash.'
+            )
+            # from IPython import embed; embed()
             raise MemoryError(
                 f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
             )
@@ -430,6 +437,9 @@ class GraphBuffer:
             while len(graphs) > int(2000):  # NOTE: limit num of graphs of each kind
                 popped_graph = graphs.pop(idx_to_pop)
                 self.hashset.remove(hash(popped_graph))
+            num_to_pop = max(0, 400 + len(self) - self.max_len)
+            if num_to_pop >= 400:
+                self.pop_some(num_to_pop)
             # while len(self) > self.max_len:
             #     assert self.pop_one(graph_to_remain=graph) is not graph
             # assert hash_value in self.hashset
@@ -461,9 +471,9 @@ class GraphBuffer:
         return None
 
     def pop_some(self, num: int) -> None:
-        if len(self) > 0:
+        if len(self) > 0 and num > 0:
             max_key_idx: int = -1
-            while True:
+            while num > 0:
                 max_key, graphs = self.cost_to_graph.peekitem(max_key_idx)
                 idx_to_pop = 0 if max_key != self.original_cost else 1
                 while idx_to_pop < len(graphs) and num > 0:
@@ -472,8 +482,6 @@ class GraphBuffer:
                     num -= 1
                 if len(graphs) == 0:
                     self.cost_to_graph.pop(max_key)
-                if num <= 0:
-                    break
                 elif len(graphs) > 0:
                     max_key_idx -= 1
             # end while

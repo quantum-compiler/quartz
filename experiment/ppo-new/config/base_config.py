@@ -131,6 +131,7 @@ class BaseConfig:
     best_graph_output_dir: str = 'best_graphs'
     output_full_seq: bool = False
     full_seq_path: str = ''  # for read in
+    vmem_perct_limit: float = 70.0
 
 
 @dataclass
@@ -143,8 +144,8 @@ class TestConfig(BaseConfig):
     input_graphs: List[InputGraph] = field(default_factory=lambda: [])
     auto_tuning_dir: bool = True
     tuning_dir: str = ''  # 'outputs/2023-02-06/12-02-12'
-    max_loss_tolerance: float = 0.15
-    max_search_sec: float = 60 * 10
+    max_loss_tolerance: float = 0.10
+    max_search_sec: float = 60 * 20
 
 
 @dataclass

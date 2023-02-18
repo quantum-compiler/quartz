@@ -13,11 +13,12 @@ class DSConfig {
 
 class DistributedSimulator {
 public:
-  DistributedSimulator(const DSConfig& config);
+  DistributedSimulator(const DSConfig &config);
+
 private:
   DSConfig config;
-  std::vector<std::pair<LogicalRegion, LogicalPartition> > cpu_state_vectors;
-  std::vector<std::pair<LogicalRegion, LogicalPartition> > gpu_state_vectors;
+  std::vector<std::pair<LogicalRegion, LogicalPartition>> cpu_state_vectors;
+  std::vector<std::pair<LogicalRegion, LogicalPartition>> gpu_state_vectors;
 };
 
-};
+}; // namespace sim

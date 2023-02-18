@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "quartz/simulator/schedule.h"
 #include "quartz/pybind/pybind.h"
+#include "quartz/simulator/schedule.h"
 #include "simgate.h"
 #include "simulator.h"
 
@@ -23,7 +23,8 @@ public:
   bool load_circuit_from_file(std::string const &filename);
 
   // APIs for generating circuit from quartz CircuitSeq
-  bool compile(quartz::CircuitSeq *seq, quartz::Context *ctx, quartz::PythonInterpreter *interpreter, bool use_ilp);
+  bool compile(quartz::CircuitSeq *seq, quartz::Context *ctx,
+               quartz::PythonInterpreter *interpreter, bool use_ilp);
 
   // APIs for creating gates, currently just read from files
 

@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "mpi.h"
+#include "nccl.h"
 #include <cuComplex.h>        // cuDoubleComplex
 #include <cuda_runtime_api.h> // cudaMalloc, cudaMemcpy, etc.
 #include <custatevec.h>       // custatevecApplyMatrix
@@ -16,6 +18,48 @@
 
 #define MAX_DEVICES 4
 #define MAX_QUBIT 30
+
+#define MPICHECK(cmd)                                                          \
+  do {                                                                         \
+    int e = cmd;                                                               \
+    if (e != MPI_SUCCESS) {                                                    \
+      printf("Failed: MPI error %s:%d '%d'\n", __FILE__, __LINE__, e);         \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
+#define NCCLCHECK(cmd)                                                         \
+  do {                                                                         \
+    ncclResult_t r = cmd;                                                      \
+    if (r != ncclSuccess) {                                                    \
+      printf("Failed, NCCL error %s:%d '%s'\n", __FILE__, __LINE__,            \
+             ncclGetErrorString(r));                                           \
+      exit(EXIT_FAILURE);                                                      \
+    }                                                                          \
+  } while (0)
+
+static __inline__ int ncclTypeSize(ncclDataType_t type) {
+  switch (type) {
+  case ncclInt8:
+  case ncclUint8:
+    return 1;
+  case ncclFloat16:
+#if defined(__CUDA_BF16_TYPES_EXIST__)
+  case ncclBfloat16:
+#endif
+    return 2;
+  case ncclInt32:
+  case ncclUint32:
+  case ncclFloat32:
+    return 4;
+  case ncclInt64:
+  case ncclUint64:
+  case ncclFloat64:
+    return 8;
+  default:
+    return -1;
+  }
+}
 
 namespace sim {
 template <typename DT> class SimulatorCuQuantum {
@@ -32,17 +76,43 @@ public:
         n_devices(ndevices) {}
 
   // for simulation
-  bool InitState(std::vector<unsigned> const &init_perm);
+  bool InitStateSingle(std::vector<unsigned> const &init_perm);
+  bool InitStateMulti(std::vector<unsigned> const &init_perm);
   bool ApplyGate(Gate<DT> &gate, int device_id);
   bool ApplyShuffle(Gate<DT> &gate);
   bool Destroy();
 
+private:
+  ncclResult_t all2all(void *sendbuff, size_t sendcount,
+                       ncclDataType_t senddatatype, void *recvbuff,
+                       size_t recvcount, ncclDataType_t recvdatatype,
+                       ncclComm_t comm, cudaStream_t stream, unsigned mask,
+                       unsigned myncclrank);
+  ncclResult_t NCCLSendrecv(void *sendbuff, size_t sendcount,
+                            ncclDataType_t datatype, int peer, void *recvbuff,
+                            size_t recvcount, ncclComm_t comm,
+                            cudaStream_t stream);
+
+public:
   custatevecHandle_t handle_[MAX_DEVICES];
   void *d_sv[MAX_DEVICES];
+  // num_devices per node
   int n_devices;
+  int subSvSize;
   unsigned n_qubits, n_local, n_global;
+  unsigned n_global_within_node = 0;
   int devices[MAX_DEVICES];
   std::vector<unsigned> permutation;
+  cudaStream_t s[MAX_DEVICES];
+
+private:
+  // nccl, mpi related info
+  int myRank, nRanks = 0;
+  void *recv_buf[MAX_DEVICES];
+  ncclUniqueId id;
+  ncclComm_t comms[MAX_DEVICES];
+  // timing metrics
+  cudaEvent_t start[MAX_DEVICES], end[MAX_DEVICES];
 };
 
 } // namespace sim

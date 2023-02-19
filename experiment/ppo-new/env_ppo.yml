@@ -2,6 +2,7 @@ channels:
   - defaults
   - dglteam
   - pytorch
+  - nvidia
   - conda-forge
   # ref: https://stackoverflow.com/a/69180871
 dependencies:
@@ -11,9 +12,9 @@ dependencies:
   - tqdm
   - numpy
   - matplotlib
-  - pytorch::pytorch
-  - cudatoolkit=11.3
-  - dgl-cuda11.3
+  - pytorch::pytorch-cuda
+  - nvidia:cudatoolkit=11.7
+  - dgl-cuda11.7
   - openmp
   - hydra-core
   - icecream

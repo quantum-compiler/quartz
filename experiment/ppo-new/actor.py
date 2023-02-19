@@ -50,7 +50,7 @@ class Observer:
         init_state_str: str,
         original_state_str: str,  # input graph, used to limit the cost
         max_eps_len: int,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
     ) -> List[SerializableExperience]:
         """Interact with env for many steps to collect data.
@@ -119,9 +119,9 @@ class Observer:
                 graph_cost = get_cost(graph, self.cost_type)
                 next_graph_cost = get_cost(next_graph, self.cost_type)
                 reward = graph_cost - next_graph_cost
-                game_over = (graph_cost > original_cost * max_cost_ratio) or (
-                    graph.gate_count > original_graph.gate_count * max_cost_ratio
-                )
+                game_over = graph_cost > original_cost + max_extra_cost  # or (
+                #     graph.gate_count > original_graph.gate_count + max_extra_cost
+                # )
                 next_graph_str = next_graph.to_qasm_str()
 
             exp = SerializableExperience(
@@ -414,7 +414,7 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data(
         self,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
         greedy_sample: bool,
     ) -> ExperienceList:
@@ -462,7 +462,7 @@ class PPOAgent:
                     init_qasm,
                     orig_qasm,
                     max_eps_len_for_all,  # make sure all observers have the same max_eps_len
-                    max_cost_ratio,
+                    max_extra_cost,
                     nop_stop,
                 )
             )
@@ -745,7 +745,7 @@ class PPOAgent:
         self,
         num_eps: int,
         agent_batch_size: int,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
         greedy_sample: bool,
     ) -> ExperienceList:
@@ -855,12 +855,12 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    # game_over = graph_cost > original_costs[i_eps] * max_cost_ratio
-                    game_over = graph_cost > cur_best_cost * max_cost_ratio
+                    # game_over = graph_cost > original_costs[i_eps] * max_extra_cost
+                    game_over = graph_cost > cur_best_cost + max_extra_cost
                     if self.limit_total_gate_count:
                         game_over |= (
                             graph.gate_count
-                            > original_graph_list[i_eps].gate_count * max_cost_ratio
+                            > original_graph_list[i_eps].gate_count * max_extra_cost
                         )
                         # NOTE: limit the gate count according to the original graph
                         # (the one inputted by file) rather than the starting graph

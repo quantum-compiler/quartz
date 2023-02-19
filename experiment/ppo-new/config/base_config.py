@@ -101,7 +101,7 @@ class BaseConfig:
     cost_type: str = 'gate_count'
     nop_stop: bool = True
     invalid_reward: float = -1.0
-    max_cost_ratio: float = 1.2
+    max_extra_cost: int = 6
     limit_total_gate_count: bool = False
     batch_inference: bool = True
     dyn_eps_len: bool = True

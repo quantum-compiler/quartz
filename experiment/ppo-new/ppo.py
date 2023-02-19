@@ -277,14 +277,14 @@ class PPOMod:
             exp_list = self.agent.collect_data_by_self(
                 self.cfg.num_eps_per_iter // self.ddp_processes,
                 self.cfg.agent_batch_size,
-                self.cfg.max_cost_ratio,
+                self.cfg.max_extra_cost,
                 self.cfg.nop_stop,
                 self.cfg.greedy_sample,
             )
         else:  # use observers to collect data
             collect_fn = partial(
                 self.agent.collect_data,
-                self.cfg.max_cost_ratio,
+                self.cfg.max_extra_cost,
                 self.cfg.nop_stop,
                 self.cfg.greedy_sample,
             )

@@ -22,7 +22,7 @@ class NamConfig(BaseConfig):
             ),
         ]
     )
-    num_gate_types: int = 29
+    # num_gate_types: int = 29
 
 
 @dataclass

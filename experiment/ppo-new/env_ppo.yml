@@ -12,7 +12,8 @@ dependencies:
   - tqdm
   - numpy
   - matplotlib
-  - pytorch::pytorch-cuda
+  - pytorch::pytorch
+  - pytorch::pytorch-cuda=11.7
   - nvidia:cudatoolkit=11.7
   - dgl-cuda11.7
   - openmp

@@ -1,6 +1,8 @@
 #include "circuitgate.h"
 #include "circuitwire.h"
 
+#include <cassert>
+
 namespace quartz {
 int CircuitGate::get_min_qubit_index() const {
   int result = -1;
@@ -40,6 +42,30 @@ std::vector<int> CircuitGate::get_control_qubit_indices() const {
       }
     }
   }
+  return result;
+}
+
+std::string CircuitGate::to_string() const {
+  std::string result;
+  if (output_wires.size() == 1) {
+    result += output_wires[0]->to_string();
+  } else if (output_wires.size() == 2) {
+    result += "[" + output_wires[0]->to_string();
+    result += ", " + output_wires[1]->to_string();
+    result += "]";
+  } else {
+    assert(false && "A circuit gate should have 1 or 2 outputs.");
+  }
+  result += " = ";
+  result += gate_type_name(gate->tp);
+  result += "(";
+  for (int j = 0; j < (int)input_wires.size(); j++) {
+    result += input_wires[j]->to_string();
+    if (j != (int)input_wires.size() - 1) {
+      result += ", ";
+    }
+  }
+  result += ")";
   return result;
 }
 

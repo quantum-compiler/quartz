@@ -58,6 +58,7 @@ public:
    */
   bool compute_kernel_schedule(const std::vector<KernelCostType> &kernel_costs);
 
+  [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
 
   // The result simulation schedule. We will execute the kernels one by one,
@@ -76,10 +77,24 @@ private:
   Context *ctx_;
 };
 
+/**
+ * Compute the schedule using dynamic programming.
+ * See more information in Schedule::compute_kernel_schedule().
+ * @param sequence The entire circuit sequence.
+ * @param local_qubits The local qubits in each stage.
+ * @param kernel_costs kernel_costs[i] represents the cost of an i-qubit
+ * kernel.
+ * @param ctx The Context object.
+ * @param absorb_single_qubit_gates An optimization to reduce the running
+ * time of this function. Requires the input circuit to be fully entangled.
+ * TODO: check if it's entangled or not
+ * @return The kernel schedule for each stage.
+ */
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<bool>> &local_qubits, Context *ctx,
-              bool absorb_single_qubit_gates = true);
+              const std::vector<std::vector<bool>> &local_qubits,
+              const std::vector<Schedule::KernelCostType> &kernel_costs,
+              Context *ctx, bool absorb_single_qubit_gates = true);
 
 class PythonInterpreter;
 std::vector<std::vector<bool>>

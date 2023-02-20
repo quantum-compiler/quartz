@@ -26,6 +26,13 @@ public:
                 const std::vector<int> &parameter_indices, Gate *gate,
                 int *output_para_index);
   bool add_gate(CircuitGate *gate);
+  // Insert a gate to any position of the circuit sequence.
+  // Warning: remove_last_gate() cannot be called anymore after calling
+  // insert_gate().
+  bool insert_gate(int insert_position, const std::vector<int> &qubit_indices,
+                   const std::vector<int> &parameter_indices, Gate *gate,
+                   int *output_para_index);
+  bool insert_gate(int insert_position, CircuitGate *gate);
   void add_input_parameter();
   bool remove_last_gate();
 

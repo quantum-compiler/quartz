@@ -94,7 +94,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<bool>> &local_qubits,
               const std::vector<Schedule::KernelCostType> &kernel_costs,
-              Context *ctx, bool absorb_single_qubit_gates = true);
+              Context *ctx, bool absorb_single_qubit_gates);
 
 class PythonInterpreter;
 std::vector<std::vector<bool>>

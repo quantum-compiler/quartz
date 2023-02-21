@@ -193,6 +193,21 @@ bool CircuitSeq::add_gate(const std::vector<int> &qubit_indices,
   return true;
 }
 
+bool CircuitSeq::add_gate(CircuitGate *gate) {
+  std::vector<int> qubit_indices;
+  std::vector<int> parameter_indices;
+  int output_para_index;
+  for (auto &wire : gate->input_wires) {
+    if (wire->is_qubit()) {
+      qubit_indices.push_back(wire->index);
+    } else {
+      parameter_indices.push_back(wire->index);
+    }
+  }
+  return add_gate(qubit_indices, parameter_indices, gate->gate,
+                  &output_para_index);
+}
+
 void CircuitSeq::add_input_parameter() {
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;

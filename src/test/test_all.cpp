@@ -14,6 +14,7 @@ int main() {
   Context ctx({GateType::x, GateType::y, GateType::add, GateType::neg,
                GateType::u2, GateType::u3, GateType::cx},
               2, 0);
+  ctx.get_and_gen_parameters(2);
 
   auto y = ctx.get_gate(GateType::y);
   y->get_matrix()->print();

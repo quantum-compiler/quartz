@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "simulator.h"
+#include "kernel.h"
 
 namespace sim {
 // only support applying gates to local qubits
@@ -89,6 +90,50 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
 }
 
 template <typename DT>
+bool SimulatorCuQuantum<DT>::ApplyKernelGates(std::vector<KernelGate> &kernelgates, qindex logicQubitset) {
+
+  // test SHM
+  // initialize blockHot (physical non-activate qubuits mask), enumerate, threadBias
+  unsigned blockHot, enumerate;
+  qindex relatedQubits = 0;
+  for (int i = 0; i < n_local; i++) {
+    if (logicQubitset >> i & 1){
+        auto it = find(permutation.begin(), permutation.end(), i);
+        assert(it != permutation.end());
+        int idx = it - permutation.begin();
+        relatedQubits |= qindex(1) << idx;
+    }
+  }
+  enumerate = relatedQubits;
+  blockHot = (qindex(1) << n_local) - 1 - enumerate;
+  qindex threadHot = 0;
+  for (int i = 0; i < THREAD_DEP; i++) {
+      qindex x = enumerate & (-enumerate);
+      threadHot += x;
+      enumerate -= x;
+  }
+  unsigned int hostThreadBias[1 << THREAD_DEP];
+  assert((threadHot | enumerate) == relatedQubits);
+  for (qindex i = (1 << THREAD_DEP) - 1, j = threadHot; i >= 0; i--, j = threadHot & (j - 1)) {
+      hostThreadBias[i] = j;
+  }
+  for (int i = 0; i < n_devices; i++) {
+      HANDLE_CUDA_ERROR(cudaMemcpyAsync(threadBias[i], hostThreadBias, sizeof(hostThreadBias), cudaMemcpyHostToDevice, s[i]));
+  }
+
+  qindex gridDim = (qindex(1) << n_local) >> SHARED_MEM_SIZE;
+  for (int k = 0; k < n_devices; k++) {
+      HANDLE_CUDA_ERROR(cudaSetDevice(devices[k]));
+      // currently all the GPU executes same set of gates; TODO: per-gpu schedule
+      copyGatesToSymbol(kernelgates.data(), kernelgates.size(), s[k], 0);
+      ApplyGatesSHM(gridDim, (qComplex*)d_sv[k], threadBias[k], n_local, kernelgates.size(), blockHot, enumerate, s[k], k);
+  }
+
+  return true;
+
+}
+
+template <typename DT>
 bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   std::vector<int2> GlobalIndexBitSwaps;
   std::vector<int2> LocalIndexBitSwaps;
@@ -102,26 +147,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     printf("%d,", permutation[i]);
   }
   printf("]\n");
-  // for (int i = 0; i < n_global; i++) {
-  //   int2 swap;
-  //   if (gate.target[n_local + i] == permutation[n_local + i])
-  //     continue;
-  //   auto it =
-  //       find(permutation.begin(), permutation.end(), gate.target[n_local +
-  //       i]);
-  //   assert(it != permutation.end());
-  //   int idx = it - permutation.begin();
-  //   if (idx >= n_local) continue;
-  //   swap.x = idx;
-  //   swap.y = n_local + i;
-  //   GlobalIndexBitSwaps.push_back(swap);
-  //   nGlobalSwaps++;
-  //   maxGlobal = maxGlobal > i ? maxGlobal : i;
-  //   // update perm
-  //   permutation[idx] = permutation[n_local + i];
-  //   permutation[n_local + i] = gate.target[n_local + i];
-  //   printf("(%d, %d)\n", idx, n_local + i);
-  // }
+  
   std::vector<int> from_idx;
   std::vector<int> to;
   for (int i = 0; i < n_global; i++) {
@@ -251,7 +277,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
       unsigned myncclrank = myRank * n_devices + i;
-      all2all(d_sv[i], sendsize, ncclFloat, recv_buf[i], sendsize, ncclFloat,
+      all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
               comms[i], s[i], mask, myncclrank);
     }
     NCCLCHECK(ncclGroupEnd());
@@ -429,6 +455,14 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
         cudaMalloc(&d_sv[i], subSvSize * sizeof(cuDoubleComplex)));
     HANDLE_ERROR(custatevecCreate(&handle_[i]));
     HANDLE_CUDA_ERROR(cudaStreamCreate(&s[i]));
+  }
+
+  // for SHM method
+  initControlIdx(n_devices, s);
+  threadBias.resize(n_devices);
+  for (int i = 0; i < n_devices; i++) {
+      HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+      HANDLE_CUDA_ERROR(cudaMalloc(&threadBias[i], sizeof(qindex) << THREAD_DEP));
   }
 
   if (myRank == 0)

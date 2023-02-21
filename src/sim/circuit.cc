@@ -270,6 +270,24 @@ void qcircuit::Circuit<DT>::simulate(int ndevices, bool use_mpi) {
     simulator.InitStateMulti(init_perm);
 
   printf("Init State Vectors!\n");
+
+  printf("Test SHM\n");
+  std::vector<KernelGate> kernelgates;
+  qComplex mat[2][2] = {make_qComplex(0, 0), make_qComplex(0, -1), make_qComplex(0, 1), make_qComplex(0, 0)};
+  for (int i=0; i<50; i++){
+    KernelGate kg(KernelGateType::Y, 5, 0, mat);
+    kernelgates.push_back(kg);
+  }
+  // just for test
+  qindex active_qubits_logical = 0;
+  for (int i = 0; i < SHARED_MEM_SIZE; i++) {
+    active_qubits_logical |= qindex(1) << i;
+  }
+  simulator.ApplyKernelGates(kernelgates, active_qubits_logical);
+  simulator.Destroy();
+  printf("Destroyed the simulator\n");
+  return;
+
   int index = 0;
   while (index < gates.size()) {
     Gate<DT> gate = gates[index++];

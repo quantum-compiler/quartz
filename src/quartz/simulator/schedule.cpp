@@ -933,7 +933,7 @@ get_schedules(const CircuitSeq &sequence,
             }
           }
           bool executed_any_gate = false;
-          for (int j = 0; j < (int) single_qubit_gate_to_execute.size(); j++) {
+          for (int j = 0; j < (int)single_qubit_gate_to_execute.size(); j++) {
             int index = single_qubit_gate_to_execute[j];
             bool executable = true;
             for (auto &wire : sequence.gates[index]->input_wires) {
@@ -950,7 +950,8 @@ get_schedules(const CircuitSeq &sequence,
               schedule.kernels[i].insert_gate(insert_location,
                                               sequence.gates[index].get());
               // Erase the gate from |single_qubit_gate_to_execute|.
-              single_qubit_gate_to_execute.erase(single_qubit_gate_to_execute.begin() + j);
+              single_qubit_gate_to_execute.erase(
+                  single_qubit_gate_to_execute.begin() + j);
               // Because we have |j++| at the end of this iteration of the
               // for loop, we need to cancel the effect here.
               j--;

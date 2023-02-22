@@ -42,7 +42,7 @@ cs.store(group="c", name="nam_alltest", node=NamAllTestConfig)
 cs.store(group="c", name="nam_convert", node=NamConvertConfig)
 
 cs.store(group="c", name="ibm", node=IBMConfig)
-cs.store(group="c", name=" ", node=IBMFTConfig)
+cs.store(group="c", name="ibm_ft", node=IBMFTConfig)
 cs.store(group="c", name="ibm_pret", node=IBMPretrainConfig)
 cs.store(group="c", name="ibm_mp", node=IBMMPConfig)
 cs.store(group="c", name="ibm_test", node=IBMTestConfig)

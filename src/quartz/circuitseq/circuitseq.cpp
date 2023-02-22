@@ -208,6 +208,102 @@ bool CircuitSeq::add_gate(CircuitGate *gate) {
                   &output_para_index);
 }
 
+bool CircuitSeq::insert_gate(int insert_position,
+                             const std::vector<int> &qubit_indices,
+                             const std::vector<int> &parameter_indices,
+                             Gate *gate, int *output_para_index) {
+  if (insert_position < 0 || insert_position > (int)gates.size())
+    return false;
+  if (gate->get_num_qubits() != qubit_indices.size())
+    return false;
+  if (gate->get_num_parameters() != parameter_indices.size())
+    return false;
+  if (gate->is_parameter_gate() && output_para_index == nullptr)
+    return false;
+  // qubit indices must stay in range
+  for (auto qubit_idx : qubit_indices)
+    if ((qubit_idx < 0) || (qubit_idx >= get_num_qubits()))
+      return false;
+  // parameter indices must stay in range
+  for (auto para_idx : parameter_indices)
+    if ((para_idx < 0) || (para_idx >= parameters.size()))
+      return false;
+  // Find the location to insert.
+  std::vector<CircuitWire *> previous_wires(get_num_qubits());
+  for (int i = 0; i < get_num_qubits(); i++) {
+    previous_wires[i] = wires[i].get();
+  }
+  for (int i = 0; i < insert_position; i++) {
+    for (auto &output_wire : gates[i]->output_wires) {
+      if (output_wire->is_qubit()) {
+        previous_wires[output_wire->index] = output_wire;
+      }
+    }
+  }
+  auto circuit_gate = std::make_unique<CircuitGate>();
+  circuit_gate->gate = gate;
+  for (auto qubit_idx : qubit_indices) {
+    circuit_gate->input_wires.push_back(previous_wires[qubit_idx]);
+    if (gate->is_quantum_gate()) {
+      auto wire = std::make_unique<CircuitWire>();
+      wire->type = CircuitWire::internal_qubit;
+      wire->index = qubit_idx;
+      wire->input_gates.push_back(circuit_gate.get());
+      circuit_gate->output_wires.push_back(wire.get());
+      if (outputs[qubit_idx] == previous_wires[qubit_idx]) {
+        outputs[qubit_idx] = wire.get(); // Update outputs
+      } else {
+        for (auto &output_gate : previous_wires[qubit_idx]->output_gates) {
+          // Should have exactly one |output_gate|
+          for (auto &input_wire : output_gate->input_wires) {
+            if (input_wire == previous_wires[qubit_idx]) {
+              input_wire = wire.get();
+              break;
+            }
+          }
+        }
+      }
+      // XXX: the wires are placed at the end, so it will be not compatible
+      // with remove_last_gate().
+      wires.push_back(std::move(wire));
+    }
+    previous_wires[qubit_idx]->output_gates.push_back(circuit_gate.get());
+  }
+  for (auto para_idx : parameter_indices) {
+    circuit_gate->input_wires.push_back(parameters[para_idx]);
+    parameters[para_idx]->output_gates.push_back(circuit_gate.get());
+  }
+  if (gate->is_parameter_gate()) {
+    auto wire = std::make_unique<CircuitWire>();
+    wire->type = CircuitWire::internal_param;
+    wire->index = *output_para_index = (int)parameters.size();
+    wire->input_gates.push_back(circuit_gate.get());
+    circuit_gate->output_wires.push_back(wire.get());
+    parameters.push_back(wire.get());
+    // XXX: the wires are placed at the end, so it will be not compatible
+    // with remove_last_gate().
+    wires.push_back(std::move(wire));
+  }
+  gates.insert(gates.begin() + insert_position, std::move(circuit_gate));
+  hash_value_valid_ = false;
+  return true;
+}
+
+bool CircuitSeq::insert_gate(int insert_position, CircuitGate *gate) {
+  std::vector<int> qubit_indices;
+  std::vector<int> parameter_indices;
+  int output_para_index;
+  for (auto &wire : gate->input_wires) {
+    if (wire->is_qubit()) {
+      qubit_indices.push_back(wire->index);
+    } else {
+      parameter_indices.push_back(wire->index);
+    }
+  }
+  return insert_gate(insert_position, qubit_indices, parameter_indices,
+                     gate->gate, &output_para_index);
+}
+
 void CircuitSeq::add_input_parameter() {
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;
@@ -825,25 +921,7 @@ std::string CircuitSeq::to_string() const {
   const int num_gates = (int)gates.size();
   for (int i = 0; i < num_gates; i++) {
     result += "  ";
-    if (gates[i]->output_wires.size() == 1) {
-      result += gates[i]->output_wires[0]->to_string();
-    } else if (gates[i]->output_wires.size() == 2) {
-      result += "[" + gates[i]->output_wires[0]->to_string();
-      result += ", " + gates[i]->output_wires[1]->to_string();
-      result += "]";
-    } else {
-      assert(false && "A circuit gate should have 1 or 2 outputs.");
-    }
-    result += " = ";
-    result += gate_type_name(gates[i]->gate->tp);
-    result += "(";
-    for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
-      result += gates[i]->input_wires[j]->to_string();
-      if (j != (int)gates[i]->input_wires.size() - 1) {
-        result += ", ";
-      }
-    }
-    result += ")";
+    result += gates[i]->to_string();
     result += "\n";
   }
   result += "}\n";

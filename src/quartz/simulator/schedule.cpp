@@ -771,9 +771,11 @@ bool Schedule::compute_kernel_schedule(
   return true;
 }
 
+int Schedule::get_num_kernels() const { return (int)kernels.size(); }
+
 void Schedule::print_kernel_schedule() const {
   assert(kernels.size() == kernel_qubits.size());
-  const int num_kernels = kernels.size();
+  const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
             << " kernels: cost = " << cost_ << std::endl;
   for (int i = 0; i < num_kernels; i++) {
@@ -792,13 +794,26 @@ void Schedule::print_kernel_schedule() const {
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<bool>> &local_qubits,
-              Context *ctx) {
+              const std::vector<Schedule::KernelCostType> &kernel_costs,
+              Context *ctx, bool absorb_single_qubit_gates) {
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
+
+  // Variables for |absorb_single_qubit_gates|=true.
+  std::vector<std::pair<int, std::unordered_set<int>>>
+      single_qubit_gate_indices;
+  // |last_gate_index[i]|: the last gate touching the |i|-th qubit;
+  // only computed when |absorb_single_qubit_gates| is true
+  std::vector<int> last_gate_index(num_qubits, -1);
+  // |gate_indices[gate_string]|: the indices of gates with to_string() being
+  // |gate_string|;
+  // only computed when |absorb_single_qubit_gates| is true
+  std::unordered_map<std::string, std::queue<int>> gate_indices;
+
   for (auto &local_qubit : local_qubits) {
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
@@ -827,7 +842,43 @@ get_schedules(const CircuitSeq &sequence,
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        current_seq.add_gate(sequence.gates[i].get());
+        if (absorb_single_qubit_gates) {
+          // Count the number of local qubits.
+          int num_local_qubit = 0;
+          for (auto &wire : sequence.gates[i]->input_wires) {
+            if (wire->is_qubit() && local_qubit[wire->index]) {
+              num_local_qubit++;
+            }
+          }
+          assert(num_local_qubit > 0);
+          if (num_local_qubit == 1) {
+            // Do not put single-qubit gates into |current_seq|.
+            // Compute the dependency here.
+            std::unordered_set<int> depending_gates;
+            for (auto &wire : sequence.gates[i]->input_wires) {
+              if (wire->is_qubit()) {
+                if (last_gate_index[wire->index] != -1) {
+                  // Use std::unordered_set to remove duplicates automatically.
+                  depending_gates.insert(last_gate_index[wire->index]);
+                }
+              }
+            }
+            single_qubit_gate_indices.emplace_back(i, depending_gates);
+          } else {
+            current_seq.add_gate(sequence.gates[i].get());
+          }
+
+          // Update |last_gate_index|.
+          for (auto &wire : sequence.gates[i]->input_wires) {
+            if (wire->is_qubit()) {
+              last_gate_index[wire->index] = i;
+            }
+          }
+          // Update |gate_indices|.
+          gate_indices[sequence.gates[i]->to_string()].push(i);
+        } else {
+          current_seq.add_gate(sequence.gates[i].get());
+        }
       } else {
         // Block the qubits.
         for (auto &wire : sequence.gates[i]->input_wires) {
@@ -848,6 +899,108 @@ get_schedules(const CircuitSeq &sequence,
     std::cerr << "Gate number " << start_gate_index
               << " is not executed yet in the schedule." << std::endl;
     assert(false);
+  }
+  for (auto &schedule : result) {
+    schedule.compute_kernel_schedule(kernel_costs);
+  }
+  if (!single_qubit_gate_indices.empty()) {
+    // Restore the single-qubit gates.
+    std::vector<std::vector<int>> next_single_qubit_gates(num_gates);
+    for (int i = 0; i < (int)single_qubit_gate_indices.size(); i++) {
+      auto &single_qubit_gate = single_qubit_gate_indices[i];
+      // Record the dependencies.
+      for (auto &index : single_qubit_gate.second) {
+        next_single_qubit_gates[index].push_back(i);
+      }
+    }
+    std::vector<int> single_qubit_gate_to_execute;
+    int current_kernel_qubits_last_updated_i = -1;
+    std::vector<bool> current_kernel_qubits(num_qubits, false);
+    for (auto &schedule : result) {
+      // avoid cache conflict with other |schedule|s
+      current_kernel_qubits_last_updated_i = -1;
+      for (int i = 0; i < schedule.get_num_kernels(); i++) {
+        auto try_to_execute_single_qubit_gates =
+            [&](int insert_location) -> bool {
+          if (single_qubit_gate_to_execute.empty()) {
+            return false;
+          }
+          if (current_kernel_qubits_last_updated_i != i) {
+            current_kernel_qubits_last_updated_i = i;
+            current_kernel_qubits.assign(num_qubits, false);
+            for (auto &qubit : schedule.kernel_qubits[i]) {
+              current_kernel_qubits[qubit] = true;
+            }
+          }
+          bool executed_any_gate = false;
+          for (int j = 0; j < (int)single_qubit_gate_to_execute.size(); j++) {
+            int index = single_qubit_gate_to_execute[j];
+            bool executable = true;
+            for (auto &wire : sequence.gates[index]->input_wires) {
+              if (wire->is_qubit() && !current_kernel_qubits[wire->index]) {
+                executable = false; // not local here
+                break;
+              }
+            }
+            if (executable) {
+              executed_any_gate = true;
+              // Insert the gate to
+              // |schedule.kernels[i].gates[insert_location]|.
+              // Note that we don't update |next_single_qubit_gates| here.
+              schedule.kernels[i].insert_gate(insert_location,
+                                              sequence.gates[index].get());
+              // Erase the gate from |single_qubit_gate_to_execute|.
+              single_qubit_gate_to_execute.erase(
+                  single_qubit_gate_to_execute.begin() + j);
+              // Because we have |j++| at the end of this iteration of the
+              // for loop, we need to cancel the effect here.
+              j--;
+            }
+          }
+          return executed_any_gate;
+        };
+
+        try_to_execute_single_qubit_gates(0);
+
+        // Purposely using |schedule.kernels[i].gates.size()| because we may
+        // modify |schedule.kernels[i].gates| in this loop.
+        for (int j = 0; j < (int)schedule.kernels[i].gates.size(); j++) {
+          auto &gate = schedule.kernels[i].gates[j];
+          auto &gate_indices_queue = gate_indices[gate->to_string()];
+          assert(!gate_indices_queue.empty());
+
+          // We execute the gate now.
+          for (auto &next_single_qubit_gate :
+               next_single_qubit_gates[gate_indices_queue.front()]) {
+            single_qubit_gate_indices[next_single_qubit_gate].second.erase(
+                gate_indices_queue.front());
+            if (single_qubit_gate_indices[next_single_qubit_gate]
+                    .second.empty()) {
+              single_qubit_gate_to_execute.push_back(
+                  single_qubit_gate_indices[next_single_qubit_gate].first);
+              // Insert the gate after this gate.
+              try_to_execute_single_qubit_gates(j + 1);
+            }
+          }
+        }
+      }
+    }
+    for (auto &single_qubit_gate : single_qubit_gate_to_execute) {
+      std::cerr << "Single-qubit gate " << single_qubit_gate
+                << " is not executed yet in the schedule because there are no "
+                   "local kernels."
+                << std::endl;
+      assert(false);
+    }
+    for (auto &single_qubit_gate : single_qubit_gate_indices) {
+      if (!single_qubit_gate.second.empty()) {
+        std::cerr << "Single-qubit gate " << single_qubit_gate.first
+                  << " is not executed yet in the schedule because of "
+                     "unresolved dependencies."
+                  << std::endl;
+        assert(false);
+      }
+    }
   }
   return result;
 }

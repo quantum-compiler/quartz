@@ -91,6 +91,9 @@ if __name__ == '__main__':
 
     circ_name = sys.argv[1]
     output_dir = sys.argv[2]
+    wandb_mode = 'online'
+    if len(sys.argv) > 3:
+        wandb_mode = sys.argv[3]
 
     context = quartz.QuartzContext(
         gate_set=['x', 'cx', 'sx', 'rz', 'add'],
@@ -106,7 +109,7 @@ if __name__ == '__main__':
         project='quartz_ibm',
         entity='quartz',
         name=f'{circ_name}',
-        mode='disabled',
+        mode=wandb_mode,  # 'disabled',
     )
 
     best_gate_cnt, best_circ = optimize(context, circ, circ_name)

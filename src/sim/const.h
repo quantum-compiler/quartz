@@ -1,9 +1,9 @@
 #ifndef _CONST_H_
 #define _CONST_H_
 
+#include "helper.h" // HANDLE_ERROR, HANDLE_CUDA_ERROR
 #include "mpi.h"
 #include "nccl.h"
-#include "helper.h" // HANDLE_ERROR, HANDLE_CUDA_ERROR
 #include <cuComplex.h>        // cuDoubleComplex
 #include <cuda_runtime_api.h> // cudaMalloc, cudaMemcpy, etc.
 #include <custatevec.h>       // custatevecApplyMatrix
@@ -30,7 +30,34 @@ typedef cuDoubleComplex qComplex;
 #define THREAD_DEP 7
 
 enum class KernelGateType {
-    CCX, CNOT, CY, CZ, CRX, CRY, CU1, CRZ, U1, U2, U3, H, X, Y, Z, S, SDG, T, TDG, RX, RY, RZ, TOTAL, ID, GII, GZZ, GOC, GCC 
+  CCX,
+  CNOT,
+  CY,
+  CZ,
+  CRX,
+  CRY,
+  CU1,
+  CRZ,
+  U1,
+  U2,
+  U3,
+  H,
+  X,
+  Y,
+  Z,
+  S,
+  SDG,
+  T,
+  TDG,
+  RX,
+  RY,
+  RZ,
+  TOTAL,
+  ID,
+  GII,
+  GZZ,
+  GOC,
+  GCC
 };
 
 enum SimGateType {

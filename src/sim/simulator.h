@@ -72,7 +72,8 @@ public:
   bool InitStateSingle(std::vector<unsigned> const &init_perm);
   bool InitStateMulti(std::vector<unsigned> const &init_perm);
   bool ApplyGate(Gate<DT> &gate, int device_id);
-  bool ApplyKernelGates(std::vector<KernelGate> &kernelgates, qindex logicQubitset);
+  bool ApplyKernelGates(std::vector<KernelGate> &kernelgates,
+                        qindex logicQubitset);
   bool ApplyShuffle(Gate<DT> &gate);
   bool Destroy();
 
@@ -108,7 +109,7 @@ private:
   // timing metrics
   cudaEvent_t start[MAX_DEVICES], end[MAX_DEVICES];
   // for SHM method
-  std::vector<unsigned int*> threadBias;
+  std::vector<unsigned int *> threadBias;
 };
 
 } // namespace sim

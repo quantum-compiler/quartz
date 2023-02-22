@@ -273,8 +273,9 @@ void qcircuit::Circuit<DT>::simulate(int ndevices, bool use_mpi) {
 
   printf("Test SHM\n");
   std::vector<KernelGate> kernelgates;
-  qComplex mat[2][2] = {make_qComplex(0, 0), make_qComplex(0, -1), make_qComplex(0, 1), make_qComplex(0, 0)};
-  for (int i=0; i<50; i++){
+  qComplex mat[2][2] = {make_qComplex(0, 0), make_qComplex(0, -1),
+                        make_qComplex(0, 1), make_qComplex(0, 0)};
+  for (int i = 0; i < 50; i++) {
     KernelGate kg(KernelGateType::Y, 5, 0, mat);
     kernelgates.push_back(kg);
   }

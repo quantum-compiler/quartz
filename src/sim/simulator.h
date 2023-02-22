@@ -7,13 +7,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "mpi.h"
-#include "nccl.h"
-#include <cuComplex.h>        // cuDoubleComplex
-#include <cuda_runtime_api.h> // cudaMalloc, cudaMemcpy, etc.
-#include <custatevec.h>       // custatevecApplyMatrix
-
-#include "helper.h" // HANDLE_ERROR, HANDLE_CUDA_ERROR
 #include "simgate.h"
 
 #define MAX_DEVICES 4
@@ -79,6 +72,8 @@ public:
   bool InitStateSingle(std::vector<unsigned> const &init_perm);
   bool InitStateMulti(std::vector<unsigned> const &init_perm);
   bool ApplyGate(Gate<DT> &gate, int device_id);
+  bool ApplyKernelGates(std::vector<KernelGate> &kernelgates,
+                        qindex logicQubitset);
   bool ApplyShuffle(Gate<DT> &gate);
   bool Destroy();
 
@@ -113,6 +108,8 @@ private:
   ncclComm_t comms[MAX_DEVICES];
   // timing metrics
   cudaEvent_t start[MAX_DEVICES], end[MAX_DEVICES];
+  // for SHM method
+  std::vector<unsigned int *> threadBias;
 };
 
 } // namespace sim

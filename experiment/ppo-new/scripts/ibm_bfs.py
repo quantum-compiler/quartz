@@ -112,7 +112,7 @@ if __name__ == '__main__':
         mode=wandb_mode,  # 'online',
     )
 
-    best_gate_cnt, best_circ = optimize(context, circ, circ_name)
+    best_gate_cnt, best_circ = optimize(context, circ, circ_name, timeout=6 * 3600)
 
     os.makedirs(output_dir, exist_ok=True)
     best_circ.to_qasm(filename=f'{output_dir}/{circ_name}_optimized.qasm')

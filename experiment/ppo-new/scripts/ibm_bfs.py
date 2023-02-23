@@ -66,7 +66,8 @@ def optimize(
 
                 new_hash = new_circ.hash()
                 new_cnt = new_circ.gate_count
-                if new_cnt > original_cnt * upper_limit:
+                # if new_cnt > original_cnt * upper_limit:
+                if new_cnt > best_gate_cnt * upper_limit:
                     continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
@@ -112,7 +113,9 @@ if __name__ == '__main__':
         mode=wandb_mode,  # 'online',
     )
 
-    best_gate_cnt, best_circ = optimize(context, circ, circ_name, timeout=6 * 3600)
+    best_gate_cnt, best_circ = optimize(
+        context, circ, circ_name, max_candidate_len=2000, timeout=6 * 3600
+    )
 
     os.makedirs(output_dir, exist_ok=True)
     best_circ.to_qasm(filename=f'{output_dir}/{circ_name}_optimized.qasm')

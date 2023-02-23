@@ -1,11 +1,11 @@
-#include "simulator.h"
-
+#include "distributed_simulator.h"
 #include "sim/circuit.h"
 
 using namespace sim;
+using namespace Legion;
 
 DSConfig::DSConfig() {
-  data_type = DT_DOUBLE;
+  state_vec_data_type = DT_DOUBLE;
   gpus_per_node = 0;
   cpus_per_node = 1;
   num_local_qubits = 0;
@@ -26,7 +26,6 @@ DSConfig::DSConfig() {
   Runtime *runtime = Runtime::get_runtime();
   lg_hlr = runtime;
   lg_ctx = Runtime::get_context();
-  field_space = runtime->create_field_space(lg_ctx);
 }
 
 void DSConfig::parse_args(char **argv, int argc) {

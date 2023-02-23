@@ -18,6 +18,7 @@
 
 #include "default_mapper.h"
 #include "legion.h"
+#include "machine_view.h"
 #include "null_mapper.h"
 
 namespace sim {
@@ -63,6 +64,10 @@ public:
   virtual MapperSyncModel get_mapper_sync_model(void) const;
 
 public:
+  static void register_all_machine_views(int num_nodes,
+                                         int gpus_per_node,
+                                         int cpus_per_node,
+                                         std::vector<MachineView> &valid_views);
   static void update_mappers(Machine machine,
                              Runtime *rt,
                              std::set<Processor> const &local_procs);

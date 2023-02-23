@@ -133,7 +133,7 @@ FFMapper::FFMapper(MapperRuntime *rt,
     view.dim[0] = all_gpus.size();
     view.stride[0] = 1;
     view.start_device_id = 0;
-    machine_views[FFConfig::DataParallelism_GPU] = view;
+    machine_views[DataParallelism_GPU] = view;
   }
   {
     MachineView view;
@@ -141,14 +141,14 @@ FFMapper::FFMapper(MapperRuntime *rt,
     view.ndims = 1;
     view.dim[0] = all_cpus.size();
     view.stride[0] = 1;
-    machine_views[FFConfig::DataParallelism_CPU] = view;
+    machine_views[DataParallelism_CPU] = view;
   }
   std::vector<MachineView> all_valid_views;
   assert(all_gpus.size() % total_nodes == 0);
   assert(all_cpus.size() % total_nodes == 0);
   int gpus_per_node = all_gpus.size() / total_nodes;
   int cpus_per_node = all_cpus.size() / total_nodes;
-  FFModel::register_all_machine_views(
+  FFMapper::register_all_machine_views(
       total_nodes, gpus_per_node, cpus_per_node, all_valid_views);
   for (auto const &it : all_valid_views) {
     MachineView view = it;
@@ -194,7 +194,7 @@ void FFMapper::register_sharding_functor(Runtime *runtime,
     view.start_device_id = 0;
     FFShardingFunctor *functor =
         new FFShardingFunctor(gpus_per_node, cpus_per_node, num_nodes, view);
-    runtime->register_sharding_functor(FFConfig::DataParallelism_GPU, functor);
+    runtime->register_sharding_functor(DataParallelism_GPU, functor);
   }
   {
     MachineView view;
@@ -204,12 +204,12 @@ void FFMapper::register_sharding_functor(Runtime *runtime,
     view.stride[0] = 1;
     FFShardingFunctor *functor =
         new FFShardingFunctor(gpus_per_node, cpus_per_node, num_nodes, view);
-    runtime->register_sharding_functor(FFConfig::DataParallelism_CPU, functor);
+    runtime->register_sharding_functor(DataParallelism_CPU, functor);
   }
   assert(gpus_per_node > 0);
   assert(cpus_per_node > 0);
   std::vector<MachineView> all_valid_views;
-  FFModel::register_all_machine_views(
+  FFMapper::register_all_machine_views(
       num_nodes, gpus_per_node, cpus_per_node, all_valid_views);
   for (auto const &it : all_valid_views) {
     MachineView view = it;
@@ -233,29 +233,6 @@ void FFMapper::register_sharding_functor(Runtime *runtime,
   }
 }
 
-bool FFMapper::is_parameter_server_update_task(TaskID tid) {
-  switch (tid) {
-    case SGD_UPD_PS_TASK_ID:
-    case ADAM_UPD_PS_TASK_ID:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool FFMapper::is_initializer_task(TaskID tid) {
-  switch (tid) {
-    case GLOROT_INIT_TASK_ID:
-    case ZERO_INIT_TASK_ID:
-    case CONSTANT_INIT_TASK_ID:
-    case UNIFORM_INIT_TASK_ID:
-    case NORMAL_INIT_TASK_ID:
-      return true;
-    default:
-      return false;
-  }
-}
-
 char const *FFMapper::get_mapper_name(void) const {
   return mapper_name;
 }
@@ -272,20 +249,8 @@ void FFMapper::select_task_options(const MapperContext ctx,
   output.stealable = false;
   output.map_locally = true;
 
-  if (task.task_id == STRATEGY_SEARCH_TASK_ID) {
-    output.initial_proc = all_gpus[0];
-    return;
-  }
-  if (task.task_id == GRAPH_OPTIMIZE_TASK_ID) {
-    output.initial_proc = all_gpus[0];
-    return;
-  }
   if (task.task_id == NCCL_GETUNIQUEID_TASK_ID) {
     output.initial_proc = all_gpus[0];
-    return;
-  }
-  if (task.task_id == UPDATE_METRICS_TASK_ID) {
-    output.initial_proc = all_cpus[0];
     return;
   }
   if (task.task_id == TOP_LEVEL_TASK_ID) {
@@ -310,52 +275,8 @@ void FFMapper::select_task_options(const MapperContext ctx,
     return;
   }
 
-  if (is_parameter_server_update_task(task.task_id) ||
-      is_initializer_task(task.task_id)) {
-    // For Parameter Server Update, pick a processor from config
-    MappingTagID hash = task.tag;
-    MachineView view;
-    if (machine_views.find(hash) != machine_views.end()) {
-      view = machine_views[hash];
-      int num_parts = 1;
-      for (int i = 0; i < view.ndims; i++) {
-        num_parts *= view.dim[i];
-      }
-      if (num_parts == 1) {
-        output.initial_proc = all_gpus[view.start_device_id];
-        // Current assert this sould be a local proc
-        assert(output.initial_proc.address_space() == node_id);
-        return;
-      } else {
-        output.initial_proc = all_gpus[view.start_device_id];
-        return;
-      }
-    }
-    if (cache_update_tasks.find(task_hash) != cache_update_tasks.end()) {
-      output.initial_proc = cache_update_tasks[task_hash];
-      assert(output.initial_proc.address_space() == node_id);
-      return;
-    }
-    // randomly select a local processor
-    output.initial_proc = local_gpus[task_hash % local_gpus.size()];
-    cache_update_tasks[task_hash] = output.initial_proc;
-    return;
-  }
-
   if ((task.task_id >= CUSTOM_CPU_TASK_ID_FIRST) &&
       (task.task_id <= CUSTOM_CPU_TASK_ID_LAST)) {
-    if (!task.is_index_space) {
-      output.initial_proc = all_cpus[0];
-      return;
-    }
-  }
-
-  if ((task.task_id == PY_DL_FLOAT_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT32_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT64_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_FLOAT_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT32_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT64_INDEX_LOAD_ENTIRE_CPU_TASK_ID)) {
     if (!task.is_index_space) {
       output.initial_proc = all_cpus[0];
       return;
@@ -388,22 +309,10 @@ void FFMapper::slice_task(const MapperContext ctx,
     // Assert data parallelism must be 1-d index space
     // since all other dims with a degree of 1 should be eliminated
     assert(ndim == 1);
-    assert(machine_views.find(FFConfig::DataParallelism_CPU) !=
+    assert(machine_views.find(DataParallelism_CPU) !=
            machine_views.end());
-    view = machine_views[FFConfig::DataParallelism_CPU];
+    view = machine_views[DataParallelism_CPU];
     printf("num_parts %zu", view.num_parts());
-    devices = &all_cpus;
-  } else if ((task.task_id == PY_DL_FLOAT_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-             (task.task_id == PY_DL_INT32_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-             (task.task_id == PY_DL_INT64_INDEX_LOAD_ENTIRE_CPU_TASK_ID)) {
-    // FIXME: even though it is a CPU task, we use data parallelism
-    assert(enable_control_replication);
-    // Assert data parallelism must be 1-d index space
-    // since all other dims with a degree of 1 should be eliminated
-    assert(input.domain.get_dim() == 1);
-    assert(machine_views.find(FFConfig::DataParallelism_GPU) !=
-           machine_views.end());
-    view = machine_views[FFConfig::DataParallelism_GPU];
     devices = &all_cpus;
   } else {
     MappingTagID hash = task.tag;
@@ -421,9 +330,9 @@ void FFMapper::slice_task(const MapperContext ctx,
         // Assert data parallelism must be 1-d index space
         // since all other dims with a degree of 1 should be eliminated
         assert(input.domain.get_dim() == 1);
-        assert(machine_views.find(FFConfig::DataParallelism_GPU) !=
+        assert(machine_views.find(DataParallelism_GPU) !=
                machine_views.end());
-        view = machine_views[FFConfig::DataParallelism_GPU];
+        view = machine_views[DataParallelism_GPU];
       } else {
         // Use CPU implementation
         runtime->find_valid_variants(
@@ -432,9 +341,9 @@ void FFMapper::slice_task(const MapperContext ctx,
         // Assert data parallelism must be 1-d index space
         // since all other dims with a degree of 1 should be eliminated
         assert(input.domain.get_dim() == 1);
-        assert(machine_views.find(FFConfig::DataParallelism_CPU) !=
+        assert(machine_views.find(DataParallelism_CPU) !=
                machine_views.end());
-        view = machine_views[FFConfig::DataParallelism_CPU];
+        view = machine_views[DataParallelism_CPU];
       }
     } else {
       // Found a strategy
@@ -719,30 +628,6 @@ void FFMapper::select_task_sources(const MapperContext ctx,
                                    Task const &task,
                                    SelectTaskSrcInput const &input,
                                    SelectTaskSrcOutput &output) {
-  if (task.task_id == PS_PREFETCH_TASK_ID) {
-    // Dummy task refers to prefetching weights tasks
-    MappingTagID hash = task.tag;
-    assert(hash != 0);
-    MachineView view;
-    if (machine_views.find(hash) == machine_views.end()) {
-      // No strategy found, use default data parallelism
-      assert(machine_views.find(FFConfig::DataParallelism_GPU) !=
-             machine_views.end());
-      view = machine_views[FFConfig::DataParallelism_GPU];
-    } else {
-      // Found a strategy
-      view = machine_views[hash];
-    }
-    Processor parameter_server = all_gpus[view.start_device_id];
-    // Prefer instances located on the parameter server
-    Memory ps_memory = proc_fbmems[parameter_server];
-    default_policy_select_sources(ctx,
-                                  input.target,
-                                  input.source_instances,
-                                  output.chosen_ranking,
-                                  ps_memory);
-    return;
-  }
   default_policy_select_sources(
       ctx, input.target, input.source_instances, output.chosen_ranking);
 }
@@ -827,20 +712,12 @@ void FFMapper::select_sharding_functor(const MapperContext ctx,
   if ((task.task_id == TOP_LEVEL_TASK_ID) ||
       ((task.task_id >= CUSTOM_CPU_TASK_ID_FIRST) &&
        (task.task_id <= CUSTOM_CPU_TASK_ID_LAST))) {
-    output.chosen_functor = FFConfig::DataParallelism_CPU;
-    return;
-  }
-  if ((task.task_id == PY_DL_FLOAT_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT32_INDEX_LOAD_ENTIRE_CPU_TASK_ID) ||
-      (task.task_id == PY_DL_INT64_INDEX_LOAD_ENTIRE_CPU_TASK_ID)) {
-    // FIXME: even though it is a CPU task, we use data parallelism
-    assert(enable_control_replication);
-    output.chosen_functor = FFConfig::DataParallelism_GPU;
+    output.chosen_functor = DataParallelism_CPU;
     return;
   }
   MappingTagID hash = task.tag;
   if (machine_views.find(hash) == machine_views.end()) {
-    output.chosen_functor = FFConfig::DataParallelism_GPU;
+    output.chosen_functor = DataParallelism_GPU;
     return;
   } else {
     output.chosen_functor = hash;

@@ -3,7 +3,7 @@
 #include "legion.h"
 #include "simulator_const.h"
 #include "cuda_helper.h"
-#include "../sim/simgate.h"
+#include "sim/simgate.h"
 #include <custatevec.h>
 #include <nccl.h>
 
@@ -13,7 +13,7 @@ class DSConfig {
 public:
   DSConfig();
   void parse_args(char **argv, int argc);
-  DataType data_type;
+  DataType state_vec_data_type;
   Legion::coord_t gpus_per_node, cpus_per_node, num_nodes;
   Legion::coord_t num_local_qubits, num_all_qubits, num_state_vectors_on_gpu;
   Legion::Context lg_ctx;
@@ -22,7 +22,6 @@ public:
 
 class GateInfo {
 public:
-  GateInfo();
   int num_targets, num_controls;
   int permutation[MAX_NUM_QUBITS], target[MAX_NUM_QUBITS];
   // FIXME: currently we send matrix_data to devices for each compute task
@@ -65,10 +64,12 @@ public:
   void init_devices();
   bool init_state_vectors();
   template<typename DT>
+  bool set_gate_info(const std::vector<Gate<DT> > &gates, GateInfo& info);
+  template<typename DT>
   bool apply_gates(const std::vector<Gate<DT> > &gates);
 private:
   DSConfig config;
-  Legion::LogicalRegion parallel_is;
+  Legion::IndexSpace parallel_is;
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > cpu_state_vectors;
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > gpu_state_vectors;
   DSHandler handlers[MAX_NUM_WORKERS];

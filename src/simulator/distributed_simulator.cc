@@ -14,13 +14,13 @@ void DistributedSimulator::init_devices() {
   Runtime *runtime = config.lg_hlr;
   // Init CUDA library on each worker
   IndexLauncher initLauncher(
-      CUDA_INIT_TASK_ID, task_is, TaskArgument(nullptr, 0), argmap,
+      CUDA_INIT_TASK_ID, task_is, TaskArgument(config, sizeof(DSConfig)), argmap,
       Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
   FutureMap fm = runtime->execute_index_space(ctx, initLauncher);
   fm.wait_all_results();
   int idx = 0;
   for (PointInRectIterator<1> it(task_rect); it(); it++) {
-    handlers[idx++] = fm.get_result<FFHandler>(*it);
+    handlers[idx++] = fm.get_result<DSHandler>(*it);
   }
 }
 

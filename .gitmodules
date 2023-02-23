@@ -2,5 +2,5 @@
 	path = external/HiGHS
 	url = https://github.com/ERGO-Code/HiGHS.git
 [submodule "external/legion"]
-	path = external/legion
+	path = src/simulator/deps/legion
 	url = https://gitlab.com/StanfordLegion/legion.git

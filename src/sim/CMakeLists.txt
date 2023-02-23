@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(qsim LANGUAGES C CXX CUDA)
 include(ExternalProject)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_LIST_DIR}/cmake)
@@ -28,7 +28,7 @@ endif()
 # ##########################################
 # custatevec_example dependencies
 # ##########################################
-set(CUSTATEVEC_ROOT ${CUQUANTUM_ROOT})
+set(CUSTATEVEC_ROOT "/home/ubuntu/anaconda3/envs/cuquantum")
 if (CUSTATEVEC_ROOT STREQUAL "")
     message(FATAL_ERROR "Please set the environment variables CUSTATEVEC_ROOT or CUQUANTUM_ROOT to the path of the cuQuantum installation.")
 endif ()

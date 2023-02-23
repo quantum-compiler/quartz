@@ -28,7 +28,7 @@ if(CUSTATEVEC_FOUND)
 endif()
 
 if(CUSTATEVEC_FOUND)
-message( STATUS "CUSTATEVEC inlcude : ${CUSTATEVEC_INCLUDE_DIR}" )
+  message( STATUS "CUSTATEVEC inlcude : ${CUSTATEVEC_INCLUDE_DIR}" )
   message( STATUS "CUSTATEVEC libraries : ${CUSTATEVEC_LIBRARIES}" )
   message("QSIM_INCLUDE_DIRS cuquantum: ${QSIM_INCLUDE_DIRS}")
 else()

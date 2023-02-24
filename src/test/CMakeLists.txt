@@ -77,6 +77,7 @@ file(GLOB_RECURSE TEST_GAME_SEARCH_ACTION_SPACE "test_game_search_action_space.c
 file(GLOB_RECURSE TEST_GAME_HYBRID "test_game_hybrid.cpp")
 file(GLOB_RECURSE TEST_ENV_HYBRID "test_env_hybrid.cpp")
 file(GLOB_RECURSE TEST_GENERATE_PLAN "test_generate_plan.cpp")
+file(GLOB_RECURSE TEST_MBQ "test_mbq.cpp")
 # benchmarks
 file(GLOB_RECURSE TEST_ROLLOUT "test_rollout.cpp")
 file(GLOB_RECURSE BENCHMARK_SABRE_1PASS "_benchmark_sabre_1_pass.cpp")
@@ -142,6 +143,7 @@ add_executable(test_game_search_action_space ${TEST_GAME_SEARCH_ACTION_SPACE})
 add_executable(test_game_hybrid ${TEST_GAME_HYBRID})
 add_executable(test_env_hybrid ${TEST_ENV_HYBRID})
 add_executable(test_generate_plan ${TEST_GENERATE_PLAN})
+add_executable(test_mbq ${TEST_MBQ})
 # benchmarks
 add_executable(test_rollout ${TEST_ROLLOUT})
 add_executable(benchmark_sabre_1pass ${BENCHMARK_SABRE_1PASS})

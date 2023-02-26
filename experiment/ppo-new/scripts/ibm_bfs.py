@@ -17,7 +17,7 @@ def optimize(
     max_candidate_len: int = 1_000_000,
     timeout: int = 86400,
 ) -> tuple[int, quartz.PyGraph]:
-    candidate = [(init_circ.gate_count, init_circ.to_qasm_str())]
+    candidate = [(init_circ.gate_count, init_circ)]
     hash_set = set([init_circ.hash()])
     best_circ: quartz.PyGraph = init_circ
     best_gate_cnt: int = init_circ.gate_count
@@ -26,15 +26,20 @@ def optimize(
     start = time.time()
     invoke_cnt: int = 0
 
-    while candidate != []:
+    while candidate:
+        old_cand_len = len(candidate)
         if len(candidate) > max_candidate_len:
+            # candidate = candidate[: len(candidate) // 2]
+            candidate = heapq.nlargest(max_candidate_len // 2, candidate)
+            hash_set.clear()
+            for cnt, circ in candidate:
+                hash_set.add(circ.hash())
             print(
-                f"[{circ_name} (rotation merging)] candidate queue shrink from {len(candidate)} to {len(candidate) // 2}"
+                f"[{circ_name}] candidate queue shrink from {old_cand_len} to {len(candidate)}"
             )
-            candidate = candidate[: len(candidate) // 2]
 
-        _, circ_qasm_str = heapq.heappop(candidate)
-        circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
+        _, circ = heapq.heappop(candidate)
+        # circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
         all_nodes = circ.all_nodes()
         for node in all_nodes:
             av_xfers = circ.available_xfers_parallel(
@@ -43,8 +48,8 @@ def optimize(
             )
             for i_xfer in av_xfers:
                 xfer = context.get_xfer_from_id(id=i_xfer)
-                t = time.time()
-                if t - start > timeout:
+                if time.time() - start > timeout:
+                    print(f'[{circ_name}] timeout, exit', flush=True)
                     return best_gate_cnt, best_circ
 
                 invoke_cnt += 1
@@ -53,7 +58,7 @@ def optimize(
                         {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
                     )
                     print(
-                        f"[{circ_name} (rotation merging)] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
+                        f"[{circ_name}] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
                         flush=True,
                     )
 
@@ -71,7 +76,7 @@ def optimize(
                     continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
-                    heapq.heappush(candidate, (new_cnt, new_circ.to_qasm_str()))
+                    heapq.heappush(candidate, (new_cnt, new_circ))
 
                     if new_cnt < best_gate_cnt:
                         best_gate_cnt = new_cnt

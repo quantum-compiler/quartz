@@ -671,6 +671,7 @@ namespace quartz {
             output_qasm_file << "OPENQASM 2.0;\n";
             output_qasm_file << "include \"qelib1.inc\";\n";
             output_qasm_file << "qreg q[" << original_qasm_qubit_count << "];\n";
+            output_qasm_file << "creg meas[" << original_qasm_qubit_count << "];\n";
 
             // output the initial single qubit gates (i.e. gates attached to input_qubits)
             // this is guid range, so we use original_qasm_qubit_count instead of logical_qubit_num

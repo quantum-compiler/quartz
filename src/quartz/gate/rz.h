@@ -6,7 +6,9 @@
 namespace quartz {
 	class RZGate : public Gate {
 	public:
-		RZGate() : Gate(GateType::rz, 1 /*num_qubits*/, 1 /*num_parameters*/) {}
+        // TODO: in quartz physical, we set rz as non-parameterized gate to make the code simpler
+        // TODO: this means that the code can no longer be used in logical optimization
+		RZGate() : Gate(GateType::rz, 1 /*num_qubits*/, 0 /*num_parameters*/) {}
 		MatrixBase *
 		get_matrix(const std::vector< ParamType > &params) override {
 			assert(params.size() == 1);

@@ -35,7 +35,8 @@ const Op Op::INVALID_OP = Op();
 
 bool operator==(const OutputGateRepresentation &g1, const OutputGateRepresentation &g2) {
     return g1.is_single_qubit_gate == g2.is_single_qubit_gate && g1.gate_type == g2.gate_type &&
-        g1.logical_idx0 == g2.logical_idx0 && g1.logical_idx1 == g2.logical_idx1;
+        g1.logical_idx0 == g2.logical_idx0 && g1.logical_idx1 == g2.logical_idx1 &&
+        g1.parameter_string == g2.parameter_string;
 }
 
 void Graph::_construct_pos_2_logical_qubit() {
@@ -1232,6 +1233,9 @@ Graph::_from_qasm_stream(Context *ctx,
   GateType gate_type;
   std::vector<Pos> pos_on_qubits;
   while (std::getline(qasm_stream, line)) {
+    // skip empty line
+    if (line.empty()) continue;
+
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
     find_and_replace_all(line, "(", " ");
@@ -1245,7 +1249,13 @@ Graph::_from_qasm_stream(Context *ctx,
       continue; // ignore this line
     } else if (command == "include") {
       continue; // ignore this line
-    } else if (command == "creg") {
+    } else if (command == "//") {
+      continue; // ignore annotation
+    } else if (command == "barrier") {
+      continue; // ignore barrier
+    } else if (command == "measure") {
+      continue; // ignore measurement
+    }else if (command == "creg") {
       continue; // ignore this line
     } else if (command == "qreg") {
       std::string token;
@@ -1267,6 +1277,12 @@ Graph::_from_qasm_stream(Context *ctx,
         return nullptr;
       }
       if (gate->is_parametrized_gate()) {
+        std::cerr << "Unexpected parameterized gate appears in circuit:" << command
+                  << std::endl;
+        return nullptr;
+
+        // TODO: we disable general parameterized gates support (rz gates are supported in a way that
+        // TODO: makes physical optimization easier)
         auto op = graph->new_gate(gate_type);
         auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
         auto num_params = graph->context->get_gate(gate_type)->num_parameters;
@@ -1310,7 +1326,16 @@ Graph::_from_qasm_stream(Context *ctx,
             return nullptr;
         }
       } else if (gate->is_quantum_gate()) {
+        // this is for rz gates
+        std::string _rz_parameter;
+        if (gate_type == GateType::rz) {
+            ss >> _rz_parameter;
+            _rz_parameter = "(" + _rz_parameter + ")";
+        }
+
+        // other regular non-parameterized gates
         auto op = graph->new_gate(gate_type);
+        op.parameter_string = _rz_parameter;
         auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
         for (int i = 0; i < num_qubits; ++i) {
           assert(ss.good());

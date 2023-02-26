@@ -8,7 +8,7 @@ using namespace quartz;
 int main() {
     // initialize the environment
     //  string circuit_file_name = "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm";
-    string circuit_file_name = "../tof_3_after_heavy.qasm";
+    string circuit_file_name = "../mbq_large_test.qasm";
     SimpleHybridEnv env = SimpleHybridEnv(
             // basic settings
             circuit_file_name, BackendType::IBM_Q27_FALCON, "../test_mapping_file.txt",
@@ -28,6 +28,8 @@ int main() {
         bool is_finished = env.is_finished();
         cout << "Reward is " << reward << ", is finished = " << is_finished << endl;
     }
+    env.save_context_to_file("../eh1.txt", "../single1.txt");
+    env.generate_mapped_qasm("../final1.qasm", true);
 
     // reset the environment to start a new game
     env.reset();
@@ -42,4 +44,6 @@ int main() {
         bool is_finished = env.is_finished();
         cout << "Reward is " << reward << ", is finished = " << is_finished << endl;
     }
+    env.save_context_to_file("../eh2.txt", "../single2.txt");
+    env.generate_mapped_qasm("../final2.qasm", true);
 }

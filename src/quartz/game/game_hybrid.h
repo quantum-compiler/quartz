@@ -332,7 +332,8 @@ namespace quartz {
                     assert(input_logical_1 == physical2logical[input_physical_1]);
                     execution_history.emplace_back(executable_gate.guid, executable_gate.ptr->tp,
                                                    input_logical_0, input_logical_1,
-                                                   input_physical_0, input_physical_1);
+                                                   input_physical_0, input_physical_1,
+                                                   executable_gate.parameter_string);
                     execute_front_gate(graph, executable_gate);
                     executed_gate_count += 1;
                 }
@@ -356,7 +357,7 @@ namespace quartz {
             // scan through the execution history to determine cost of each swap
             std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
             int swap_with_cost = 0;
-            for (ExecutionHistory eh_item: execution_history) {
+            for (const ExecutionHistory &eh_item: execution_history) {
                 if (eh_item.gate_type == GateType::swap) {
                     // only swaps with at least one logical input used have non-zero cost
                     int _logical0 = eh_item.logical0;
@@ -456,7 +457,7 @@ namespace quartz {
             eh_file << execution_history.size() << "\n";
             for (const ExecutionHistory &eh: execution_history) {
                 eh_file << eh.guid << " "
-                        << eh.gate_type << " "
+                        << eh.gate_type << eh.parameter_string << " "
                         << eh.physical0 << " "
                         << eh.physical1 << " "
                         << eh.logical0 << " "
@@ -482,7 +483,8 @@ namespace quartz {
             for (const auto &entry: graph.simplified_gates_after_op) {
                 single_qubit_gate_file << entry.first.guid << " " << entry.second.size() << "\n";
                 for (const auto &gate: entry.second) {
-                    single_qubit_gate_file << gate.gate_type << " " << gate.logical_idx0 << "\n";
+                    single_qubit_gate_file << gate.gate_type << gate.parameter_string << " "
+                                           << gate.logical_idx0 << "\n";
                 }
             }
 
@@ -493,6 +495,7 @@ namespace quartz {
         void generated_mapping_plan(const std::string &output_qasm_file_path,
                                     const std::string &original_qasm_file_path,
                                     bool debug_mode) const {
+            // FIXME: Currently we do not support circuits with unused logical qubits.
             // circuit must be finished in order to generate the plan
             Assert(is_circuit_finished(graph), "Circuit must be finished!");
 
@@ -503,9 +506,13 @@ namespace quartz {
             int original_qasm_qubit_count = -1;
             while (std::getline(original_qasm_file, tmp_file_line)) {
                 // ignore headings and annotations
+                if (tmp_file_line.empty()) continue;
                 if (tmp_file_line.rfind("//", 0) == 0) continue;
                 if (tmp_file_line.rfind("OPENQASM", 0) == 0) continue;
                 if (tmp_file_line.rfind("include", 0) == 0) continue;
+                if (tmp_file_line.rfind("barrier", 0) == 0) continue;
+                if (tmp_file_line.rfind("measure", 0) == 0) continue;
+                if (tmp_file_line.rfind("creg", 0) == 0) continue;
                 if (tmp_file_line.rfind("qreg", 0) == 0) {
                     size_t offset = tmp_file_line.find('[') + 1;
                     size_t count = tmp_file_line.find(']') - offset;
@@ -528,7 +535,23 @@ namespace quartz {
                 std::istringstream _tmp_iss(tmp_file_line);
                 std::string gate_type_str;
                 _tmp_iss >> gate_type_str;
-                GateType gate_type = to_gate_type(gate_type_str);
+                GateType gate_type;
+                std::string parameter_string;
+                if (gate_type_str.find('(') != std::string::npos) {
+                    // parameterized gates
+                    Assert(gate_type_str.find(')') != std::string::npos, "Parameter bracket mismatch!");
+
+                    // parse parameter first
+                    size_t start = gate_type_str.find('(');
+                    size_t end = gate_type_str.find(')') + 1;
+                    parameter_string = gate_type_str.substr(start, end - start);
+
+                    // then gate type
+                    gate_type = to_gate_type(gate_type_str.substr(0, start));
+                } else {
+                    gate_type = to_gate_type(gate_type_str);
+                    parameter_string = "";
+                }
 
                 // parse the input of gates
                 auto left_bracket_occurrences = find_all_occurrences(tmp_file_line, '[');
@@ -547,9 +570,10 @@ namespace quartz {
 
                 // assemble them into OutputGateRepresentation
                 if (gate_inputs.size() == 1) {
-                    original_qasm_gates.emplace_back(true, gate_type, gate_inputs[0], -1);
+                    original_qasm_gates.emplace_back(true, gate_type, gate_inputs[0], -1, parameter_string);
                 } else {
-                    original_qasm_gates.emplace_back(false, gate_type, gate_inputs[0], gate_inputs[1]);
+                    original_qasm_gates.emplace_back(false, gate_type, gate_inputs[0], gate_inputs[1],
+                                                     parameter_string);
                 }
             }
             Assert(original_qasm_qubit_count != -1, "Missing qreg line in original qasm file!");
@@ -665,7 +689,8 @@ namespace quartz {
                         // check each gate's mapping and output
                         Assert(gate.is_single_qubit_gate && cur_input_qubit_logical_idx == gate.logical_idx0,
                                "Gate after input qubit has an error!");
-                        output_qasm_file << gate.gate_type << " q[" << cur_l2p_mapping[gate.logical_idx0] << "];\n";
+                        output_qasm_file << gate.gate_type << gate.parameter_string << " q["
+                                         << cur_l2p_mapping[gate.logical_idx0] << "];\n";
 
                         // put into pending gate list for integrity check
                         pending_gate_coverage[gate.logical_idx0] += 1;
@@ -692,8 +717,8 @@ namespace quartz {
                     Assert(cur_l2p_mapping[l1] == cur_eh_entry.physical1, "Mapping error!");
 
                     // first write the swap into file and then change the mapping table
-                    output_qasm_file << cur_eh_entry.gate_type << " q[" << cur_eh_entry.physical0 << "], q["
-                                     << cur_eh_entry.physical1 << "];\n";
+                    output_qasm_file << cur_eh_entry.gate_type << cur_eh_entry.parameter_string
+                                     << " q[" << cur_eh_entry.physical0 << "], q[" << cur_eh_entry.physical1 << "];\n";
                     cur_l2p_mapping[l1] = cur_eh_entry.physical0;
                     cur_l2p_mapping[l0] = cur_eh_entry.physical1;
                 } else {
@@ -706,8 +731,8 @@ namespace quartz {
                     int l1 = cur_eh_entry.logical1;
                     Assert(cur_l2p_mapping[l0] == cur_eh_entry.physical0, "Mapping error!");
                     Assert(cur_l2p_mapping[l1] == cur_eh_entry.physical1, "Mapping error!");
-                    output_qasm_file << cur_eh_entry.gate_type << " q[" << cur_eh_entry.physical0 << "], q["
-                                     << cur_eh_entry.physical1 << "];\n";
+                    output_qasm_file << cur_eh_entry.gate_type << cur_eh_entry.parameter_string
+                                     << " q[" << cur_eh_entry.physical0 << "], q[" << cur_eh_entry.physical1 << "];\n";
 
                     // write any single qubit gate that follows this gate into output file
                     if (single_qubit_gate_plan.find(cur_eh_entry.guid) != single_qubit_gate_plan.end()) {
@@ -716,8 +741,8 @@ namespace quartz {
                             Assert(single_qubit_gate.is_single_qubit_gate, "Found non-single qubit gate simplified!");
                             Assert(single_qubit_gate.logical_idx0 == l0 || single_qubit_gate.logical_idx0 == l1,
                                    "Bad single qubit execution plan!");
-                            output_qasm_file << single_qubit_gate.gate_type << " q["
-                                             << cur_l2p_mapping[single_qubit_gate.logical_idx0] << "];\n";
+                            output_qasm_file << single_qubit_gate.gate_type << single_qubit_gate.parameter_string
+                                             << " q[" << cur_l2p_mapping[single_qubit_gate.logical_idx0] << "];\n";
 
                             // put into pending gate list for integrity check
                             pending_gate_coverage[single_qubit_gate.logical_idx0] += 1;
@@ -733,7 +758,8 @@ namespace quartz {
                     // this step is necessary because of independent gate reordering
                     pending_gate_coverage[l0] += 1;
                     pending_gate_coverage[l1] += 1;
-                    pending_gate_queue.emplace_back(false, cur_eh_entry.gate_type, l0, l1);
+                    pending_gate_queue.emplace_back(false, cur_eh_entry.gate_type, l0, l1,
+                                                    cur_eh_entry.parameter_string);
 
                     // compare against the original qasm file only in debug mode
                     while (debug_mode && !original_qasm_gates.empty()) {
@@ -771,7 +797,28 @@ namespace quartz {
             // after we have walked through the history, we can assign the real_final_l2p_mapping
             real_final_l2p_mapping = cur_l2p_mapping;
 
-            // STEP 5: output the guid -> logical mapping, initial & final logical -> physical mapping as notes
+            // STEP 5: output barrier and measurement command
+            // barrier
+            output_qasm_file << "barrier q[0]";
+            for (int _qubit_idx = 1; _qubit_idx < original_qasm_qubit_count; ++_qubit_idx) {
+                output_qasm_file << ",q[" << _qubit_idx << "]";
+            }
+            output_qasm_file << ";\n";
+            // measurement (measure q[physical] -> meas[guid(as defined in qreg)];)
+            std::vector<std::string> measure_command_list(original_qasm_qubit_count, "");
+            for (const auto &guid2logical: input_guid_to_logical) {
+                int guid = guid2logical.first;
+                int logical_idx = guid2logical.second;
+                Assert(measure_command_list[guid].empty(), "Duplicate guid found!");
+                measure_command_list[guid] = "measure q[" + std::to_string(real_final_l2p_mapping[logical_idx])
+                                             + "] -> meas[" + std::to_string(guid) + "];\n";
+            }
+            for (const auto &measure_command: measure_command_list) {
+                output_qasm_file << measure_command;
+            }
+
+
+            // STEP 6: output the guid -> logical mapping, initial & final logical -> physical mapping as notes
             output_qasm_file << "\n// ***************************************** ADDITIONAL INFO"
                                 " ***************************************** //\n";
             // save guid -> logical mapping
@@ -795,7 +842,7 @@ namespace quartz {
             output_qasm_file << "// *************************************************"
                                 "************************************************** //\n";
 
-            // STEP 6: some final integrity check and clean up
+            // STEP 7: some final integrity check and clean up
             Assert(original_qasm_gates.empty(), "Found unexecuted gates in original qasm!");
             Assert(output_execution_history.empty(), "Execution history unfinished!");
             Assert(single_qubit_gate_plan.empty(), "Single qubit plan unfinished!");

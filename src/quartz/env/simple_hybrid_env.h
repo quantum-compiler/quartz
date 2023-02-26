@@ -25,14 +25,9 @@ namespace quartz {
             // initialize context, graph and device
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
                                                          GateType::tdg, GateType::input_qubit, GateType::s,
-                                                         GateType::sdg, GateType::x, GateType::z}));
-            QASMParser qasm_parser(&(*context));
-            DAG *dag = nullptr;
-            if (!qasm_parser.load_qasm(qasm_file_path, dag)) {
-                std::cout << "Parser failed" << std::endl;
-                assert(false);
-            }
-            graph = std::make_shared<Graph>(Graph(&(*context), dag));
+                                                         GateType::sdg, GateType::x, GateType::z, GateType::rz,
+                                                         GateType::sx}));
+            graph = Graph::from_qasm_file(&(*context), qasm_file_path);
             device = GetDevice(backend_type);
 
             // set randomness (random_generator is initialized above)

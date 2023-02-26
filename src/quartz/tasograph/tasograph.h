@@ -15,6 +15,7 @@
 #include <queue>
 #include <set>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace quartz {
@@ -56,6 +57,7 @@ namespace quartz {
         Op &operator=(const Op &op) {
             guid = op.guid;
             ptr = op.ptr;
+            parameter_string = op.parameter_string;
             return *this;
         }
 
@@ -64,6 +66,7 @@ namespace quartz {
     public:
         size_t guid;
         Gate *ptr;
+        std::string parameter_string;
     };
 
     class OpCompare {
@@ -223,13 +226,16 @@ namespace quartz {
     public:
         OutputGateRepresentation() = delete;
 
-        OutputGateRepresentation(bool _is_single_qubit_gate, GateType _gate_type, int _logical_idx0, int _logical_idx1)
+        OutputGateRepresentation(bool _is_single_qubit_gate, GateType _gate_type, int _logical_idx0,
+                                 int _logical_idx1, std::string _parameter_string="")
                 : is_single_qubit_gate(_is_single_qubit_gate), gate_type(_gate_type),
-                  logical_idx0(_logical_idx0), logical_idx1(_logical_idx1) {}
+                  logical_idx0(_logical_idx0), logical_idx1(_logical_idx1),
+                  parameter_string(std::move(_parameter_string)) {}
 
     public:
         bool is_single_qubit_gate;
         GateType gate_type;
+        std::string parameter_string;
         int logical_idx0;
         int logical_idx1;
     };

@@ -1,4 +1,4 @@
-import heapq
+import bisect
 import os
 import sys
 import time
@@ -23,24 +23,24 @@ def optimize(
     best_gate_cnt: int = init_circ.gate_count
     original_cnt = init_circ.gate_count
 
-    start = time.time()
+    t_start = time.time()
     invoke_cnt: int = 0
 
-    while candidate:
-        old_cand_len = len(candidate)
-        if len(candidate) > max_candidate_len:
-            # candidate = candidate[: len(candidate) // 2]
-            t_shr_s = time.time()
-            candidate = heapq.nlargest(max_candidate_len // 2, candidate)
-            hash_set.clear()
-            for cnt, circ in candidate:
-                hash_set.add(circ.hash())
-            print(
-                f"[{circ_name}] candidate queue shrink from {old_cand_len} to {len(candidate)}, taking {time.time() - t_shr_s:.1f} sec",
-                flush=True,
-            )
+    def print_and_log():
+        wandb.log(
+            {
+                'invoke_cnt': invoke_cnt,
+                'best_gate_cnt': best_gate_cnt,
+                'candidate_len': len(candidate),
+            }
+        )
+        print(
+            f"[{circ_name}] best gate count: {best_gate_cnt}, {len(candidate) = }, {invoke_cnt = }, time cost: {time.time() - t_start:.2f} s",
+            flush=True,
+        )
 
-        _, circ = heapq.heappop(candidate)
+    while candidate:
+        _, circ = candidate.pop(0)
         # circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
         all_nodes = circ.all_nodes()
         for node in all_nodes:
@@ -50,19 +50,13 @@ def optimize(
             )
             for i_xfer in av_xfers:
                 xfer = context.get_xfer_from_id(id=i_xfer)
-                if time.time() - start > timeout:
+                if time.time() - t_start > timeout:
                     print(f'[{circ_name}] timeout, exit', flush=True)
                     return best_gate_cnt, best_circ
 
                 invoke_cnt += 1
-                if print_message and invoke_cnt % 100_000_000 == 0:
-                    wandb.log(
-                        {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
-                    )
-                    print(
-                        f"[{circ_name}] best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
-                        flush=True,
-                    )
+                if print_message and invoke_cnt % 10_000_000 == 0:
+                    print_and_log()
 
                 new_circ = circ.apply_xfer(
                     xfer=xfer, node=node, eliminate_rotation=True
@@ -78,18 +72,16 @@ def optimize(
                     continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
-                    heapq.heappush(candidate, (new_cnt, new_circ))
+                    bisect.insort_left(candidate, (new_cnt, new_circ))
+                    if len(candidate) > max_candidate_len:
+                        _, popped_circ = candidate.pop(-1)
+                        hash_set.remove(popped_circ.hash())
 
                     if new_cnt < best_gate_cnt:
                         best_gate_cnt = new_cnt
                         best_circ = new_circ
-                        wandb.log(
-                            {'invoke_cnt': invoke_cnt, 'best_gate_cnt': best_gate_cnt}
-                        )
-                        print(
-                            f"[{circ_name}] better circuit is found! best gate count: {best_gate_cnt}, candidate count: {len(candidate)}, API invoke time: {invoke_cnt}, time cost: {t - start:.3f}s",
-                            flush=True,
-                        )
+                        print(f"[{circ_name}] better circuit is found!", flush=True)
+                        print_and_log()
 
     return best_gate_cnt, best_circ
 

@@ -30,12 +30,14 @@ def optimize(
         old_cand_len = len(candidate)
         if len(candidate) > max_candidate_len:
             # candidate = candidate[: len(candidate) // 2]
+            t_shr_s = time.time()
             candidate = heapq.nlargest(max_candidate_len // 2, candidate)
             hash_set.clear()
             for cnt, circ in candidate:
                 hash_set.add(circ.hash())
             print(
-                f"[{circ_name}] candidate queue shrink from {old_cand_len} to {len(candidate)}"
+                f"[{circ_name}] candidate queue shrink from {old_cand_len} to {len(candidate)}, taking {time.time() - t_shr_s:.1f} sec",
+                flush=True,
             )
 
         _, circ = heapq.heappop(candidate)

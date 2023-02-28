@@ -52,7 +52,7 @@ def optimize(
             candidate = new_candidate
             hash_set = new_hash_set
             print(
-                f'queue shrinks: {old_len} -> {len(candidate)}, taking {time.time() - t_shr_s:.0f} sec',
+                f'queue shrinks: {old_len} -> {len(candidate)}, taking {time.time() - t_shr_s:.0f} sec, {invoke_cnt = }',
                 flush=True,
             )
 

@@ -37,6 +37,13 @@ python scripts/ibm_bfs.py tof_3 quartz_ibm_outputs online & sleep 30
 python scripts/ibm_bfs.py tof_4 quartz_ibm_outputs online & sleep 30
 python scripts/ibm_bfs.py tof_5 quartz_ibm_outputs online & sleep 30
 python scripts/ibm_bfs.py tof_10 quartz_ibm_outputs online & sleep 30
-python scripts/ibm_bfs.py vbe_adder_3 quartz_ibm_outputs online
+python scripts/ibm_bfs.py vbe_adder_3 quartz_ibm_outputs online & sleep 30
+
+python scripts/ibm_bfs.py portfolioqaoa_nativegates_ibm_tket_8 quartz_ibm_outputs online & sleep 30
+python scripts/ibm_bfs.py su2random_nativegates_ibm_tket_8 quartz_ibm_outputs online & sleep 30
+python scripts/ibm_bfs.py twolocalrandom_nativegates_ibm_tket_8 quartz_ibm_outputs online & sleep 30
+python scripts/ibm_bfs.py realamprandom_nativegates_ibm_tket_8 quartz_ibm_outputs online & sleep 30
+python scripts/ibm_bfs.py portfoliovqe_nativegates_ibm_tket_8 quartz_ibm_outputs online
+
 
 echo "Finished!"

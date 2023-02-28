@@ -580,6 +580,32 @@ class PPOMod:
 
     @torch.no_grad()
     def test(self, rank: int, world_size: int) -> None:
+        def auto_find_tuning_dir(input_graphs: List[str]) -> Optional[str]:
+            input_graphs = sorted(input_graphs)
+            for date in natsorted(os.listdir('outputs'), reverse=True):
+                date_dir = os.path.join('outputs', date)
+                for time in natsorted(os.listdir(date_dir), reverse=True)[1:]:
+                    tuning_dir = os.path.join(date_dir, time)
+                    sync_dir = os.path.join(tuning_dir, 'sync_dir')
+                    if os.path.exists(sync_dir):
+                        best_info_path = os.path.join(sync_dir, 'best_info_0.json')
+                        while True:
+                            if not os.path.exists(best_info_path):
+                                time.sleep(1)
+                                continue
+                            try:
+                                with open(best_info_path, 'r') as f:
+                                    best_info: list = json.load(f)
+                                break
+                            except json.decoder.JSONDecodeError as e:
+                                time.sleep(1)
+                                continue
+                        # end while
+                        graphs_in_info = sorted(info['name'] for info in best_info)
+                        if input_graphs == graphs_in_info:
+                            return tuning_dir
+            return None
+
         self.cfg = cast(TestConfig, self.cfg)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""
@@ -593,17 +619,16 @@ class PPOMod:
                 self.ddp_ac_net.load_state_dict(model_state_dict)
             printfl(f'rank {rank} resumed from "{ckpt_path}"!')
 
-        def auto_find_tuning_dir() -> Optional[str]:
-            for date in natsorted(os.listdir('outputs'), reverse=True):
-                date_dir = os.path.join('outputs', date)
-                for time in natsorted(os.listdir(date_dir), reverse=True)[1:]:
-                    tuning_dir = os.path.join(date_dir, time)
-                    if os.path.exists(os.path.join(tuning_dir, 'sync_dir')):
-                        return tuning_dir
-            return None
+        """get input graphs"""
+        input_graphs: Dict[str, quartz.PyGraph] = {}
+        for input_graph in self.cfg.input_graphs:
+            with open(input_graph.path) as f:
+                qasm_str = f.read()
+            graph = qtz.qasm_to_graph(qasm_str)
+            input_graphs[input_graph.name] = graph
 
         if self.cfg.auto_tuning_dir:
-            tuning_dir = auto_find_tuning_dir()
+            tuning_dir = auto_find_tuning_dir(list(input_graphs.keys()))
             if not tuning_dir:
                 raise Exception(f'Cannot find tuning_dir automatically!')
         else:
@@ -628,13 +653,6 @@ class PPOMod:
             max_search_sec=self.cfg.max_search_sec,
             vmem_perct_limit=self.cfg.vmem_perct_limit,
         )
-        """get input graphs"""
-        input_graphs: Dict[str, quartz.PyGraph] = {}
-        for input_graph in self.cfg.input_graphs:
-            with open(input_graph.path) as f:
-                qasm_str = f.read()
-            graph = qtz.qasm_to_graph(qasm_str)
-            input_graphs[input_graph.name] = graph
         tester.search(input_graphs)
 
     def convert(self, rank: int) -> None:

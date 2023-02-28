@@ -18,7 +18,7 @@ class NamConfig(BaseConfig):
         default_factory=lambda: [
             InputGraph(
                 'barenco_tof_3',
-                '../nam_circs/barenco_tof_3.qasm',
+                '../circs/nam_circs/barenco_tof_3.qasm',
             ),
         ]
     )
@@ -43,7 +43,7 @@ class NamFTConfig(NamConfig):
         default_factory=lambda: [
             InputGraph(
                 'barenco_tof_3',
-                '../nam_circs/barenco_tof_3.qasm',
+                '../circs/nam_circs/barenco_tof_3.qasm',
             ),
         ]
     )
@@ -57,7 +57,7 @@ class NamPretrainConfig(NamConfig):
         default_factory=lambda: [
             InputGraph(
                 'barenco_tof_3',
-                '../nam_circs/barenco_tof_3.qasm',
+                '../circs/nam_circs/barenco_tof_3.qasm',
             ),
         ]
     )
@@ -71,7 +71,7 @@ class NamMPConfig(NamConfig):
         default_factory=lambda: [
             InputGraph(
                 name=f'{circ}',
-                path=f'../nam_circs/{circ}.qasm',
+                path=f'../circs/nam_circs/{circ}.qasm',
             )
             for circ in [
                 'barenco_tof_3',
@@ -93,7 +93,7 @@ class NamRMMPConfig(NamConfig):
         default_factory=lambda: [
             InputGraph(
                 name=f'{circ}',
-                path=f'../nam_rm_circs/{circ}.qasm',
+                path=f'../circs/nam_rm_circs/{circ}.qasm',
             )
             for circ in [
                 'barenco_tof_3',
@@ -124,7 +124,7 @@ class NamTestConfig(TestConfig):
         default_factory=lambda: [
             InputGraph(
                 'barenco_tof_3',
-                '../nam_circs/barenco_tof_3.qasm',
+                '../circs/nam_circs/barenco_tof_3.qasm',
             ),
             # InputGraph(
             #     'qcla_mod_7',
@@ -138,7 +138,7 @@ class NamTestConfig(TestConfig):
 @dataclass
 class NamAllTestConfig(NamTestConfig):
     input_graphs: List[InputGraph] = field(default_factory=lambda: [])
-    input_graph_dir: str = '../nam_circs'
+    input_graph_dir: str = '../circs/nam_circs'
     budget: int = 4000
 
 

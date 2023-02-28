@@ -55,7 +55,7 @@ def optimize(
                     return best_gate_cnt, best_circ
 
                 invoke_cnt += 1
-                if print_message and invoke_cnt % 10_000_000 == 0:
+                if print_message and invoke_cnt % 1_000_000 == 0:
                     print_and_log()
 
                 new_circ = circ.apply_xfer(

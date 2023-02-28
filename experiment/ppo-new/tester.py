@@ -91,10 +91,13 @@ class Tester:
         # from pympler import summary
         # sum0 = summary.summarize(muppy.get_objects())
         best_graphs = input_graphs
+        t_start = time.time()
         while True:
             # gc.collect()
             # summary.print_(summary.get_diff(sum0, summary.summarize(muppy.get_objects())))
-            printfl(f'==== Tester: mem usage: {cur_proc_vmem_perct()}')
+            printfl(
+                f'==== Tester: mem usage: {cur_proc_vmem_perct()}, duration: {time.time() - t_start:0f} sec'
+            )
             """update model from ckpt"""
             latest_info_path = os.path.join(self.output_dir, 'ckpts', 'latest.json')
             if self.sync_tuning_dir and os.path.exists(latest_info_path):

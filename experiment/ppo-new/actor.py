@@ -580,7 +580,7 @@ class PPOAgent:
         for i in range(len(self.graph_buffers)):
             buffer = self.graph_buffers[i]
             info = best_info[i]
-            assert buffer.name == info['name']
+            assert buffer.name == info['name'], f'{buffer.name = }, {info["name"] = }'
             if info['best_cost'] < get_cost(buffer.best_graph, self.cost_type):
                 graph = qtz.qasm_to_graph(info['qasm'])
                 buffer.push_back(graph)

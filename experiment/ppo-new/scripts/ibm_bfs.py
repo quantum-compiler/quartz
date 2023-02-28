@@ -1,4 +1,4 @@
-import bisect
+import heapq
 import os
 import sys
 import time
@@ -40,8 +40,23 @@ def optimize(
         )
 
     while candidate:
-        _, circ = candidate.pop(0)
-        # circ = quartz.PyGraph.from_qasm_str(context=context, qasm_str=circ_qasm_str)
+        old_len = len(candidate)
+        if old_len > max_candidate_len:
+            t_shr_s = time.time()
+            new_candidate = []
+            new_hash_set = set()
+            while len(new_candidate) <= max_candidate_len // 2:
+                gc, circ = heapq.heappop(candidate)
+                heapq.heappush(new_candidate, (gc, circ))
+                new_hash_set.add(circ.hash())
+            candidate = new_candidate
+            hash_set = new_hash_set
+            print(
+                f'queue shrinks: {old_len} -> {len(candidate)}, taking {time.time() - t_shr_s:.0f} sec',
+                flush=True,
+            )
+
+        _, circ = heapq.heappop(candidate)
         all_nodes = circ.all_nodes()
         for node in all_nodes:
             av_xfers = circ.available_xfers_parallel(
@@ -72,10 +87,7 @@ def optimize(
                     continue
                 if new_hash not in hash_set:
                     hash_set.add(new_hash)
-                    bisect.insort_left(candidate, (new_cnt, new_circ))
-                    if len(candidate) > max_candidate_len:
-                        _, popped_circ = candidate.pop(-1)
-                        hash_set.remove(popped_circ.hash())
+                    heapq.heappush(candidate, (new_cnt, new_circ))
 
                     if new_cnt < best_gate_cnt:
                         best_gate_cnt = new_cnt

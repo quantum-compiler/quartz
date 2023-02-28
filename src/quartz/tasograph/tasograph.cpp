@@ -1235,6 +1235,7 @@ Graph::_from_qasm_stream(Context *ctx,
   while (std::getline(qasm_stream, line)) {
     // skip empty line
     if (line.empty()) continue;
+    if (line[0] == ' ') line = line.substr(1);
 
     // repleace comma with space
     find_and_replace_all(line, ",", " ");

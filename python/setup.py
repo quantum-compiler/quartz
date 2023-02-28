@@ -46,7 +46,7 @@ setup_args = {}
 
 setup(
     name='quartz',
-    version="2.3.1",
+    version="2.3.2",
     description="QuartzPhysical: A learning based quantum circuit layout synthesizer.",
     zip_safe=False,
     install_requires=[],

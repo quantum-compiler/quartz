@@ -25,6 +25,7 @@ def optimize(
 
     t_start = time.time()
     invoke_cnt: int = 0
+    popped_cnt: int = 0
 
     def print_and_log():
         wandb.log(
@@ -35,7 +36,7 @@ def optimize(
             }
         )
         print(
-            f"[{circ_name}] best gate count: {best_gate_cnt}, {len(candidate) = }, {invoke_cnt = }, time cost: {time.time() - t_start:.2f} s",
+            f"[{circ_name}] best gate count: {best_gate_cnt}, {len(candidate) = }, {invoke_cnt = }, {popped_cnt = }, time cost: {time.time() - t_start:.2f} s",
             flush=True,
         )
 
@@ -57,6 +58,7 @@ def optimize(
             )
 
         _, circ = heapq.heappop(candidate)
+        popped_cnt += 1
         all_nodes = circ.all_nodes()
         for node in all_nodes:
             av_xfers = circ.available_xfers_parallel(

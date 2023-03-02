@@ -28,7 +28,7 @@ endif()
 # ##########################################
 # custatevec_example dependencies
 # ##########################################
-set(CUSTATEVEC_ROOT "/home/ubuntu/anaconda3/envs/cuquantum")
+set(CUSTATEVEC_ROOT ${CUQUANTUM_ROOT})
 if (CUSTATEVEC_ROOT STREQUAL "")
     message(FATAL_ERROR "Please set the environment variables CUSTATEVEC_ROOT or CUQUANTUM_ROOT to the path of the cuQuantum installation.")
 endif ()
@@ -68,6 +68,8 @@ include(cuda)
 
 include(cuquantum)
 
+include(legion)
+
 #if (NCCL_ROOT STREQUAL "")
     #include(nccl)
 #else()
@@ -98,7 +100,8 @@ file(GLOB_RECURSE QSIM_GPU_SRC
 cuda_add_library(quansim SHARED ${QSIM_GPU_SRC} ${QSIM_SRC})
 set_property(TARGET quansim PROPERTY CUDA_ARCHITECTURES "70;75;80;90")
 target_include_directories(quansim PUBLIC ${QSIM_INCLUDE_DIRS})
-target_link_libraries(quansim quartz_runtime)
+# TODO: add option to choose simulator backend
+target_link_libraries(quansim ${LEGION_LIBRARY} quartz_runtime)
 
 set(INCLUDE_DEST "include")
 set(LIB_DEST "lib")

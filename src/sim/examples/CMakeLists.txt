@@ -4,7 +4,7 @@ project(QSIM_Test)
 set(project_target test)
 
 set(CPU_SRC
-  test_sim.cc)
+  test_sim_legion.cc)
 
 cuda_add_executable(${project_target} ${CPU_SRC})
 target_include_directories(${project_target} PRIVATE ${QSIM_INCLUDE_DIRS} ${CMAKE_INSTALL_INCLUDEDIR})

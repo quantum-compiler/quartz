@@ -9,7 +9,7 @@
 #include "simulator.h"
 
 namespace sim {
-// only support applying gates to local qubits
+// only support applying gates to local qubits, TODO: support batched gates application
 template <typename DT>
 bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   HANDLE_CUDA_ERROR(cudaSetDevice(devices[device_id]));

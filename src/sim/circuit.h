@@ -51,7 +51,14 @@ public:
   unsigned n_local, n_global;
 
   unsigned permutation[MAX_QUBIT];
+
+  /* set in compile() */
   std::vector<sim::Gate<DT>> gates;
+  // batched gates
+  std::vector<std::vector<sim::Gate<qreal>>> fused_gates;
+  std::vector<std::vector<KernelGate>> shm_gates;
+  std::vector<qindex> active_physic_qs;
+  std::vector<SimGateType> task_map;
 };
 } // namespace qcircuit
 

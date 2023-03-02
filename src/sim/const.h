@@ -64,6 +64,7 @@ enum SimGateType {
   CONTROL,
   NORMAL,
   FUSED,
+  SHM,
   SHUFFLE,
 };
 

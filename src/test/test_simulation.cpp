@@ -138,6 +138,11 @@ int main() {
   for (int i = 28; i <= 28; i++) {
     num_local_qubits.push_back(i);
   }
+  KernelCost kernel_cost(
+      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
+      /*shared_memory_init_cost=*/10.4,
+      /*shared_memory_gate_cost=*/[](GateType) { return 0.8; },
+      /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   // FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());
@@ -172,9 +177,8 @@ int main() {
         // fprintf(fout, " %d", result);
         local_qubits =
             compute_local_qubits_with_ilp(*seq, local_q, &ctx, &interpreter);
-        auto schedules = get_schedules(
-            *seq, local_qubits, {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
-            &ctx, /*absorb_single_qubit_gates=*/true);
+        auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
+                                       /*absorb_single_qubit_gates=*/true);
         for (auto &schedule : schedules) {
           std::cout << "cost = " << schedule.cost_ << std::endl;
           schedule.print_kernel_schedule();

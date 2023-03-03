@@ -1,7 +1,9 @@
 #pragma once
 
-#include "../context/context.h"
 #include "quartz/circuitseq/circuitseq.h"
+#include "quartz/context/context.h"
+#include "quartz/simulator/kernel.h"
+#include "quartz/simulator/kernel_cost.h"
 
 #include <cassert>
 #include <cmath>
@@ -15,11 +17,9 @@ namespace quartz {
  */
 class Schedule {
 public:
-  using KernelCostType = double;
-
   Schedule(const CircuitSeq &sequence, const std::vector<bool> &local_qubit,
            Context *ctx)
-      : sequence_(sequence), local_qubit_(local_qubit), ctx_(ctx) {}
+      : cost_(), sequence_(sequence), local_qubit_(local_qubit), ctx_(ctx) {}
 
   // Compute the number of down sets for the circuit sequence.
   [[nodiscard]] size_t num_down_sets();
@@ -51,20 +51,18 @@ public:
    * half of the cost of a kernel with a single corresponding non-controlled
    * gate (e.g., X). A kernel with one CCX is assumed to have 1/4 of the
    * cost of a kernel with X.
-   * @param kernel_costs kernel_costs[i] represents the cost of an i-qubit
-   * kernel.
+   * @param kernel_cost The cost function of kernels.
    * @return True iff the computation succeeds. The results are stored in
    * the member variables |kernels|, |kernel_qubits|, and |cost_|.
    */
-  bool compute_kernel_schedule(const std::vector<KernelCostType> &kernel_costs);
+  bool compute_kernel_schedule(const KernelCost &kernel_cost);
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
 
   // The result simulation schedule. We will execute the kernels one by one,
   // and each kernel contains a sequence of gates.
-  std::vector<CircuitSeq> kernels;
-  std::vector<std::vector<int>> kernel_qubits;
+  std::vector<Kernel> kernels;
   KernelCostType cost_;
 
 private:
@@ -82,8 +80,7 @@ private:
  * See more information in Schedule::compute_kernel_schedule().
  * @param sequence The entire circuit sequence.
  * @param local_qubits The local qubits in each stage.
- * @param kernel_costs kernel_costs[i] represents the cost of an i-qubit
- * kernel.
+ * @param kernel_cost The cost function of kernels.
  * @param ctx The Context object.
  * @param absorb_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
@@ -93,8 +90,8 @@ private:
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<bool>> &local_qubits,
-              const std::vector<Schedule::KernelCostType> &kernel_costs,
-              Context *ctx, bool absorb_single_qubit_gates);
+              const KernelCost &kernel_cost, Context *ctx,
+              bool absorb_single_qubit_gates);
 
 class PythonInterpreter;
 std::vector<std::vector<bool>>

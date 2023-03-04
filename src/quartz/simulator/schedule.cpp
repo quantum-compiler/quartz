@@ -411,7 +411,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           }
         }
       };
-  constexpr bool debug = true;
+  constexpr bool debug = false;
   if (debug) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
@@ -546,6 +546,15 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         // Optimization:
         // The current gate absorbed by a previous kernel.
         // Directly update.
+        assert(current_status.absorbing_qubits[absorbing_set_index].second ==
+                   KernelType::fusion ||
+               current_status.absorbing_qubits[absorbing_set_index].second ==
+                   KernelType::shared_memory);
+        if (current_status.absorbing_qubits[absorbing_set_index].second ==
+            KernelType::shared_memory) {
+          current_cost +=
+              kernel_cost.get_shared_memory_gate_cost(current_gate.gate->tp);
+        }
         update_f(f[~i & 1], current_status, current_cost,
                  current_local_schedule);
         continue;
@@ -950,8 +959,6 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    // debug
-    std::cout << current_seq.to_string() << std::endl;
     result.emplace_back(current_seq, local_qubit, ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
@@ -966,6 +973,7 @@ get_schedules(const CircuitSeq &sequence,
     schedule.compute_kernel_schedule(kernel_cost);
   }
   if (!single_qubit_gate_indices.empty()) {
+    std::vector<int> single_qubit_gate_to_execute;
     // Restore the single-qubit gates.
     std::vector<std::vector<int>> next_single_qubit_gates(num_gates);
     for (int i = 0; i < (int)single_qubit_gate_indices.size(); i++) {
@@ -974,8 +982,11 @@ get_schedules(const CircuitSeq &sequence,
       for (auto &index : single_qubit_gate.second) {
         next_single_qubit_gates[index].push_back(i);
       }
+      // If there is no dependency, we can execute it.
+      if (single_qubit_gate.second.empty()) {
+        single_qubit_gate_to_execute.push_back(single_qubit_gate.first);
+      }
     }
-    std::vector<int> single_qubit_gate_to_execute;
     int current_kernel_qubits_last_updated_i = -1;
     std::vector<bool> current_kernel_qubits(num_qubits, false);
     for (auto &schedule : result) {
@@ -999,8 +1010,9 @@ get_schedules(const CircuitSeq &sequence,
             int index = single_qubit_gate_to_execute[j];
             bool executable = true;
             for (auto &wire : sequence.gates[index]->input_wires) {
-              if (wire->is_qubit() && !current_kernel_qubits[wire->index]) {
-                executable = false; // not local here
+              if (wire->is_qubit() && schedule.is_local_qubit(wire->index) &&
+                  !current_kernel_qubits[wire->index]) {
+                executable = false; // not local in this kernel
                 break;
               }
             }
@@ -1011,6 +1023,12 @@ get_schedules(const CircuitSeq &sequence,
               // Note that we don't update |next_single_qubit_gates| here.
               schedule.kernels[i].gates.insert_gate(
                   insert_location, sequence.gates[index].get());
+              assert(schedule.kernels[i].type == KernelType::fusion ||
+                     schedule.kernels[i].type == KernelType::shared_memory);
+              if (schedule.kernels[i].type == KernelType::shared_memory) {
+                schedule.cost_ += kernel_cost.get_shared_memory_gate_cost(
+                    sequence.gates[index]->gate->tp);
+              }
               // Erase the gate from |single_qubit_gate_to_execute|.
               single_qubit_gate_to_execute.erase(
                   single_qubit_gate_to_execute.begin() + j);
@@ -1024,18 +1042,19 @@ get_schedules(const CircuitSeq &sequence,
 
         try_to_execute_single_qubit_gates(0);
 
-        // Purposely using |schedule.kernels[i].gates.size()| because we may
-        // modify |schedule.kernels[i].gates| in this loop.
+        // Purposely using |schedule.kernels[i].gates.gates.size()| because we
+        // may modify |schedule.kernels[i].gates.gates| in this loop.
         for (int j = 0; j < (int)schedule.kernels[i].gates.gates.size(); j++) {
           auto &gate = schedule.kernels[i].gates.gates[j];
           auto &gate_indices_queue = gate_indices[gate->to_string()];
           assert(!gate_indices_queue.empty());
 
           // We execute the gate now.
+          const int original_index = gate_indices_queue.front();
           for (auto &next_single_qubit_gate :
-               next_single_qubit_gates[gate_indices_queue.front()]) {
+               next_single_qubit_gates[original_index]) {
             single_qubit_gate_indices[next_single_qubit_gate].second.erase(
-                gate_indices_queue.front());
+                original_index);
             if (single_qubit_gate_indices[next_single_qubit_gate]
                     .second.empty()) {
               single_qubit_gate_to_execute.push_back(
@@ -1044,6 +1063,7 @@ get_schedules(const CircuitSeq &sequence,
               try_to_execute_single_qubit_gates(j + 1);
             }
           }
+          gate_indices_queue.pop();
         }
       }
     }

@@ -431,6 +431,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     f[~i & 1].clear();
     // Get the qubit indices of the current gate.
     auto &current_gate = *sequence_.gates[i];
+    auto current_gate_cost =
+        kernel_cost.get_shared_memory_gate_cost(current_gate.gate->tp);
     std::vector<bool> current_index(num_qubits, false);
     std::vector<int> current_indices;
     current_indices.reserve(current_gate.input_wires.size());
@@ -544,7 +546,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       }
       if (absorbing_set_index >= 0 && absorb_count == current_indices.size()) {
         // Optimization:
-        // The current gate absorbed by a previous kernel.
+        // The current gate is absorbed by a previous kernel.
         // Directly update.
         assert(current_status.absorbing_qubits[absorbing_set_index].second ==
                    KernelType::fusion ||
@@ -552,8 +554,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                    KernelType::shared_memory);
         if (current_status.absorbing_qubits[absorbing_set_index].second ==
             KernelType::shared_memory) {
-          current_cost +=
-              kernel_cost.get_shared_memory_gate_cost(current_gate.gate->tp);
+          current_cost += current_gate_cost;
         }
         update_f(f[~i & 1], current_status, current_cost,
                  current_local_schedule);
@@ -583,6 +584,14 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         // The current gate is touching exactly one kernel on the frontier,
         // and is subsumed by that kernel.
         // Directly update.
+        assert(current_status.sets[touching_set_indices[0]].second ==
+                   KernelType::fusion ||
+               current_status.sets[touching_set_indices[0]].second ==
+                   KernelType::shared_memory);
+        if (current_status.sets[touching_set_indices[0]].second ==
+            KernelType::shared_memory) {
+          current_cost += current_gate_cost;
+        }
         update_f(f[~i & 1], current_status, current_cost,
                  current_local_schedule);
         continue;
@@ -620,6 +629,13 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         new_status.absorbing_qubits = new_absorbing_qubits;
         new_status.hash ^= current_indices_hash;
         update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
+
+        new_status = current_status;
+        new_status.insert_set(current_indices, KernelType::shared_memory);
+        new_status.absorbing_qubits = new_absorbing_qubits;
+        new_status.hash ^= current_indices_hash;
+        current_cost += current_gate_cost;
+        update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
         continue;
       }
       // Keep track of the schedule during the search.
@@ -633,7 +649,9 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       }
       auto search_merging_kernels =
           [&](auto &this_ref, const std::vector<int> &current_gate_kernel,
+              KernelType current_gate_kernel_type,
               const std::vector<int> &current_merging_kernel,
+              KernelType current_merging_kernel_type,
               const KernelCostType &cost, int touching_set_index,
               int kernel_index) -> void {
         if (kernel_index == num_kernels) {
@@ -645,7 +663,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             // Because we are not merging this kernel with the current
             // gate, we need to record the merged kernel.
             local_schedule.sets.emplace_back(current_merging_kernel,
-                                             KernelType::fusion);
+                                             current_merging_kernel_type);
             std::sort(local_schedule.sets.back().first.begin(),
                       local_schedule.sets.back().first.end());
             new_cost += kernel_costs[current_merging_kernel.size()];
@@ -660,7 +678,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             }
             std::sort(absorbing_set.begin(), absorbing_set.end());
             absorbing_sets_stack.emplace_back(absorbing_set,
-                                              KernelType::fusion);
+                                              current_merging_kernel_type);
           }
           if (touching_set_index == (int)touching_set_indices.size()) {
             // We have searched everything.
@@ -671,8 +689,10 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                 new_status.sets.push_back(current_status.sets[j]);
               }
             }
-            // Insert the new kernel on the frontier.
-            new_status.insert_set(current_gate_kernel, KernelType::fusion);
+            // Insert the new open kernel.
+            new_status.insert_set(current_gate_kernel,
+                                  current_gate_kernel_type);
+            // Insert the absorbing kernels.
             new_status.absorbing_qubits = new_absorbing_qubits;
             new_status.absorbing_qubits.insert(
                 new_status.absorbing_qubits.end(), absorbing_sets_stack.begin(),
@@ -683,44 +703,54 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                 new_status.absorbing_qubits.end(),
                 [](auto &s1, auto &s2) { return s1.first[0] < s2.first[0]; });
             new_status.compute_hash();
-            /*if (!new_status.check_valid()) {
-              for (int j = 0; j < (int)current_gate_kernel.size(); j++) {
-                std::cout << current_gate_kernel[j] << std::endl;
-              }
-              std::cout << current_status.to_string() << std::endl;
-              exit(1);
-            }*/
             update_f(f[~i & 1], new_status, new_cost, local_schedule);
           } else {
             // Start a new iteration of searching.
             // Try to merge the "touching set" with the current gate first.
-            auto new_gate_kernel = current_gate_kernel;
-            for (auto &index :
-                 current_status.sets[touching_set_indices[touching_set_index]]
-                     .first) {
-              if (!current_index[index]) {
-                new_gate_kernel.push_back(index);
+            bool merging_is_always_better = false;
+            if (current_status.sets[touching_set_indices[touching_set_index]]
+                    .second == current_gate_kernel_type) {
+              // We only merge kernels of the same type.
+              auto new_gate_kernel = current_gate_kernel;
+              for (auto &index :
+                   current_status.sets[touching_set_indices[touching_set_index]]
+                       .first) {
+                if (!current_index[index]) {
+                  new_gate_kernel.push_back(index);
+                }
+              }
+              if (new_gate_kernel.size() == current_gate_kernel.size()) {
+                // An optimization: if we merge a kernel with the current gate
+                // and the size remain unchanged, we always want to merge the
+                // kernel with the current gate.
+                merging_is_always_better = true;
+              }
+              assert(current_gate_kernel_type == KernelType::fusion ||
+                     current_gate_kernel_type == KernelType::shared_memory);
+              if (new_gate_kernel.size() <=
+                  (current_gate_kernel_type == KernelType::fusion
+                       ? max_fusion_kernel_size
+                       : shared_memory_kernel_size)) {
+                std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
+                // If we merge a kernel with the current gate, we do not need
+                // to search for other kernels to merge together.
+                this_ref(this_ref, new_gate_kernel, current_gate_kernel_type,
+                         /*current_merging_kernel=*/std::vector<int>(),
+                         /*current_merging_kernel_type=*/KernelType(), new_cost,
+                         touching_set_index,
+                         /*kernel_index=*/num_kernels);
               }
             }
-            if (new_gate_kernel.size() <= max_kernel_size) {
-              std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
-              // If we merge a kernel with the current gate, we do not need
-              // to search for other kernels to merge together.
-              this_ref(this_ref, new_gate_kernel,
-                       /*current_merging_kernel=*/std::vector<int>(), new_cost,
-                       touching_set_index,
-                       /*kernel_index=*/num_kernels);
-            }
-            // An optimization: if we merge a kernel with the current gate
-            // and the size remain unchanged, we always want to merge the
-            // kernel with the current gate.
-            if (new_gate_kernel.size() > current_gate_kernel.size()) {
+            if (!merging_is_always_better) {
               // Try to not merge the "touching set" with the current gate.
               this_ref(
-                  this_ref, current_gate_kernel,
+                  this_ref, current_gate_kernel, current_gate_kernel_type,
                   /*current_merging_kernel=*/
                   current_status.sets[touching_set_indices[touching_set_index]]
                       .first,
+                  /*current_merging_kernel_type=*/
+                  current_status.sets[touching_set_indices[touching_set_index]]
+                      .second,
                   new_cost, touching_set_index, /*kernel_index=*/0);
             }
           }
@@ -732,15 +762,25 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           return;
         }
         // We can always try not to merge with this kernel.
-        this_ref(this_ref, current_gate_kernel, current_merging_kernel, cost,
+        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
+                 current_merging_kernel, current_merging_kernel_type, cost,
                  touching_set_index, kernel_index + 1);
         if (kernel_merged[kernel_index]) {
           // This kernel is already considered. Continue to the next one.
           return;
         }
+        if (current_status.sets[kernel_index].second !=
+            current_merging_kernel_type) {
+          // We don't merge kernels with different types.
+          return;
+        }
+        assert(current_merging_kernel_type == KernelType::fusion ||
+               current_merging_kernel_type == KernelType::shared_memory);
         if (current_merging_kernel.size() +
                 current_status.sets[kernel_index].first.size() >
-            max_kernel_size) {
+            (current_merging_kernel_type == KernelType::fusion
+                 ? max_fusion_kernel_size
+                 : shared_memory_kernel_size)) {
           // The kernel would be too large if we merge this one.
           // Continue to the next one.
           return;
@@ -753,7 +793,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             current_status.sets[kernel_index].first.end());
         kernel_merged[kernel_index] = true;
         // Continue the search.
-        this_ref(this_ref, current_gate_kernel, new_merging_kernel, cost,
+        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
+                 new_merging_kernel, current_merging_kernel_type, cost,
                  touching_set_index, kernel_index + 1);
         // Restore the |kernel_merged| status.
         kernel_merged[kernel_index] = false;
@@ -763,7 +804,17 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       // first "touching set" with the current gate or not inside the search.
       search_merging_kernels(
           search_merging_kernels, /*current_gate_kernel=*/current_indices,
-          /*current_merging_kernel=*/std::vector<int>(), /*cost=*/current_cost,
+          /*current_gate_kernel_type=*/KernelType::fusion,
+          /*current_merging_kernel=*/std::vector<int>(),
+          /*current_merging_kernel_type=*/KernelType(), /*cost=*/current_cost,
+          /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
+      // For shared-memory kernels, we account for the gate cost now.
+      search_merging_kernels(
+          search_merging_kernels, /*current_gate_kernel=*/current_indices,
+          /*current_gate_kernel_type=*/KernelType::shared_memory,
+          /*current_merging_kernel=*/std::vector<int>(),
+          /*current_merging_kernel_type=*/KernelType(),
+          /*cost=*/current_cost + current_gate_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
     if (debug) {

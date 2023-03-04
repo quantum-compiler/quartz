@@ -140,9 +140,9 @@ int main() {
   }
   KernelCost kernel_cost(
       /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
-      /*shared_memory_init_cost=*/10.4,
+      /*shared_memory_init_cost=*/10,
       /*shared_memory_gate_cost=*/[](GateType) { return 0.8; },
-      /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
+      /*shared_memory_total_qubits=*/11, /*shared_memory_cacheline_qubits=*/3);
   // FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());

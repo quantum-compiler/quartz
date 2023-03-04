@@ -14,6 +14,18 @@ using KernelCostType = double;
  */
 class KernelCost {
 public:
+  /**
+   * The cost function of kernels.
+   * @param fusion_kernel_costs An array of costs for fusion kernels.
+   * The value of the 0-th index in the array should be 0 because it stands
+   * for a 0-qubit kernel.
+   * @param shared_memory_init_cost The cost of an empty shared-memory kernel.
+   * @param shared_memory_gate_cost The cost function of each gate in a
+   * shared-memory kernel.
+   * @param shared_memory_total_qubits
+   * @param shared_memory_cacheline_qubits Currently unused. The difference
+   * of the above 2 variables is the maximum size of a shared-memory kernel.
+   */
   KernelCost(
       const std::vector<KernelCostType> &fusion_kernel_costs,
       const KernelCostType &shared_memory_init_cost,

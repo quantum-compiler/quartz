@@ -38,11 +38,11 @@ public:
    * not necessary to record them.
    * @return True iff the computation succeeds.
    */
-  static bool
-  compute_end_schedule(const KernelCost &kernel_cost,
-                       const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
-                       KernelCostType &result_cost,
-                       std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
+  static bool compute_end_schedule(
+      const KernelCost &kernel_cost,
+      const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
+      KernelCostType &result_cost,
+      std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
 
   /**
    * Compute the schedule using dynamic programming.

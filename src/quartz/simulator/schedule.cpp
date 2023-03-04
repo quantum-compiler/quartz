@@ -448,9 +448,6 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     }
     std::sort(current_indices.begin(), current_indices.end());
     auto current_indices_hash = Status::get_hash(current_indices);
-    // TODO: add an option to directly execute the gate if it's a controlled
-    //  gate -- don't forget to remove the corresponding qubits from the
-    //  |absorbed_qubits| set if they are partially in the set.
 
     // TODO: make these numbers configurable
     constexpr int kMaxNumOfStatus = 4000;

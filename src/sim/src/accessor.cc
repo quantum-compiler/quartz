@@ -302,4 +302,4 @@ template double *helperGetTensorPointerWO(PhysicalRegion region,
                                           Context ctx,
                                           Runtime *runtime);
 
-}; // namespace FlexFlow
+}; // namespace sim

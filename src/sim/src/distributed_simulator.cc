@@ -49,7 +49,7 @@ bool DistributedSimulator::create_regions() {
   Rect<1> task_rect(Point<1>(0), Point<1>(total_gpus - 1));
   this->parallel_is = runtime->create_index_space(ctx, task_rect);
   Rect<1> state_vec_rect(Point<1>(0),
-                         total_gpus * (1 << config.num_local_qubits));
+                         total_gpus * (1 << config.num_local_qubits) - 1);
   IndexSpaceT<1> is = runtime->create_index_space(ctx, state_vec_rect);
   Transform<1, 1> transform;
   Point<1> ext_hi;
@@ -66,14 +66,14 @@ bool DistributedSimulator::create_regions() {
   FieldSpace fs = runtime->create_field_space(ctx);
   FieldAllocator allocator = runtime->create_field_allocator(ctx, fs);
   switch (config.state_vec_data_type) {
-  case DT_FLOAT:
-    allocator.allocate_field(sizeof(cuFloatComplex), FID_DATA);
-    break;
-  case DT_DOUBLE:
-    allocator.allocate_field(sizeof(cuDoubleComplex), FID_DATA);
-    break;
-  default:
-    assert(false);
+    case DT_FLOAT:
+      allocator.allocate_field(sizeof(cuFloatComplex), FID_DATA);
+      break;
+    case DT_DOUBLE:
+      allocator.allocate_field(sizeof(cuDoubleComplex), FID_DATA);
+      break;
+    default:
+      assert(false);
   }
   // currently assume that 2^num_all_qubits is a multiplier of
   // 2^num_local_qubits * total_gpus
@@ -91,21 +91,34 @@ bool DistributedSimulator::create_regions() {
     LogicalPartition lp = runtime->get_logical_partition(ctx, lr, ip);
     gpu_state_vectors.push_back(std::make_pair(lr, lp));
   }
+  printf("num_state_vectors: %d\n", num_state_vectors);
   return true;
 }
 
 bool DistributedSimulator::init_state_vectors() {
   // initialize all cpu_state_vectors
+  Context ctx = config.lg_ctx;
+  Runtime* runtime = config.lg_hlr;
   for (size_t i = 0; i < cpu_state_vectors.size(); i++) {
-    // TODO: to be implemented
+    ArgumentMap argmap;
+    IndexLauncher launcher(
+        SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
+        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+    launcher.add_region_requirement(
+        RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/, WRITE_ONLY,
+                          EXCLUSIVE, cpu_state_vectors[i].first, MAP_TO_ZC_MEMORY));
+    launcher.add_field(0, FID_DATA);
+    FutureMap fm = runtime->execute_index_space(ctx, launcher);
+    fm.wait_all_results();
   }
   return true;
 }
 
 bool DistributedSimulator::run() {
-  init_devices();
   create_regions();
-  // init_state_vectors();
+  init_devices();
+  
+  init_state_vectors();
 
   for (int i = 0; i < config.num_all_qubits; i++) {
     permutation[i] = i;
@@ -135,7 +148,7 @@ bool DistributedSimulator::run() {
       info.num_batched_gates = circuit.shm_gates[shm_idx].size();
       info.gtype = SHM;
       info.kgates = circuit.shm_gates[shm_idx].data();
-      info.active_qubits_logical = active_logical_qs;
+      info.active_qubits_logical = circuit.active_physic_qs[shm_idx];
       apply_gates(info);
       shm_idx++;
     }
@@ -151,7 +164,7 @@ bool DistributedSimulator::run() {
 bool DistributedSimulator::apply_gates(const GateInfo &info) {
   Context ctx = config.lg_ctx;
   Runtime* runtime = config.lg_hlr;
-  for (size_t i = 0; i < cpu_state_vectors.size(); i++) {
+  for (size_t i = 0; i < 1; i++) {
     std::pair<LogicalRegion, LogicalPartition> cpu_sv = cpu_state_vectors[i];
     std::pair<LogicalRegion, LogicalPartition> gpu_sv =
         gpu_state_vectors[i % gpu_state_vectors.size()];
@@ -168,32 +181,36 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
       runtime->issue_copy_operation(ctx, launcher);
     }
     // Step 2: launch all gate kernels
-    {
-      // GateInfo info;
-      // set_gate_info(gates, info);
-      ArgumentMap argmap;
-      IndexLauncher launcher(
-          GATE_COMP_TASK_ID, parallel_is, TaskArgument(&info, sizeof(GateInfo)),
-          argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
-      launcher.add_region_requirement(
-          RegionRequirement(gpu_sv.second, 0 /*projection ID*/, READ_WRITE,
-                            EXCLUSIVE, gpu_sv.first));
-    }
+    // {
+    //   // GateInfo info;
+    //   // set_gate_info(gates, info);
+    //   printf("size: %d, num: %d, %p, %p\n",sizeof(GateInfo), info.num_batched_gates, info.kgates, info);
+    //   ArgumentMap argmap;
+    //   //FIXME: set_argmap
+    //   IndexLauncher launcher(
+    //       GATE_COMP_TASK_ID, parallel_is, TaskArgument(&info, sizeof(GateInfo)),
+    //       argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+    //   launcher.add_region_requirement(
+    //       RegionRequirement(gpu_sv.second, 0 /*projection ID*/, READ_WRITE,
+    //                         EXCLUSIVE, gpu_sv.first));
+    //   launcher.add_field(0, FID_DATA);
+    //   runtime->execute_index_space(ctx, launcher);
+    // }
     // Step 3: move a state vector from GPU memory to DRAM
-    {
-      IndexCopyLauncher launcher(parallel_is);
-      launcher.add_copy_requirements(
-          RegionRequirement(
-              gpu_state_vectors[i % gpu_state_vectors.size()].second,
-              0 /*projection ID*/, WRITE_DISCARD, EXCLUSIVE,
-              gpu_state_vectors[i % gpu_state_vectors.size()].first),
-          RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/,
-                            READ_ONLY, EXCLUSIVE, cpu_state_vectors[i].first,
-                            MAP_TO_ZC_MEMORY));
-      launcher.add_src_field(0, FID_DATA);
-      launcher.add_dst_field(0, FID_DATA);
-      runtime->issue_copy_operation(ctx, launcher);
-    }
+    // {
+    //   IndexCopyLauncher launcher(parallel_is);
+    //   launcher.add_copy_requirements(
+    //       RegionRequirement(
+    //           gpu_state_vectors[i % gpu_state_vectors.size()].second,
+    //           0 /*projection ID*/, READ_ONLY, EXCLUSIVE,
+    //           gpu_state_vectors[i % gpu_state_vectors.size()].first),
+    //       RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/,
+    //                         WRITE_DISCARD, EXCLUSIVE, cpu_state_vectors[i].first,
+    //                         MAP_TO_ZC_MEMORY));
+    //   launcher.add_src_field(0, FID_DATA);
+    //   launcher.add_dst_field(0, FID_DATA);
+    //   runtime->issue_copy_operation(ctx, launcher);
+    // }
   }
   return true;
 }

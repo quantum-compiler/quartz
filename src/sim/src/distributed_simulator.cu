@@ -39,13 +39,16 @@ void DistributedSimulator::sv_init_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   // TODO: implement this function
+  printf("SV Init...\n");
+  return;
 }
 
 void DistributedSimulator::sv_comp_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
-  DSHandler const *handler = *((DSHandler **)task->local_args);
   GateInfo const *info = (GateInfo *)task->args;
+  if (info == nullptr) return;
+  DSHandler const *handler = (DSHandler *)task->local_args;
   assert(handler->vecDataType == DT_FLOAT || handler->vecDataType == DT_DOUBLE);
   cudaDataType_t data_type = handler->vecDataType == DT_FLOAT ? CUDA_C_32F : CUDA_C_64F;
   custatevecComputeType_t compute_type = handler->vecDataType == DT_FLOAT ? CUSTATEVEC_COMPUTE_32F : CUSTATEVEC_COMPUTE_64F;
@@ -54,8 +57,13 @@ void DistributedSimulator::sv_comp_task(
 
   // FUSED Gates
   unsigned const nIndexBits = handler->num_local_qubits;
+  
+  // printf("yess %d??\n", info->num_batched_gates);
+  if(info->gtype == SHM)
+    printf("??? %d\n", info->kgates[0].targetQubit);
 
   for (int gate_idx=0; gate_idx < info->num_batched_gates; gate_idx++){
+    if (info->gtype == SHM) break;
     // TODO: get target & control qubit idx from current perm[]
     Gate<qreal> gate = info->gates[gate_idx];
     std::vector<int> targets;

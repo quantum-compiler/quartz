@@ -32,10 +32,15 @@ void sim::top_level_task(
                         GateType::h, GateType::x, GateType::ry, GateType::u2,
                         GateType::u3, GateType::cx, GateType::cz, GateType::cp,
                         GateType::swap});
+  // auto seq = quartz::CircuitSeq::from_qasm_file(
+  //     &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_") +
+  //               std::to_string(config.num_all_qubits) + "q/qft"
+  //               "_indep_qiskit_" + std::to_string(config.num_all_qubits) +
+  //               ".qasm");
   auto seq = quartz::CircuitSeq::from_qasm_file(
-      &qtz, std::string("/home/ubuntu/quartz/circuit/MQTBench_") +
-                std::to_string(config.num_all_qubits) + "q/" +
-                "_indep_qiskit_" + std::to_string(config.num_all_qubits) +
+      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_28") +
+                "q/qft"
+                "_indep_qiskit_28" +
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
                                          config.num_local_qubits);
@@ -115,6 +120,13 @@ int main(int argc, char **argv) {
     registrar.set_leaf();
     Runtime::preregister_task_variant<DistributedSimulator::sv_comp_task>(
         registrar, "Gate Compute Task");
+  }
+  {
+    TaskVariantRegistrar registrar(SV_INIT_TASK_ID, "SV Init");
+    registrar.add_constraint(ProcessorConstraint(Processor::TOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<DistributedSimulator::sv_init_task>(
+        registrar, "SV Init Task");
   }
 
   Runtime::add_registration_callback(FFMapper::update_mappers);

@@ -1,5 +1,4 @@
 #include "distributed_simulator.h"
-#include "cuda_helper.h"
 
 using namespace sim;
 using namespace Legion;
@@ -53,48 +52,55 @@ void DistributedSimulator::sv_comp_task(
   GenericTensorAccessorW state_vector = helperGetGenericTensorAccessorWO(
       handler->vecDataType, regions[0], task->regions[0], FID_DATA, ctx, runtime);
 
-  // TODO: get target & control qubit idx from current perm[]
-  std::vector<int> targets;
-  std::vector<int> controls;
-
+  // FUSED Gates
   unsigned const nIndexBits = handler->num_local_qubits;
-  unsigned const nTargets = info->num_targets;
-  unsigned const nControls = info->num_controls;
-  int const adjoint = 0;
-  // TODO: check if targets should be ordered
-  printf("Targets: [");
-  for (int i = 0; i < info->num_targets; i++) {
-    int idx = 0;
-    while (info->permutation[idx] != info->target[i])
-      idx++;
-    targets.push_back(idx);
-    printf("(%d, %d) ", info->target[i], idx);
-  }
-  printf("]\n");
 
-  for (int i = 0; i < info->num_controls; i++) {
-    int idx = 0;
-    while (info->permutation[idx] != info->target[i])
-      idx++;
-    controls.push_back(idx);
-  }
+  for (int gate_idx=0; gate_idx < info->num_batched_gates; gate_idx++){
+    // TODO: get target & control qubit idx from current perm[]
+    Gate<qreal> gate = info->gates[gate_idx];
+    std::vector<int> targets;
+    std::vector<int> controls;
+    
+    unsigned const nTargets = gate.num_target;
+    unsigned const nControls = gate.num_control;
+    int const adjoint = 0;
+    // TODO: check if targets should be ordered
+    printf("Targets: [");
+    for (int i = 0; i < gate.num_target; i++) {
+      int idx = 0;
+      while (info->permutation[idx] != gate.target[i])
+        idx++;
+      targets.push_back(idx);
+      printf("(%d, %d) ", gate.target[i], idx);
+    }
+    printf("]\n");
 
-  // apply gate
-  custatevecApplyMatrix(
-      /* custatevecHandle_t */ handler->statevec,
-      /* void* */ state_vector.get_void_ptr(),
-      /* cudaDataType_t */ data_type,
-      /* const uint32_t */ nIndexBits,
-      /* const void* */ info->matrix_data,
-      /* cudaDataType_t */ data_type,
-      /* custatevecMatrixLayout_t */ CUSTATEVEC_MATRIX_LAYOUT_ROW,
-      /* const int32_t */ adjoint,
-      /* const int32_t* */ targets.data(),
-      /* const uint32_t */ nTargets,
-      /* const int32_t* */ controls.data(),
-      /* const int32_t* */ nullptr,
-      /* const uint32_t */ nControls,
-      /* custatevecComputeType_t */ compute_type,
-      /* void* */ handler->workSpace,
-      /* size_t */ handler->workSpaceSize);
+    for (int i = 0; i < gate.num_control; i++) {
+      int idx = 0;
+      while (info->permutation[idx] != gate.target[i])
+        idx++;
+      controls.push_back(idx);
+    }
+
+    // apply gate
+    custatevecApplyMatrix(
+        /* custatevecHandle_t */ handler->statevec,
+        /* void* */ state_vector.get_void_ptr(),
+        /* cudaDataType_t */ data_type,
+        /* const uint32_t */ nIndexBits,
+        /* const void* */ gate.matrix.data(),
+        /* cudaDataType_t */ data_type,
+        /* custatevecMatrixLayout_t */ CUSTATEVEC_MATRIX_LAYOUT_ROW,
+        /* const int32_t */ adjoint,
+        /* const int32_t* */ targets.data(),
+        /* const uint32_t */ nTargets,
+        /* const int32_t* */ controls.data(),
+        /* const int32_t* */ nullptr,
+        /* const uint32_t */ nControls,
+        /* custatevecComputeType_t */ compute_type,
+        /* void* */ handler->workSpace,
+        /* size_t */ handler->workSpaceSize);
+
+    }
+  
 }

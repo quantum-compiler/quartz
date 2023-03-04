@@ -168,6 +168,39 @@ FFMapper::FFMapper(MapperRuntime *rt,
   }
 }
 
+void FFMapper::register_all_machine_views(
+    int num_nodes,
+    int gpus_per_node,
+    int cpus_per_node,
+    std::vector<MachineView> &valid_views) {
+  // Single-parallelism-dimension views
+  for (int i = 1; i <= num_nodes * gpus_per_node; i++) {
+    if (num_nodes * gpus_per_node % i == 0) {
+      MachineView view;
+      view.device_type = MachineView::GPU;
+      view.ndims = 1;
+      view.dim[0] = i;
+      view.stride[0] = 1;
+      view.start_device_id = 0;
+      valid_views.push_back(view);
+    }
+  }
+  // Two-dimensional views
+  /* for (int i = 1; i <= num_nodes; i++) { */
+  /*   for (int j = 1; j <= gpus_per_node; j++) { */
+  /*     MachineView view; */
+  /*     view.device_type = MachineView::GPU; */
+  /*     view.ndims = 2; */
+  /*     view.dim[0] = i; */
+  /*     view.stride[0] = 1; */
+  /*     view.dim[1] = j; */
+  /*     view.stride[1] = 1; */
+  /*     view.start_device_id = 0; */
+  /*     valid_views.push_back(view); */
+  /*   } */
+  /* } */
+}
+
 void FFMapper::register_sharding_functor(Runtime *runtime,
                                          Machine machine,
                                          int argc,

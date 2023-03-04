@@ -1,4 +1,4 @@
-#include "sim/distributed_simulator.h"
+#include "distributed_simulator.h"
 
 using namespace sim;
 using namespace Legion;

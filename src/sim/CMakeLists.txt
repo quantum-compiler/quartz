@@ -8,6 +8,9 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LIBEXT ".so")
 endif()
 
+# Legion to not use static cuda runtime
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static ones" ON)
+
 # ##########################################
 # custatevec_example build mode
 # ##########################################
@@ -82,26 +85,33 @@ list(APPEND QSIM_EXT_LIBRARIES
 
 include(mpi)
 
+list(APPEND QSIM_LD_FLAGS
+  -lrt
+  -ldl
+  -rdynamic)
+link_libraries(${QSIM_LD_FLAGS})
+
 list(APPEND QSIM_INCLUDE_DIRS
-  ${QSIM_ROOT})
+  ${QSIM_ROOT}/include)
 
 file(GLOB_RECURSE QSIM_HDR
   LIST_DIRECTORIES False
-  ${QSIM_ROOT}/*.h)
+  ${QSIM_ROOT}/include/*.h)
 
 file(GLOB_RECURSE QSIM_SRC
   LIST_DIRECTORIES False
-  ${QSIM_ROOT}/*.cc)
+  ${QSIM_ROOT}/src/*.cc)
 
 file(GLOB_RECURSE QSIM_GPU_SRC
   LIST_DIRECTORIES False
-  ${QSIM_ROOT}/*.cu)
+  ${QSIM_ROOT}/src/*.cu)
 
 cuda_add_library(quansim SHARED ${QSIM_GPU_SRC} ${QSIM_SRC})
 set_property(TARGET quansim PROPERTY CUDA_ARCHITECTURES "70;75;80;90")
 target_include_directories(quansim PUBLIC ${QSIM_INCLUDE_DIRS})
 # TODO: add option to choose simulator backend
 target_link_libraries(quansim ${LEGION_LIBRARY} quartz_runtime)
+#target_link_libraries(quansim quartz_runtime)
 
 set(INCLUDE_DEST "include")
 set(LIB_DEST "lib")

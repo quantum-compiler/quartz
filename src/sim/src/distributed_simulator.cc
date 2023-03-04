@@ -1,6 +1,4 @@
 #include "distributed_simulator.h"
-#include "sim/circuit.h"
-#include "mapper.h"
 
 using namespace sim;
 using namespace Legion;
@@ -110,21 +108,34 @@ bool DistributedSimulator::run() {
   // init_state_vectors();
 
   for (int i = 0; i < config.num_all_qubits; i++) {
-    permutation(i) = i;
+    permutation[i] = i;
   }
   
   int fused_idx = 0;
   int shm_idx = 0;
   for (int i = 0; i < circuit.task_map.size(); i++) {
     if (circuit.task_map[i] == FUSED) {
-      GateInfo info{permutation, circuit.fused_gates[fused_idx].size(), FUSED, circuit.fused_gates[fused_idx].data()};
+      GateInfo info;
+      for (int i = 0; i < config.num_all_qubits; i++) {
+        info.permutation[i] = permutation[i];
+      }
+      info.num_batched_gates = circuit.fused_gates[fused_idx].size();
+      info.gtype = FUSED;
+      info.gates = circuit.fused_gates[fused_idx].data();
       apply_gates(info);
       fused_idx++;
     }
     else if (circuit.task_map[i] == SHM) {
       qindex active_logical_qs = 0;
       // TODO: convert active physical qubits to logical qubits
-      GateInfo info{permutation, circuit.shm_gates[shm_idx].size(), SHM, nullptr, circuit.shm_gates[shm_idx].data(), active_logical_qs};
+      GateInfo info;
+      for (int i = 0; i < config.num_all_qubits; i++) {
+        info.permutation[i] = permutation[i];
+      }
+      info.num_batched_gates = circuit.shm_gates[shm_idx].size();
+      info.gtype = SHM;
+      info.kgates = circuit.shm_gates[shm_idx].data();
+      info.active_qubits_logical = active_logical_qs;
       apply_gates(info);
       shm_idx++;
     }

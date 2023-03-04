@@ -1,5 +1,3 @@
-#include "legion.h"
-#include "distributed_simulator_const.h"
 #include "cuda_helper.h"
 #include "simgate.h"
 #include "circuit.h"
@@ -70,7 +68,7 @@ public:
   
 private:
   DSConfig config;
-  qcircuit::Circuit circuit;
+  qcircuit::Circuit<qreal> circuit;
   Legion::IndexSpace parallel_is;
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > cpu_state_vectors;
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > gpu_state_vectors;

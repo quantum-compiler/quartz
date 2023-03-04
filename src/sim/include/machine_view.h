@@ -2,7 +2,7 @@
 #define _FLEXFLOW_MACHINE_VIEW_H
 
 #include "legion.h"
-#include "simulator_const.h"
+#include "distributed_simulator_const.h"
 #include <vector>
 #ifdef FF_USE_NCCL
 #include <nccl.h>

@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "sim/circuit.h"
+#include "circuit.h"
 
 using quartz::GateType;
 

@@ -11,9 +11,10 @@ std::string kernel_type_name(KernelType tp) {
   return "undefined";
 }
 
-std::string quartz::Kernel::to_string() const {
+std::string Kernel::to_string() const {
   std::string result;
-  result += "qubits [";
+  result += kernel_type_name(type);
+  result += ", qubits [";
   for (int j = 0; j < (int)qubits.size(); j++) {
     result += std::to_string(qubits[j]);
     if (j != (int)qubits.size() - 1) {

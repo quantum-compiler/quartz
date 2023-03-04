@@ -19,4 +19,8 @@ int KernelCost::get_shared_memory_num_free_qubits() const {
   return shared_memory_total_qubits_ - shared_memory_cacheline_qubits_;
 }
 
+int KernelCost::get_optimal_fusion_kernel_size() const {
+  return optimal_fusion_kernel_size_;
+}
+
 } // namespace quartz

@@ -9,6 +9,8 @@ namespace quartz {
 
 enum KernelType { fusion, shared_memory };
 
+std::string kernel_type_name(KernelType tp);
+
 class Kernel {
 public:
   Kernel(const CircuitSeq &gates, const std::vector<int> &qubits,

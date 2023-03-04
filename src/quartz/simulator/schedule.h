@@ -31,8 +31,7 @@ public:
    * algorithm, assuming there are no other kernels after the given ones.
    * The greedy algorithm is approximate -- it might not give the optimal
    * result.
-   * @param kernel_costs kernel_costs[i] represents the cost of an i-qubit
-   * kernel.
+   * @param kernel_cost The cost function of kernels.
    * @param kernels The non-intersecting kernels to be merged.
    * @param result_cost The sum of the cost of the resulting merged kernels.
    * @param result_kernels The resulting merged kernels, or nullptr if it is
@@ -40,10 +39,10 @@ public:
    * @return True iff the computation succeeds.
    */
   static bool
-  compute_end_schedule(const std::vector<KernelCostType> &kernel_costs,
-                       const std::vector<std::vector<int>> &kernels,
+  compute_end_schedule(const KernelCost &kernel_cost,
+                       const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
                        KernelCostType &result_cost,
-                       std::vector<std::vector<int>> *result_kernels);
+                       std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
 
   /**
    * Compute the schedule using dynamic programming.

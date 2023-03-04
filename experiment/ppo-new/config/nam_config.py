@@ -27,15 +27,15 @@ class NamConfig(BaseConfig):
 
 @dataclass
 class NamFTConfig(NamConfig):
-    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-03')
+    wandb: WandbConfig = WandbConfig.new_project('PPO-Finetune-04')
     greedy_sample: bool = True
     k_epochs: int = 20
-    lr_gnn: float = 3e-5
-    lr_actor: float = 3e-5
-    lr_critic: float = 5e-5
+    lr_gnn: float = 3e-4
+    lr_actor: float = 3e-4
+    lr_critic: float = 5e-4
     lr_scheduler: str = 'linear'
     lr_start_factor: float = 0.1
-    lr_warmup_epochs: int = 50
+    lr_warmup_epochs: int = 15
     resume_optimizer: bool = False
     num_eps_per_iter: int = 64
     max_eps_len: int = 600

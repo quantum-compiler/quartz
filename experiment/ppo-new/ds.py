@@ -483,6 +483,7 @@ class GraphBuffer:
         gcost = torch.Tensor(gcost_list).to(self.device)
         if greedy:
             weights = 1 / (gcost - gcost.min() + 0.2)
+            # weights = (gcost == gcost.min()).float()
         else:
             weights = 1 / gcost**4
         sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
@@ -490,6 +491,7 @@ class GraphBuffer:
         graphs = self.cost_to_graph[sampled_gcost]
         if greedy:
             graph_weights = torch.linspace(0.6, 1.000001, len(graphs)).to(self.device)
+            # graph_weights = torch.linspace(1.0, 1.0, len(graphs)).to(self.device)
             sampled_graph_idx = int(torch.multinomial(graph_weights, num_samples=1))
             sampled_graph = graphs[sampled_graph_idx]
         else:

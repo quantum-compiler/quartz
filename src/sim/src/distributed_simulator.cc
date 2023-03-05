@@ -111,6 +111,19 @@ bool DistributedSimulator::init_state_vectors() {
     FutureMap fm = runtime->execute_index_space(ctx, launcher);
     fm.wait_all_results();
   }
+  // initialize all gpu_state_vectors
+  for (size_t i = 0; i < gpu_state_vectors.size(); i++) {
+    ArgumentMap argmap;
+    IndexLauncher launcher(
+        SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
+        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+    launcher.add_region_requirement(
+        RegionRequirement(gpu_state_vectors[i].second, 0 /*projection ID*/, WRITE_ONLY,
+                          EXCLUSIVE, gpu_state_vectors[i].first));
+    launcher.add_field(0, FID_DATA);
+    FutureMap fm = runtime->execute_index_space(ctx, launcher);
+    fm.wait_all_results();
+  }
   return true;
 }
 

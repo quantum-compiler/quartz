@@ -885,7 +885,17 @@ void FFMapper::map_copy(const MapperContext ctx,
                         Copy const &copy,
                         MapCopyInput const &input,
                         MapCopyOutput &output) {
-  assert(false);
+  // Assert no indirect copies
+  assert(copy.src_indirect_requirements.size() == 0);
+  assert(copy.dst_indirect_requirements.size() == 0);
+  for (unsigned idx = 0; idx < copy.src_requirements.size(); idx++) {
+    fprintf(stderr, "src_instance[%d].size() = %zu\n", idx, input.src_instances[idx].size());
+    fprintf(stderr, "dst_instance[%d].size() = %zu\n", idx, input.dst_instances[idx].size());
+    assert(input.src_instances[idx].size() > 0);
+    assert(input.dst_instances[idx].size() > 0);
+    output.src_instances[idx] = input.src_instances[idx];
+    output.dst_instances[idx] = input.dst_instances[idx];
+  }
 }
 
 void FFMapper::select_copy_sources(const MapperContext ctx,

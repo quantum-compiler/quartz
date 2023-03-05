@@ -129,15 +129,20 @@ int main() {
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
   std::vector<std::string> circuit_names = {
-      "dj"
+      "qft"
       // "realamprandom"
   };
-  // 29 total qubits, 28 local qubits
-  std::vector<int> num_qubits = {29};
+  // 31 total qubits, 28 local qubits
+  std::vector<int> num_qubits = {31};
   std::vector<int> num_local_qubits;
   for (int i = 28; i <= 28; i++) {
     num_local_qubits.push_back(i);
   }
+  KernelCost kernel_cost(
+      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
+      /*shared_memory_init_cost=*/10,
+      /*shared_memory_gate_cost=*/[](GateType) { return 0.8; },
+      /*shared_memory_total_qubits=*/11, /*shared_memory_cacheline_qubits=*/3);
   // FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());
@@ -172,9 +177,8 @@ int main() {
         // fprintf(fout, " %d", result);
         local_qubits =
             compute_local_qubits_with_ilp(*seq, local_q, &ctx, &interpreter);
-        auto schedules = get_schedules(
-            *seq, local_qubits, {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
-            &ctx, /*absorb_single_qubit_gates=*/true);
+        auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
+                                       /*absorb_single_qubit_gates=*/true);
         for (auto &schedule : schedules) {
           std::cout << "cost = " << schedule.cost_ << std::endl;
           schedule.print_kernel_schedule();

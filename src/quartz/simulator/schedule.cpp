@@ -1171,22 +1171,32 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
   for (int i = 0; i < num_gates; i++) {
     circuit_gate_qubits.push_back(sequence.gates[i]->get_qubit_indices());
     int executable_type;
-    if (sequence.gates[i]->gate->get_num_qubits() == 1) {
-      // 2 is local-only
-      executable_type = sequence.gates[i]->gate->is_sparse() ? 0 : 2;
-    } else if (sequence.gates[i]->gate->is_sparse() &&
-               sequence.gates[i]->gate->is_symmetric()) {
-      // 0 is always executable
-      executable_type = 0;
-    } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
-      // 1 is the target qubit must be local-only
-      // We assume there is only 1 target qubit in the Python code.
-      assert(sequence.gates[i]->gate->get_num_control_qubits() ==
-             sequence.gates[i]->gate->get_num_qubits() - 1);
-      executable_type = 1;
+    // 0 is always executable
+    // 1 is the target qubits must be local-only
+    // 2 is local-only
+    if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+      if (sequence.gates[i]->gate->is_symmetric()) {
+        // A controlled gate is always executable if every qubit can be a
+        // control qubit.
+        executable_type = 0;
+      } else {
+        // The target qubits must be local-only.
+        // We assume there is only 1 target qubit in the Python code.
+        assert(sequence.gates[i]->gate->get_num_control_qubits() ==
+               sequence.gates[i]->gate->get_num_qubits() - 1);
+        executable_type = 1;
+      }
     } else {
-      // 2 is local-only
-      executable_type = 2;
+      if (sequence.gates[i]->gate->is_sparse()) {
+        // A non-controlled gate is always executable if its matrix's rank is 1.
+        // The only multi-qubit case here is the SWAP gate.
+        // XXX: The usage of is_sparse() needs to be changed if we ever
+        // introduce multi-qubit gates that is sparse but not executable.
+        executable_type = 0;
+      } else {
+        // For all other cases, we require all qubits to be local-only.
+        executable_type = 2;
+      }
     }
     circuit_gate_executable_type.push_back(executable_type);
     gate_index[sequence.gates[i].get()] = i;

@@ -14,7 +14,7 @@ class PythonInterpreter {
 public:
   std::vector<std::vector<int>>
   solve_ilp(const std::vector<std::vector<int>> &circuit_gate_qubits,
-            const std::vector<bool> &circuit_gate_is_sparse,
+            const std::vector<int> &circuit_gate_executable_type,
             const std::vector<std::vector<int>> &out_gate, int num_qubits,
             int num_local_qubits, int num_iterations,
             bool print_solution = false);

@@ -5,7 +5,7 @@ import qiskit.circuit.library.standard_gates as gates
 
 def solve_ilp(
     circuit_gate_qubits,
-    circuit_gate_is_sparse,
+    circuit_gate_executable_type,
     out_gate,
     num_qubits,
     num_local_qubits,
@@ -66,13 +66,21 @@ def solve_ilp(
         for j in range(num_iterations):
             prob += b[i, j] <= b[i, j + 1]
 
-    # If a non-sparse gate is executed at the j-th iteration,
-    # its qubits must be local at the j-th iteration.
     for i in range(num_gates):
-        if not circuit_gate_is_sparse[i]:
+        if circuit_gate_executable_type[i] == 2:
+            # If a "local-only" gate is executed at the j-th iteration,
+            # its qubits must be local at the j-th iteration.
             for qubit_id in circuit_gate_qubits[i]:
                 for j in range(num_iterations):
                     prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
+        elif circuit_gate_executable_type[i] == 1:
+            # If a "target-qubit local-only" gate is executed at the j-th iteration,
+            # the target qubit must be local at the j-th iteration.
+            # XXX: assume there is always 1 target qubit.
+            assert len(circuit_gate_qubits[i]) >= 2
+            qubit_id = circuit_gate_qubits[i][-1]
+            for j in range(num_iterations):
+                prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
 
     # Dependencies
     for i1 in range(num_gates):
@@ -127,14 +135,14 @@ def solve_ilp(
 
 
 def preprocess_circuit_seq(circuit_seq, index_offset, num_qubits):
-    sparse_gates = {
+    always_executable_gates = {
         gates.x.XGate,
-        gates.x.CXGate,
         gates.z.CZGate,
         gates.p.CPhaseGate,
         gates.swap.SwapGate,
     }
-    non_sparse_gates = {
+    target_local_only_gates = {gates.x.CXGate}
+    local_only_gates = {
         gates.h.HGate,
         gates.ry.RYGate,
         gates.u.UGate,
@@ -148,8 +156,19 @@ def preprocess_circuit_seq(circuit_seq, index_offset, num_qubits):
     ]
 
     for gate in circuit_seq:
-        assert type(gate[0]) in sparse_gates or type(gate[0]) in non_sparse_gates
-    circuit_gate_is_sparse = [type(gate[0]) in sparse_gates for gate in circuit_seq]
+        assert (
+            type(gate[0]) in always_executable_gates
+            or type(gate[0]) in target_local_only_gates
+            or type(gate[0]) in local_only_gates
+        )
+    circuit_gate_executable_type = [
+        0
+        if type(gate[0]) in always_executable_gates
+        else 1
+        if type(gate[0]) in target_local_only_gates
+        else 2
+        for gate in circuit_seq
+    ]
 
     # Dependencies
     num_gates = len(circuit_seq)
@@ -163,7 +182,7 @@ def preprocess_circuit_seq(circuit_seq, index_offset, num_qubits):
                 out_gate[last_gate[qubit_id]].add(i)
             last_gate[qubit_id] = i
 
-    return circuit_gate_qubits, circuit_gate_is_sparse, out_gate
+    return circuit_gate_qubits, circuit_gate_executable_type, out_gate
 
 
 def run(n, circuit_name, repeat_circuit=1):

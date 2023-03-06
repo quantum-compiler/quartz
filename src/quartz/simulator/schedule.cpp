@@ -950,11 +950,32 @@ get_schedules(const CircuitSeq &sequence,
           break;
         }
       }
-      if (!sequence.gates[i]->gate->is_sparse()) {
-        for (auto &wire : sequence.gates[i]->input_wires) {
-          if (wire->is_qubit() && !local_qubit[wire->index]) {
-            executable = false;
-            break;
+      if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+        if (!sequence.gates[i]->gate->is_symmetric()) {
+          // For controlled gates, we only need to have all target qubits local
+          // when it's not symmetric.
+          int control_qubit_count =
+              sequence.gates[i]->gate->get_num_control_qubits();
+          for (auto &wire : sequence.gates[i]->input_wires) {
+            if (wire->is_qubit() && control_qubit_count--) {
+              // Skip the control qubits.
+              continue;
+            }
+            if (wire->is_qubit() && !local_qubit[wire->index]) {
+              executable = false;
+              break;
+            }
+          }
+        }
+      } else {
+        if (!sequence.gates[i]->gate->is_sparse()) {
+          // For non-sparse non-controlled gates, we need to have all qubits
+          // local.
+          for (auto &wire : sequence.gates[i]->input_wires) {
+            if (wire->is_qubit() && !local_qubit[wire->index]) {
+              executable = false;
+              break;
+            }
           }
         }
       }
@@ -1141,15 +1162,33 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<std::vector<int>> circuit_gate_qubits;
-  std::vector<bool> circuit_gate_is_sparse;
+  std::vector<int> circuit_gate_executable_type;
   std::unordered_map<CircuitGate *, int> gate_index;
   std::vector<std::vector<int>> out_gate(num_gates);
   circuit_gate_qubits.reserve(num_gates);
-  circuit_gate_is_sparse.reserve(num_gates);
+  circuit_gate_executable_type.reserve(num_gates);
   gate_index.reserve(num_gates);
   for (int i = 0; i < num_gates; i++) {
     circuit_gate_qubits.push_back(sequence.gates[i]->get_qubit_indices());
-    circuit_gate_is_sparse.push_back(sequence.gates[i]->gate->is_sparse());
+    int executable_type;
+    if (sequence.gates[i]->gate->get_num_qubits() == 1) {
+      // 2 is local-only
+      executable_type = sequence.gates[i]->gate->is_sparse() ? 0 : 2;
+    } else if (sequence.gates[i]->gate->is_sparse() &&
+               sequence.gates[i]->gate->is_symmetric()) {
+      // 0 is always executable
+      executable_type = 0;
+    } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+      // 1 is the target qubit must be local-only
+      // We assume there is only 1 target qubit in the Python code.
+      assert(sequence.gates[i]->gate->get_num_control_qubits() ==
+             sequence.gates[i]->gate->get_num_qubits() - 1);
+      executable_type = 1;
+    } else {
+      // 2 is local-only
+      executable_type = 2;
+    }
+    circuit_gate_executable_type.push_back(executable_type);
     gate_index[sequence.gates[i].get()] = i;
   }
   for (int i = 0; i < num_gates; i++) {
@@ -1161,7 +1200,7 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
   }
   for (int num_iterations = 1; true; num_iterations++) {
     auto result = interpreter->solve_ilp(
-        circuit_gate_qubits, circuit_gate_is_sparse, out_gate, num_qubits,
+        circuit_gate_qubits, circuit_gate_executable_type, out_gate, num_qubits,
         num_local_qubits, num_iterations);
     if (!result.empty()) {
       // convert vector<int> to vector<bool>

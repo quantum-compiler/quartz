@@ -1188,7 +1188,7 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
       }
     } else {
       if (sequence.gates[i]->gate->is_sparse()) {
-        // A non-controlled gate is always executable if its matrix's rank is 1.
+        // A non-controlled gate is always executable if it is "sparse".
         // The only multi-qubit case here is the SWAP gate.
         // XXX: The usage of is_sparse() needs to be changed if we ever
         // introduce multi-qubit gates that is sparse but not executable.

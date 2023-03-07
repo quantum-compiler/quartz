@@ -32,6 +32,10 @@ public:
    * result.
    * @param kernel_cost The cost function of kernels.
    * @param kernels The non-intersecting kernels to be merged.
+   * @param is_shared_memory_cacheline_qubit A vector of size equal to the
+   * number of qubits, denoting if the qubits are in the shared-memory
+   * cacheline. When in doubt, it is safe to pass in a vector of |num_qubits|
+   * false's.
    * @param result_cost The sum of the cost of the resulting merged kernels.
    * @param result_kernels The resulting merged kernels, or nullptr if it is
    * not necessary to record them.
@@ -40,6 +44,7 @@ public:
   static bool compute_end_schedule(
       const KernelCost &kernel_cost,
       const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
+      const std::vector<bool> &is_shared_memory_cacheline_qubit,
       KernelCostType &result_cost,
       std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
 

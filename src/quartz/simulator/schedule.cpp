@@ -78,6 +78,7 @@ bool Schedule::is_local_qubit(int index) const {
 bool Schedule::compute_end_schedule(
     const KernelCost &kernel_cost,
     const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
+    const std::vector<bool> &is_shared_memory_cacheline_qubit,
     KernelCostType &result_cost,
     std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels) {
   const auto &kernel_costs = kernel_cost.get_fusion_kernel_costs();
@@ -109,15 +110,22 @@ bool Schedule::compute_end_schedule(
         fusion_kernels_of_size[kernels[i].first.size()].push_back(i);
       }
     } else if (kernels[i].second == KernelType::shared_memory) {
-      if (kernels[i].first.size() >= max_shared_memory_kernel_size) {
-        assert(kernels[i].first.size() == max_shared_memory_kernel_size);
+      int kernel_size = kernels[i].first.size();
+      for (auto &qubit : kernels[i].first) {
+        if (is_shared_memory_cacheline_qubit[qubit]) {
+          // Exclude shared-memory cacheline qubits.
+          kernel_size--;
+        }
+      }
+      if (kernel_size >= max_shared_memory_kernel_size) {
+        assert(kernel_size == max_shared_memory_kernel_size);
         // Copy the large shared-memory kernels to the result.
         if (result_kernels != nullptr) {
           result_kernels->emplace_back(kernels[i]);
         }
         result_cost += kernel_cost.get_shared_memory_init_cost();
       } else {
-        shared_memory_kernels_of_size[kernels[i].first.size()].push_back(i);
+        shared_memory_kernels_of_size[kernel_size].push_back(i);
       }
     } else {
       assert(false);
@@ -203,15 +211,22 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   const int num_gates = sequence_.get_num_gates();
   auto kernel_costs = kernel_cost.get_fusion_kernel_costs();
   const int max_fusion_kernel_size = (int)kernel_costs.size() - 1;
-  // TODO: utilize the cacheline qubits of shared-memory kernels
   const int shared_memory_kernel_size =
       kernel_cost.get_shared_memory_num_free_qubits();
+  const int shared_memory_cacheline_size =
+      kernel_cost.get_shared_memory_num_cacheline_qubits();
   const int max_kernel_size =
       std::max(max_fusion_kernel_size, shared_memory_kernel_size);
   // We need to be able to execute at least 1-qubit gates.
   assert(max_kernel_size >= 2);
   // We have not computed the schedule before.
   assert(kernels.empty());
+  std::vector<bool> is_shared_memory_cacheline_qubit(num_qubits, false);
+  assert(local_qubit_.size() >= shared_memory_cacheline_size);
+  for (int i = 0; i < shared_memory_cacheline_size; i++) {
+    // These are the shared-memory cacheline qubits.
+    is_shared_memory_cacheline_qubit[local_qubit_[i]] = true;
+  }
   struct Status {
   public:
     static size_t get_hash(const std::vector<int> &s) {
@@ -482,7 +497,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         // TODO: profile the running time of |compute_end_schedule| and see
         //  if an approximation optimization is necessary.
         KernelCostType result_cost;
-        compute_end_schedule(kernel_cost, it->first.sets, result_cost,
+        compute_end_schedule(kernel_cost, it->first.sets,
+                             is_shared_memory_cacheline_qubit, result_cost,
                              /*result_kernels=*/nullptr);
         costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
         if (debug) {
@@ -527,7 +543,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       assert(current_status.check_valid());
       if (debug) {
         KernelCostType tmp;
-        compute_end_schedule(kernel_cost, current_status.sets, tmp, nullptr);
+        compute_end_schedule(kernel_cost, current_status.sets,
+                             is_shared_memory_cacheline_qubit, tmp, nullptr);
         tmp += current_cost;
         if (tmp < tmp_best_cost) {
           tmp_best_cost = tmp;
@@ -735,10 +752,27 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
               }
               assert(current_gate_kernel_type == KernelType::fusion ||
                      current_gate_kernel_type == KernelType::shared_memory);
-              if (new_gate_kernel.size() <=
-                  (current_gate_kernel_type == KernelType::fusion
-                       ? max_fusion_kernel_size
-                       : shared_memory_kernel_size)) {
+              bool kernel_size_ok = false;
+              if (current_gate_kernel_type == KernelType::fusion) {
+                kernel_size_ok =
+                    new_gate_kernel.size() <= max_fusion_kernel_size;
+              } else {
+                if (new_gate_kernel.size() <= shared_memory_kernel_size) {
+                  kernel_size_ok = true;
+                } else {
+                  // Check cacheline qubits.
+                  int num_cacheline_qubits = 0;
+                  for (const auto &qubit : new_gate_kernel) {
+                    if (is_shared_memory_cacheline_qubit[qubit]) {
+                      num_cacheline_qubits++;
+                    }
+                  }
+                  kernel_size_ok =
+                      new_gate_kernel.size() - num_cacheline_qubits <=
+                      shared_memory_kernel_size;
+                }
+              }
+              if (kernel_size_ok) {
                 std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
                 // If we merge a kernel with the current gate, we do not need
                 // to search for other kernels to merge together.
@@ -784,11 +818,37 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
         assert(current_merging_kernel_type == KernelType::fusion ||
                current_merging_kernel_type == KernelType::shared_memory);
-        if (current_merging_kernel.size() +
-                current_status.sets[kernel_index].first.size() >
-            (current_merging_kernel_type == KernelType::fusion
-                 ? max_fusion_kernel_size
-                 : shared_memory_kernel_size)) {
+        bool kernel_size_ok = false;
+        if (current_merging_kernel_type == KernelType::fusion) {
+          kernel_size_ok = current_merging_kernel.size() +
+                               current_status.sets[kernel_index].first.size() <=
+                           max_fusion_kernel_size;
+        } else {
+          if (current_merging_kernel.size() +
+                  current_status.sets[kernel_index].first.size() <=
+              shared_memory_kernel_size) {
+            kernel_size_ok = true;
+          } else {
+            // Check cacheline qubits.
+            int num_cacheline_qubits = 0;
+            for (const auto &qubit : current_merging_kernel) {
+              if (is_shared_memory_cacheline_qubit[qubit]) {
+                num_cacheline_qubits++;
+              }
+            }
+            for (const auto &qubit : current_status.sets[kernel_index].first) {
+              if (is_shared_memory_cacheline_qubit[qubit]) {
+                num_cacheline_qubits++;
+              }
+            }
+            kernel_size_ok =
+                current_merging_kernel.size() +
+                    current_status.sets[kernel_index].first.size() -
+                    num_cacheline_qubits <=
+                shared_memory_kernel_size;
+          }
+        }
+        if (!kernel_size_ok) {
           // The kernel would be too large if we merge this one.
           // Continue to the next one.
           return;
@@ -841,7 +901,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     // Compute the end schedule and get the one with minimal total cost.
     KernelCostType cost;
     std::vector<std::pair<std::vector<int>, KernelType>> end_schedule;
-    compute_end_schedule(kernel_cost, it.first.sets, cost, &end_schedule);
+    compute_end_schedule(kernel_cost, it.first.sets,
+                         is_shared_memory_cacheline_qubit, cost, &end_schedule);
     if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;
       result_schedule = it.second.second;

@@ -45,7 +45,7 @@ void init_python_interpreter() {
 
 std::vector<std::vector<int>> PythonInterpreter::solve_ilp(
     const std::vector<std::vector<int>> &circuit_gate_qubits,
-    const std::vector<bool> &circuit_gate_is_sparse,
+    const std::vector<int> &circuit_gate_executable_type,
     const std::vector<std::vector<int>> &out_gate, int num_qubits,
     int num_local_qubits, int num_iterations, bool print_solution) {
   if (!solve_ilp_) {
@@ -53,7 +53,7 @@ std::vector<std::vector<int>> PythonInterpreter::solve_ilp(
         py::module::import("simulator.ilp").attr("solve_ilp"));
   }
   auto result =
-      solve_ilp_(circuit_gate_qubits, circuit_gate_is_sparse, out_gate,
+      solve_ilp_(circuit_gate_qubits, circuit_gate_executable_type, out_gate,
                  num_qubits, num_local_qubits, num_iterations, print_solution);
   return result.cast<std::vector<std::vector<int>>>();
 }

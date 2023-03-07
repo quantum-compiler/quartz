@@ -894,7 +894,13 @@ void FFMapper::map_copy(const MapperContext ctx,
     assert(input.src_instances[idx].size() > 0);
     assert(input.dst_instances[idx].size() > 0);
     output.src_instances[idx] = input.src_instances[idx];
+    if (!output.src_instances[idx].empty())
+      runtime->acquire_and_filter_instances(ctx,
+                                          output.src_instances[idx]);
     output.dst_instances[idx] = input.dst_instances[idx];
+    if (!output.dst_instances[idx].empty())
+      runtime->acquire_and_filter_instances(ctx,
+                                          output.dst_instances[idx]);
   }
 }
 

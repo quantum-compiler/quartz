@@ -171,7 +171,7 @@ int main() {
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        std::vector<std::vector<bool>> local_qubits;
+        std::vector<std::vector<int>> local_qubits;
         // int result =
         // num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
         // fprintf(fout, " %d", result);

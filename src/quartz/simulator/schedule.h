@@ -17,9 +17,8 @@ namespace quartz {
  */
 class Schedule {
 public:
-  Schedule(const CircuitSeq &sequence, const std::vector<bool> &local_qubit,
-           Context *ctx)
-      : cost_(), sequence_(sequence), local_qubit_(local_qubit), ctx_(ctx) {}
+  Schedule(const CircuitSeq &sequence, const std::vector<int> &local_qubit,
+           Context *ctx);
 
   // Compute the number of down sets for the circuit sequence.
   [[nodiscard]] size_t num_down_sets();
@@ -68,8 +67,12 @@ private:
   // The original circuit sequence.
   CircuitSeq sequence_;
 
+  // The set of local qubits.
+  // |local_qubit_[0]| is the least significant bit.
+  std::vector<int> local_qubit_;
+
   // The mask for local qubits.
-  std::vector<bool> local_qubit_;
+  std::vector<bool> local_qubit_mask_;
 
   Context *ctx_;
 };
@@ -88,12 +91,12 @@ private:
  */
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<bool>> &local_qubits,
+              const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
               bool absorb_single_qubit_gates);
 
 class PythonInterpreter;
-std::vector<std::vector<bool>>
+std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter);
 } // namespace quartz

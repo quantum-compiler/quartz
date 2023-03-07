@@ -7,6 +7,15 @@
 
 namespace quartz {
 
+Schedule::Schedule(const CircuitSeq &sequence,
+                   const std::vector<int> &local_qubit, Context *ctx)
+    : cost_(), sequence_(sequence), local_qubit_(local_qubit), ctx_(ctx) {
+  local_qubit_mask_.assign(sequence.get_num_qubits(), false);
+  for (auto &i : local_qubit) {
+    local_qubit_mask_[i] = true;
+  }
+}
+
 size_t Schedule::num_down_sets() {
   const int num_qubits = sequence_.get_num_qubits();
   const int num_gates = sequence_.get_num_gates();
@@ -62,7 +71,9 @@ size_t Schedule::num_down_sets() {
   return down_sets.size();
 }
 
-bool Schedule::is_local_qubit(int index) const { return local_qubit_[index]; }
+bool Schedule::is_local_qubit(int index) const {
+  return local_qubit_mask_[index];
+}
 
 bool Schedule::compute_end_schedule(
     const KernelCost &kernel_cost,
@@ -912,7 +923,7 @@ void Schedule::print_kernel_schedule() const {
 
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<bool>> &local_qubits,
+              const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
               bool absorb_single_qubit_gates) {
   std::vector<Schedule> result;
@@ -934,6 +945,12 @@ get_schedules(const CircuitSeq &sequence,
   std::unordered_map<std::string, std::queue<int>> gate_indices;
 
   for (auto &local_qubit : local_qubits) {
+    // convert vector<int> to vector<bool>
+    std::vector<bool> local_qubit_mask(num_qubits, false);
+    for (auto &i : local_qubit) {
+      local_qubit_mask[i] = true;
+    }
+
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
@@ -961,7 +978,7 @@ get_schedules(const CircuitSeq &sequence,
               // Skip the control qubits.
               continue;
             }
-            if (wire->is_qubit() && !local_qubit[wire->index]) {
+            if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
               executable = false;
               break;
             }
@@ -972,7 +989,7 @@ get_schedules(const CircuitSeq &sequence,
           // For non-sparse non-controlled gates, we need to have all qubits
           // local.
           for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && !local_qubit[wire->index]) {
+            if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
               executable = false;
               break;
             }
@@ -986,7 +1003,7 @@ get_schedules(const CircuitSeq &sequence,
           // Count the number of local qubits.
           int num_local_qubit = 0;
           for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && local_qubit[wire->index]) {
+            if (wire->is_qubit() && local_qubit_mask[wire->index]) {
               num_local_qubit++;
             }
           }
@@ -1156,7 +1173,7 @@ get_schedules(const CircuitSeq &sequence,
   return result;
 }
 
-std::vector<std::vector<bool>>
+std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter) {
   const int num_qubits = sequence.get_num_qubits();
@@ -1213,15 +1230,7 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
         circuit_gate_qubits, circuit_gate_executable_type, out_gate, num_qubits,
         num_local_qubits, num_iterations);
     if (!result.empty()) {
-      // convert vector<int> to vector<bool>
-      std::vector<std::vector<bool>> ret(result.size());
-      for (int i = 0; i < (int)result.size(); i++) {
-        ret[i] = std::vector<bool>(num_qubits, false);
-        for (auto j : result[i]) {
-          ret[i][j] = true;
-        }
-      }
-      return ret;
+      return result;
     }
   }
 }

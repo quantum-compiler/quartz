@@ -4,6 +4,7 @@ from typing import Any, List
 
 import hydra
 from config.base_config import BaseConfig
+from config.ibm2_config import *
 from config.ibm_config import *
 from config.ionq_config import *
 from config.nam_config import *
@@ -46,6 +47,12 @@ cs.store(group="c", name="ibm_ft", node=IBMFTConfig)
 cs.store(group="c", name="ibm_pret", node=IBMPretrainConfig)
 cs.store(group="c", name="ibm_mp", node=IBMMPConfig)
 cs.store(group="c", name="ibm_test", node=IBMTestConfig)
+
+cs.store(group="c", name="ibm2", node=IBM2Config)
+cs.store(group="c", name="ibm2_ft", node=IBM2FTConfig)
+cs.store(group="c", name="ibm2_pret", node=IBM2PretrainConfig)
+cs.store(group="c", name="ibm2_mp", node=IBM2MPConfig)
+cs.store(group="c", name="ibm2_test", node=IBM2TestConfig)
 
 cs.store(group="c", name="tdg", node=TdgConfig)
 cs.store(group="c", name="tdg_ft", node=TdgFTConfig)

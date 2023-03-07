@@ -92,7 +92,7 @@ class IBM2TestConfig(TestConfig):
             'z',
         ]
     )
-    ecc_file: str = '../ecc_set/ibm_special_angle_circs.json'
+    ecc_file: str = '../ecc_set/ibm_special_angles_3_2_5_ecc.json'
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(

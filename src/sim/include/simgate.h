@@ -33,6 +33,34 @@ struct Gate {
   // TODO: add creat APIs for manual creation
 };
 
+struct FusedGate {
+  SimGateType gtype;
+
+  unsigned num_target;
+  unsigned num_control;
+  int target[MAX_KERNEL_SIZE];
+  int control[MAX_KERNEL_SIZE];
+
+  qComplex matrix[(1<<MAX_KERNEL_SIZE)];
+
+  FusedGate(const Gate<qreal> &gate) {
+    num_target = gate.num_target;
+    num_control = gate.num_control;
+    for (int i = 0; i < gate.target.size(); i++) {
+      target[i] = gate.target[i];
+    }
+    for (int i = 0; i < gate.control.size(); i++) {
+      control[i] = gate.control[i];
+    }
+    for (int i = 0; i < gate.matrix.size(); i++) {
+      matrix[i].x = gate.matrix[i].real();
+      matrix[i].y = gate.matrix[i].imag();
+    }
+  }
+    
+
+};
+
 struct KernelGate {
   int targetQubit;
   int controlQubit;

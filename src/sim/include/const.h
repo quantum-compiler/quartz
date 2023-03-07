@@ -28,6 +28,8 @@ typedef cuDoubleComplex qComplex;
 #define SHARED_MEM_SIZE 10
 #define MAX_GATE 600
 #define THREAD_DEP 7
+#define MAX_KERNEL_SIZE 10
+#define MAX_BATCHED_TASKS 20
 
 enum class KernelGateType {
   CCX,

@@ -17,20 +17,17 @@ public:
 };
 
 struct GateInfo {
+  // FusedGate** fgates = nullptr;
+  // int* num_fused = nullptr;
+  // KernelGate** kgates = nullptr;
+  KernelGate* kgates = nullptr;
+  // int* num_shm = nullptr;
+  // qindex* active_qubits_logical = nullptr;
+  int num_tasks = 0;
+  int fused_idx = 0;
+  int shm_idx = 0;
+  SimGateType tasks[MAX_BATCHED_TASKS];
   unsigned permutation[MAX_QUBIT];
-  int num_batched_gates;
-  // gates type for a batch of gates (FUSE or SHM)
-  SimGateType gtype;
-  Gate<qreal> *gates = nullptr;
-  // non-zero only if SHM gates
-  KernelGate *kgates = nullptr;
-  qindex active_qubits_logical = 0;
-  // int num_targets, num_controls;
-  // int permutation[MAX_NUM_QUBITS], target[MAX_NUM_QUBITS];
-  // // FIXME: currently we send matrix_data to devices for each compute task
-  // // Should precompute all matrices and send them to devices before computation
-  // // starts
-  // qreal matrix_data[MAX_GATE_MATRIX_SIZE];
 };
 
 class DistributedSimulator {
@@ -73,6 +70,7 @@ private:
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > cpu_state_vectors;
   std::vector<std::pair<Legion::LogicalRegion, Legion::LogicalPartition> > gpu_state_vectors;
   DSHandler handlers[MAX_NUM_WORKERS];
+  // Task Info
   unsigned permutation[MAX_QUBIT];
 };
 

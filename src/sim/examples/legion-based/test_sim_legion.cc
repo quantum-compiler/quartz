@@ -50,7 +50,7 @@ void sim::top_level_task(
 }
 
 DSConfig::DSConfig() {
-  state_vec_data_type = DT_DOUBLE;
+  state_vec_data_type = DT_DOUBLE_COMPLEX;
   gpus_per_node = 0;
   cpus_per_node = 1;
   num_local_qubits = 0;
@@ -122,11 +122,18 @@ int main(int argc, char **argv) {
         registrar, "Gate Compute Task");
   }
   {
-    TaskVariantRegistrar registrar(SV_INIT_TASK_ID, "SV Init");
+    TaskVariantRegistrar registrar(GPU_SV_INIT_TASK_ID, "GPU SV Init");
     registrar.add_constraint(ProcessorConstraint(Processor::TOC_PROC));
     registrar.set_leaf();
     Runtime::preregister_task_variant<DistributedSimulator::sv_init_task>(
-        registrar, "SV Init Task");
+        registrar, "GPU SV Init Task");
+  }
+  {
+    TaskVariantRegistrar registrar(CPU_SV_INIT_TASK_ID, "CPU SV Init");
+    registrar.add_constraint(ProcessorConstraint(Processor::LOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<DistributedSimulator::sv_init_task>(
+        registrar, "CPU SV Init Task");
   }
 
   Runtime::add_registration_callback(FFMapper::update_mappers);

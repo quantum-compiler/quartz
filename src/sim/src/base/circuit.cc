@@ -186,26 +186,6 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
                                     quartz::Context *ctx,
                                     quartz::PythonInterpreter *interpreter,
                                     bool use_ilp) {
-  // FOR testing only
-  std::vector<KernelGate> kernelgates;
-  qComplex mat[2][2] = {make_qComplex(0, 0), make_qComplex(0, -1),
-                        make_qComplex(0, 1), make_qComplex(0, 0)};
-  for (int i = 0; i < 50; i++) {
-    KernelGate kg(KernelGateType::Y, 5, 0, mat);
-    kernelgates.push_back(kg);
-  }
-  shm_gates.push_back(kernelgates);
-  // just for test
-  qindex active_qubits_logical = 0;
-  for (int i = 0; i < SHARED_MEM_SIZE; i++) {
-    active_qubits_logical |= qindex(1) << i;
-  }
-  active_physic_qs.push_back(active_qubits_logical);
-  task_map.push_back(SimGateType::SHM);
-
-  return true;
-  
-  
   // 1. ILP/heuristics
   std::vector<std::vector<bool>> local_qubits;
   if (!use_ilp)

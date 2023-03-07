@@ -8,6 +8,8 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LIBEXT ".so")
 endif()
 
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -UNDEBUG")
+
 # Legion to not use static cuda runtime
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static ones" ON)
 
@@ -71,7 +73,9 @@ include(cuda)
 
 include(cuquantum)
 
-include(legion)
+if(USE_LEGION)
+  include(legion)
+endif()
 
 #if (NCCL_ROOT STREQUAL "")
     #include(nccl)
@@ -98,24 +102,43 @@ file(GLOB_RECURSE QSIM_HDR
   LIST_DIRECTORIES False
   ${QSIM_ROOT}/include/*.h)
 
-file(GLOB_RECURSE QSIM_SRC
-  LIST_DIRECTORIES False
-  ${QSIM_ROOT}/src/*.cc)
+if(USE_LEGION)
+  file(GLOB_RECURSE QSIM_SRC
+    LIST_DIRECTORIES False
+    ${QSIM_ROOT}/src/*.cc)
 
-file(GLOB_RECURSE QSIM_GPU_SRC
-  LIST_DIRECTORIES False
-  ${QSIM_ROOT}/src/*.cu)
+  file(GLOB_RECURSE QSIM_GPU_SRC
+    LIST_DIRECTORIES False
+    ${QSIM_ROOT}/src/*.cu)
+else()
+  file(GLOB_RECURSE QSIM_SRC
+    LIST_DIRECTORIES False
+    ${QSIM_ROOT}/src/base/*.cc)
+
+  file(GLOB_RECURSE QSIM_GPU_SRC
+    LIST_DIRECTORIES False
+    ${QSIM_ROOT}/src/base/*.cu)
+endif()
+
 
 cuda_add_library(quansim SHARED ${QSIM_GPU_SRC} ${QSIM_SRC})
 set_property(TARGET quansim PROPERTY CUDA_ARCHITECTURES "70;75;80;90")
 target_include_directories(quansim PUBLIC ${QSIM_INCLUDE_DIRS})
 # TODO: add option to choose simulator backend
-target_link_libraries(quansim ${LEGION_LIBRARY} quartz_runtime)
-#target_link_libraries(quansim quartz_runtime)
+if(USE_LEGION)
+  target_link_libraries(quansim ${LEGION_LIBRARY} quartz_runtime)
+else()
+  target_link_libraries(quansim quartz_runtime)
+endif()
 
 set(INCLUDE_DEST "include")
 set(LIB_DEST "lib")
 install(FILES ${QSIM_HDR} DESTINATION ${INCLUDE_DEST})
 install(TARGETS quansim DESTINATION ${LIB_DEST})
 
-add_subdirectory(examples)
+if(USE_LEGION)
+  add_subdirectory(examples/legion-based)
+else()
+  add_subdirectory(examples/mpi-based)
+endif()
+

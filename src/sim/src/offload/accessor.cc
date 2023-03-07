@@ -1,4 +1,5 @@
 #include "cuda_helper.h"
+#include <cuComplex.h>
 
 namespace sim {
 
@@ -33,7 +34,7 @@ GenericTensorAccessorR::GenericTensorAccessorR()
 
 
 float const *GenericTensorAccessorR::get_float_ptr() const {
-  if (data_type == DT_FLOAT)
+  if (data_type == DT_FLOAT || data_type == DT_FLOAT_COMPLEX)
     return static_cast<float const *>(ptr);
   else {
     assert(false && "Invalid Accessor Type");
@@ -42,7 +43,7 @@ float const *GenericTensorAccessorR::get_float_ptr() const {
 }
 
 double const *GenericTensorAccessorR::get_double_ptr() const {
-  if (data_type == DT_DOUBLE)
+  if (data_type == DT_DOUBLE || data_type == DT_DOUBLE_COMPLEX)
     return static_cast<double const *>(ptr);
   else {
     assert(false && "Invalid Accessor Type");
@@ -203,6 +204,14 @@ GenericTensorAccessorR
       ptr = helperGetTensorPointerRO<double>(region, req, fid, ctx, runtime);
       break;
     }
+    case DT_FLOAT_COMPLEX: {
+      ptr = helperGetTensorPointerRO<cuFloatComplex>(region, req, fid, ctx, runtime);
+      break;
+    }
+    case DT_DOUBLE_COMPLEX: {
+      ptr = helperGetTensorPointerRO<cuDoubleComplex>(region, req, fid, ctx, runtime);
+      break;
+    }
     default: {
       assert(false);
     }
@@ -229,6 +238,14 @@ GenericTensorAccessorW
       ptr = helperGetTensorPointerWO<double>(region, req, fid, ctx, runtime);
       break;
     }
+    case DT_FLOAT_COMPLEX: {
+      ptr = helperGetTensorPointerWO<cuFloatComplex>(region, req, fid, ctx, runtime);
+      break;
+    }
+    case DT_DOUBLE_COMPLEX: {
+      ptr = helperGetTensorPointerWO<cuDoubleComplex>(region, req, fid, ctx, runtime);
+      break;
+    }
     default: {
       assert(false);
     }
@@ -253,6 +270,14 @@ GenericTensorAccessorW
     }
     case DT_DOUBLE: {
       ptr = helperGetTensorPointerRW<double>(region, req, fid, ctx, runtime);
+      break;
+    }
+    case DT_FLOAT_COMPLEX: {
+      ptr = helperGetTensorPointerRW<cuFloatComplex>(region, req, fid, ctx, runtime);
+      break;
+    }
+    case DT_DOUBLE_COMPLEX: {
+      ptr = helperGetTensorPointerRW<cuDoubleComplex>(region, req, fid, ctx, runtime);
       break;
     }
     default: {

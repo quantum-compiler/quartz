@@ -31,7 +31,7 @@ void DistributedSimulator::init_devices() {
   // Init CUDA library on each worker
   IndexLauncher initLauncher(
       CUDA_INIT_TASK_ID, this->parallel_is, TaskArgument(&config, sizeof(DSConfig)), argmap,
-      Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+      Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/, PreservedIDs::DataParallelism_GPU);
   FutureMap fm = runtime->execute_index_space(ctx, initLauncher);
   fm.wait_all_results();
   Domain domain = runtime->get_index_space_domain(ctx, this->parallel_is);
@@ -66,10 +66,10 @@ bool DistributedSimulator::create_regions() {
   FieldSpace fs = runtime->create_field_space(ctx);
   FieldAllocator allocator = runtime->create_field_allocator(ctx, fs);
   switch (config.state_vec_data_type) {
-    case DT_FLOAT:
+    case DT_FLOAT_COMPLEX:
       allocator.allocate_field(sizeof(cuFloatComplex), FID_DATA);
       break;
-    case DT_DOUBLE:
+    case DT_DOUBLE_COMPLEX:
       allocator.allocate_field(sizeof(cuDoubleComplex), FID_DATA);
       break;
     default:
@@ -102,8 +102,8 @@ bool DistributedSimulator::init_state_vectors() {
   for (size_t i = 0; i < cpu_state_vectors.size(); i++) {
     ArgumentMap argmap;
     IndexLauncher launcher(
-        SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
-        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+        CPU_SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
+        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/, PreservedIDs::DataParallelism_CPU);
     launcher.add_region_requirement(
         RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/, WRITE_ONLY,
                           EXCLUSIVE, cpu_state_vectors[i].first, MAP_TO_ZC_MEMORY));
@@ -115,8 +115,8 @@ bool DistributedSimulator::init_state_vectors() {
   for (size_t i = 0; i < gpu_state_vectors.size(); i++) {
     ArgumentMap argmap;
     IndexLauncher launcher(
-        SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
-        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
+        GPU_SV_INIT_TASK_ID, parallel_is, TaskArgument(nullptr, 0),
+        argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/, PreservedIDs::DataParallelism_GPU);
     launcher.add_region_requirement(
         RegionRequirement(gpu_state_vectors[i].second, 0 /*projection ID*/, WRITE_ONLY,
                           EXCLUSIVE, gpu_state_vectors[i].first));
@@ -136,40 +136,48 @@ bool DistributedSimulator::run() {
   for (int i = 0; i < config.num_all_qubits; i++) {
     permutation[i] = i;
   }
+
+  
   
   int fused_idx = 0;
   int shm_idx = 0;
-  for (int i = 0; i < circuit.task_map.size(); i++) {
-    if (circuit.task_map[i] == FUSED) {
-      GateInfo info;
-      for (int i = 0; i < config.num_all_qubits; i++) {
-        info.permutation[i] = permutation[i];
-      }
-      info.num_batched_gates = circuit.fused_gates[fused_idx].size();
-      info.gtype = FUSED;
-      info.gates = circuit.fused_gates[fused_idx].data();
-      apply_gates(info);
-      fused_idx++;
-    }
-    else if (circuit.task_map[i] == SHM) {
-      qindex active_logical_qs = 0;
-      // TODO: convert active physical qubits to logical qubits
-      GateInfo info;
-      for (int i = 0; i < config.num_all_qubits; i++) {
-        info.permutation[i] = permutation[i];
-      }
-      info.num_batched_gates = circuit.shm_gates[shm_idx].size();
-      info.gtype = SHM;
-      info.kgates = circuit.shm_gates[shm_idx].data();
-      info.active_qubits_logical = circuit.active_physic_qs[shm_idx];
-      apply_gates(info);
-      shm_idx++;
-    }
-    else if (circuit.task_map[i] == SHUFFLE) {
-      // TODO: implement shuffle
-    }
-
-  }
+  int current_task = 0;
+  // GateInfo info{circuit.fused_gates_.data(), circuit.num_fused.data(), circuit.shm_gates_.data(), circuit.num_shm.data(), circuit.active_physic_qs.data()};
+  // GateInfo info{circuit.shm_gates_[0].second};
+  // apply_gates(info);
+  
+  // while (current_task < circuit.task_map.size()) {
+  //   int num_tasks = 0;
+  //   info.shm_idx = shm_idx;
+  //   info.fused_idx = fused_idx;
+  //   for (int i = current_task; i < circuit.task_map.size(); i++) {
+  //     if (circuit.task_map[i] == SHM) {
+  //       info.tasks[num_tasks++] = SimGateType::SHM;
+  //       shm_idx++;
+  //       current_task++;
+  //     }
+  //     if (circuit.task_map[i] == FUSED) {
+  //       info.tasks[num_tasks++] = SimGateType::FUSED;
+  //       fused_idx++;
+  //       current_task++;
+  //     }
+  //     if (circuit.task_map[i] == SHUFFLE || current_task == circuit.task_map.size()) {
+  //       // launch all the batched jobs
+  //       info.num_tasks = num_tasks;
+  //       for (int j = 0; j < config.num_all_qubits; j++) {
+  //         info.permutation[j] = permutation[j];
+  //       }
+  //       // FusedGate* gates = (FusedGate*) info.fgates[info.fused_idx];
+  //       // KernelGate* kgates = (KernelGate*) info.kgates[info.shm_idx];
+  //       // printf("%d Batched Tasks: %d fusion task 1: %d targets, targetqubit %d\n", info.num_tasks, info.num_fused[0], gates[0].num_target, gates[0].target[0]);
+  //       apply_gates(info);
+  //       // do the shuffle op if task == shuffle
+  //       // update current permutation
+  //       current_task++;
+  //       break;
+  //     }
+  //   }
+  // }
   
   return true;
 }
@@ -194,21 +202,24 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
       runtime->issue_copy_operation(ctx, launcher);
     }
     // Step 2: launch all gate kernels
-    // {
-    //   // GateInfo info;
-    //   // set_gate_info(gates, info);
-    //   printf("size: %d, num: %d, %p, %p\n",sizeof(GateInfo), info.num_batched_gates, info.kgates, info);
-    //   ArgumentMap argmap;
-    //   //FIXME: set_argmap
-    //   IndexLauncher launcher(
-    //       GATE_COMP_TASK_ID, parallel_is, TaskArgument(&info, sizeof(GateInfo)),
-    //       argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/);
-    //   launcher.add_region_requirement(
-    //       RegionRequirement(gpu_sv.second, 0 /*projection ID*/, READ_WRITE,
-    //                         EXCLUSIVE, gpu_sv.first));
-    //   launcher.add_field(0, FID_DATA);
-    //   runtime->execute_index_space(ctx, launcher);
-    // }
+    {
+      // FusedGate* gates = (FusedGate*) info.fgates[info.fused_idx];
+      // printf("ffff%d Batched Tasks: %d(%p) fusion task 1: %d targets, targetqubit %d\n", info.num_tasks, info.num_fused[0], info.num_fused, gates[0].num_target, gates[0].target[0]);
+      ArgumentMap argmap;
+      Domain domain = runtime->get_index_space_domain(ctx, parallel_is);
+      int idx = 0;
+      for (Domain::DomainPointIterator it(domain); it; it++) {
+        argmap.set_point(*it, TaskArgument(&handlers[idx++], sizeof(DSHandler)));
+      }
+      IndexLauncher launcher(
+          GATE_COMP_TASK_ID, parallel_is, TaskArgument(&info, sizeof(GateInfo)),
+          argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/, PreservedIDs::DataParallelism_GPU);
+      launcher.add_region_requirement(
+          RegionRequirement(gpu_sv.second, 0 /*projection ID*/, READ_WRITE,
+                            EXCLUSIVE, gpu_sv.first));
+      launcher.add_field(0, FID_DATA);
+      runtime->execute_index_space(ctx, launcher);
+    }
     // Step 3: move a state vector from GPU memory to DRAM
     // {
     //   IndexCopyLauncher launcher(parallel_is);

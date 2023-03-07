@@ -87,6 +87,30 @@ private:
                             ncclDataType_t datatype, int peer, void *recvbuff,
                             size_t recvcount, ncclComm_t comm,
                             cudaStream_t stream);
+  // from HyQuas
+  KernelGate getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID)
+  KernelGateType toU(KernelGateType type) {
+    switch (type) {
+      case KernelGateType::CCX:
+        return KernelGateType::X;
+      case KernelGateType::CNOT:
+        return KernelGateType::X;
+      case KernelGateType::CY:
+        return KernelGateType::Y;
+      case KernelGateType::CZ:
+        return KernelGateType::Z;
+      case KernelGateType::CRX:
+        return KernelGateType::RX;
+      case KernelGateType::CRY:
+        return KernelGateType::RY;
+      case KernelGateType::CU1:
+        return KernelGateType::U1;
+      case KernelGateType::CRZ:
+        return KernelGateType::RZ;
+      default:
+          assert(false);
+    }
+  }
 
 public:
   custatevecHandle_t handle_[MAX_DEVICES];
@@ -97,8 +121,12 @@ public:
   unsigned n_qubits, n_local, n_global;
   unsigned n_global_within_node = 0;
   int devices[MAX_DEVICES];
+  // this will be changed after each shuffle operation
   std::vector<unsigned> permutation;
+  std::vector<unsigned> pos;
   cudaStream_t s[MAX_DEVICES];
+  // physical id = myNcclRank; this will be changed when we encouter X gates targeting global qubit
+  std::map<unsigned, unsigned> device_logical_to_phy;
 
 private:
   // nccl, mpi related info

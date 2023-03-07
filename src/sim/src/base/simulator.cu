@@ -100,10 +100,10 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
   qindex relatedQubits = 0;
   for (int i = 0; i < n_local; i++) {
     if (logicQubitset >> i & 1) {
-      auto it = find(permutation.begin(), permutation.end(), i);
-      assert(it != permutation.end());
-      int idx = it - permutation.begin();
-      relatedQubits |= qindex(1) << idx;
+      // auto it = find(permutation.begin(), permutation.end(), i);
+      // assert(it != permutation.end());
+      // int idx = it - permutation.begin();
+      relatedQubits |= qindex(1) << pos[i];
     }
   }
   enumerate = relatedQubits;
@@ -120,17 +120,53 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
        i--, j = threadHot & (j - 1)) {
     hostThreadBias[i] = j;
   }
+
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaMemcpyAsync(threadBias[i], hostThreadBias,
                                       sizeof(hostThreadBias),
                                       cudaMemcpyHostToDevice, s[i]));
   }
 
+  // get the current logic_qubit <-> qubit_group_idx map:
+  // example 6-qubit circuit: 5 local [], 4 shm '', 1 global {}: ['3', '5', '4', 0, '1'] {2}
+  // map 3 -> 0 in shm
+  //     5 -> 1 in shm
+  // .   4 -> 2 in shm
+  //     0 -> 0 in local-shm
+  //     1 -> 3 in shm
+  //     2 -> 0 in global
+  std::vector<int, int> qubit_group_map;
+  int shm = 0;
+  int local = 0;
+  int global = 0; 
+  for (int i = 0; i < n_local; i++) {
+    if (relatedQubits & (qindex(1) << i)) {
+        qubit_group_map[permutation[i]] = shm++;
+    } else {
+        qubit_group_map[permutation[i]] = local++;
+    }
+  }
+  for (int i = n_local; i < n_qubits; i++)
+      qubit_group_map[permutation[i]] = global++;
+
+  // now we 
+  // 1. reset all the gates' target/control qubit to group qubit id
+  // 2. generate per-device schedule
+  KernelGate hostGates[n_devices * kernelgates.size()];
+    assert(gates.size() < MAX_GATE);
+    #pragma omp parallel for num_threads(n_devices)
+    for (int k = 0; k < n_devices; n++) {
+        int myncclrank = device_logical_to_phy.at[myRank * n_devices + k];
+        for (size_t i = 0; i < gates.size(); i++) {
+           hostGates[k * kernelgates.size() + i] = getGate(kernelgates[i], myncclrank, n_local, logicQubitset, qubit_group_map);
+        }
+    }
+
   qindex gridDim = (qindex(1) << n_local) >> SHARED_MEM_SIZE;
   for (int k = 0; k < n_devices; k++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[k]));
-    // currently all the GPU executes same set of gates; TODO: per-gpu schedule
-    copyGatesToSymbol(kernelgates.data(), kernelgates.size(), s[k], 0);
+    // now we have per-device gates
+    copyGatesToSymbol(hostGates, kernelgates.size(), s[k], k);
     ApplyGatesSHM(gridDim, (qComplex *)d_sv[k], threadBias[k], n_local,
                   kernelgates.size(), blockHot, enumerate, s[k], k);
   }
@@ -282,6 +318,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
       unsigned myncclrank = myRank * n_devices + i;
+      // TODO: map to physical device
       all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
               comms[i], s[i], mask, myncclrank);
     }
@@ -428,8 +465,10 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
     n_global_within_node++;
   subSvSize = (1 << n_local);
   int size = init_perm.size();
+  pos.resize(size);
   for (int i = 0; i < size; i++) {
     permutation.push_back(init_perm[i]);
+    pos[init_perm[i]] = i;
   }
 
   for (int i = 0; i < n_devices; i++) {
@@ -482,6 +521,12 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
                                myRank * n_devices + i));
   }
   NCCLCHECK(ncclGroupEnd());
+
+  // init logical <-> device map
+  for (int i = 0; i < nRanks * n_devices; i++) {
+    device_logical_to_phy[i] = i;
+  }
+
 
   // for profiling TODO: considering using openmp for this parts
   for (int i = 0; i < n_devices; ++i) {
@@ -581,6 +626,236 @@ ncclResult_t SimulatorCuQuantum<DT>::NCCLSendrecv(
     return b;
   }
   return ncclSuccess;
+}
+
+// below is from HyQuas
+
+#define IS_SHARE_QUBIT(logicIdx) ((relatedLogicQb >> logicIdx & 1) > 0)
+#define IS_LOCAL_QUBIT(logicIdx) (pos[logicIdx] < n_local)
+#define IS_HIGH_PART(part_id, logicIdx) ((part_id >> (pos[logicIdx] - n_local) & 1) > 0)
+
+template <typename DT>
+KernelGate SimulatorCuQuantum<DT>::getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID) const {
+    if (gate.controlQubit2 != -1) { // 2 control-qubit
+        // Assume no CC-Diagonal
+        int c1 = gate.controlQubit;
+        int c2 = gate.controlQubit2;
+        if (IS_LOCAL_QUBIT(c2) && !IS_LOCAL_QUBIT(c1)) {
+            int c = c1; c1 = c2; c2 = c;
+        }
+        if (IS_LOCAL_QUBIT(c1) && IS_LOCAL_QUBIT(c2)) { // CCU(c1, c2, t)
+            if (IS_SHARE_QUBIT(c2) && !IS_SHARE_QUBIT(c1)) {
+                int c = c1; c1 = c2; c2 = c;
+            }
+            return KernelGate(
+                gate.type,
+                toID.at(c2), 1 - IS_SHARE_QUBIT(c2),
+                toID.at(c1), 1 - IS_SHARE_QUBIT(c1),
+                toID.at(gate.targetQubit), 1 - IS_SHARE_QUBIT(gate.targetQubit),
+                gate.mat
+            );
+        } else if (IS_LOCAL_QUBIT(c1) && !IS_LOCAL_QUBIT(c2)) {
+            if (IS_HIGH_PART(part_id, c2)) { // CU(c1, t)
+              KernelGateType new_type;
+              switch (gate.type) {
+                case KernelGateType::CCX:
+                  new_type = KernelGateType::CNOT;
+                  break;
+                default:
+                    assert(false);
+              }   
+              return KernelGate(
+                  new_type,
+                  toID.at(c1), 1 - IS_SHARE_QUBIT(c1),
+                  toID.at(gate.targetQubit), 1 - IS_SHARE_QUBIT(gate.targetQubit),
+                  gate.mat
+              );
+            } else { // ID(t)
+                return KernelGate::ID();
+            }
+        } else { // !IS_LOCAL_QUBIT(c1) && !IS_LOCAL_QUBIT(c2)
+            if (IS_HIGH_PART(part_id, c1) && IS_HIGH_PART(part_id, c2)) { // U(t)
+                return KernelGate(
+                    toU(gate.type),
+                    toID.at(gate.targetQubit), 1 - IS_SHARE_QUBIT(gate.targetQubit),
+                    gate.mat
+                );
+            } else { // ID(t)
+                return KernelGate::ID();
+            }
+        }
+    } else if (gate.controlQubit != -1) {
+        int c = gate.controlQubit, t = gate.targetQubit;
+        if (IS_LOCAL_QUBIT(c) && IS_LOCAL_QUBIT(t)) { // CU(c, t)
+            return KernelGate(
+                gate.type,
+                toID.at(c), 1 - IS_SHARE_QUBIT(c),
+                toID.at(t), 1 - IS_SHARE_QUBIT(t),
+                gate.mat
+            );
+        } else if (IS_LOCAL_QUBIT(c) && !IS_LOCAL_QUBIT(t)) { // U(c)
+            switch (gate.type) {
+                case KernelGateType::CZ: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        return KernelGate(
+                            KernelGateType::Z,
+                            toID.at(c), 1 - IS_SHARE_QUBIT(c),
+                            gate.mat
+                        );
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case KernelGateType::CU1: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        return KernelGate(
+                            KernelGateType::U1,
+                            toID.at(c), 1 - IS_SHARE_QUBIT(c),
+                            gate.mat
+                        );
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case GateType::CRZ: { // GOC(c)
+                    qComplex mat[2][2] = {make_qComplex(1), make_qComplex(0), make_qComplex(0), IS_HIGH_PART(part_id, t) ? gate.mat[1][1]: gate.mat[0][0]};
+                    return KernelGate(
+                        KernelGateType::GOC,
+                        toID.at(c), 1 - IS_SHARE_QUBIT(c),
+                        mat
+                    );
+                }
+                default: {
+                    assert(false);
+                }
+            }
+        } else if (!IS_LOCAL_QUBIT(c) && IS_LOCAL_QUBIT(t)) {
+            if (IS_HIGH_PART(part_id, c)) { // U(t)
+                return KernelGate(
+                    toU(gate.type),
+                    toID.at(t), 1 - IS_SHARE_QUBIT(t),
+                    gate.mat
+                );
+            } else {
+                return KernelGate::ID();
+            }
+        } else { // !IS_LOCAL_QUBIT(c) && !IS_LOCAL_QUBIT(t)
+            assert(gate.type == KernelGateType::CZ || gate.type == KernelGateType::CU1 || gate.type == KernelGateType::CRZ);
+            if (IS_HIGH_PART(part_id, c)) {
+                switch (gate.type) {
+                    case KernelGateType::CZ: {
+                        if (IS_HIGH_PART(part_id, t)) {
+                            qComplex mat[2][2] = {make_qComplex(-1), make_qComplex(0), make_qComplex(0), make_qComplex(-1)};
+                            return KernelGate(
+                                KernelGateType::GZZ,
+                                0, 0,
+                                mat
+                            );
+                        } else {
+                            return KernelGate::ID();
+                        }
+                    }
+                    case KernelGateType::CU1: {
+                        if (IS_HIGH_PART(part_id, t)) {
+                            qComplex mat[2][2] = {gate.mat[1][1], make_qComplex(0), make_qComplex(0), gate.mat[1][1]};
+                            return KernelGate(
+                                KernelGateType::GCC,
+                                0, 0,
+                                mat
+                            );
+                        }
+                    }
+                    case KernelGateType::CRZ: {
+                        qComplex val = IS_HIGH_PART(part_id, t) ? gate.mat[1][1]: gate.mat[0][0];
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(
+                            KernelGateType::GCC,
+                            0, 0,
+                            mat
+                        );
+                    }
+                    default: {
+                        assert(false);
+                    }
+                }
+            } else {
+                return KernelGate::ID();
+            }
+        }
+    } else {
+        int t = gate.targetQubit;
+        if (!IS_LOCAL_QUBIT(t)) { // GCC(t)
+            switch (gate.type) {
+                case KernelGateType::U1: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex val = gate.mat[1][1];
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(KernelGateType::GCC, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case KernelGateType::Z: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex mat[2][2] = {make_qComplex(-1), make_qComplex(0), make_qComplex(0), make_qComplex(-1)};
+                        return KernelGate(KernelGateType::GZZ, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case KernelGateType::S: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex val = make_qComplex(0, 1);
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(KernelGateType::GII, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case KernelGateType::SDG: {
+                    // FIXME
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex val = make_qComplex(0, -1);
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(KernelGateType::GCC, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case GateType::T: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex val = gate.mat[1][1];
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(KernelGateType::GCC, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case GateType::TDG: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        qComplex val = gate.mat[1][1];
+                        qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                        return KernelGate(KernelGateType::GCC, 0, 0, mat);
+                    } else {
+                        return KernelGate::ID();
+                    }
+                }
+                case GateType::RZ: {
+                    qComplex val = IS_HIGH_PART(part_id, t) ? gate.mat[1][1]: gate.mat[0][0];
+                    qComplex mat[2][2] = {val, make_qComplex(0), make_qComplex(0), val};
+                    return KernelGate(KernelGateType::GCC, 0, 0, mat);
+                }
+                case GateType::ID: {
+                    return KernelGate::ID();
+                }
+                default: {
+                    assert(false);
+                }
+            }
+        } else { // IS_LOCAL_QUBIT(t) -> U(t)
+            return KernelGate(gate.type, toID.at(t), 1 - IS_SHARE_QUBIT(t), gate.mat);
+        }
+    }
 }
 
 template class SimulatorCuQuantum<double>;

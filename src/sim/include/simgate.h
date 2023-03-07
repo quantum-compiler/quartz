@@ -25,6 +25,9 @@ struct Gate {
   std::vector<int> control;
   std::vector<int> control_value;
 
+  qindex target_logical;
+  qindex control_logical;
+
   // if using legion, should use LogicalRegion (similar to weights in FlexFlow),
   // currently using std::vector<DT> matrix is a flattened 2D array with size
   // 2^(num_target)x2^(num_target)

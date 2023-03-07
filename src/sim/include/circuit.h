@@ -42,9 +42,10 @@ private:
   void MatShuffle(M &res_mat, unsigned n_qubit, const std::vector<int> &perm);
 
   // called inside compile
-  std::vector<std::complex<DT>> FuseGates(const quartz::CircuitSeq &seq,
-                                          const std::vector<int> &qubits,
+  std::vector<std::complex<DT>> FuseGates(const quartz::Kernel &kernel,
                                           quartz::Context *ctx);
+  
+  KernelGateType toKernel(quartz::GateType type);
 
 public:
   unsigned num_qubits;
@@ -57,7 +58,7 @@ public:
   // batched gates
   std::vector<std::vector<sim::Gate<qreal>>> fused_gates;
   std::vector<std::vector<KernelGate>> shm_gates;
-  std::vector<qindex> active_physic_qs;
+  std::vector<qindex> active_logical_qs;
   std::vector<SimGateType> task_map;
 };
 } // namespace qcircuit

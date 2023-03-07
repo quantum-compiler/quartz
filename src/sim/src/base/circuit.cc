@@ -197,8 +197,13 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   // fprintf(fout, " %d", result);
 
   // 2. DP, fuse gates and add shuffle gates
-  int idx = 0;
-  auto schedules = get_schedules(*seq, local_qubits, ctx);
+  quartz::KernelCost kernel_cost(
+      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
+      /*shared_memory_init_cost=*/10,
+      /*shared_memory_gate_cost=*/[](quartz::GateType) { return 0.8; },
+      /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
+  auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx);
+  
   for (auto &schedule : schedules) {
     // add shuffle gate
     std::vector<int> target;
@@ -217,38 +222,90 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
     gates.push_back(gate);
 
-    schedule.compute_kernel_schedule(
-        {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66});
-    std::cout << "cost = " << schedule.cost_ << std::endl;
+    // schedule.compute_kernel_schedule(
+    //     {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66});
+    // std::cout << "cost = " << schedule.cost_ << std::endl;
     // schedule.print_kernel_schedule();
-    int num_kernels = schedule.kernels.size();
-    for (int i = 0; i < num_kernels; i++) {
-      SimGateType g_type = FUSED;
-      unsigned n_target = schedule.kernel_qubits[i].size();
-      unsigned n_control = 0;
-      std::vector<int> target;
-      std::vector<int> control;
-      // TODO: use template for matrix type, to be compatible with Legion-based
-      // version std::vector<std::complex<DT>> mat;
-      std::cout << "Fusing Kernel " << i << ": qubits [";
-      for (int j = 0; j < (int)schedule.kernel_qubits[i].size(); j++) {
-        std::cout << schedule.kernel_qubits[i][j];
-        target.push_back(schedule.kernel_qubits[i][j]);
-        if (j != (int)schedule.kernel_qubits[i].size() - 1) {
-          std::cout << ", ";
+    for (auto &kernel : schedule.kernels) {
+      if (kernel.type == quartz::KernelType::fusion) {
+        SimGateType g_type = FUSED;
+        unsigned n_target = schedule.kernel[i].qubits.size();
+        unsigned n_control = 0;
+        std::vector<int> target;
+        std::vector<int> control;
+        std::cout << "Fusing Kernel: qubits [";
+        for (int j = 0; j < (int)kernel.qubits.size(); j++) {
+          std::cout << kernel.qubits[j];
+          target.push_back(kernel.qubits[j]);
+          if (j != (int)schedule.kernel_qubits[i].size() - 1) {
+            std::cout << ", ";
+          }
         }
+        std::cout << "], gates ";
+        std::cout << schedule.kernels[i].to_string() << std::endl;
+        // mat = FuseGates<DT>(kernels);
+        auto mat = FuseGates(kernel, ctx);
+
+        // add fused gates kernels
+        Gate<DT> gate{g_type, n_target, n_control, target, control, {}, mat};
+        gates.push_back(gate);
+        task_map.push_back(SimGateType::FUSED);
       }
-      std::cout << "], gates ";
-      std::cout << schedule.kernels[i].to_string() << std::endl;
-      // mat = FuseGates<DT>(kernels);
-      auto mat = FuseGates(schedule.kernels[i], schedule.kernel_qubits[i], ctx);
+      else if (kernel.type == quartz::KernelType::shared_memory) {
+        SimGateType g_type = SHM;
+        qindex active_qubits_logical = 0;
+        for (int i = 0; i < SHARED_MEM_SIZE; i++) {
+          active_qubits_logical |= qindex(1) << kernel.qubits[i];
+        }
+        active_logical_qs.push_back(active_qubits_logical);
 
-      // add fused gates kernels
-      Gate<DT> gate{g_type, n_target, n_control, target, control, {}, mat};
-      gates.push_back(gate);
+        std::vector<KernelGate> kernelgates;
+        for(auto &gate : kernel.gates.gates) {
+          // get logical target qubit
+          std::vector<int> qubit_indices;
+          std::vector<ParamType> params;
+          for (const auto &input_wire : gate->input_wires) {
+            if (input_wire->is_qubit()) {
+              qubit_indices.push_back(input_wire->index);
+              printf("SHM Kernel [%d]\n", input_wire->index);
+            } else {
+              params.push_back(ctx->input_parameters[input_wire->index]);
+            }
+          }
+          auto *m = gate->gate->get_matrix(params);
+          std::vector<std::complex<double>> mat = m->flatten();
+          //other way from quartz::GateType to KernelGateType?
+          // target and control will be converted to related qubit when executing
+          if (gate->gate->get_num_control_qubits() == 2) {
+            // don't want to hardcode..
+            qComplex mat_[2][2] = {mat[3*8+3], mat[3*8+7], mat[7*8+3, mat[7*8+7]]};
+            qindex mask = active_qubits_logical;
+            char isGlobalControl1 = (mask >> qubit_indices[0]) & 1;
+            char isGlobalControl2 = (mask >> qubit_indices[1]) & 1;
+            char isGlobalTarget = (mask >> qubit_indices[2]) & 1;
+            KernelGate kg(toKernel(gate->gate->tp), qubit_indices[1], isGlobalControl2, qubit_indices[0], isGlobalControl1, qubit_indices[2], isGlobalTarget, mat_);
+            kernelgates.push_back(kg); 
+          }
+          else if (gate->gate->get_num_control_qubits() == 1) {
+            // compress mat
+            qComplex mat_[2][2] = {mat[1*4+1], mat[1*4+3], mat[3*4+1, mat[3*4+3]]};
+            qindex mask = active_qubits_logical;
+            char isGlobalControl1 = (mask >> qubit_indices[0]) & 1;
+            char isGlobalTarget = (mask >> qubit_indices[1]) & 1;
+            KernelGate kg(toKernel(gate->gate->tp), qubit_indices[0], isGlobalControl1, qubit_indices[1], isGlobalTarget, mat_);
+            kernelgates.push_back(kg); 
+          }
+          else if (gate->gate->get_num_control_qubits() == 0) {
+            qindex mask = active_qubits_logical;
+            char isGlobalTarget = (mask >> qubit_indices[0]) & 1;
+            KernelGate kg(toKernel(gate->gate->tp), qubit_indices[0], isGlobalTarget, mat);
+            kernelgates.push_back(kg); 
+          }            
+        }
+      
+        task_map.push_back(SimGateType::SHM);
+      }
     }
-
-    idx++;
   }
 
   printf("Compilation Done! Start simulating...\n");
@@ -271,34 +328,25 @@ void qcircuit::Circuit<DT>::simulate(int ndevices, bool use_mpi) {
 
   printf("Init State Vectors!\n");
 
-  printf("Test SHM\n");
-  std::vector<KernelGate> kernelgates;
-  qComplex mat[2][2] = {make_qComplex(0, 0), make_qComplex(0, -1),
-                        make_qComplex(0, 1), make_qComplex(0, 0)};
-  for (int i = 0; i < 50; i++) {
-    KernelGate kg(KernelGateType::Y, 5, 0, mat);
-    kernelgates.push_back(kg);
-  }
-  // just for test
-  qindex active_qubits_logical = 0;
-  for (int i = 0; i < SHARED_MEM_SIZE; i++) {
-    active_qubits_logical |= qindex(1) << i;
-  }
-  simulator.ApplyKernelGates(kernelgates, active_qubits_logical);
-  simulator.Destroy();
-  printf("Destroyed the simulator\n");
-  return;
-
-  int index = 0;
-  while (index < gates.size()) {
-    Gate<DT> gate = gates[index++];
-    if (gate.gtype == SHUFFLE) {
-      simulator.ApplyShuffle(gate);
-    } else {
-      for (int i = 0; i < ndevices; i++)
-        simulator.ApplyGate(gate, i);
+  int normal_idx = 0;
+  int shm_idx = 0;
+  for (auto &task : task_map) {
+    if (task == SHUFFLE) {
+      simulator.ApplyShuffle(gates[normal_idx]);
+      normal_idx++;
+    }
+    else if (task == FUSED) {
+      for (int i = 0; i < ndevices; i++){
+        simulator.ApplyGate(gates[normal_idx], i);
+        normal_idx++;
+      }
+    }
+    else if (task == SHM) {
+      simulator.ApplyKernelGates(shm_gates[shm_idx], active_logical_qs[shm_idx]);
+      shm_idx++;
     }
   }
+  
   printf("Finish Simulating!\n");
   simulator.Destroy();
   printf("Destroyed the simulator\n");
@@ -415,15 +463,16 @@ bool qcircuit::Circuit<DT>::parse_gate(std::stringstream &ss,
 // an naive impl for fusing gates: can be more efficient
 template <typename DT>
 std::vector<std::complex<DT>>
-qcircuit::Circuit<DT>::FuseGates(const quartz::CircuitSeq &seq,
-                                 const std::vector<int> &kernel_qubits,
+qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
                                  quartz::Context *ctx) {
+  // TODO: add support for gates on global qubits (CZ,...), 
+  // need to generate matrices per device
+
   // expand all gates to 2^n_target * 2^n_target matrix: identity X mat =>
   // matrix shuffle
-  std::vector<int> qubits = kernel_qubits;
-  unsigned ksize = unsigned(1) << qubits.size();
+  std::vector<int> qubits = kernel.qubits;
+  unsigned ksize = unsigned(1) << kernel.qubits.size();
   unsigned vec_size = ksize * ksize;
-  // std::vector<std::complex<DT>> res_mat(vec_size, std::complex<DT> (1, 0));
   std::vector<std::complex<DT>> res_mat;
   res_mat.resize(vec_size);
   for (unsigned i = 0; i < ksize; ++i) {
@@ -434,11 +483,11 @@ qcircuit::Circuit<DT>::FuseGates(const quartz::CircuitSeq &seq,
   // reorder qubits to increasing order
   std::sort(qubits.begin(), qubits.end());
 
-  for (int i = 0; i < seq.gates.size(); i++) {
+  for (int i = 0; i < kernel.gates.gates.size(); i++) {
     printf("Gate %d: [", i);
     std::vector<int> qubit_indices;
     std::vector<ParamType> params;
-    for (const auto &input_wire : seq.gates[i]->input_wires) {
+    for (const auto &input_wire : kernel.gates.gates[i]->input_wires) {
       if (input_wire->is_qubit()) {
         qubit_indices.push_back(input_wire->index);
         printf("%d, ", input_wire->index);
@@ -454,7 +503,7 @@ qcircuit::Circuit<DT>::FuseGates(const quartz::CircuitSeq &seq,
     std::vector<int> ordered_qubit = qubit_indices;
     std::sort(ordered_qubit.begin(), ordered_qubit.end());
     unsigned mask = 0;
-    // get qubit mask for the gate to be fused
+    // get qubit mask and qubit perm for the gate to be fused
     for (int t = 0; t < qubit_indices.size(); t++) {
       int it = std::find(qubits.begin(), qubits.end(), qubit_indices[t]) -
                qubits.begin();
@@ -473,10 +522,11 @@ qcircuit::Circuit<DT>::FuseGates(const quartz::CircuitSeq &seq,
 
     printf("MatShuffle and MatMul\n");
 
-    auto *m = seq.gates[i]->gate->get_matrix(params);
+    auto *m = kernel.gates.gates[i]->gate->get_matrix(params);
     std::vector<std::complex<double>> temp_d = m->flatten();
     std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
-    // matrix shuffle: to increasing order
+    
+    // matrix shuffle: make sure the logical target qubits are in increasing order
     printf("matrix to be fused:\n");
     for (int i = 0; i < temp.size(); i++) {
       printf("(%f, %f)", temp[i].real(), temp[i].imag());
@@ -496,18 +546,13 @@ void qcircuit::Circuit<DT>::MatMul(unsigned mask, unsigned n_fused, M &res_mat,
   printf("Matrix Multiplication\n");
   unsigned n1 = unsigned{1} << m_size;
   unsigned n = unsigned{1} << n_fused;
-  // std::vector<std::complex<DT>> res_mat;
-  // res_mat.resize(n*n);
-  // for (unsigned i = 0; i < n; ++i) {
-  //   res_mat[(n * i + i)] = std::complex<DT> (1, 0);
-  // }
   std::vector<std::complex<DT>> temp_mat = res_mat;
 
   for (unsigned i = 0; i < n; ++i) {
     unsigned i_ = i;
     unsigned row_m1 = 0;
     unsigned pos = 0;
-    for (unsigned q = 0; q < n; ++q) {
+    for (unsigned q = 0; q < n_fused; ++q) {
       if ((mask >> q) & 1) {
         row_m1 |= ((i_ >> q) & 1) << pos;
         ++pos;
@@ -521,7 +566,7 @@ void qcircuit::Circuit<DT>::MatMul(unsigned mask, unsigned n_fused, M &res_mat,
         unsigned row_res = 0;
         unsigned k_ = k;
         pos = 0;
-        for (unsigned q = 0; q < n; ++q) {
+        for (unsigned q = 0; q < n_fused; ++q) {
           if ((mask >> q) & 1) {
             row_res |= ((k_ >> pos) & 1) << q;
             ++pos;
@@ -577,6 +622,50 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
   }
   printf("\n");
 }
+
+template <typename DT>
+KernelGateType qcircuit::Circuit<DT>::toKernel(quartz::GateType type) {
+    switch (type) {
+      case quartz::GateType::ccx:
+        return KernelGateType::CCX;
+      case quartz::GateType::cx:
+        return KernelGateType::CNOT;
+      case quartz::GateType::cz:
+        return KernelGateType::CZ;
+      case quartz::GateType::cp:
+        return KernelGateType::CU1;
+      case quartz::GateType::u1:
+        return KernelGateType::U1;
+      case quartz::GateType::u2:
+        return KernelGateType::U2;
+      case quartz::GateType::u3:
+        return KernelGateType::U3;
+      case quartz::GateType::h:
+        return KernelGateType::H;
+      case quartz::GateType::x:
+        return KernelGateType::X;
+      case quartz::GateType::y:
+        return KernelGateType::Y;
+      case quartz::GateType::z:
+        return KernelGateType::Z;
+      case quartz::GateType::s:
+        return KernelGateType::S;
+      case quartz::GateType::sdg:
+        return KernelGateType::SDG;
+      case quartz::GateType::rx:
+        return KernelGateType::RX;
+      case quartz::GateType::ry:
+        return KernelGateType::RY;
+      case quartz::GateType::rz:
+        return KernelGateType::RZ;
+      case quartz::GateType::t:
+        return KernelGateType::T;
+      case quartz::GateType::tdg:
+        return KernelGateType::TDG;
+      default:
+          assert(false);
+    }
+  }
 
 template class qcircuit::Circuit<double>;
 template class qcircuit::Circuit<float>;

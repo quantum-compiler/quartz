@@ -207,7 +207,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     else {
       // for cuQuantum-based comm (~global_mask < n_devices)
       for (int j = j1; j < num_swaps; j++) {
-          if(!(global_mask >> j) & 1) {
+          if(!(global_mask >> j & 1)) {
             int2 swap;
             swap.x = new_global_pos[i];
             swap.y = n_local + j;
@@ -223,8 +223,8 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       }
       else {
         nLocalSwaps++;
-        for (int j = 0; j < num_swaps; j++) {
-          if(!(local_mask >> j) & 1) {
+        for (int j = num_swaps - 1; j >= 0; j--) {
+          if(!(local_mask >> j & 1)) {
             int2 swap;
             swap.x = new_global_pos[i];
             swap.y = n_local - num_swaps + j;

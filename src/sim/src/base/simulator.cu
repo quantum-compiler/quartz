@@ -30,19 +30,19 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   // TODO: check if targets should be ordered
   printf("Targets: [");
   for (int i = 0; i < gate.target.size(); i++) {
-    auto it = find(permutation.begin(), permutation.end(), gate.target[i]);
-    assert(it != permutation.end());
-    int idx = it - permutation.begin();
-    targets.push_back(idx);
-    printf("(%d, %d) ", gate.target[i], idx);
+    // auto it = find(permutation.begin(), permutation.end(), gate.target[i]);
+    // assert(it != permutation.end());
+    // int idx = it - permutation.begin();
+    targets.push_back(pos[gate.target[i]]);
+    printf("(%d, %d) ", gate.target[i], pos[gate.target[i]]);
   }
   printf("]\n");
 
   for (int i = 0; i < gate.control.size(); i++) {
-    auto it = find(permutation.begin(), permutation.end(), gate.control[i]);
-    assert(it != permutation.end());
-    int idx = it - permutation.begin();
-    controls.push_back(idx);
+    // auto it = find(permutation.begin(), permutation.end(), gate.control[i]);
+    // assert(it != permutation.end());
+    // int idx = it - permutation.begin();
+    controls.push_back(pos[gate.control[i]]);
   }
 
   // check the size of external workspace
@@ -156,7 +156,7 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
     assert(gates.size() < MAX_GATE);
     #pragma omp parallel for num_threads(n_devices)
     for (int k = 0; k < n_devices; n++) {
-        int myncclrank = device_logical_to_phy.at[myRank * n_devices + k];
+        int myncclrank = device_logical_to_phy.at(myRank * n_devices + k);
         for (size_t i = 0; i < gates.size(); i++) {
            hostGates[k * kernelgates.size() + i] = getGate(kernelgates[i], myncclrank, n_local, logicQubitset, qubit_group_map);
         }
@@ -179,8 +179,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   std::vector<int2> GlobalIndexBitSwaps;
   std::vector<int2> LocalIndexBitSwaps;
 
-  // currently only global
-  int nGlobalSwaps = 0;
+  int nGlobalSwaps = n_global;
   int nLocalSwaps = 0;
   int maxGlobal = 0;
   printf("Before Perm: [");
@@ -189,38 +188,54 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   }
   printf("]\n");
 
-  std::vector<int> from_idx;
-  std::vector<int> to;
+  std::vector<int> new_global_pos;
+  int num_swaps = 0;
   for (int i = 0; i < n_global; i++) {
-    auto it = find(gate.target.begin() + n_local, gate.target.end(),
-                   permutation[n_local + i]);
-    if (it == gate.target.end()) {
-      from_idx.push_back(n_local + i);
+    new_global_pos.push_back(pos[gate.target[i + n_local]]);
+    if(pos[gate.target[i + n_local]] < n_local) num_swaps++;
+  }
+  std::sort(new_global_pos.begin(), new_global_pos.end());
+  
+  unsigned local_mask = 0;
+  unsigned global_mask = 0;
+  int j1 = 0;
+  for (int i = n_global - 1; i >= 0; i--) {
+    if(new_global_pos[i] >= n_local) {
+      global_mask |= 1 << (new_global_pos[i] - n_local);
+      nGlobalSwaps--;
     }
-    auto it2 = find(permutation.begin() + n_local, permutation.end(),
-                    gate.target[n_local + i]);
-    if (it2 == permutation.end()) {
-      to.push_back(gate.target[n_local + i]);
+    else {
+      // for cuQuantum-based comm (~global_mask < n_devices)
+      for (int j = j1; j < num_swaps; j++) {
+          if(!(global_mask >> j) & 1) {
+            int2 swap;
+            swap.x = new_global_pos[i];
+            swap.y = n_local + j;
+            GlobalIndexBitSwaps.push_back(swap);
+            j1 = j + 1;
+            break;
+          }
+      }
+      
+      // for nccl-based comm, local transpose
+      if(new_global_pos[i] >= (n_local - num_swaps)) {
+        local_mask |= 1 << (new_global_pos[i] - n_local + num_swaps);
+      }
+      else {
+        nLocalSwaps++;
+        for (int j = 0; j < num_swaps; j++) {
+          if(!(local_mask >> j) & 1) {
+            int2 swap;
+            swap.x = new_global_pos[i];
+            swap.y = n_local - num_swaps + j;
+            LocalIndexBitSwaps.push_back(swap);
+            local_mask |= 1 << j;
+            break;
+          }
+        }
+      }
     }
   }
-  assert(from_idx.size() == to.size());
-
-  for (int i = 0; i < to.size(); i++) {
-    int2 swap;
-    auto it = find(permutation.begin(), permutation.end(), to[i]);
-    assert(it != permutation.end());
-    int idx = it - permutation.begin();
-    swap.x = idx;
-    swap.y = from_idx[i];
-    GlobalIndexBitSwaps.push_back(swap);
-    nGlobalSwaps++;
-    maxGlobal = maxGlobal > from_idx[i] ? maxGlobal : from_idx[i];
-    // update perm
-    permutation[idx] = permutation[swap.y];
-    permutation[swap.y] = to[i];
-    printf("(%d, %d)\n", idx, swap.y);
-  }
-  maxGlobal -= n_local;
 
   printf("Current Perm: [");
   for (int i = 0; i < n_local + n_global; i++) {
@@ -247,39 +262,34 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   int maskOrdering[] = {};
 
   // global bit swap within a node
-  if ((1 << (maxGlobal + 1)) <= n_devices) {
+  if ((~global_mask) + 1 <= n_devices) {
     printf("Using cuQuantum for swaps within a node %d\n",
            n_global_within_node);
+    // need to perm d_sv according to device_logical_to_phy map
+    void** d_sv_;
+    for (int i = 0; i < n_devices; i++) {
+      unsigned myncclrank = device_logical_to_phy.at(myRank * n_devices + i);
+      int i_new = myncclrank & (1 << (n_global_within_node - 1));
+      d_sv_[i] = d_sv[i_new]; 
+    }
     HANDLE_ERROR(custatevecMultiDeviceSwapIndexBits(
-        handle_, n_devices, (void **)d_sv, data_type, n_global_within_node,
+        handle_, n_devices, (void **)d_sv_, data_type, n_global_within_node,
         n_local, GlobalIndexBitSwaps.data(), nGlobalSwaps, maskBitString,
         maskOrdering, maskLen, deviceNetworkType));
+    // update perm
+    for (int i = 0; i < nGlobalSwaps; i++) {
+      std::swap(pos[permutation[GlobalIndexBitSwaps[i].x]], pos[permutation[GlobalIndexBitSwaps[i].y]]);
+      std::swap(permutation[GlobalIndexBitSwaps[i].x], permutation[GlobalIndexBitSwaps[i].y]);
+    }
+    //print layout
+    printf("After global Perm: [");
+    for (int i = 0; i < n_local + n_global; i++) {
+      printf("%d,", permutation[i]);
+    }
+    printf("]\n");
   } else { // else transpose + all2all + update curr perm
     printf("Using NCCL for cross-node shuffle\n");
-    // get curr highest nGlobalSwaps qubits
-    std::vector<int> high_bits;
-    for (int i = 0; i < nGlobalSwaps; i++) {
-      high_bits.push_back(n_local - nGlobalSwaps + i);
-    }
-    for (int i = 0; i < nGlobalSwaps; i++) {
-      auto it =
-          find(high_bits.begin(), high_bits.end(), GlobalIndexBitSwaps[i].x);
-      if (it != high_bits.end()) {
-        high_bits.erase(it);
-        continue;
-      }
-      int2 swap;
-      swap.x = GlobalIndexBitSwaps[i].x;
-      swap.y = high_bits.back();
-      high_bits.pop_back();
-      LocalIndexBitSwaps.push_back(swap);
-      nLocalSwaps++;
-      // update perm
-      unsigned temp = permutation[swap.x];
-      permutation[swap.x] = permutation[swap.y];
-      permutation[swap.y] = temp;
-      printf("(%d, %d)\n", swap.x, swap.y);
-    }
+    
     // local bit swap
     for (int i = 0; i < n_devices; i++) {
       if (nLocalSwaps == 0)
@@ -289,18 +299,39 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
           handle_[i], d_sv[i], data_type, n_local, LocalIndexBitSwaps.data(),
           nLocalSwaps, maskBitString, maskOrdering, maskLen));
     }
+    // update perm/pos
+    for (int i = 0; i < nLocalSwaps; i++) {
+      std::swap(pos[permutation[LocalIndexBitSwaps[i].x]], pos[permutation[LocalIndexBitSwaps[i].y]]);
+      std::swap(permutation[LocalIndexBitSwaps[i].x], permutation[LocalIndexBitSwaps[i].y]);
+    }
+    //print layout
+    printf("After local Perm: [");
+    for (int i = 0; i < n_local + n_global; i++) {
+      printf("%d,", permutation[i]);
+    }
+    printf("]\n");
 
-    int sendsize = subSvSize / (1 << GlobalIndexBitSwaps.size());
-    printf("MyRank %d, sendsize %d\n", myRank, sendsize);
+    // update perm/pos after global
+    int idx = 0;
+    for (int i = 0; i < n_global; i++) {
+      if((~global_mask) >> i & 1) {
+        std::swap(pos[permutation[idx+n_local-num_swaps]], pos[permutation[i+n_local]]);
+        std::swap(permutation[idx+n_local-num_swaps], permutation[i+n_local]);
+        idx++;
+      }     
+    }
+    //print layout
+    printf("After global Perm: [");
+    for (int i = 0; i < n_local + n_global; i++) {
+      printf("%d,", permutation[i]);
+    }
+    printf("]\n");
+
+    int sendsize = subSvSize / (1 << nGlobalSwaps);
     for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
       HANDLE_CUDA_ERROR(
           cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
-    }
-
-    unsigned mask = 0;
-    for (int i = 0; i < nGlobalSwaps; i++) {
-      mask |= (1 << (GlobalIndexBitSwaps[i].y - n_local));
     }
 
     cudaEvent_t t_start[MAX_DEVICES], t_end[MAX_DEVICES];
@@ -317,10 +348,9 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
 
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
-      unsigned myncclrank = myRank * n_devices + i;
-      // TODO: map to physical device
+      unsigned myncclrank = device_logical_to_phy.at(myRank * n_devices + i);
       all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
-              comms[i], s[i], mask, myncclrank);
+              comms[i], s[i], ~global_mask, myncclrank);
     }
     NCCLCHECK(ncclGroupEnd());
 
@@ -333,7 +363,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       HANDLE_CUDA_ERROR(cudaEventElapsedTime(&elapsed, t_start[i], t_end[i]));
       cudaEventDestroy(t_start[i]);
       cudaEventDestroy(t_end[i]);
-      printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", myRank * n_devices + i,
+      printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", device_logical_to_phy.at(myRank * n_devices + i),
              elapsed);
     }
 
@@ -341,32 +371,6 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
     }
   }
-
-  // all2all
-  // int sendsize = subSvSize / (1 << GlobalIndexBitSwaps.size());
-  // printf("MyRank %d, sendsize %d\n", myRank, sendsize);
-  // for (int i = 0; i < n_devices; i++) {
-  //   HANDLE_CUDA_ERROR(cudaSetDevice(i));
-  //   HANDLE_CUDA_ERROR(
-  //       cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
-  // }
-
-  // unsigned mask = 0;
-
-  // NCCLCHECK(ncclGroupStart());
-  // for(int i = 0; i < n_devices; ++i){
-  //   unsigned myncclrank =  myRank * n_devices + i;
-  //   all2all(d_sv[i], sendsize, ncclFloat, recv_buf[i], sendsize, ncclFloat,
-  //   comms[i], s[i], mask, myncclrank);
-  // }
-  // NCCLCHECK(ncclGroupEnd());
-
-  // for (int i = 0; i < n_devices; i++)
-  //   HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
-
-  // for (int i = 0; i < n_devices; i++) {
-  //    HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
-  // }
 
   return true;
 }

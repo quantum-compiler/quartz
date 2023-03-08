@@ -29,3 +29,4 @@ PER_GATE(input_qubit, InputQubitGate)
 PER_GATE(input_param, InputParamGate)
 // quartz physical: MQT benchmark
 PER_GATE(sx, SXGate)
+PER_GATE(sxdg, SXDGGate)

@@ -30,3 +30,4 @@
 #include "input_qubit.h"
 #include "input_param.h"
 #include "sx.h"
+#include "sxdg.h"

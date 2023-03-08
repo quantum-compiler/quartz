@@ -64,7 +64,7 @@ namespace quartz {
         const std::string name_list[] = {"h", "x", "y", "rx", "ry", "rz", "cx", "ccx", "add",
                                          "neg", "z", "s", "sdg", "t", "tdg", "ch", "swap", "p",
                                          "pdg", "rx1", "rx3", "u1", "u2", "u3", "ccz", "cz",
-                                         "input_qubit", "input_param", "sx"
+                                         "input_qubit", "input_param", "sx", "sxdg"
         };
         return stream << name_list[int(t)];
     }

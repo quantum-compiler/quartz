@@ -26,7 +26,7 @@ namespace quartz {
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
                                                          GateType::tdg, GateType::input_qubit, GateType::s,
                                                          GateType::sdg, GateType::x, GateType::z, GateType::rz,
-                                                         GateType::sx}));
+                                                         GateType::sx, GateType::sxdg}));
             graph = Graph::from_qasm_file(&(*context), qasm_file_path);
             device = GetDevice(backend_type);
 

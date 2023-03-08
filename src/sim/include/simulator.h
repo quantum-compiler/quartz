@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <vector>
+#include <map>
 
 #include "simgate.h"
 
@@ -88,29 +89,8 @@ private:
                             size_t recvcount, ncclComm_t comm,
                             cudaStream_t stream);
   // from HyQuas
-  KernelGate getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID)
-  KernelGateType toU(KernelGateType type) {
-    switch (type) {
-      case KernelGateType::CCX:
-        return KernelGateType::X;
-      case KernelGateType::CNOT:
-        return KernelGateType::X;
-      case KernelGateType::CY:
-        return KernelGateType::Y;
-      case KernelGateType::CZ:
-        return KernelGateType::Z;
-      case KernelGateType::CRX:
-        return KernelGateType::RX;
-      case KernelGateType::CRY:
-        return KernelGateType::RY;
-      case KernelGateType::CU1:
-        return KernelGateType::U1;
-      case KernelGateType::CRZ:
-        return KernelGateType::RZ;
-      default:
-          assert(false);
-    }
-  }
+  KernelGate getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID) const;
+  static KernelGateType toU(KernelGateType type);
 
 public:
   custatevecHandle_t handle_[MAX_DEVICES];

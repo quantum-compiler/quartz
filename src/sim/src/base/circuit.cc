@@ -202,14 +202,14 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
       /*shared_memory_init_cost=*/10,
       /*shared_memory_gate_cost=*/[](quartz::GateType) { return 0.8; },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
-  auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx);
-  
+  auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
+  int idx = 0;
   for (auto &schedule : schedules) {
     // add shuffle gate
     std::vector<int> target;
     std::vector<int> global;
     for (int i = 0; i < num_qubits; i++) {
-      if (local_qubits[idx][i]) {
+      if (local_qubits[idx++][i]) {
         target.push_back(i);
       } else {
         global.push_back(i);
@@ -229,7 +229,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     for (auto &kernel : schedule.kernels) {
       if (kernel.type == quartz::KernelType::fusion) {
         SimGateType g_type = FUSED;
-        unsigned n_target = schedule.kernel[i].qubits.size();
+        unsigned n_target = kernel.qubits.size();
         unsigned n_control = 0;
         std::vector<int> target;
         std::vector<int> control;
@@ -237,12 +237,12 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
         for (int j = 0; j < (int)kernel.qubits.size(); j++) {
           std::cout << kernel.qubits[j];
           target.push_back(kernel.qubits[j]);
-          if (j != (int)schedule.kernel_qubits[i].size() - 1) {
+          if (j != (int)kernel.qubits.size() - 1) {
             std::cout << ", ";
           }
         }
         std::cout << "], gates ";
-        std::cout << schedule.kernels[i].to_string() << std::endl;
+        std::cout << kernel.to_string() << std::endl;
         // mat = FuseGates<DT>(kernels);
         auto mat = FuseGates(kernel, ctx);
 
@@ -273,12 +273,12 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             }
           }
           auto *m = gate->gate->get_matrix(params);
-          std::vector<std::complex<double>> mat = m->flatten();
+          std::vector<std::complex<qreal>> mat = m->flatten();
           //other way from quartz::GateType to KernelGateType?
           // target and control will be converted to related qubit when executing
           if (gate->gate->get_num_control_qubits() == 2) {
             // don't want to hardcode..
-            qComplex mat_[2][2] = {mat[3*8+3], mat[3*8+7], mat[7*8+3, mat[7*8+7]]};
+            qComplex mat_[2][2] = {(mat[3*8+3].real(),mat[3*8+3].imag()), (mat[3*8+7].real(), mat[3*8+7].imag()), (mat[7*8+3].real(), mat[7*8+3].imag()), (mat[7*8+7].real(), mat[7*8+7].imag())};
             qindex mask = active_qubits_logical;
             char isGlobalControl1 = (mask >> qubit_indices[0]) & 1;
             char isGlobalControl2 = (mask >> qubit_indices[1]) & 1;
@@ -288,7 +288,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
           }
           else if (gate->gate->get_num_control_qubits() == 1) {
             // compress mat
-            qComplex mat_[2][2] = {mat[1*4+1], mat[1*4+3], mat[3*4+1, mat[3*4+3]]};
+            qComplex mat_[2][2] = {(mat[1*4+1].real(),mat[1*4+1].imag()), (mat[1*4+3].real(), mat[1*4+3].imag()), (mat[3*4+1].real(), mat[3*4+1].imag()), (mat[3*4+3].real(), mat[3*4+3].imag())};
             qindex mask = active_qubits_logical;
             char isGlobalControl1 = (mask >> qubit_indices[0]) & 1;
             char isGlobalTarget = (mask >> qubit_indices[1]) & 1;
@@ -296,9 +296,10 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             kernelgates.push_back(kg); 
           }
           else if (gate->gate->get_num_control_qubits() == 0) {
+            qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
             qindex mask = active_qubits_logical;
             char isGlobalTarget = (mask >> qubit_indices[0]) & 1;
-            KernelGate kg(toKernel(gate->gate->tp), qubit_indices[0], isGlobalTarget, mat);
+            KernelGate kg(toKernel(gate->gate->tp), qubit_indices[0], isGlobalTarget, mat_);
             kernelgates.push_back(kg); 
           }            
         }

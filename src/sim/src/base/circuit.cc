@@ -204,12 +204,14 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
   int idx = 0;
+  int num_fuse = 0;
+  int num_shm = 0;
   for (auto &schedule : schedules) {
     // add shuffle gate
     std::vector<int> target;
     std::vector<int> global;
     for (int i = 0; i < num_qubits; i++) {
-      if (local_qubits[idx++][i]) {
+      if (local_qubits[idx][i]) {
         target.push_back(i);
       } else {
         global.push_back(i);
@@ -221,6 +223,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     }
     Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
     gates.push_back(gate);
+    idx++;
 
     // schedule.compute_kernel_schedule(
     //     {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66});
@@ -228,12 +231,13 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     // schedule.print_kernel_schedule();
     for (auto &kernel : schedule.kernels) {
       if (kernel.type == quartz::KernelType::fusion) {
+        num_fuse++;
         SimGateType g_type = FUSED;
         unsigned n_target = kernel.qubits.size();
         unsigned n_control = 0;
         std::vector<int> target;
         std::vector<int> control;
-        std::cout << "Fusing Kernel: qubits [";
+        printf( "Fusing Kernel (%d): qubits [", kernel.gates.gates.size());
         for (int j = 0; j < (int)kernel.qubits.size(); j++) {
           std::cout << kernel.qubits[j];
           target.push_back(kernel.qubits[j]);
@@ -252,14 +256,23 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
         task_map.push_back(SimGateType::FUSED);
       }
       else if (kernel.type == quartz::KernelType::shared_memory) {
+        num_shm++;
         SimGateType g_type = SHM;
         qindex active_qubits_logical = 0;
-        for (int i = 0; i < SHARED_MEM_SIZE; i++) {
+        printf("SHM Kernel (%d): [ ", kernel.gates.gates.size());
+        for (int i = 0; i < kernel.qubits.size(); i++) {
           active_qubits_logical |= qindex(1) << kernel.qubits[i];
+          if (i != kernel.qubits.size() - 1)
+            printf("%d,", kernel.qubits[i]);
+          else
+            printf("%d]\n", kernel.qubits[i]);
         }
+        // TODO: if kernel.qubits.size() < SHARED_MEM_SIZE: fill it
         active_logical_qs.push_back(active_qubits_logical);
+        std::cout << kernel.to_string() << std::endl;
 
         std::vector<KernelGate> kernelgates;
+        
         for(auto &gate : kernel.gates.gates) {
           // get logical target qubit
           std::vector<int> qubit_indices;
@@ -267,7 +280,6 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
           for (const auto &input_wire : gate->input_wires) {
             if (input_wire->is_qubit()) {
               qubit_indices.push_back(input_wire->index);
-              printf("SHM Kernel [%d]\n", input_wire->index);
             } else {
               params.push_back(ctx->input_parameters[input_wire->index]);
             }
@@ -284,7 +296,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             char isGlobalControl2 = (mask >> qubit_indices[1]) & 1;
             char isGlobalTarget = (mask >> qubit_indices[2]) & 1;
             KernelGate kg(toKernel(gate->gate->tp), qubit_indices[1], isGlobalControl2, qubit_indices[0], isGlobalControl1, qubit_indices[2], isGlobalTarget, mat_);
-            kernelgates.push_back(kg); 
+            kernelgates.push_back(kg);
           }
           else if (gate->gate->get_num_control_qubits() == 1) {
             // compress mat
@@ -293,7 +305,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             char isGlobalControl1 = (mask >> qubit_indices[0]) & 1;
             char isGlobalTarget = (mask >> qubit_indices[1]) & 1;
             KernelGate kg(toKernel(gate->gate->tp), qubit_indices[0], isGlobalControl1, qubit_indices[1], isGlobalTarget, mat_);
-            kernelgates.push_back(kg); 
+            kernelgates.push_back(kg);
           }
           else if (gate->gate->get_num_control_qubits() == 0) {
             qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
@@ -309,7 +321,12 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
     }
   }
 
-  printf("Compilation Done! Start simulating...\n");
+  printf("Compilation Done! \n");
+  printf("Num Shuffles: %d\n", schedules.size());
+  printf("Num FUSION Kernel: %d\n", num_fuse);
+  printf("Num SHM Kernel: %d\n", num_shm);
+  printf("Start Simulating...\n");
+  
 
   return true;
 }
@@ -528,11 +545,11 @@ qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
     std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
     
     // matrix shuffle: make sure the logical target qubits are in increasing order
-    printf("matrix to be fused:\n");
-    for (int i = 0; i < temp.size(); i++) {
-      printf("(%f, %f)", temp[i].real(), temp[i].imag());
-    }
-    printf("\n");
+    // printf("matrix to be fused:\n");
+    // for (int i = 0; i < temp.size(); i++) {
+    //   printf("(%f, %f)", temp[i].real(), temp[i].imag());
+    // }
+    // printf("\n");
     MatShuffle(temp, qubit_indices.size(), qperm);
     MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
   }
@@ -544,7 +561,7 @@ template <typename DT>
 void qcircuit::Circuit<DT>::MatMul(unsigned mask, unsigned n_fused, M &res_mat,
                                    const M &m1, unsigned m_size) {
   // expand m1
-  printf("Matrix Multiplication\n");
+  // printf("Matrix Multiplication\n");
   unsigned n1 = unsigned{1} << m_size;
   unsigned n = unsigned{1} << n_fused;
   std::vector<std::complex<DT>> temp_mat = res_mat;
@@ -583,10 +600,10 @@ void qcircuit::Circuit<DT>::MatMul(unsigned mask, unsigned n_fused, M &res_mat,
     }
   }
 
-  for (int i = 0; i < res_mat.size(); i++) {
-    printf("(%.1f, %.1f)", res_mat[i].real(), res_mat[i].imag());
-  }
-  printf("\n");
+  // for (int i = 0; i < res_mat.size(); i++) {
+  //   printf("(%.1f, %.1f)", res_mat[i].real(), res_mat[i].imag());
+  // }
+  // printf("\n");
 }
 
 template <typename DT>
@@ -594,7 +611,7 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
                                        const std::vector<int> &perm) {
 
   std::vector<std::complex<DT>> temp_mat = res_mat;
-  printf("Matrix Shuffle\n");
+  // printf("Matrix Shuffle\n");
 
   unsigned n = unsigned{1} << n_qubit;
 
@@ -618,10 +635,10 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
     }
   }
 
-  for (int i = 0; i < res_mat.size(); i++) {
-    printf("(%.1f, %.1f)", res_mat[i].real(), res_mat[i].imag());
-  }
-  printf("\n");
+  // for (int i = 0; i < res_mat.size(); i++) {
+  //   printf("(%.1f, %.1f)", res_mat[i].real(), res_mat[i].imag());
+  // }
+  // printf("\n");
 }
 
 template <typename DT>

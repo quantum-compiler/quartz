@@ -43,12 +43,12 @@ int main(int argc, char *argv[]) {
                        GateType::u3, GateType::cx, GateType::cz, GateType::cp,
                        GateType::swap});
   auto seq = quartz::CircuitSeq::from_qasm_file(
-      &ctx, std::string("/home/ubuntu/quartz/circuit/MQTBench_") +
+      &ctx, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_") +
                 std::to_string(nqubits) + "q/" + circuit_file +
                 "_indep_qiskit_" + std::to_string(nqubits) + ".qasm");
   sim::qcircuit::Circuit<double> circuit(nqubits, nlocal);
   circuit.compile(seq.get(), &ctx, &interpreter, use_ilp);
-  circuit.simulate(ndevice, true);
+  // circuit.simulate(ndevice, true);
 
   MPICHECK(MPI_Finalize());
 

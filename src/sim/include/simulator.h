@@ -127,6 +127,7 @@ public:
   cudaStream_t s[MAX_DEVICES];
   // physical id = myNcclRank; this will be changed when we encouter X gates targeting global qubit
   std::map<unsigned, unsigned> device_logical_to_phy;
+  std::map<unsigned, unsigned> device_phy_to_logical;
 
 private:
   // nccl, mpi related info

@@ -156,7 +156,7 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
     assert(gates.size() < MAX_GATE);
     #pragma omp parallel for num_threads(n_devices)
     for (int k = 0; k < n_devices; n++) {
-        int myncclrank = device_logical_to_phy.at(myRank * n_devices + k);
+        int myncclrank = device_phy_to_logical.at(myRank * n_devices + k);
         for (size_t i = 0; i < gates.size(); i++) {
            hostGates[k * kernelgates.size() + i] = getGate(kernelgates[i], myncclrank, n_local, logicQubitset, qubit_group_map);
         }
@@ -265,10 +265,10 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   if ((~global_mask) + 1 <= n_devices) {
     printf("Using cuQuantum for swaps within a node %d\n",
            n_global_within_node);
-    // need to perm d_sv according to device_logical_to_phy map
+    // need to perm d_sv according to device_phy_to_logical map
     void** d_sv_;
     for (int i = 0; i < n_devices; i++) {
-      unsigned myncclrank = device_logical_to_phy.at(myRank * n_devices + i);
+      unsigned myncclrank = device_phy_to_logical.at(myRank * n_devices + i);
       int i_new = myncclrank & (1 << (n_global_within_node - 1));
       d_sv_[i] = d_sv[i_new]; 
     }
@@ -348,7 +348,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
 
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
-      unsigned myncclrank = device_logical_to_phy.at(myRank * n_devices + i);
+      unsigned myncclrank = device_phy_to_logical.at(myRank * n_devices + i);
       all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
               comms[i], s[i], ~global_mask, myncclrank);
     }
@@ -363,7 +363,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       HANDLE_CUDA_ERROR(cudaEventElapsedTime(&elapsed, t_start[i], t_end[i]));
       cudaEventDestroy(t_start[i]);
       cudaEventDestroy(t_end[i]);
-      printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", device_logical_to_phy.at(myRank * n_devices + i),
+      printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", device_phy_to_logical.at(myRank * n_devices + i),
              elapsed);
     }
 
@@ -529,6 +529,7 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   // init logical <-> device map
   for (int i = 0; i < nRanks * n_devices; i++) {
     device_logical_to_phy[i] = i;
+    device_phy_to_logical[i] = i;
   }
 
 
@@ -602,10 +603,12 @@ ncclResult_t SimulatorCuQuantum<DT>::all2all(
 
     printf("I am %d, mask %d, I am sending to %d\n", myncclrank, mask,
            peer_idx);
+    
+    unsigned peer_phy = device_logical_to_phy.at(peer_idx);
 
     auto a = NCCLSendrecv(static_cast<std::byte *>(sendbuff) +
                               i * ncclTypeSize(senddatatype) * sendcount,
-                          sendcount, senddatatype, peer_idx,
+                          sendcount, senddatatype, peer_phy,
                           static_cast<std::byte *>(recvbuff) +
                               i * ncclTypeSize(recvdatatype) * recvcount,
                           recvcount, comm, stream);

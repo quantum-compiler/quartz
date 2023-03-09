@@ -457,7 +457,7 @@ bool EquivalenceSet::simplify(Context *ctx,
                               bool other_simplification, bool verbose) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 5;
+  constexpr int kNumOptimizationsToPerform = 6;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {

@@ -8,8 +8,11 @@
 namespace quartz {
 
 Schedule::Schedule(const CircuitSeq &sequence,
-                   const std::vector<int> &local_qubit, Context *ctx)
-    : cost_(), sequence_(sequence), local_qubit_(local_qubit), ctx_(ctx) {
+                   const std::vector<int> &local_qubit,
+                   const std::vector<int> &global_qubit, Context *ctx)
+    : cost_(), sequence_(sequence), local_qubit_(local_qubit),
+      global_qubit_(global_qubit), ctx_(ctx) {
+  assert(local_qubit.size() + global_qubit.size() == sequence.get_num_qubits());
   local_qubit_mask_.assign(sequence.get_num_qubits(), false);
   for (auto &i : local_qubit) {
     local_qubit_mask_[i] = true;
@@ -441,6 +444,11 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
     for (auto &i : local_qubit_) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
+    std::cout << "Global qubits: ";
+    for (auto &i : global_qubit_) {
       std::cout << i << ", ";
     }
     std::cout << std::endl;
@@ -988,6 +996,7 @@ get_schedules(const CircuitSeq &sequence,
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<int> current_local_qubit_layout;
+  std::vector<int> current_global_qubit_layout;
   std::vector<bool> local_qubit_mask(num_qubits, false);
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
@@ -1004,7 +1013,6 @@ get_schedules(const CircuitSeq &sequence,
   std::unordered_map<std::string, std::queue<int>> gate_indices;
 
   for (auto &local_qubit : local_qubits) {
-    auto previous_local_qubit_mask = local_qubit_mask;
     // Convert vector<int> to vector<bool>.
     local_qubit_mask.assign(num_qubits, false);
     for (auto &i : local_qubit) {
@@ -1014,13 +1022,21 @@ get_schedules(const CircuitSeq &sequence,
     if (current_local_qubit_layout.empty()) {
       // First iteration. Take the initial layout from |local_qubits[0]|.
       current_local_qubit_layout = local_qubit;
+      current_global_qubit_layout.reserve(num_qubits - local_qubit.size());
+      // The global qubits are sorted in ascending order.
+      for (int i = 0; i < num_qubits; i++) {
+        if (!local_qubit_mask[i]) {
+          current_global_qubit_layout.push_back(i);
+        }
+      }
     } else {
       // Update the layout.
       // We should have the same number of local qubits.
       assert(local_qubit.size() == current_local_qubit_layout.size());
       int num_global_swaps = 0;
-      for (auto &i : local_qubit) {
-        if (!previous_local_qubit_mask[i]) {
+      for (auto &i : current_global_qubit_layout) {
+        if (local_qubit_mask[i]) {
+          // A global-to-local swap.
           num_global_swaps++;
         }
       }
@@ -1041,11 +1057,14 @@ get_schedules(const CircuitSeq &sequence,
                   current_local_qubit_layout[should_swap_ptr]);
         should_swap_ptr++;
       }
-      for (auto &i : local_qubit) {
-        if (!previous_local_qubit_mask[i]) {
-          // Put the new local qubit at its corresponding position.
-          current_local_qubit_layout[(int)current_local_qubit_layout.size() -
-                                     num_global_swaps] = i;
+      for (auto &i : current_global_qubit_layout) {
+        if (local_qubit_mask[i]) {
+          // Swap the new local qubit with the qubit at its corresponding
+          // position.
+          std::swap(
+              i,
+              current_local_qubit_layout
+                  [(int)current_local_qubit_layout.size() - num_global_swaps]);
           num_global_swaps--;
         }
       }
@@ -1144,7 +1163,8 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    result.emplace_back(current_seq, current_local_qubit_layout, ctx);
+    result.emplace_back(current_seq, current_local_qubit_layout,
+                        current_global_qubit_layout, ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }

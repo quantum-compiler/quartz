@@ -18,7 +18,7 @@ namespace quartz {
 class Schedule {
 public:
   Schedule(const CircuitSeq &sequence, const std::vector<int> &local_qubit,
-           Context *ctx);
+           const std::vector<int> &global_qubit, Context *ctx);
 
   // Compute the number of down sets for the circuit sequence.
   [[nodiscard]] size_t num_down_sets();
@@ -75,6 +75,10 @@ private:
   // The set of local qubits.
   // |local_qubit_[0]| is the least significant bit.
   std::vector<int> local_qubit_;
+
+  // The set of non-local qubits.
+  // |global_qubit_[0]| is the least significant bit.
+  std::vector<int> global_qubit_;
 
   // The mask for local qubits.
   std::vector<bool> local_qubit_mask_;

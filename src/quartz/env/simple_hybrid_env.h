@@ -28,6 +28,7 @@ namespace quartz {
                                                          GateType::sdg, GateType::x, GateType::z, GateType::rz,
                                                          GateType::sx, GateType::sxdg}));
             graph = Graph::from_qasm_file(&(*context), qasm_file_path);
+            fidelity_graph = GetFidelityGraph(backend_type);
             device = GetDevice(backend_type);
 
             // set randomness (random_generator is initialized above)
@@ -46,7 +47,8 @@ namespace quartz {
                                 initial_mapping_file, device_reg_count);
             Assert(graph->check_mapping_correctness() == MappingStatus::VALID, "Invalid mapping!");
             cur_game_ptr = std::make_shared<GameHybrid>(
-                    GameHybrid(*graph, device, initial_phase_len, allow_nop_in_initial, initial_phase_reward));
+                    GameHybrid(*graph, device, fidelity_graph, initial_phase_len,
+                               allow_nop_in_initial, initial_phase_reward));
             Assert(!is_circuit_finished(cur_game_ptr->graph), "Empty GameHybrid found!");
 
             // initialize game buffer (game_buffer is initialize above)
@@ -66,6 +68,7 @@ namespace quartz {
             GameHybrid game_copy = *old_env.cur_game_ptr;
             cur_game_ptr = std::make_shared<GameHybrid>(game_copy);
             device = old_env.device;
+            fidelity_graph = old_env.fidelity_graph;
             context = old_env.context;
             Graph graph_copy = *old_env.graph;
             graph = std::make_shared<Graph>(graph_copy);
@@ -107,7 +110,8 @@ namespace quartz {
                                     initial_mapping_file, device_reg_count);
                 Assert(graph->check_mapping_correctness() == MappingStatus::VALID, "Invalid Mapping!");
                 cur_game_ptr = std::make_shared<GameHybrid>(
-                        GameHybrid(*graph, device, initial_phase_len, allow_nop_in_initial, initial_phase_reward));
+                        GameHybrid(*graph, device, fidelity_graph, initial_phase_len,
+                                   allow_nop_in_initial, initial_phase_reward));
                 Assert(!is_finished(), "Empty GameHybrid found!");
             }
         }
@@ -137,6 +141,11 @@ namespace quartz {
         [[nodiscard]] int total_cost() const {
             // call this only when game ends !!!
             return cur_game_ptr->total_cost();
+        }
+
+        [[nodiscard]] double sum_ln_cx_fidelity() const {
+            // call this only when game ends !!!
+            return cur_game_ptr->sum_ln_cx_fidelity();
         }
 
         [[nodiscard]] State get_state() const {
@@ -173,6 +182,7 @@ namespace quartz {
         int device_reg_count;
         std::string initial_mapping_file;
         std::shared_ptr<DeviceTopologyGraph> device;
+        std::shared_ptr<FidelityGraph> fidelity_graph;
         std::shared_ptr<Context> context;
         std::shared_ptr<Graph> graph;
         std::shared_ptr<GameHybrid> cur_game_ptr;

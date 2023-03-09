@@ -5,6 +5,7 @@
 
 #include "../tasograph/tasograph.h"
 #include "../sabre/sabre_swap.h"
+#include "../fidelity/known_fidelity_graphs.h"
 #include "game_utils.h"
 
 namespace quartz {
@@ -14,8 +15,9 @@ namespace quartz {
         GameHybrid() = delete;
 
         GameHybrid(const Graph &_graph, std::shared_ptr<DeviceTopologyGraph> _device,
+                   std::shared_ptr<FidelityGraph> _fidelity_graph,
                    int _initial_phase_len, bool _allow_nop_in_initial, double _initial_phase_reward)
-                : graph(_graph), device(std::move(_device)) {
+                : graph(_graph), device(std::move(_device)), fidelity_graph(std::move(_fidelity_graph)) {
             /// GameHybrid expects that the input graph has been initialized !!!
 
             // STEP 1: record phase info
@@ -100,6 +102,7 @@ namespace quartz {
         GameHybrid(const GameHybrid &game) : graph(game.graph) {
             // graph & device (graph is directly copied)
             device = game.device;
+            fidelity_graph = game.fidelity_graph;
             device_edges = game.device_edges;
 
             // phase info
@@ -391,6 +394,62 @@ namespace quartz {
                    "Swaps with cost must be fewer than swaps inserted!");
 
             return original_gate_count + int(SWAPCOST) * swap_with_cost;
+        }
+
+        [[nodiscard]] double sum_ln_cx_fidelity() const {
+            // this function can only be called at the end of a game
+            // it calculates the sum of ln cx fidelity of the execution history
+
+            // some quick sanity checks
+            Assert(is_circuit_finished(graph),
+                   "Circuit should be finished when call total cost!");
+            Assert(original_gate_count == single_qubit_gate_count + executed_logical_gate_count,
+                   "original gate count != single qubit gate count + executed logical gate count!");
+            Assert(execution_history.size() == swaps_inserted + virtual_swaps_inserted + executed_logical_gate_count,
+                   "Execution history size mismatch with gates executed!");
+            Assert(check_execution_history(graph, device, execution_history, false) == ExecutionHistoryStatus::VALID,
+                   "Execution history should be valid!");
+
+            // scan through the execution history to determine cost of each swap
+            std::vector<bool> is_qubit_used = std::vector<bool>(physical_qubit_num, false);
+            double sum_ln_cx_fidelity = 0;
+            for (const ExecutionHistory &eh_item: execution_history) {
+                if (eh_item.gate_type == GateType::swap) {
+                    // only swaps with at least one logical input used have non-zero cost
+                    int _logical0 = eh_item.logical0;
+                    int _logical1 = eh_item.logical1;
+                    if (is_qubit_used[_logical0] || is_qubit_used[_logical1]) {
+                        // the swap has cost, it also marks the input qubits as used.
+                        // Note: we think swap2 below has cost.
+                        // 1          swap2
+                        // 2    swap1 swap2
+                        // 3 cx swap1
+                        // 4 cx
+                        sum_ln_cx_fidelity += 3 * fidelity_graph->query_cx_fidelity(eh_item.physical0,
+                                                                                    eh_item.physical1);
+                        is_qubit_used[_logical0] = true;
+                        is_qubit_used[_logical1] = true;
+                    }
+
+                    // check if virtual swaps indeed have cost 0
+                    if (eh_item.guid == -2) {
+                        Assert(!is_qubit_used[_logical0] && !is_qubit_used[_logical1],
+                               "Virtual Swaps in phase one must have cost 0!");
+                    }
+                } else {
+                    // set target logical qubit as used
+                    int _logical0 = eh_item.logical0;
+                    int _logical1 = eh_item.logical1;
+                    is_qubit_used[_logical0] = true;
+                    is_qubit_used[_logical1] = true;
+
+                    // add fidelity of this gate (it must be a CNOT)
+                    Assert(eh_item.gate_type==GateType::cx, "Fidelity calculation only supports cx gates!");
+                    sum_ln_cx_fidelity += fidelity_graph->query_cx_fidelity(eh_item.physical0, eh_item.physical1);
+                }
+            }
+
+            return sum_ln_cx_fidelity;
         }
 
         void save_context_to_file(const std::string &eh_file_name,
@@ -859,6 +918,7 @@ namespace quartz {
         // graph & device
         Graph graph;
         std::shared_ptr<DeviceTopologyGraph> device;
+        std::shared_ptr<FidelityGraph> fidelity_graph;
         std::vector<std::pair<int, int>> device_edges;
 
         // phase info

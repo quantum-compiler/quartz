@@ -30,11 +30,8 @@ namespace quartz {
 
             // insert the error_rate message into the map
             std::string f_edge_name = std::to_string(reg0) + "->" + std::to_string(reg1);
-            std::string b_edge_name = std::to_string(reg1) + "->" + std::to_string(reg0);
             Assert(cx_error_rate_map.find(f_edge_name) == cx_error_rate_map.end(), "Duplicate edge!");
-            Assert(cx_error_rate_map.find(b_edge_name) == cx_error_rate_map.end(), "Duplicate edge!");
             cx_error_rate_map[f_edge_name] = error_rate;
-            cx_error_rate_map[b_edge_name] = error_rate;
         }
 
         double query_cx_fidelity(int reg0, int reg1) {

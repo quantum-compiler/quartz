@@ -16,7 +16,7 @@ namespace quartz {
         device->add_edge(5, 6);
         device->add_edge(6, 7);
         device->add_edge(7, 8);
-        // device->add_edge(8, 9); // This edge does not exist in real device!
+        device->add_edge(8, 9);
         device->add_edge(9, 10);
         device->add_edge(10, 11);
         device->add_edge(11, 12);

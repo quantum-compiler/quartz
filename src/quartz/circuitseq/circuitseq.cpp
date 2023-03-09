@@ -1303,9 +1303,6 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
                             const std::vector<int> &param_permutation) {
   num_qubits = other.num_qubits;
   num_input_parameters = other.num_input_parameters;
-  hash_value_ = other.hash_value_;
-  other_hash_values_ = other.other_hash_values_;
-  hash_value_valid_ = other.hash_value_valid_;
   original_fingerprint_ = other.original_fingerprint_;
   std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
   std::unordered_map<CircuitGate *, CircuitGate *> gates_mapping;
@@ -1318,6 +1315,10 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   parameters.clear();
   parameters.reserve(other.parameters.size());
   if (qubit_permutation.empty() && param_permutation.empty()) {
+    // A simple clone.
+    hash_value_ = other.hash_value_;
+    other_hash_values_ = other.other_hash_values_;
+    hash_value_valid_ = other.hash_value_valid_;
     for (int i = 0; i < (int)other.wires.size(); i++) {
       wires.emplace_back(std::make_unique<CircuitWire>(*(other.wires[i])));
       assert(wires[i].get() !=
@@ -1325,6 +1326,8 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       wires_mapping[other.wires[i].get()] = wires[i].get();
     }
   } else {
+    // We need to invalidate the hash value.
+    hash_value_valid_ = false;
     assert(qubit_permutation.size() == num_qubits);
     wires.resize(other.wires.size());
     for (int i = 0; i < num_qubits; i++) {

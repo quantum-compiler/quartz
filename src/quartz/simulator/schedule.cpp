@@ -1084,15 +1084,14 @@ get_schedules(const CircuitSeq &sequence,
             }
           }
         }
-      } else {
-        if (!sequence.gates[i]->gate->is_sparse()) {
-          // For non-sparse non-controlled gates, we need to have all qubits
-          // local.
-          for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
-              executable = false;
-              break;
-            }
+      } else if (sequence.gates[i]->gate->get_num_qubits() > 1 ||
+                 !sequence.gates[i]->gate->is_sparse()) {
+        // For non-controlled multi-qubit gates and non-sparse single-qubit
+        // gates, we need to have all qubits local.
+        for (auto &wire : sequence.gates[i]->input_wires) {
+          if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
+            executable = false;
+            break;
           }
         }
       }
@@ -1291,7 +1290,15 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
     // 0 is always executable
     // 1 is the target qubits must be local-only
     // 2 is local-only
-    if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+    if (sequence.gates[i]->gate->get_num_qubits() == 1) {
+      if (sequence.gates[i]->gate->is_sparse()) {
+        // A single-qubit gate is always executable if it is "sparse".
+        executable_type = 0;
+      } else {
+        // Otherwise, we require the qubit to be local-only.
+        executable_type = 2;
+      }
+    } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
       if (sequence.gates[i]->gate->is_symmetric()) {
         // A controlled gate is always executable if every qubit can be a
         // control qubit.
@@ -1304,16 +1311,12 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
         executable_type = 1;
       }
     } else {
-      if (sequence.gates[i]->gate->is_sparse()) {
-        // A non-controlled gate is always executable if it is "sparse".
-        // The only multi-qubit case here is the SWAP gate.
-        // XXX: The usage of is_sparse() needs to be changed if we ever
-        // introduce multi-qubit gates that is sparse but not executable.
-        executable_type = 0;
-      } else {
-        // For all other cases, we require all qubits to be local-only.
-        executable_type = 2;
-      }
+      // For all non-controlled multi-qubit gates,
+      // we require all qubits to be local-only.
+      // Note: although the SWAP gate can be executed globally,
+      // it cannot be executed when it's partial global and partial local,
+      // so we restrict it to be local-only here.
+      executable_type = 2;
     }
     circuit_gate_executable_type.push_back(executable_type);
     gate_index[sequence.gates[i].get()] = i;

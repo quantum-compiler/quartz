@@ -96,8 +96,7 @@ bool Schedule::compute_end_schedule(
   }
   result_cost = 0;
   for (int i = 0; i < num_kernels; i++) {
-    assert(kernels[i].size() <= max_kernel_size);
-    assert(kernels[i].size() > 0);
+    assert(kernels[i].first.size() > 0);
     if (kernels[i].second == KernelType::fusion) {
       if (kernels[i].first.size() >= optimal_fusion_kernel_size) {
         // Greedily try to use the optimal kernel size for fusion kernels.
@@ -441,10 +440,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   if (debug) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
-    for (int i = 0; i < num_qubits; i++) {
-      if (is_local_qubit(i)) {
-        std::cout << i << ", ";
-      }
+    for (auto &i : local_qubit_) {
+      std::cout << i << ", ";
     }
     std::cout << std::endl;
     std::cout << sequence_.to_string() << std::endl;
@@ -972,7 +969,6 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
 int Schedule::get_num_kernels() const { return (int)kernels.size(); }
 
 void Schedule::print_kernel_schedule() const {
-  assert(kernels.size() == kernel_qubits.size());
   const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
             << " kernels: cost = " << cost_ << std::endl;
@@ -991,6 +987,8 @@ get_schedules(const CircuitSeq &sequence,
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
+  std::vector<int> current_local_qubit_layout;
+  std::vector<bool> local_qubit_mask(num_qubits, false);
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
 
@@ -1006,10 +1004,51 @@ get_schedules(const CircuitSeq &sequence,
   std::unordered_map<std::string, std::queue<int>> gate_indices;
 
   for (auto &local_qubit : local_qubits) {
-    // convert vector<int> to vector<bool>
-    std::vector<bool> local_qubit_mask(num_qubits, false);
+    auto previous_local_qubit_mask = local_qubit_mask;
+    // Convert vector<int> to vector<bool>.
+    local_qubit_mask.assign(num_qubits, false);
     for (auto &i : local_qubit) {
       local_qubit_mask[i] = true;
+    }
+    std::cout << std::endl;
+    if (current_local_qubit_layout.empty()) {
+      // First iteration. Take the initial layout from |local_qubits[0]|.
+      current_local_qubit_layout = local_qubit;
+    } else {
+      // Update the layout.
+      // We should have the same number of local qubits.
+      assert(local_qubit.size() == current_local_qubit_layout.size());
+      int num_global_swaps = 0;
+      for (auto &i : local_qubit) {
+        if (!previous_local_qubit_mask[i]) {
+          num_global_swaps++;
+        }
+      }
+      int should_swap_ptr = 0;
+      for (int i = (int)current_local_qubit_layout.size() - num_global_swaps;
+           i < (int)current_local_qubit_layout.size(); i++) {
+        if (!local_qubit_mask[current_local_qubit_layout[i]]) {
+          // This qubit should be swapped with a global qubit,
+          // and it is already at the correct position.
+          continue;
+        }
+        while (local_qubit_mask[current_local_qubit_layout[should_swap_ptr]]) {
+          should_swap_ptr++;
+        }
+        // Find the first local qubit that should be swapped with a global
+        // qubit, and perform a local swap.
+        std::swap(current_local_qubit_layout[i],
+                  current_local_qubit_layout[should_swap_ptr]);
+        should_swap_ptr++;
+      }
+      for (auto &i : local_qubit) {
+        if (!previous_local_qubit_mask[i]) {
+          // Put the new local qubit at its corresponding position.
+          current_local_qubit_layout[(int)current_local_qubit_layout.size() -
+                                     num_global_swaps] = i;
+          num_global_swaps--;
+        }
+      }
     }
 
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
@@ -1106,7 +1145,7 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    result.emplace_back(current_seq, local_qubit, ctx);
+    result.emplace_back(current_seq, current_local_qubit_layout, ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }

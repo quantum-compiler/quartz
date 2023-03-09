@@ -1,5 +1,6 @@
 #include "quartz/game/game_hybrid.h"
 #include "quartz/supported_devices/supported_devices.h"
+#include "quartz/fidelity/known_fidelity_graphs.h"
 
 #include <string>
 #include <cstdlib>
@@ -24,9 +25,10 @@ int main() {
     auto graph = std::make_shared<Graph>(Graph(&(*context), dag));
     set_initial_mapping(*graph, 0, "../test_mapping_file.txt", 27);
     auto device = GetDevice(BackendType::IBM_Q27_FALCON);
+    auto fidelity_graph = GetFidelityGraph(BackendType::IBM_Q27_FALCON);
 
     // initialize game
-    GameHybrid current_game = GameHybrid(*graph, device, 5, true, -0.3);
+    GameHybrid current_game = GameHybrid(*graph, device, fidelity_graph, 5, true, -0.3);
 
     // make a few moves
     int step_count = 0;

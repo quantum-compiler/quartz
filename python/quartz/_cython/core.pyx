@@ -1035,6 +1035,9 @@ cdef class PySimpleHybridEnv:
     def total_cost(self) -> int:
         return self.env.total_cost()
 
+    def sum_ln_cx_fidelity(self) -> double:
+        return self.env.sum_ln_cx_fidelity()
+
     def get_state(self) -> PyState:
         cdef shared_ptr[State] c_state = make_shared[State](self.env.get_state())
         py_state = PyState()

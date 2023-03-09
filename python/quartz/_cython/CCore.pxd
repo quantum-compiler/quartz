@@ -227,6 +227,7 @@ cdef extern from "env/simple_hybrid_env.h" namespace "quartz":
         Reward step(Action)
         bool is_finished()
         int total_cost()
+        double sum_ln_cx_fidelity()
         State get_state()
         vector[Action] get_action_space()
         void save_context_to_file(const string &, const string &)

@@ -3,6 +3,8 @@ import qiskit
 import qiskit.circuit.library.standard_gates as gates
 
 
+# Partition the circuit into stages.
+# The return value is a list of sets of local qubits.
 def solve_ilp(
     circuit_gate_qubits,
     circuit_gate_executable_type,

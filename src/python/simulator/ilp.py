@@ -3,6 +3,8 @@ import qiskit
 import qiskit.circuit.library.standard_gates as gates
 
 
+# Partition the circuit into stages.
+# The return value is a list of sets of local qubits.
 def solve_ilp(
     circuit_gate_qubits,
     circuit_gate_executable_type,
@@ -139,10 +141,13 @@ def preprocess_circuit_seq(circuit_seq, index_offset, num_qubits):
         gates.x.XGate,
         gates.z.CZGate,
         gates.p.CPhaseGate,
-        gates.swap.SwapGate,
     }
     target_local_only_gates = {gates.x.CXGate}
+    # Note: although the SWAP gate can be executed globally,
+    # it cannot be executed when it's partial global and partial local,
+    # so we restrict it to be local-only here.
     local_only_gates = {
+        gates.swap.SwapGate,
         gates.h.HGate,
         gates.ry.RYGate,
         gates.u.UGate,

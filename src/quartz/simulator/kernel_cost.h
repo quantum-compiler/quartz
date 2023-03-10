@@ -22,9 +22,10 @@ public:
    * @param shared_memory_init_cost The cost of an empty shared-memory kernel.
    * @param shared_memory_gate_cost The cost function of each gate in a
    * shared-memory kernel.
-   * @param shared_memory_total_qubits
-   * @param shared_memory_cacheline_qubits Currently unused. The difference
-   * of the above 2 variables is the maximum size of a shared-memory kernel.
+   * @param shared_memory_total_qubits The maximum size of a shared-memory
+   * kernel.
+   * @param shared_memory_cacheline_qubits Any shared-memory kernel must
+   * contain this number of the least significant qubits.
    */
   KernelCost(
       const std::vector<KernelCostType> &fusion_kernel_costs,
@@ -56,6 +57,7 @@ public:
   [[nodiscard]] const KernelCostType &get_shared_memory_init_cost() const;
   [[nodiscard]] KernelCostType get_shared_memory_gate_cost(GateType tp) const;
   [[nodiscard]] int get_shared_memory_num_free_qubits() const;
+  [[nodiscard]] int get_shared_memory_num_cacheline_qubits() const;
   [[nodiscard]] int get_optimal_fusion_kernel_size() const;
 
   std::vector<KernelCostType> fusion_kernel_costs_;

@@ -142,6 +142,11 @@ public:
   // Return the number of equivalent classes removed.
   int remove_parameter_permutations(Context *ctx, bool verbose = false);
 
+  // If there are two equivalence classes that are equivalent under
+  // permutation of qubits, remove one of them.
+  // Return the number of equivalent classes removed.
+  int remove_qubit_permutations(Context *ctx, bool verbose = false);
+
   // This function runs in O(1).
   [[nodiscard]] int num_equivalence_classes() const;
 

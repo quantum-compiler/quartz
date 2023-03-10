@@ -457,7 +457,7 @@ bool EquivalenceSet::simplify(Context *ctx,
                               bool other_simplification, bool verbose) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 5;
+  constexpr int kNumOptimizationsToPerform = 6;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
@@ -488,6 +488,12 @@ bool EquivalenceSet::simplify(Context *ctx,
       break;
     }
     if (other_simplification && remove_parameter_permutations(ctx, verbose)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (other_simplification && remove_qubit_permutations(ctx, verbose)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -923,6 +929,122 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
       classes_to_remove.push_back(item.get());
       if (verbose) {
         std::cout << "Remove parameter permutations: remove " << item->hash(ctx)
+                  << std::endl;
+        for (auto &dag : dags) {
+          std::cout << "  " << dag->to_json() << std::endl;
+        }
+      }
+      for (auto &dag : dags) {
+        remove_possible_class(dag->hash(ctx), item.get());
+        for (const auto &other_hash : dag->other_hash_values()) {
+          remove_possible_class(other_hash, item.get());
+        }
+      }
+    }
+  }
+
+  if (classes_to_remove.empty()) {
+    return 0;
+  }
+
+  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
+  std::swap(prev_classes, classes_);
+  // Now |classes_| is empty.
+  assert(prev_classes.size() >= classes_to_remove.size());
+  classes_.reserve(prev_classes.size() - classes_to_remove.size());
+  auto remove_it = classes_to_remove.begin();
+  for (auto &item : prev_classes) {
+    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
+      // Remove the equivalence class.
+      remove_it++;
+    } else {
+      assert(item->size() > 0);
+      classes_.push_back(std::move(item));
+    }
+  }
+
+  return (int)classes_to_remove.size();
+}
+
+int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
+  // This function needs a deterministic order of |classes_| in order for
+  // the result to be reproducible.
+  // Therefore, we sort the ECCs here.
+  std::sort(classes_.begin(), classes_.end(),
+            UniquePtrEquivalenceClassComparator());
+  std::vector<EquivalenceClass *> classes_to_remove;
+  for (auto &item : classes_) {
+    if (item->size() == 0) {
+      continue;
+    }
+    const auto &dags = item->get_all_dags();
+    int min_num_input_param = dags[0]->get_num_input_parameters();
+    int num_qubits = dags[0]->get_num_qubits();
+    if (num_qubits <= 1) {
+      // No way to permute the qubit.
+      continue;
+    }
+    std::vector<int> qubit_permutation(num_qubits);
+    for (int i = 0; i < num_qubits; i++) {
+      qubit_permutation[i] = i;
+    }
+    // |param_permutation| is always the identity.
+    std::vector<int> param_permutation(min_num_input_param);
+    for (int i = 0; i < min_num_input_param; i++) {
+      param_permutation[i] = i;
+    }
+    bool found_permuted_equivalence = false;
+    do {
+      // Check all permutations including the identity (because
+      // we want to merge ECCs with the same CircuitSeq).
+      std::set<EquivalenceClass *> permuted_classes;
+      std::vector<std::unique_ptr<CircuitSeq>> permuted_dags;
+      permuted_dags.reserve(dags.size());
+      for (auto &dag : dags) {
+        permuted_dags.emplace_back(
+            dag->get_permuted_seq(qubit_permutation, param_permutation));
+      }
+      for (auto &permuted_dag : permuted_dags) {
+        for (const auto &permuted_class :
+             get_containing_class(ctx, permuted_dag.get())) {
+          permuted_classes.insert(permuted_class);
+        }
+      }
+      EquivalenceClass *permuted_class = nullptr;
+      for (auto &c : permuted_classes) {
+        if (c != item.get() && (!permuted_class || EquivalenceClass::less_than(
+                                                       *c, *permuted_class))) {
+          permuted_class = c;
+        }
+      }
+      if (permuted_class) {
+        found_permuted_equivalence = true;
+        if (verbose) {
+          std::cout << "Remove qubit permutations: found ECC "
+                    << permuted_class->hash(ctx) << std::endl;
+          for (auto &dag : permuted_class->get_all_dags()) {
+            std::cout << "  " << dag->to_json() << std::endl;
+          }
+        }
+        // Update the permuted class using this class.
+        for (auto &permuted_dag : permuted_dags) {
+          if (!permuted_class->contains(*permuted_dag)) {
+            if (verbose) {
+              std::cout << "Remove qubit permutations: insert "
+                        << permuted_dag->to_json() << std::endl;
+            }
+            insert(ctx, permuted_class, std::move(permuted_dag));
+          }
+        }
+        break;
+      }
+    } while (std::next_permutation(qubit_permutation.begin(),
+                                   qubit_permutation.end()));
+    if (found_permuted_equivalence) {
+      // Remove this equivalence class.
+      classes_to_remove.push_back(item.get());
+      if (verbose) {
+        std::cout << "Remove qubit permutations: remove " << item->hash(ctx)
                   << std::endl;
         for (auto &dag : dags) {
           std::cout << "  " << dag->to_json() << std::endl;

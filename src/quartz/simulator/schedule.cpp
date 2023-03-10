@@ -7,6 +7,18 @@
 
 namespace quartz {
 
+Schedule::Schedule(const CircuitSeq &sequence,
+                   const std::vector<int> &local_qubit,
+                   const std::vector<int> &global_qubit, Context *ctx)
+    : cost_(), sequence_(sequence), local_qubit_(local_qubit),
+      global_qubit_(global_qubit), ctx_(ctx) {
+  assert(local_qubit.size() + global_qubit.size() == sequence.get_num_qubits());
+  local_qubit_mask_.assign(sequence.get_num_qubits(), false);
+  for (auto &i : local_qubit) {
+    local_qubit_mask_[i] = true;
+  }
+}
+
 size_t Schedule::num_down_sets() {
   const int num_qubits = sequence_.get_num_qubits();
   const int num_gates = sequence_.get_num_gates();
@@ -62,11 +74,14 @@ size_t Schedule::num_down_sets() {
   return down_sets.size();
 }
 
-bool Schedule::is_local_qubit(int index) const { return local_qubit_[index]; }
+bool Schedule::is_local_qubit(int index) const {
+  return local_qubit_mask_[index];
+}
 
 bool Schedule::compute_end_schedule(
     const KernelCost &kernel_cost,
     const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
+    const std::vector<bool> &is_shared_memory_cacheline_qubit,
     KernelCostType &result_cost,
     std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels) {
   const auto &kernel_costs = kernel_cost.get_fusion_kernel_costs();
@@ -84,8 +99,7 @@ bool Schedule::compute_end_schedule(
   }
   result_cost = 0;
   for (int i = 0; i < num_kernels; i++) {
-    assert(kernels[i].size() <= max_kernel_size);
-    assert(kernels[i].size() > 0);
+    assert(kernels[i].first.size() > 0);
     if (kernels[i].second == KernelType::fusion) {
       if (kernels[i].first.size() >= optimal_fusion_kernel_size) {
         // Greedily try to use the optimal kernel size for fusion kernels.
@@ -98,15 +112,22 @@ bool Schedule::compute_end_schedule(
         fusion_kernels_of_size[kernels[i].first.size()].push_back(i);
       }
     } else if (kernels[i].second == KernelType::shared_memory) {
-      if (kernels[i].first.size() >= max_shared_memory_kernel_size) {
-        assert(kernels[i].first.size() == max_shared_memory_kernel_size);
+      int kernel_size = kernels[i].first.size();
+      for (auto &qubit : kernels[i].first) {
+        if (is_shared_memory_cacheline_qubit[qubit]) {
+          // Exclude shared-memory cacheline qubits.
+          kernel_size--;
+        }
+      }
+      if (kernel_size >= max_shared_memory_kernel_size) {
+        assert(kernel_size == max_shared_memory_kernel_size);
         // Copy the large shared-memory kernels to the result.
         if (result_kernels != nullptr) {
           result_kernels->emplace_back(kernels[i]);
         }
         result_cost += kernel_cost.get_shared_memory_init_cost();
       } else {
-        shared_memory_kernels_of_size[kernels[i].first.size()].push_back(i);
+        shared_memory_kernels_of_size[kernel_size].push_back(i);
       }
     } else {
       assert(false);
@@ -192,15 +213,22 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   const int num_gates = sequence_.get_num_gates();
   auto kernel_costs = kernel_cost.get_fusion_kernel_costs();
   const int max_fusion_kernel_size = (int)kernel_costs.size() - 1;
-  // TODO: utilize the cacheline qubits of shared-memory kernels
   const int shared_memory_kernel_size =
       kernel_cost.get_shared_memory_num_free_qubits();
+  const int shared_memory_cacheline_size =
+      kernel_cost.get_shared_memory_num_cacheline_qubits();
   const int max_kernel_size =
       std::max(max_fusion_kernel_size, shared_memory_kernel_size);
   // We need to be able to execute at least 1-qubit gates.
   assert(max_kernel_size >= 2);
   // We have not computed the schedule before.
   assert(kernels.empty());
+  std::vector<bool> is_shared_memory_cacheline_qubit(num_qubits, false);
+  assert(local_qubit_.size() >= shared_memory_cacheline_size);
+  for (int i = 0; i < shared_memory_cacheline_size; i++) {
+    // These are the shared-memory cacheline qubits.
+    is_shared_memory_cacheline_qubit[local_qubit_[i]] = true;
+  }
   struct Status {
   public:
     static size_t get_hash(const std::vector<int> &s) {
@@ -415,10 +443,13 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   if (debug) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
-    for (int i = 0; i < num_qubits; i++) {
-      if (is_local_qubit(i)) {
-        std::cout << i << ", ";
-      }
+    for (auto &i : local_qubit_) {
+      std::cout << i << ", ";
+    }
+    std::cout << std::endl;
+    std::cout << "Global qubits: ";
+    for (auto &i : global_qubit_) {
+      std::cout << i << ", ";
     }
     std::cout << std::endl;
     std::cout << sequence_.to_string() << std::endl;
@@ -471,7 +502,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         // TODO: profile the running time of |compute_end_schedule| and see
         //  if an approximation optimization is necessary.
         KernelCostType result_cost;
-        compute_end_schedule(kernel_cost, it->first.sets, result_cost,
+        compute_end_schedule(kernel_cost, it->first.sets,
+                             is_shared_memory_cacheline_qubit, result_cost,
                              /*result_kernels=*/nullptr);
         costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
         if (debug) {
@@ -516,7 +548,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       assert(current_status.check_valid());
       if (debug) {
         KernelCostType tmp;
-        compute_end_schedule(kernel_cost, current_status.sets, tmp, nullptr);
+        compute_end_schedule(kernel_cost, current_status.sets,
+                             is_shared_memory_cacheline_qubit, tmp, nullptr);
         tmp += current_cost;
         if (tmp < tmp_best_cost) {
           tmp_best_cost = tmp;
@@ -724,10 +757,27 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
               }
               assert(current_gate_kernel_type == KernelType::fusion ||
                      current_gate_kernel_type == KernelType::shared_memory);
-              if (new_gate_kernel.size() <=
-                  (current_gate_kernel_type == KernelType::fusion
-                       ? max_fusion_kernel_size
-                       : shared_memory_kernel_size)) {
+              bool kernel_size_ok = false;
+              if (current_gate_kernel_type == KernelType::fusion) {
+                kernel_size_ok =
+                    new_gate_kernel.size() <= max_fusion_kernel_size;
+              } else {
+                if (new_gate_kernel.size() <= shared_memory_kernel_size) {
+                  kernel_size_ok = true;
+                } else {
+                  // Check cacheline qubits.
+                  int num_cacheline_qubits = 0;
+                  for (const auto &qubit : new_gate_kernel) {
+                    if (is_shared_memory_cacheline_qubit[qubit]) {
+                      num_cacheline_qubits++;
+                    }
+                  }
+                  kernel_size_ok =
+                      new_gate_kernel.size() - num_cacheline_qubits <=
+                      shared_memory_kernel_size;
+                }
+              }
+              if (kernel_size_ok) {
                 std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
                 // If we merge a kernel with the current gate, we do not need
                 // to search for other kernels to merge together.
@@ -773,11 +823,37 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
         assert(current_merging_kernel_type == KernelType::fusion ||
                current_merging_kernel_type == KernelType::shared_memory);
-        if (current_merging_kernel.size() +
-                current_status.sets[kernel_index].first.size() >
-            (current_merging_kernel_type == KernelType::fusion
-                 ? max_fusion_kernel_size
-                 : shared_memory_kernel_size)) {
+        bool kernel_size_ok = false;
+        if (current_merging_kernel_type == KernelType::fusion) {
+          kernel_size_ok = current_merging_kernel.size() +
+                               current_status.sets[kernel_index].first.size() <=
+                           max_fusion_kernel_size;
+        } else {
+          if (current_merging_kernel.size() +
+                  current_status.sets[kernel_index].first.size() <=
+              shared_memory_kernel_size) {
+            kernel_size_ok = true;
+          } else {
+            // Check cacheline qubits.
+            int num_cacheline_qubits = 0;
+            for (const auto &qubit : current_merging_kernel) {
+              if (is_shared_memory_cacheline_qubit[qubit]) {
+                num_cacheline_qubits++;
+              }
+            }
+            for (const auto &qubit : current_status.sets[kernel_index].first) {
+              if (is_shared_memory_cacheline_qubit[qubit]) {
+                num_cacheline_qubits++;
+              }
+            }
+            kernel_size_ok =
+                current_merging_kernel.size() +
+                    current_status.sets[kernel_index].first.size() -
+                    num_cacheline_qubits <=
+                shared_memory_kernel_size;
+          }
+        }
+        if (!kernel_size_ok) {
           // The kernel would be too large if we merge this one.
           // Continue to the next one.
           return;
@@ -830,7 +906,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     // Compute the end schedule and get the one with minimal total cost.
     KernelCostType cost;
     std::vector<std::pair<std::vector<int>, KernelType>> end_schedule;
-    compute_end_schedule(kernel_cost, it.first.sets, cost, &end_schedule);
+    compute_end_schedule(kernel_cost, it.first.sets,
+                         is_shared_memory_cacheline_qubit, cost, &end_schedule);
     if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;
       result_schedule = it.second.second;
@@ -900,7 +977,6 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
 int Schedule::get_num_kernels() const { return (int)kernels.size(); }
 
 void Schedule::print_kernel_schedule() const {
-  assert(kernels.size() == kernel_qubits.size());
   const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
             << " kernels: cost = " << cost_ << std::endl;
@@ -912,13 +988,16 @@ void Schedule::print_kernel_schedule() const {
 
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<bool>> &local_qubits,
+              const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
               bool absorb_single_qubit_gates) {
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
+  std::vector<int> current_local_qubit_layout;
+  std::vector<int> current_global_qubit_layout;
+  std::vector<bool> local_qubit_mask(num_qubits, false);
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
 
@@ -934,6 +1013,63 @@ get_schedules(const CircuitSeq &sequence,
   std::unordered_map<std::string, std::queue<int>> gate_indices;
 
   for (auto &local_qubit : local_qubits) {
+    // Convert vector<int> to vector<bool>.
+    local_qubit_mask.assign(num_qubits, false);
+    for (auto &i : local_qubit) {
+      local_qubit_mask[i] = true;
+    }
+    std::cout << std::endl;
+    if (current_local_qubit_layout.empty()) {
+      // First iteration. Take the initial layout from |local_qubits[0]|.
+      current_local_qubit_layout = local_qubit;
+      current_global_qubit_layout.reserve(num_qubits - local_qubit.size());
+      // The global qubits are sorted in ascending order.
+      for (int i = 0; i < num_qubits; i++) {
+        if (!local_qubit_mask[i]) {
+          current_global_qubit_layout.push_back(i);
+        }
+      }
+    } else {
+      // Update the layout.
+      // We should have the same number of local qubits.
+      assert(local_qubit.size() == current_local_qubit_layout.size());
+      int num_global_swaps = 0;
+      for (auto &i : current_global_qubit_layout) {
+        if (local_qubit_mask[i]) {
+          // A global-to-local swap.
+          num_global_swaps++;
+        }
+      }
+      int should_swap_ptr = 0;
+      for (int i = (int)current_local_qubit_layout.size() - num_global_swaps;
+           i < (int)current_local_qubit_layout.size(); i++) {
+        if (!local_qubit_mask[current_local_qubit_layout[i]]) {
+          // This qubit should be swapped with a global qubit,
+          // and it is already at the correct position.
+          continue;
+        }
+        while (local_qubit_mask[current_local_qubit_layout[should_swap_ptr]]) {
+          should_swap_ptr++;
+        }
+        // Find the first local qubit that should be swapped with a global
+        // qubit, and perform a local swap.
+        std::swap(current_local_qubit_layout[i],
+                  current_local_qubit_layout[should_swap_ptr]);
+        should_swap_ptr++;
+      }
+      for (auto &i : current_global_qubit_layout) {
+        if (local_qubit_mask[i]) {
+          // Swap the new local qubit with the qubit at its corresponding
+          // position.
+          std::swap(
+              i,
+              current_local_qubit_layout
+                  [(int)current_local_qubit_layout.size() - num_global_swaps]);
+          num_global_swaps--;
+        }
+      }
+    }
+
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
@@ -961,21 +1097,20 @@ get_schedules(const CircuitSeq &sequence,
               // Skip the control qubits.
               continue;
             }
-            if (wire->is_qubit() && !local_qubit[wire->index]) {
+            if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
               executable = false;
               break;
             }
           }
         }
-      } else {
-        if (!sequence.gates[i]->gate->is_sparse()) {
-          // For non-sparse non-controlled gates, we need to have all qubits
-          // local.
-          for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && !local_qubit[wire->index]) {
-              executable = false;
-              break;
-            }
+      } else if (sequence.gates[i]->gate->get_num_qubits() > 1 ||
+                 !sequence.gates[i]->gate->is_sparse()) {
+        // For non-controlled multi-qubit gates and non-sparse single-qubit
+        // gates, we need to have all qubits local.
+        for (auto &wire : sequence.gates[i]->input_wires) {
+          if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
+            executable = false;
+            break;
           }
         }
       }
@@ -986,7 +1121,7 @@ get_schedules(const CircuitSeq &sequence,
           // Count the number of local qubits.
           int num_local_qubit = 0;
           for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && local_qubit[wire->index]) {
+            if (wire->is_qubit() && local_qubit_mask[wire->index]) {
               num_local_qubit++;
             }
           }
@@ -1028,7 +1163,8 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    result.emplace_back(current_seq, local_qubit, ctx);
+    result.emplace_back(current_seq, current_local_qubit_layout,
+                        current_global_qubit_layout, ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
@@ -1156,7 +1292,7 @@ get_schedules(const CircuitSeq &sequence,
   return result;
 }
 
-std::vector<std::vector<bool>>
+std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter) {
   const int num_qubits = sequence.get_num_qubits();
@@ -1174,7 +1310,15 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
     // 0 is always executable
     // 1 is the target qubits must be local-only
     // 2 is local-only
-    if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+    if (sequence.gates[i]->gate->get_num_qubits() == 1) {
+      if (sequence.gates[i]->gate->is_sparse()) {
+        // A single-qubit gate is always executable if it is "sparse".
+        executable_type = 0;
+      } else {
+        // Otherwise, we require the qubit to be local-only.
+        executable_type = 2;
+      }
+    } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
       if (sequence.gates[i]->gate->is_symmetric()) {
         // A controlled gate is always executable if every qubit can be a
         // control qubit.
@@ -1187,16 +1331,12 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
         executable_type = 1;
       }
     } else {
-      if (sequence.gates[i]->gate->is_sparse()) {
-        // A non-controlled gate is always executable if it is "sparse".
-        // The only multi-qubit case here is the SWAP gate.
-        // XXX: The usage of is_sparse() needs to be changed if we ever
-        // introduce multi-qubit gates that is sparse but not executable.
-        executable_type = 0;
-      } else {
-        // For all other cases, we require all qubits to be local-only.
-        executable_type = 2;
-      }
+      // For all non-controlled multi-qubit gates,
+      // we require all qubits to be local-only.
+      // Note: although the SWAP gate can be executed globally,
+      // it cannot be executed when it's partial global and partial local,
+      // so we restrict it to be local-only here.
+      executable_type = 2;
     }
     circuit_gate_executable_type.push_back(executable_type);
     gate_index[sequence.gates[i].get()] = i;
@@ -1213,15 +1353,7 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
         circuit_gate_qubits, circuit_gate_executable_type, out_gate, num_qubits,
         num_local_qubits, num_iterations);
     if (!result.empty()) {
-      // convert vector<int> to vector<bool>
-      std::vector<std::vector<bool>> ret(result.size());
-      for (int i = 0; i < (int)result.size(); i++) {
-        ret[i] = std::vector<bool>(num_qubits, false);
-        for (auto j : result[i]) {
-          ret[i][j] = true;
-        }
-      }
-      return ret;
+      return result;
     }
   }
 }

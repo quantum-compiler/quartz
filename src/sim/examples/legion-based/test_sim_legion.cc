@@ -38,9 +38,9 @@ void sim::top_level_task(
   //               "_indep_qiskit_" + std::to_string(config.num_all_qubits) +
   //               ".qasm");
   auto seq = quartz::CircuitSeq::from_qasm_file(
-      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_28") +
-                "q/qft"
-                "_indep_qiskit_28" +
+      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_29") +
+                "q/dj"
+                "_indep_qiskit_29" +
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
                                          config.num_local_qubits);

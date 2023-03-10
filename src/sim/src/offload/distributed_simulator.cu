@@ -48,7 +48,9 @@ void DistributedSimulator::sv_comp_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   GateInfo const *info = (GateInfo *)task->args;
-  if (info == nullptr) return;
+  FusedGate* fgates = (FusedGate*) info->fgates;
+  printf("num_target: %d, %d, %d, %d\n", fgates[0].num_target, fgates[1].num_target, fgates[2].num_target, fgates[3].num_target);
+  // if (info == nullptr) return;
   DSHandler const *handler = (DSHandler *)task->local_args;
   
   assert(handler->vecDataType == DT_FLOAT_COMPLEX || handler->vecDataType == DT_DOUBLE_COMPLEX);
@@ -76,6 +78,38 @@ void DistributedSimulator::sv_comp_task(
   
   // FUSED Gates
   unsigned const nIndexBits = handler->num_local_qubits;
+
+  for (int i = 1; i < 4; i++) {
+    unsigned const nTargets = fgates[i].num_target;
+    unsigned const nControls = fgates[i].num_control;
+    int const adjoint = 0;
+    std::vector<int> targets;
+    std::vector<int> controls;
+
+  
+    for (int k = 0; k < nTargets; k++) {
+      targets.push_back(k);
+    }
+
+    //   // apply gate
+    custatevecApplyMatrix(
+        /* custatevecHandle_t */ handler->statevec,
+        /* void* */ state_vector.get_void_ptr(),
+        /* cudaDataType_t */ data_type,
+        /* const uint32_t */ nIndexBits,
+        /* const void* */ fgates[i].matrix,
+        /* cudaDataType_t */ data_type,
+        /* custatevecMatrixLayout_t */ CUSTATEVEC_MATRIX_LAYOUT_ROW,
+        /* const int32_t */ adjoint,
+        /* const int32_t* */ targets.data(),
+        /* const uint32_t */ nTargets,
+        /* const int32_t* */ controls.data(),
+        /* const int32_t* */ nullptr,
+        /* const uint32_t */ nControls,
+        /* custatevecComputeType_t */ compute_type,
+        /* void* */ handler->workSpace,
+        /* size_t */ handler->workSpaceSize);
+  }
   
   // for (int gate_idx=0; gate_idx < info->num_batched_gates; gate_idx++){
   //   if (info->gtype == SHM) break;

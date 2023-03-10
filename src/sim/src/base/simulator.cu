@@ -260,8 +260,9 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   int maskBitString[] = {};
   int maskOrdering[] = {};
 
-  // global bit swap within a node
-  if ((~global_mask) + 1 <= n_devices) {
+  // global qubit swap within a node (currently disabled since we want to keep consistent witht the DP on qubit layout)
+  // if ((~global_mask) + 1 <= n_devices) {
+  if (false) {
     printf("Using cuQuantum for swaps within a node %d\n",
            n_global_within_node);
     // need to perm d_sv according to device_phy_to_logical map

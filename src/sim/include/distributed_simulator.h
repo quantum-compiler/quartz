@@ -17,10 +17,10 @@ public:
 };
 
 struct GateInfo {
-  // FusedGate** fgates = nullptr;
+  FusedGate* fgates = nullptr;
   // int* num_fused = nullptr;
   // KernelGate** kgates = nullptr;
-  KernelGate* kgates = nullptr;
+  // KernelGate* kgates = nullptr;
   // int* num_shm = nullptr;
   // qindex* active_qubits_logical = nullptr;
   int num_tasks = 0;

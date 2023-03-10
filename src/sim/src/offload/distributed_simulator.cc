@@ -142,9 +142,16 @@ bool DistributedSimulator::run() {
   int fused_idx = 0;
   int shm_idx = 0;
   int current_task = 0;
+  FusedGate* fgates = (FusedGate*) malloc(4*sizeof(FusedGate));
+  for (int j = 0; j < 4; j++) {
+    FusedGate gate(circuit.gates[j+1]);
+    printf("num target: %d\n", gate.num_target);
+    fgates[j] = gate;
+  }
   // GateInfo info{circuit.fused_gates_.data(), circuit.num_fused.data(), circuit.shm_gates_.data(), circuit.num_shm.data(), circuit.active_physic_qs.data()};
-  // GateInfo info{circuit.shm_gates_[0].second};
-  // apply_gates(info);
+  GateInfo info{fgates};
+  apply_gates(info);
+  printf("hhhhh\n");
   
   // while (current_task < circuit.task_map.size()) {
   //   int num_tasks = 0;
@@ -185,7 +192,7 @@ bool DistributedSimulator::run() {
 bool DistributedSimulator::apply_gates(const GateInfo &info) {
   Context ctx = config.lg_ctx;
   Runtime* runtime = config.lg_hlr;
-  for (size_t i = 0; i < 1; i++) {
+  for (size_t i = 0; i < cpu_state_vectors.size(); i++) {
     std::pair<LogicalRegion, LogicalPartition> cpu_sv = cpu_state_vectors[i];
     std::pair<LogicalRegion, LogicalPartition> gpu_sv =
         gpu_state_vectors[i % gpu_state_vectors.size()];
@@ -221,20 +228,20 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
       runtime->execute_index_space(ctx, launcher);
     }
     // Step 3: move a state vector from GPU memory to DRAM
-    // {
-    //   IndexCopyLauncher launcher(parallel_is);
-    //   launcher.add_copy_requirements(
-    //       RegionRequirement(
-    //           gpu_state_vectors[i % gpu_state_vectors.size()].second,
-    //           0 /*projection ID*/, READ_ONLY, EXCLUSIVE,
-    //           gpu_state_vectors[i % gpu_state_vectors.size()].first),
-    //       RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/,
-    //                         WRITE_DISCARD, EXCLUSIVE, cpu_state_vectors[i].first,
-    //                         MAP_TO_ZC_MEMORY));
-    //   launcher.add_src_field(0, FID_DATA);
-    //   launcher.add_dst_field(0, FID_DATA);
-    //   runtime->issue_copy_operation(ctx, launcher);
-    // }
+    {
+      IndexCopyLauncher launcher(parallel_is);
+      launcher.add_copy_requirements(
+          RegionRequirement(
+              gpu_state_vectors[i % gpu_state_vectors.size()].second,
+              0 /*projection ID*/, READ_ONLY, EXCLUSIVE,
+              gpu_state_vectors[i % gpu_state_vectors.size()].first),
+          RegionRequirement(cpu_state_vectors[i].second, 0 /*projection ID*/,
+                            WRITE_DISCARD, EXCLUSIVE, cpu_state_vectors[i].first,
+                            MAP_TO_ZC_MEMORY));
+      launcher.add_src_field(0, FID_DATA);
+      launcher.add_dst_field(0, FID_DATA);
+      runtime->issue_copy_operation(ctx, launcher);
+    }
   }
   return true;
 }

@@ -36,16 +36,13 @@ public:
   void simulate(bool use_mpi);
 
 private:
-  // called inside load_circuit_from_file
-  bool parse_gate(std::stringstream &ss, std::string const &gate_name);
-
   // called inside compile
   bool FuseGates(const quartz::Kernel &kernel, quartz::Context *ctx);
   void MatMul(unsigned mask, unsigned n_fused, M &res_mat, const M &m1,
               unsigned m_size);
   void MatShuffle(M &res_mat, unsigned n_qubit, const std::vector<int> &perm);
-  void update_layout(std:;vector<int> local_qubits);
-  bool getMat_per_device(int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, M &res, unsigned &mask, std::vector<int>& perm);
+  void update_layout(std::vector<int> local_qubits);
+  bool getMat_per_device(quartz::Context *ctx, int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, std::vector<ComplexType> &res, unsigned &mask, std::vector<int>& perm);
   
   KernelGateType toKernel(quartz::GateType type);
 

@@ -53,7 +53,7 @@ struct FusedGate {
     for (int i = 0; i < gate.matrix.size(); i++) {
       for (int j = 0; j < gate.matrix[i].size(); j++) {
         matrix[i*gate.matrix[i].size()+j].x = gate.matrix[i][j].real();
-        matrix[i*gate.matrix[i].size()+].y = gate.matrix[i][j].imag();
+        matrix[i*gate.matrix[i].size()+j].y = gate.matrix[i][j].imag();
       }    
     }
   }

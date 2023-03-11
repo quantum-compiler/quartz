@@ -186,9 +186,9 @@ bool qcircuit::Circuit<DT>::load_circuit_from_file(
     // controled gates: c n_control control_qubits gate_name target_qubits
     // params shuffle gate: sf new_perm
     ss >> gate_name;
-    if (!parse_gate(ss, gate_name)) {
-      return false;
-    }
+    // if (!parse_gate(ss, gate_name)) {
+    //   return false;
+    // }
   }
 
   return true;
@@ -205,6 +205,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   std::vector<std::vector<int>> local_qubits;
   if (!use_ilp)
     // int result = num_iterations_by_heuristics(seq, n_local, local_qubits);
+    assert(0);
   else {
     local_qubits =
         compute_local_qubits_with_ilp(*seq, n_local, ctx, interpreter);
@@ -215,13 +216,13 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   quartz::KernelCost kernel_cost(
       /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
       /*shared_memory_init_cost=*/10,
-      /*shared_memory_gate_cost=*/[](quartz::GateType type) { if(type==quartz::GateType::swap) return 1000; else return 0.8; },
+      /*shared_memory_gate_cost=*/[](quartz::GateType type) { return 0.8; },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
   int idx = 0;
   int num_fuse = 0;
   int num_shm = 0;
-  local_mask.assign(num_qubits, fasle);
+  local_mask.assign(num_qubits, false);
   for (auto &schedule : schedules) {
     // add shuffle gate
     std::vector<int> target;
@@ -264,7 +265,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
               assert(k >= 3);
               cnt++;
               active_qubits_logical |= (1ll << permutation[k]);
-              if (cnt == SHARED_MEM_SIZE);
+              if (cnt == SHARED_MEM_SIZE)
                   break;
             }
           }
@@ -355,7 +356,7 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
       normal_idx++;
     }
     else if (task == FUSED) {
-      for (int i = 0; i < ndevices; i++){
+      for (int i = 0; i < n_devices; i++){
         simulator.ApplyGate(gates[normal_idx], i);
         normal_idx++;
       }
@@ -372,112 +373,6 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
 }
 
 /* private functiona for qcircuit::Circuit */
-// TODO: add more gates
-template <typename DT>
-bool qcircuit::Circuit<DT>::parse_gate(std::stringstream &ss,
-                                       std::string const &gate_name) {
-  int q0, q1;
-  DT isqrt2 = 1 / std::sqrt(2);
-  unsigned n_control;
-  std::vector<int> control;
-  SimGateType g_type = NORMAL;
-  std::string tgate_name;
-
-  if (gate_name == "c") {
-    ss >> n_control;
-    g_type = CONTROL;
-    for (int i = 0; i < n_control; i++) {
-      int c_qubit;
-      ss >> c_qubit;
-      control.push_back(c_qubit);
-    }
-    tgate_name.reserve(16);
-    ss >> tgate_name;
-  }
-
-  std::string gname = n_control == 0 ? gate_name : tgate_name;
-
-  if (gname == "h") {
-    ss >> q0;
-    Gate<DT> gate{g_type,
-                  1,
-                  n_control,
-                  {q0},
-                  control,
-                  {},
-                  {{isqrt2, 0}, {isqrt2, 0}, {isqrt2, 0}, {-isqrt2, 0}}};
-    gates.push_back(gate);
-  } else if (gname == "t") {
-    ss >> q0;
-    Gate<DT> gate{g_type,
-                  1,
-                  n_control,
-                  {q0},
-                  control,
-                  {},
-                  {{1, 0}, {0, 0}, {0, 0}, {isqrt2, isqrt2}}};
-    gates.push_back(gate);
-  } else if (gname == "x") {
-    ss >> q0;
-    Gate<DT> gate{g_type,
-                  1,
-                  n_control,
-                  {q0},
-                  control,
-                  {},
-                  {{0, 0}, {1, 0}, {1, 0}, {0, 0}}};
-    gates.push_back(gate);
-  } else if (gate_name == "y") {
-    ss >> q0;
-    Gate<DT> gate{g_type,
-                  1,
-                  n_control,
-                  {q0},
-                  control,
-                  {},
-                  {{0, 0}, {0, -1}, {0, 1}, {0, 0}}};
-    gates.push_back(gate);
-  } else if (gname == "z") {
-    ss >> q0;
-    Gate<DT> gate{g_type,
-                  1,
-                  n_control,
-                  {q0},
-                  control,
-                  {},
-                  {{1, 0}, {0, 0}, {0, 0}, {-1, 0}}};
-    gates.push_back(gate);
-  } else if (gname == "cz") {
-    ss >> q0 >> q1;
-    Gate<DT> gate{
-        g_type, 2, n_control, {q0}, control, {}, {1, 0, 0, 0, 0, 0, 0,  0,
-                                                  0, 0, 1, 0, 0, 0, 0,  0,
-                                                  0, 0, 0, 0, 1, 0, 0,  0,
-                                                  0, 0, 0, 0, 0, 0, -1, 0}};
-    gates.push_back(gate);
-  } else if (gname == "cnot" || gate_name == "cx") {
-    ss >> q0 >> q1;
-    Gate<DT> gate{
-        g_type, 2, n_control, {q0, q1}, control, {}, {1, 0, 0, 0, 0, 0, 0, 0,
-                                                      0, 0, 0, 0, 0, 0, 1, 0,
-                                                      0, 0, 0, 0, 1, 0, 0, 0,
-                                                      0, 0, 1, 0, 0, 0, 0, 0}};
-    gates.push_back(gate);
-  } else if (gname == "shuffle") {
-    std::vector<int> target;
-    for (int i = 0; i < num_qubits; i++) {
-      int qubit;
-      ss >> qubit;
-      target.push_back(qubit);
-    }
-    Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
-    gates.push_back(gate);
-  } else {
-    return false;
-  }
-
-  return true;
-}
 
 // an naive impl for fusing gates: can be more efficient
 template <typename DT>
@@ -493,7 +388,7 @@ bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
   int fuse = 0;
   qubit_group_map_fusion.clear();
   for (int i = 0; i < n_local; i++) {
-    if (std::find(kernel.qubits.begin(), kernel.qubits.end(), permutation[i]) != v.end()) {
+    if (std::find(kernel.qubits.begin(), kernel.qubits.end(), permutation[i]) != kernel.qubits.end()) {
         target.push_back(i); //physical target
         qubit_group_map_fusion[permutation[i]] = fuse++;
     }
@@ -515,7 +410,7 @@ bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
   unsigned ksize = unsigned(1) << kernel.qubits.size();
   unsigned vec_size = ksize * ksize;
   std::vector<std::vector<std::complex<DT>>> res_mats;
-  std::vector<std::complex<DT> res_mat;
+  std::vector<std::complex<DT>> res_mat;
   res_mat.resize(vec_size);
   for (unsigned i = 0; i < ksize; ++i) {
     res_mat[(ksize * i + i)] = std::complex<DT>(1, 0);
@@ -524,9 +419,9 @@ bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
     res_mats.push_back(res_mat);
   }
 
-  printf("Fused Kernel Size: %d\n", ksize);
-  // reorder qubits to increasing order
-  std::sort(qubits.begin(), qubits.end());
+  // printf("Fused Kernel Size: %d\n", ksize);
+  // // reorder qubits to increasing order
+  // std::sort(qubits.begin(), qubits.end());
 
   for (int i = 0; i < kernel.gates.gates.size(); i++) {
     printf("Gate %d: [", i);
@@ -543,11 +438,12 @@ bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
     printf("]\n");
 
     for (int d = 0; d < n_devices; d++) {
-      std::vector<std::complex<qreal>> temp_mat;
       unsigned mask = 0;
       std::vector<int> qperm;
-      if(getMat_per_device(myRank*n_devices+d, kernel.gates.gates[i]->gate, qubit_indices, params, temp_mat, mask, qperm)) {
+      std::vector<ComplexType> temp_mat_;
+      if(getMat_per_device(ctx, myRank*n_devices+d, kernel.gates.gates[i]->gate, qubit_indices, params, temp_mat_, mask, qperm)) {
         //do MatMul
+        M temp_mat(temp_mat_.begin(), temp_mat_.end());
         MatShuffle(temp_mat, qubit_indices.size(), qperm);
         MatMul(mask, qubits.size(), res_mats[i], temp_mat, qubit_indices.size());
       }
@@ -649,8 +545,7 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
 
 #define IS_HIGH_PART(part_id, logicIdx) ((part_id >> (pos[logicIdx] - n_local) & 1) > 0)
 template <typename DT>
-bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, M& res, unsigned &mask, std::vector<int>& perm) {
-  
+bool qcircuit::Circuit<DT>::getMat_per_device(quartz::Context *ctx, int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, std::vector<ComplexType>& res, unsigned &mask, std::vector<int>& perm) {
   if (gate->get_num_control_qubits() == 2) { //ccx
     int c2 = qubit_indices[0];
     int c1 = qubit_indices[1];
@@ -658,7 +553,7 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
     if(local_mask[c2] && !local_mask[c1]) {
       int c = c1; c1 = c2; c2 = c;
     }
-    if (local_mask(c1) && local_mask(c2)) { // CCU(c1, c2, t)
+    if (local_mask[c1] && local_mask[c2]) { // CCU(c1, c2, t)
       auto *m = gate->get_matrix(params);
       res = m->flatten();
       std::vector<int> position;
@@ -668,7 +563,7 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
         mask |= 1 << v;
       }
       std::vector<int> sorted_position_;
-      std::sort(sorted_position_.begin(), sorted_postition_.end());
+      std::sort(sorted_position_.begin(), sorted_position_.end());
       assert(qubit_indices.size()==3);
       perm.resize(qubit_indices.size());
       for (int t = 0; t < qubit_indices.size(); t++) {
@@ -678,17 +573,17 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
         perm[it2] = t;
       }
       return true;
-    } else if (local_mask(c1) && !local_mask(c2)) {
+    } else if (local_mask[c1] && !local_mask[c2]) {
         if (IS_HIGH_PART(part_id, c2)) { // CU(c1, t)
           //cx/cz gate mat
           if(gate->tp == quartz::GateType::ccx) {
-            quartz::CXGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::cx);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           else if(gate->tp == quartz::GateType::ccz) {
-            quartz::CZGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::cz);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           mask |= 1 << qubit_group_map_fusion.at(c1);
@@ -701,16 +596,16 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
         } else { // ID(t)
           return false;
         }
-    } else { // !local_mask(c1) && !local_mask(c2)
+    } else { // !local_mask[c1] && !local_mask[c2]
         if (IS_HIGH_PART(part_id, c1) && IS_HIGH_PART(part_id, c2)) { // U(t)
           if(gate->tp == quartz::GateType::ccx) {
-            quartz::XGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::x);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           else if(gate->tp == quartz::GateType::ccz) {
-            quartz::ZGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::cz);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           mask |= 1 << qubit_group_map_fusion.at(t);
@@ -724,7 +619,7 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
   }
   else if (gate->get_num_control_qubits() == 1) {//cz, cp, cx
     int c = qubit_indices[0], t = qubit_indices[1];
-    if (local_mask(c) && local_mask(t)) { // CU(c, t)
+    if (local_mask[c] && local_mask[t]) { // CU(c, t)
       auto *m = gate->get_matrix();
       res = m->flatten();
       mask |= 1 << qubit_group_map_fusion.at(c);
@@ -733,17 +628,17 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
       perm[0] = qubit_group_map_fusion.at(c) > qubit_group_map_fusion.at(t) ? 1 : 0;
       perm[1] = 1 - perm[0];
       return true;    
-    } else if (local_mask(c) && !local_mask(t)) { // U(c)
+    } else if (local_mask[c] && !local_mask[t]) { // U(c)
         if (IS_HIGH_PART(part_id, t)) { // U(t)
           // for this case, control qubit will become target, can be proved
           if(gate->tp == quartz::GateType::cz) {
-            quartz::ZGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::z);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           else if(gate->tp == quartz::GateType::cp) {
-            quartz::PGate new_gate;
-            auto *m = new_gate.get_matrix(params);
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::p);
+            auto *m = new_gate->get_matrix(params);
             res = m->flatten();
           }
           mask |= 1 << qubit_group_map_fusion.at(c);
@@ -754,21 +649,21 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
         else {
           return false;
         }
-    } else if (!local_mask(c) && local_mask(t)) {
+    } else if (!local_mask[c] && local_mask[t]) {
         if (IS_HIGH_PART(part_id, c)) { // U(t)
           if(gate->tp == quartz::GateType::cx) {
-            quartz::XGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::x);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           else if(gate->tp == quartz::GateType::cz) {
-            quartz::ZGate new_gate;
-            auto *m = new_gate.get_matrix();
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::z);
+            auto *m = new_gate->get_matrix();
             res = m->flatten();
           }
           else if(gate->tp == quartz::GateType::cp) {
-            quartz::PGate new_gate;
-            auto *m = new_gate.get_matrix(params);
+            quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::p);
+            auto *m = new_gate->get_matrix(params);
             res = m->flatten();
           }
           mask |= 1 << qubit_group_map_fusion.at(t);
@@ -778,14 +673,14 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
         } else {
             return false;
         }
-    } else { // !local_mask(c) && !local_mask(t)
+    } else { // !local_mask[c] && !local_mask[t]
         assert(gate->tp == quartz::GateType::cz || gate->tp == quartz::GateType::cp);
         if (IS_HIGH_PART(part_id, c)) {
             switch (gate->tp) {
-                case quartz::GateType::CZ: {
+                case quartz::GateType::cz: {
                     if (IS_HIGH_PART(part_id, t)) {
-                        quartz::ZGate new_gate;
-                        auto *m = new_gate.get_matrix();
+                        quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::z);
+                        auto *m = new_gate->get_matrix();
                         res = m->flatten();
                         res[0] = res[3];
                         mask |= 1 << 0;
@@ -794,10 +689,10 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
                         return true;  
                     }
                 }
-                case quartz::GateType::CP: {
+                case quartz::GateType::cp: {
                     if (IS_HIGH_PART(part_id, t)) {
-                        quartz::PGate new_gate;
-                        auto *m = new_gate.get_matrix(params);
+                        quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::p);
+                        auto *m = new_gate->get_matrix(params);
                         res = m->flatten();
                         res[0] = res[3];
                         mask |= 1 << 0;
@@ -814,14 +709,12 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
   }
   else if (gate->get_num_control_qubits() == 0) {
     int t = qubit_indices[0];
-      if (!local_mask(t)) { // GCC(t)
-        auto *m = gate->get_matrix();
-        res = m->flatten();
+      if (!local_mask[t]) { // GCC(t)
         switch (gate->tp) {
             case quartz::GateType::p: {
                 if (IS_HIGH_PART(part_id, t)) {
-                    quartz::PGate new_gate;
-                    auto *m = new_gate.get_matrix(params);
+                    quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::p);
+                    auto *m = new_gate->get_matrix(params);
                     res = m->flatten();
                     res[0] = res[3];
                     mask |= 1 << 0;
@@ -834,8 +727,8 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
             }
             case quartz::GateType::z: {
                 if (IS_HIGH_PART(part_id, t)) {
-                    quartz::ZGate new_gate;
-                    auto *m = new_gate.get_matrix();
+                    quartz::Gate* new_gate = ctx->get_gate(quartz::GateType::z);
+                    auto *m = new_gate->get_matrix();
                     res = m->flatten();
                     res[0] = res[3];
                     mask |= 1 << 0;
@@ -855,7 +748,7 @@ bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, s
             //     }
             // }
         }
-      } else { // local_mask(t) -> U(t)
+      } else { // local_mask[t] -> U(t)
           auto *m = gate->get_matrix();
           res = m->flatten();
           mask |= 1 << qubit_group_map_fusion.at(t);

@@ -10,9 +10,6 @@
 
 #include "simgate.h"
 
-#define MAX_DEVICES 4
-#define MAX_QUBIT 30
-
 #define MPICHECK(cmd)                                                          \
   do {                                                                         \
     int e = cmd;                                                               \

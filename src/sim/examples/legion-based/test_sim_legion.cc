@@ -44,9 +44,9 @@ void sim::top_level_task(
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
                                          config.num_local_qubits);
-  circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
-  DistributedSimulator simulator(config, circuit);
-  simulator.run();
+  // circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
+  // DistributedSimulator simulator(config, circuit);
+  // simulator.run();
 }
 
 DSConfig::DSConfig() {

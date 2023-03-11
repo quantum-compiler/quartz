@@ -7,6 +7,9 @@ using quartz::GateType;
 int main(int argc, char *argv[]) {
 
   MPICHECK(MPI_Init(&argc, &argv));
+  MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &myRank));
+  MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &nRanks));
+  printf("Num ranks: %d, myrank: %d\n", nRanks, myRank);
 
   std::string circuit_file;
   unsigned nqubits;
@@ -46,9 +49,9 @@ int main(int argc, char *argv[]) {
       &ctx, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_") +
                 std::to_string(nqubits) + "q/" + circuit_file +
                 "_indep_qiskit_" + std::to_string(nqubits) + ".qasm");
-  sim::qcircuit::Circuit<double> circuit(nqubits, nlocal);
-  circuit.compile(seq.get(), &ctx, &interpreter, use_ilp);
-  // circuit.simulate(ndevice, true);
+  sim::qcircuit::Circuit<double> circuit(nqubits, nlocal, myRank, nRanks);
+  circuit.compile(seq.get(), &ctx, &interpreter, ndevices, use_ilp);
+  // circuit.simulate(true);
 
   MPICHECK(MPI_Finalize());
 

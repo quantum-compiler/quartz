@@ -23,34 +23,18 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   cudaDataType_t data_type = cuDT;
   custatevecComputeType_t compute_type = cuCompute;
 
-  // TODO: get target & control qubit idx from current perm[]
-  std::vector<int> targets;
-  std::vector<int> controls;
-
-  // TODO: check if targets should be ordered
   printf("Targets: [");
   for (int i = 0; i < gate.target.size(); i++) {
-    // auto it = find(permutation.begin(), permutation.end(), gate.target[i]);
-    // assert(it != permutation.end());
-    // int idx = it - permutation.begin();
-    targets.push_back(pos[gate.target[i]]);
-    printf("(%d, %d) ", gate.target[i], pos[gate.target[i]]);
+    printf("(%d, %d) ", gate.target[i], permutation[gate.target[i]]);
   }
   printf("]\n");
-
-  for (int i = 0; i < gate.control.size(); i++) {
-    // auto it = find(permutation.begin(), permutation.end(), gate.control[i]);
-    // assert(it != permutation.end());
-    // int idx = it - permutation.begin();
-    controls.push_back(pos[gate.control[i]]);
-  }
 
   // check the size of external workspace
   HANDLE_ERROR(custatevecApplyMatrixGetWorkspaceSize(
       /* custatevecHandle_t */ handle_[device_id],
       /* cudaDataType_t */ data_type,
       /* const uint32_t */ nIndexBits,
-      /* const void* */ gate.matrix.data(),
+      /* const void* */ gate.matrix[i].data(),
       /* cudaDataType_t */ data_type,
       /* custatevecMatrixLayout_t */ CUSTATEVEC_MATRIX_LAYOUT_ROW,
       /* const int32_t */ adjoint,
@@ -70,13 +54,13 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
       /* void* */ d_sv[device_id],
       /* cudaDataType_t */ data_type,
       /* const uint32_t */ nIndexBits,
-      /* const void* */ gate.matrix.data(),
+      /* const void* */ gate.matrix[i].data(),
       /* cudaDataType_t */ data_type,
       /* custatevecMatrixLayout_t */ CUSTATEVEC_MATRIX_LAYOUT_ROW,
       /* const int32_t */ adjoint,
-      /* const int32_t* */ targets.data(),
+      /* const int32_t* */ gate.target.data(),
       /* const uint32_t */ nTargets,
-      /* const int32_t* */ controls.data(),
+      /* const int32_t* */ gate.control.data(),
       /* const int32_t* */ nullptr,
       /* const uint32_t */ nControls,
       /* custatevecComputeType_t */ compute_type,
@@ -459,9 +443,9 @@ template <typename DT>
 bool SimulatorCuQuantum<DT>::InitStateMulti(
     std::vector<unsigned> const &init_perm) {
 
-  MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &myRank));
-  MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &nRanks));
-  printf("Num ranks: %d, myrank: %d\n", nRanks, myRank);
+  // MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &myRank));
+  // MPICHECK(MPI_Comm_size(MPI_COMM_WORLD, &nRanks));
+  // printf("Num ranks: %d, myrank: %d\n", nRanks, myRank);
   // assert((1<<n_global)== nRanks*n_devices);
 
   unsigned x = n_devices;

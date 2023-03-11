@@ -25,12 +25,8 @@ struct Gate {
   std::vector<int> control;
   std::vector<int> control_value;
 
-  // if using legion, should use LogicalRegion (similar to weights in FlexFlow),
-  // currently using std::vector<DT> matrix is a flattened 2D array with size
-  // 2^(num_target)x2^(num_target)
-  Mat matrix;
+  std::vector<Mat> matrix;
 
-  // TODO: add creat APIs for manual creation
 };
 
 struct FusedGate {
@@ -40,23 +36,25 @@ struct FusedGate {
   unsigned num_control;
   // int target[MAX_KERNEL_SIZE];
   // int control[MAX_KERNEL_SIZE];
-  qindex target_logical = 0;
-  qindex control_logical = 0;
+  qindex target_physical = 0;
+  qindex control_physical = 0;
 
-  qComplex matrix[(1<<MAX_KERNEL_SIZE)];
+  qComplex matrix[MAX_DEVICES*(1<<MAX_KERNEL_SIZE)];
 
   FusedGate(const Gate<qreal> &gate) {
     num_target = gate.num_target;
     num_control = gate.num_control;
     for (int i = 0; i < gate.target.size(); i++) {
-      target_logical |= qindex(1) << gate.target[i];
+      target_physical |= qindex(1) << gate.target[i];
     }
     for (int i = 0; i < gate.control.size(); i++) {
-      control_logical |= qindex(1) << gate.control[i];
+      control_physical |= qindex(1) << gate.control[i];
     }
     for (int i = 0; i < gate.matrix.size(); i++) {
-      matrix[i].x = gate.matrix[i].real();
-      matrix[i].y = gate.matrix[i].imag();
+      for (int j = 0; j < gate.matrix[i].size(); j++) {
+        matrix[i*gate.matrix[i].size()+j].x = gate.matrix[i][j].real();
+        matrix[i*gate.matrix[i].size()+].y = gate.matrix[i][j].imag();
+      }    
     }
   }
     

@@ -131,7 +131,7 @@ qcircuit::Circuit<DT>::Circuit(std::vector<unsigned> const &perm,
                                unsigned nlocal) {
   num_qubits = perm.size();
   for (int i = 0; i < num_qubits; i++) {
-    permutation[i] = perm[i];
+    permutation.push_back(perm[i]);
   }
   n_local = nlocal;
   n_global = num_qubits - nlocal;
@@ -141,10 +141,24 @@ template <typename DT>
 qcircuit::Circuit<DT>::Circuit(unsigned nqubits, unsigned nlocal) {
   num_qubits = nqubits;
   for (int i = 0; i < num_qubits; i++) {
-    permutation[i] = i;
+    permutation.push_back(i);
+    pos.push_back(i);
   }
   n_local = nlocal;
   n_global = num_qubits - nlocal;
+}
+
+template <typename DT>
+qcircuit::Circuit<DT>::Circuit(unsigned nqubits, unsigned nlocal, int myrank, int nranks) {
+  num_qubits = nqubits;
+  for (int i = 0; i < num_qubits; i++) {
+    permutation.push_back(i);
+    pos.push_back(i);
+  }
+  n_local = nlocal;
+  n_global = num_qubits - nlocal;
+  myRank = myrank;
+  nRanks = nranks;
 }
 
 template <typename DT>
@@ -185,11 +199,12 @@ template <typename DT>
 bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
                                     quartz::Context *ctx,
                                     quartz::PythonInterpreter *interpreter,
+                                    int ndevices,
                                     bool use_ilp) {
   // 1. ILP/heuristics
-  std::vector<std::vector<bool>> local_qubits;
+  std::vector<std::vector<int>> local_qubits;
   if (!use_ilp)
-    int result = num_iterations_by_heuristics(seq, n_local, local_qubits);
+    // int result = num_iterations_by_heuristics(seq, n_local, local_qubits);
   else {
     local_qubits =
         compute_local_qubits_with_ilp(*seq, n_local, ctx, interpreter);
@@ -200,74 +215,60 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   quartz::KernelCost kernel_cost(
       /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
       /*shared_memory_init_cost=*/10,
-      /*shared_memory_gate_cost=*/[](quartz::GateType) { return 0.8; },
+      /*shared_memory_gate_cost=*/[](quartz::GateType type) { if(type==quartz::GateType::swap) return 1000; else return 0.8; },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
   int idx = 0;
   int num_fuse = 0;
   int num_shm = 0;
+  local_mask.assign(num_qubits, fasle);
   for (auto &schedule : schedules) {
     // add shuffle gate
     std::vector<int> target;
-    std::vector<int> global;
-    for (int i = 0; i < num_qubits; i++) {
-      if (local_qubits[idx][i]) {
-        target.push_back(i);
-      } else {
-        global.push_back(i);
-      }
+    for (int i = 0; i < n_local; i++) {
+      target.push_back(local_qubits[idx][i]);
+      local_mask[local_qubits[idx][i]] = true;
     }
 
     for (int i = 0; i < n_global; i++) {
-      target.push_back(global[i]);
+      if(!local_mask[i])
+        target.push_back(i);
     }
     Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
     gates.push_back(gate);
+    update_layout(target);
     idx++;
 
-    // schedule.compute_kernel_schedule(
-    //     {0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66});
-    // std::cout << "cost = " << schedule.cost_ << std::endl;
-    // schedule.print_kernel_schedule();
     for (auto &kernel : schedule.kernels) {
       if (kernel.type == quartz::KernelType::fusion) {
         num_fuse++;
-        SimGateType g_type = FUSED;
-        unsigned n_target = kernel.qubits.size();
-        unsigned n_control = 0;
-        std::vector<int> target;
-        std::vector<int> control;
-        printf( "Fusing Kernel (%d): qubits [", kernel.gates.gates.size());
-        for (int j = 0; j < (int)kernel.qubits.size(); j++) {
-          std::cout << kernel.qubits[j];
-          target.push_back(kernel.qubits[j]);
-          if (j != (int)kernel.qubits.size() - 1) {
-            std::cout << ", ";
-          }
-        }
-        std::cout << "], gates ";
-        std::cout << kernel.to_string() << std::endl;
-        // mat = FuseGates<DT>(kernels);
-        auto mat = FuseGates(kernel, ctx);
-
-        // add fused gates kernels
-        Gate<DT> gate{g_type, n_target, n_control, target, control, {}, mat};
-        gates.push_back(gate);
-        task_map.push_back(SimGateType::FUSED);
+        FuseGates(kernel, ctx);
       }
       else if (kernel.type == quartz::KernelType::shared_memory) {
         num_shm++;
         SimGateType g_type = SHM;
         qindex active_qubits_logical = 0;
-        printf("SHM Kernel (%d): [ ", kernel.gates.gates.size());
+        printf("SHM Kernel Physical (%d): [ ", kernel.gates.gates.size());
         for (int i = 0; i < kernel.qubits.size(); i++) {
           active_qubits_logical |= qindex(1) << kernel.qubits[i];
           if (i != kernel.qubits.size() - 1)
-            printf("%d,", kernel.qubits[i]);
+            printf("%d,", pos[kernel.qubits[i]]);
           else
-            printf("%d]\n", kernel.qubits[i]);
+            printf("%d]\n", pos[kernel.qubits[i]]);
         }
-        // TODO: if kernel.qubits.size() < SHARED_MEM_SIZE: fill it
+        // if kernel.qubits.size() < SHARED_MEM_SIZE: fill it
+        if (kernel.qubits.size() < SHARED_MEM_SIZE) {
+          int cnt = kernel.qubits.size();
+          for (int k = 0; k < SHARED_MEM_SIZE; k++) {
+            if (!(active_qubits_logical & (1ll << permutation[k]))) {
+              assert(k >= 3);
+              cnt++;
+              active_qubits_logical |= (1ll << permutation[k]);
+              if (cnt == SHARED_MEM_SIZE);
+                  break;
+            }
+          }
+        }
         active_logical_qs.push_back(active_qubits_logical);
         std::cout << kernel.to_string() << std::endl;
 
@@ -286,7 +287,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
           }
           auto *m = gate->gate->get_matrix(params);
           std::vector<std::complex<qreal>> mat = m->flatten();
-          //other way from quartz::GateType to KernelGateType?
+          // other way from quartz::GateType to KernelGateType?
           // target and control will be converted to related qubit when executing
           if (gate->gate->get_num_control_qubits() == 2) {
             // don't want to hardcode..
@@ -332,9 +333,9 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
 }
 
 template <typename DT>
-void qcircuit::Circuit<DT>::simulate(int ndevices, bool use_mpi) {
+void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
   using Simulator = SimulatorCuQuantum<DT>;
-  Simulator simulator(n_local, n_global, ndevices);
+  Simulator simulator(n_local, n_global, n_devices, myRank, nRanks);
   std::vector<unsigned> init_perm;
   for (int i = 0; i < n_local + n_global; i++) {
     init_perm.push_back(i);
@@ -480,21 +481,47 @@ bool qcircuit::Circuit<DT>::parse_gate(std::stringstream &ss,
 
 // an naive impl for fusing gates: can be more efficient
 template <typename DT>
-std::vector<std::complex<DT>>
-qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
+bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
                                  quartz::Context *ctx) {
-  // TODO: add support for gates on global qubits (CZ,...), 
-  // need to generate matrices per device
+  SimGateType g_type = FUSED;
+  unsigned n_target = kernel.qubits.size();
+  unsigned n_control = 0;
+  std::vector<int> target;
+  std::vector<int> control;
+  
+  //reset qubit group map for current fusion kernel's qubits
+  int fuse = 0;
+  qubit_group_map_fusion.clear();
+  for (int i = 0; i < n_local; i++) {
+    if (std::find(kernel.qubits.begin(), kernel.qubits.end(), permutation[i]) != v.end()) {
+        target.push_back(i); //physical target
+        qubit_group_map_fusion[permutation[i]] = fuse++;
+    }
+  }
 
-  // expand all gates to 2^n_target * 2^n_target matrix: identity X mat =>
-  // matrix shuffle
+  printf( "Fusing Kernel (%d gates): qubits [", kernel.gates.gates.size());
+  for (int j = 0; j < (int)kernel.qubits.size(); j++) {
+    std::cout << kernel.qubits[j];
+    target.push_back(kernel.qubits[j]);
+    if (j != (int)kernel.qubits.size() - 1) {
+      std::cout << ", ";
+    }
+  }
+  std::cout << "], gates ";
+  std::cout << kernel.to_string() << std::endl;
+
+
   std::vector<int> qubits = kernel.qubits;
   unsigned ksize = unsigned(1) << kernel.qubits.size();
   unsigned vec_size = ksize * ksize;
-  std::vector<std::complex<DT>> res_mat;
+  std::vector<std::vector<std::complex<DT>>> res_mats;
+  std::vector<std::complex<DT> res_mat;
   res_mat.resize(vec_size);
   for (unsigned i = 0; i < ksize; ++i) {
     res_mat[(ksize * i + i)] = std::complex<DT>(1, 0);
+  }
+  for (int i = 0; i < n_devices; i++) {
+    res_mats.push_back(res_mat);
   }
 
   printf("Fused Kernel Size: %d\n", ksize);
@@ -515,46 +542,25 @@ qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
     }
     printf("]\n");
 
-    // getting mask and qubit perm
-    std::vector<int> qperm;
-    qperm.resize(qubit_indices.size());
-    std::vector<int> ordered_qubit = qubit_indices;
-    std::sort(ordered_qubit.begin(), ordered_qubit.end());
-    unsigned mask = 0;
-    // get qubit mask and qubit perm for the gate to be fused
-    for (int t = 0; t < qubit_indices.size(); t++) {
-      int it = std::find(qubits.begin(), qubits.end(), qubit_indices[t]) -
-               qubits.begin();
-      mask |= (1 << it);
-      int it2 = std::find(qubit_indices.begin(), qubit_indices.end(),
-                          ordered_qubit[t]) -
-                qubit_indices.begin();
-      qperm[it2] = t;
-    }
-
-    printf("qperm:[\n");
-    for (int e = 0; e < qperm.size(); e++) {
-      printf("%d, ", qperm[e]);
-    }
-    printf("\n");
-
-    printf("MatShuffle and MatMul\n");
-
-    auto *m = kernel.gates.gates[i]->gate->get_matrix(params);
-    std::vector<std::complex<double>> temp_d = m->flatten();
-    std::vector<std::complex<DT>> temp(temp_d.begin(), temp_d.end());
-    
-    // matrix shuffle: make sure the logical target qubits are in increasing order
-    // printf("matrix to be fused:\n");
-    // for (int i = 0; i < temp.size(); i++) {
-    //   printf("(%f, %f)", temp[i].real(), temp[i].imag());
-    // }
-    // printf("\n");
-    MatShuffle(temp, qubit_indices.size(), qperm);
-    MatMul(mask, qubits.size(), res_mat, temp, qubit_indices.size());
+    for (int d = 0; d < n_devices; d++) {
+      std::vector<std::complex<qreal>> temp_mat;
+      unsigned mask = 0;
+      std::vector<int> qperm;
+      if(getMat_per_device(myRank*n_devices+d, kernel.gates.gates[i]->gate, qubit_indices, params, temp_mat, mask, qperm)) {
+        //do MatMul
+        MatShuffle(temp_mat, qubit_indices.size(), qperm);
+        MatMul(mask, qubits.size(), res_mats[i], temp_mat, qubit_indices.size());
+      }
+      //otherwise skip
+    } 
   }
 
-  return res_mat;
+  // add fused gates kernels
+  Gate<DT> gate{g_type, n_target, n_control, target, control, {}, res_mats};
+  gates.push_back(gate);
+  task_map.push_back(SimGateType::FUSED);
+
+  return true;
 }
 
 template <typename DT>
@@ -639,6 +645,274 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
   //   printf("(%.1f, %.1f)", res_mat[i].real(), res_mat[i].imag());
   // }
   // printf("\n");
+}
+
+#define IS_HIGH_PART(part_id, logicIdx) ((part_id >> (pos[logicIdx] - n_local) & 1) > 0)
+template <typename DT>
+bool qcircuit::Circuit<DT>::getMat_per_device(int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, M& res, unsigned &mask, std::vector<int>& perm) {
+  
+  if (gate->get_num_control_qubits() == 2) { //ccx
+    int c2 = qubit_indices[0];
+    int c1 = qubit_indices[1];
+    int t = qubit_indices[2];
+    if(local_mask[c2] && !local_mask[c1]) {
+      int c = c1; c1 = c2; c2 = c;
+    }
+    if (local_mask(c1) && local_mask(c2)) { // CCU(c1, c2, t)
+      auto *m = gate->get_matrix(params);
+      res = m->flatten();
+      std::vector<int> position;
+      for (int t = 0; t < qubit_indices.size(); t++) {
+        int v = qubit_group_map_fusion.at(qubit_indices[t]);
+        position.push_back(v);
+        mask |= 1 << v;
+      }
+      std::vector<int> sorted_position_;
+      std::sort(sorted_position_.begin(), sorted_postition_.end());
+      assert(qubit_indices.size()==3);
+      perm.resize(qubit_indices.size());
+      for (int t = 0; t < qubit_indices.size(); t++) {
+        int it2 = std::find(position.begin(), position.end(),
+                            sorted_position_[t]) -
+                  position.begin();
+        perm[it2] = t;
+      }
+      return true;
+    } else if (local_mask(c1) && !local_mask(c2)) {
+        if (IS_HIGH_PART(part_id, c2)) { // CU(c1, t)
+          //cx/cz gate mat
+          if(gate->tp == quartz::GateType::ccx) {
+            quartz::CXGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          else if(gate->tp == quartz::GateType::ccz) {
+            quartz::CZGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          mask |= 1 << qubit_group_map_fusion.at(c1);
+          mask |= 1 << qubit_group_map_fusion.at(t);
+          perm.resize(2);
+          perm[0] = qubit_group_map_fusion.at(c1) > qubit_group_map_fusion.at(t) ? 1 : 0;
+          perm[1] = 1 - perm[0];
+          return true;
+          
+        } else { // ID(t)
+          return false;
+        }
+    } else { // !local_mask(c1) && !local_mask(c2)
+        if (IS_HIGH_PART(part_id, c1) && IS_HIGH_PART(part_id, c2)) { // U(t)
+          if(gate->tp == quartz::GateType::ccx) {
+            quartz::XGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          else if(gate->tp == quartz::GateType::ccz) {
+            quartz::ZGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          mask |= 1 << qubit_group_map_fusion.at(t);
+          perm.resize(1);
+          perm[0] = 0;
+          return true;
+        } else { // ID(t)
+            return false;
+        }
+    }
+  }
+  else if (gate->get_num_control_qubits() == 1) {//cz, cp, cx
+    int c = qubit_indices[0], t = qubit_indices[1];
+    if (local_mask(c) && local_mask(t)) { // CU(c, t)
+      auto *m = gate->get_matrix();
+      res = m->flatten();
+      mask |= 1 << qubit_group_map_fusion.at(c);
+      mask |= 1 << qubit_group_map_fusion.at(t);
+      perm.resize(2);
+      perm[0] = qubit_group_map_fusion.at(c) > qubit_group_map_fusion.at(t) ? 1 : 0;
+      perm[1] = 1 - perm[0];
+      return true;    
+    } else if (local_mask(c) && !local_mask(t)) { // U(c)
+        if (IS_HIGH_PART(part_id, t)) { // U(t)
+          // for this case, control qubit will become target, can be proved
+          if(gate->tp == quartz::GateType::cz) {
+            quartz::ZGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          else if(gate->tp == quartz::GateType::cp) {
+            quartz::PGate new_gate;
+            auto *m = new_gate.get_matrix(params);
+            res = m->flatten();
+          }
+          mask |= 1 << qubit_group_map_fusion.at(c);
+          perm.resize(1);
+          perm[0] = 0;
+          return true;
+        }
+        else {
+          return false;
+        }
+    } else if (!local_mask(c) && local_mask(t)) {
+        if (IS_HIGH_PART(part_id, c)) { // U(t)
+          if(gate->tp == quartz::GateType::cx) {
+            quartz::XGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          else if(gate->tp == quartz::GateType::cz) {
+            quartz::ZGate new_gate;
+            auto *m = new_gate.get_matrix();
+            res = m->flatten();
+          }
+          else if(gate->tp == quartz::GateType::cp) {
+            quartz::PGate new_gate;
+            auto *m = new_gate.get_matrix(params);
+            res = m->flatten();
+          }
+          mask |= 1 << qubit_group_map_fusion.at(t);
+          perm.resize(1);
+          perm[0] = 0;
+          return true;
+        } else {
+            return false;
+        }
+    } else { // !local_mask(c) && !local_mask(t)
+        assert(gate->tp == quartz::GateType::cz || gate->tp == quartz::GateType::cp);
+        if (IS_HIGH_PART(part_id, c)) {
+            switch (gate->tp) {
+                case quartz::GateType::CZ: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        quartz::ZGate new_gate;
+                        auto *m = new_gate.get_matrix();
+                        res = m->flatten();
+                        res[0] = res[3];
+                        mask |= 1 << 0;
+                        perm.resize(1);
+                        perm[0] = 0;
+                        return true;  
+                    }
+                }
+                case quartz::GateType::CP: {
+                    if (IS_HIGH_PART(part_id, t)) {
+                        quartz::PGate new_gate;
+                        auto *m = new_gate.get_matrix(params);
+                        res = m->flatten();
+                        res[0] = res[3];
+                        mask |= 1 << 0;
+                        perm.resize(1);
+                        perm[0] = 0;
+                        return true;
+                    }
+                }
+            }
+        } else {
+            return false;
+        }
+    }
+  }
+  else if (gate->get_num_control_qubits() == 0) {
+    int t = qubit_indices[0];
+      if (!local_mask(t)) { // GCC(t)
+        auto *m = gate->get_matrix();
+        res = m->flatten();
+        switch (gate->tp) {
+            case quartz::GateType::p: {
+                if (IS_HIGH_PART(part_id, t)) {
+                    quartz::PGate new_gate;
+                    auto *m = new_gate.get_matrix(params);
+                    res = m->flatten();
+                    res[0] = res[3];
+                    mask |= 1 << 0;
+                    perm.resize(1);
+                    perm[0] = 0;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            case quartz::GateType::z: {
+                if (IS_HIGH_PART(part_id, t)) {
+                    quartz::ZGate new_gate;
+                    auto *m = new_gate.get_matrix();
+                    res = m->flatten();
+                    res[0] = res[3];
+                    mask |= 1 << 0;
+                    perm.resize(1);
+                    perm[0] = 0;
+                    return true;  
+                } else {
+                    return false;
+                }
+            }
+            // case quartz::GateType::x: { //TODO
+            //     if (IS_HIGH_PART(part_id, t)) {
+            //         //change device logic <-> physic mapping
+            //         return false;
+            //     } else {
+            //         return false;
+            //     }
+            // }
+        }
+      } else { // local_mask(t) -> U(t)
+          auto *m = gate->get_matrix();
+          res = m->flatten();
+          mask |= 1 << qubit_group_map_fusion.at(t);
+          perm.resize(1);
+          perm[0] = 0;
+          return true;
+      }
+  }
+}
+
+template <typename DT>
+void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
+  
+  std::vector<int> new_global_pos;
+  int nGlobalSwaps = n_global;
+  int nLocalSwaps = 0;
+  int num_swaps = 0;
+  for (int i = 0; i < n_global; i++) {
+    new_global_pos.push_back(pos[targets[i + n_local]]);
+    if(pos[targets[i + n_local]] < n_local) num_swaps++;
+  }
+  std::sort(new_global_pos.begin(), new_global_pos.end());
+  
+  unsigned local_mask = 0;
+  unsigned global_mask = 0;
+  int j1 = 0;
+  for (int i = n_global - 1; i >= 0; i--) {
+    if(new_global_pos[i] >= n_local) {
+      global_mask |= 1 << (new_global_pos[i] - n_local);
+      nGlobalSwaps--;
+    }
+    else {
+      // for nccl-based comm, local transpose
+      if(new_global_pos[i] >= (n_local - num_swaps)) {
+        local_mask |= 1 << (new_global_pos[i] - n_local + num_swaps);
+      }
+      else {
+        nLocalSwaps++;
+        for (int j = num_swaps - 1; j >= 0; j--) {
+          if(!(local_mask >> j & 1)) {
+            std::swap(pos[permutation[new_global_pos[i]]], pos[permutation[n_local - num_swaps + j]]);
+            std::swap(permutation[new_global_pos[i]], permutation[n_local - num_swaps + j]);
+            local_mask |= 1 << j;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  for (int i = 0; i < n_global; i++) {
+    if((~global_mask) >> i & 1) {
+      std::swap(pos[permutation[n_local-nGlobalSwaps]], pos[permutation[i+n_local]]);
+      std::swap(permutation[n_local-nGlobalSwaps], permutation[i+n_local]);
+      nGlobalSwaps--;
+    }     
+  }
 }
 
 template <typename DT>

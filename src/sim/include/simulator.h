@@ -65,9 +65,9 @@ public:
   static constexpr auto cuCompute =
       is_float ? CUSTATEVEC_COMPUTE_32F : CUSTATEVEC_COMPUTE_64F;
 
-  SimulatorCuQuantum(unsigned nlocal, unsigned nglobal, int ndevices)
+  SimulatorCuQuantum(unsigned nlocal, unsigned nglobal, int ndevices, int myrank, int nranks)
       : n_qubits(nlocal + nglobal), n_local(nlocal), n_global(nglobal),
-        n_devices(ndevices) {}
+        n_devices(ndevices), myRank(myrank), nRanks(nranks) {}
 
   // for simulation
   bool InitStateSingle(std::vector<unsigned> const &init_perm);

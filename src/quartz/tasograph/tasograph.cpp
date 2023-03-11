@@ -782,7 +782,8 @@ void Graph::constant_and_rotation_elimination() {
     } else if (op.ptr->is_parametrized_gate()) {
       // TODO: we shoud use matrix representation to check if a gate is identity
       if (op.ptr->tp != GateType::rx && op.ptr->tp != GateType::ry &&
-          op.ptr->tp != GateType::rz && op.ptr->tp != GateType::u1) {
+          op.ptr->tp != GateType::rz && op.ptr->tp != GateType::u1 &&
+          op.ptr->tp != GateType::u3) {
         continue;
       }
       // Eliminate 0 rotation gates

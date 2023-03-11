@@ -134,4 +134,4 @@ if __name__ == '__main__':
     best_circ.to_qasm(filename=f'{output_dir}/{circ_name}_optimized.qasm')
 
     with open(f'{output_dir}/results.txt', 'a') as f:
-        f.write(f"{best_gate_cnt}\t\t{circ_name}\n")
+        f.write(f"{best_gate_cnt}\t\t{circ_name}\t\t{circ.gate_count}\n")

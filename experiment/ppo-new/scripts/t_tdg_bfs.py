@@ -110,17 +110,23 @@ if __name__ == '__main__':
         wandb_mode = sys.argv[3]
 
     context = quartz.QuartzContext(
-        gate_set=['x', 'cx', 'sx', 'rz', 't', 'tdg', 'z'],
-        filename='../ecc_set/ibm_special_angles_3_2_5_ecc.json',
+        gate_set=[
+            'h',
+            'cx',
+            't',
+            'tdg',
+            'x',
+        ],
+        filename='../ecc_set/clifford_plus_t_3_5_ecc.json',
         no_increase=False,
         include_nop=True,
     )
     circ = quartz.PyGraph.from_qasm(
-        context=context, filename=f"../circs/ibm_special_angle_circs/{circ_name}.qasm"
+        context=context, filename=f"../circs/t_tdg_rm_circs/{circ_name}.qasm"
     )
 
     wandb.init(
-        project='quartz_ibm2',
+        project='quartz_t_tdg',
         entity='quartz',
         name=f'{circ_name}',
         mode=wandb_mode,  # 'online',

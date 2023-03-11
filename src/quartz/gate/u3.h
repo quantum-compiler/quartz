@@ -18,7 +18,7 @@ public:
         cached_matrices[theta][phi].find(lambda) ==
             cached_matrices[theta][phi].end()) {
       auto mat = std::make_unique<Matrix<2>>(Matrix<2>(
-          {{cos(theta), sin(theta) * (cos(lambda) + 1.0i * sin(lambda))},
+          {{cos(theta), -sin(theta) * (cos(lambda) + 1.0i * sin(lambda))},
            {sin(theta) * (cos(phi) + 1.0i * sin(phi)),
             cos(theta) * (cos(phi + lambda) + 1.0i * sin(phi + lambda))}}));
       cached_matrices[theta][phi][lambda] = std::move(mat);

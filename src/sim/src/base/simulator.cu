@@ -82,11 +82,8 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
   // threadBias
   unsigned blockHot, enumerate;
   qindex relatedQubits = 0;
-  for (int i = 0; i < n_local; i++) {
-    if (logicQubitset >> i & 1) {
-      // auto it = find(permutation.begin(), permutation.end(), i);
-      // assert(it != permutation.end());
-      // int idx = it - permutation.begin();
+  for (int i = 0; i < n_qubits; i++) {
+    if ((logicQubitset >> i) & 1) {
       relatedQubits |= qindex(1) << pos[i];
     }
   }
@@ -130,6 +127,7 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
         qubit_group_map[permutation[i]] = local++;
     }
   }
+  printf("shm:%d\n", shm);
   for (int i = n_local; i < n_qubits; i++)
       qubit_group_map[permutation[i]] = global++;
 
@@ -137,14 +135,14 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
   // 1. reset all the gates' target/control qubit to group qubit id
   // 2. generate per-device schedule
   KernelGate hostGates[n_devices * kernelgates.size()];
-    assert(kernelgates.size() < MAX_GATE);
-    #pragma omp parallel for num_threads(n_devices)
-    for (int k = 0; k < n_devices; k++) {
-        int myncclrank = device_phy_to_logical.at(myRank * n_devices + k);
-        for (size_t i = 0; i < kernelgates.size(); i++) {
-           hostGates[k * kernelgates.size() + i] = getGate(kernelgates[i], myncclrank, logicQubitset, qubit_group_map);
-        }
+  assert(kernelgates.size() < MAX_GATE);
+  #pragma omp parallel for num_threads(n_devices)
+  for (int k = 0; k < n_devices; k++) {
+    int myncclrank = device_phy_to_logical.at(myRank * n_devices + k);
+    for (size_t i = 0; i < kernelgates.size(); i++) {
+        hostGates[k * kernelgates.size() + i] = getGate(kernelgates[i], myncclrank, logicQubitset, qubit_group_map);
     }
+  }
 
   qindex gridDim = (qindex(1) << n_local) >> SHARED_MEM_SIZE;
   for (int k = 0; k < n_devices; k++) {

@@ -288,10 +288,10 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
         // if kernel.qubits.size() < SHARED_MEM_SIZE: fill it
         if (kernel.qubits.size() < SHARED_MEM_SIZE) {
           int cnt = kernel.qubits.size();
-          for (int k = 0; k < 3; k++) {
-            if (!(active_qubits_logical & (1ll << permutation[k]))) {
+          for (int k = 0; k < n_local; k++) {
+            if (!(active_qubits_logical & (qindex(1) << permutation[k]))) {
               cnt++;
-              active_qubits_logical |= (1ll << permutation[k]);
+              active_qubits_logical |= (qindex(1) << permutation[k]);
               if (cnt == SHARED_MEM_SIZE)
                   break;
             }
@@ -344,7 +344,8 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             kernelgates.push_back(kg); 
           }            
         }
-      
+
+        shm_gates.push_back(kernelgates);
         task_map.push_back(SimGateType::SHM);
       }
     }
@@ -385,6 +386,12 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
       }
     }
     else if (task == SHM) {
+      // qindex qs = active_logical_qs[shm_idx];
+      // for(int i = 0; i < num_qubits; i++) {
+      //   if((qs >> i) & 1) {
+      //     printf("qs %d\n", i);
+      //   }
+      // }
       simulator.ApplyKernelGates(shm_gates[shm_idx], active_logical_qs[shm_idx]);
       shm_idx++;
     }

@@ -18,14 +18,14 @@ template <typename DT> class Circuit {
 public:
   Circuit(std::vector<unsigned> const &perm, unsigned num_local);
   Circuit(unsigned nqubits, unsigned num_local);
-  Circuit(unsigned nqubits, unsigned num_local, int myrank, int nranks);
+  Circuit(unsigned nqubits, unsigned num_local, int ndevices, int myrank, int nranks);
 
   // APIs for loading circuit from file
   bool load_circuit_from_file(std::string const &filename);
 
   // APIs for generating circuit from quartz CircuitSeq
   bool compile(quartz::CircuitSeq *seq, quartz::Context *ctx,
-               quartz::PythonInterpreter *interpreter, int ndevices, bool use_ilp);
+               quartz::PythonInterpreter *interpreter, bool use_ilp);
 
   // APIs for creating gates, currently just read from files
 
@@ -38,8 +38,7 @@ public:
 private:
   // called inside compile
   bool FuseGates(const quartz::Kernel &kernel, quartz::Context *ctx);
-  void MatMul(unsigned mask, unsigned n_fused, M &res_mat, const M &m1,
-              unsigned m_size);
+  void MatMul(unsigned mask, unsigned n_fused, M &res_mat, const M &m1);
   void MatShuffle(M &res_mat, unsigned n_qubit, const std::vector<int> &perm);
   void update_layout(std::vector<int> local_qubits);
   bool getMat_per_device(quartz::Context *ctx, int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, std::vector<ComplexType> &res, unsigned &mask, std::vector<int>& perm);
@@ -49,7 +48,7 @@ private:
 public:
   unsigned num_qubits;
   unsigned n_local, n_global;
-  int n_devices;
+  int n_devices = 0;
   int myRank, nRanks;
   
   // states info kept for doing compilation

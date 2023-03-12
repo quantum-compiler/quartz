@@ -51,8 +51,8 @@ int main(int argc, char *argv[]) {
       &ctx, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_") +
                 std::to_string(nqubits) + "q/" + circuit_file +
                 "_indep_qiskit_" + std::to_string(nqubits) + ".qasm");
-  sim::qcircuit::Circuit<double> circuit(nqubits, nlocal, myRank, nRanks);
-  circuit.compile(seq.get(), &ctx, &interpreter, ndevice, use_ilp);
+  sim::qcircuit::Circuit<double> circuit(nqubits, nlocal, ndevice, myRank, nRanks);
+  circuit.compile(seq.get(), &ctx, &interpreter, use_ilp);
   // circuit.simulate(true);
 
   MPICHECK(MPI_Finalize());

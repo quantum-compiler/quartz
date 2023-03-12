@@ -195,6 +195,8 @@ cdef class PyXfer:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
             self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
+        else:
+            self.graphXfer = NULL
 
     def __dealloc__(self):
         pass
@@ -333,6 +335,13 @@ cdef class QuartzContext:
 
     def has_parameterized_gate(self) -> bool:
         return self.context.has_parameterized_gate()
+
+    def add_xfer(self, *, src_str: str, dst_str: str):
+        src_bytes = src_str.encode('utf-8')
+        dst_bytes = dst_str.encode('utf-8')
+        xfer = GraphXfer.create_GraphXfer_from_qasm_str(self.context, src_bytes, dst_bytes)
+        if xfer != NULL:
+            self.v_xfers.push_back(xfer)
 
     @property
     def num_equivalence_classes(self):

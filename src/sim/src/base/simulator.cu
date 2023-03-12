@@ -181,10 +181,12 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
   
   unsigned local_mask = 0;
   unsigned global_mask = 0;
+  unsigned global = 0;
   int j1 = 0;
   for (int i = n_global - 1; i >= 0; i--) {
+    global |= unsigned(1) << i;
     if(new_global_pos[i] >= n_local) {
-      global_mask |= 1 << (new_global_pos[i] - n_local);
+      global_mask |= unsigned(1) << (new_global_pos[i] - n_local);
       nGlobalSwaps--;
     }
     else {
@@ -219,12 +221,6 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       }
     }
   }
-
-  printf("Current Perm: [");
-  for (int i = 0; i < n_local + n_global; i++) {
-    printf("%d,", permutation[i]);
-  }
-  printf("]\n");
 
   printf("Shuffle: [");
   for (int i = 0; i < n_local + n_global; i++) {
@@ -295,22 +291,6 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
     printf("]\n");
 
-    // update perm/pos after global
-    int idx = 0;
-    for (int i = 0; i < n_global; i++) {
-      if((~global_mask) >> i & 1) {
-        std::swap(pos[permutation[idx+n_local-num_swaps]], pos[permutation[i+n_local]]);
-        std::swap(permutation[idx+n_local-num_swaps], permutation[i+n_local]);
-        idx++;
-      }     
-    }
-    //print layout
-    printf("After global Perm: [");
-    for (int i = 0; i < n_local + n_global; i++) {
-      printf("%d,", permutation[i]);
-    }
-    printf("]\n");
-
     int sendsize = subSvSize / (1 << nGlobalSwaps);
     for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
@@ -332,9 +312,10 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
 
     NCCLCHECK(ncclGroupStart());
     for (int i = 0; i < n_devices; ++i) {
+      printf("My physical id:%d, %d\n", myRank * n_devices + i, global_mask);
       unsigned myncclrank = device_phy_to_logical.at(myRank * n_devices + i);
-      all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
-              comms[i], s[i], ~global_mask, myncclrank);
+      // all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
+      //         comms[i], s[i], global&(~global_mask), myncclrank);
     }
     NCCLCHECK(ncclGroupEnd());
 
@@ -350,6 +331,22 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", device_phy_to_logical.at(myRank * n_devices + i),
              elapsed);
     }
+
+    // update perm/pos after global
+    int idx = 0;
+    for (int i = 0; i < n_global; i++) {
+      if((~global_mask) >> i & 1) {
+        std::swap(pos[permutation[idx+n_local-num_swaps]], pos[permutation[i+n_local]]);
+        std::swap(permutation[idx+n_local-num_swaps], permutation[i+n_local]);
+        idx++;
+      }     
+    }
+    //print layout
+    printf("After global Perm: [");
+    for (int i = 0; i < n_local + n_global; i++) {
+      printf("%d,", permutation[i]);
+    }
+    printf("]\n");
 
     for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));

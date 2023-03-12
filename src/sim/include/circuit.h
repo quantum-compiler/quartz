@@ -50,6 +50,7 @@ public:
   unsigned n_local, n_global;
   int n_devices = 0;
   int myRank, nRanks;
+  std::vector<unsigned> init_permutation;
   
   // states info kept for doing compilation
   std::vector<unsigned> permutation;
@@ -59,7 +60,6 @@ public:
 
   /* set in compile() */
   std::vector<sim::Gate<DT>> gates;
-  std::vector<std::vector<sim::Gate<DT>>> gates_per_device;
   // batched gates
   std::vector<std::vector<sim::Gate<qreal>>> fused_gates;
   std::vector<std::vector<KernelGate>> shm_gates;

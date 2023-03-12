@@ -224,21 +224,49 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   int num_shm = 0;
   for (auto &schedule : schedules) {
     // add shuffle gate
-    local_mask.assign(num_qubits, false);
-    std::vector<int> target;
-    for (int i = 0; i < n_local; i++) {
-      target.push_back(local_qubits[idx][i]);
-      local_mask[local_qubits[idx][i]] = true;
-    }
+    if (idx == 0) {
+      local_mask.assign(num_qubits, false);
+      //init layout = local_qubits[0]
+      for (int i = 0; i < n_local; i++) {
+        local_mask[local_qubits[idx][i]] = true;
+        permutation[i] = local_qubits[idx][i];
+        pos[local_qubits[idx][i]] = i;
+      }
+      int j = 0;
+      for (int i = 0; i < num_qubits; i++) {
+        if(!local_mask[i]) {
+          permutation[n_local + j] = i;
+          pos[i] = n_local + j;
+          j++;
+        }
+      }
+      init_permutation = permutation;
 
-    for (int i = 0; i < num_qubits; i++) {
-      if(!local_mask[i])
-        target.push_back(i);
+      printf("Current Layout0: [");
+      for (int i = 0; i < permutation.size(); i++) {
+        printf("%d, ", permutation[i]);
+      }
+      idx++;
     }
-    Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
-    gates.push_back(gate);
-    update_layout(target);
-    idx++;
+    else {
+      local_mask.assign(num_qubits, false);
+      std::vector<int> target;
+      for (int i = 0; i < n_local; i++) {
+        target.push_back(local_qubits[idx][i]);
+        local_mask[local_qubits[idx][i]] = true;
+      }
+
+      for (int i = 0; i < num_qubits; i++) {
+        if(!local_mask[i])
+          target.push_back(i);
+      }
+      Gate<DT> gate{SHUFFLE, num_qubits, 0, target, {}, {}, {}};
+      gates.push_back(gate);
+      task_map.push_back(SimGateType::SHUFFLE);
+      update_layout(target);
+      idx++;
+    }
+    
 
     for (auto &kernel : schedule.kernels) {
       if (kernel.type == quartz::KernelType::fusion) {
@@ -323,7 +351,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   }
 
   printf("Compilation Done! \n");
-  printf("Num Shuffles: %d\n", schedules.size());
+  printf("Num Shuffles: %d\n", schedules.size()-1);
   printf("Num FUSION Kernel: %d\n", num_fuse);
   printf("Num SHM Kernel: %d\n", num_shm);
   printf("Start Simulating...\n");
@@ -336,14 +364,10 @@ template <typename DT>
 void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
   using Simulator = SimulatorCuQuantum<DT>;
   Simulator simulator(n_local, n_global, n_devices, myRank, nRanks);
-  std::vector<unsigned> init_perm;
-  for (int i = 0; i < n_local + n_global; i++) {
-    init_perm.push_back(i);
-  }
   if (!use_mpi)
-    simulator.InitStateSingle(init_perm);
+    simulator.InitStateSingle(init_permutation);
   else
-    simulator.InitStateMulti(init_perm);
+    simulator.InitStateMulti(init_permutation);
 
   printf("Init State Vectors!\n");
 
@@ -820,15 +844,10 @@ void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
     }     
   }
 
-  printf("Target: [");
-  for (int i = 0; i < targets.size(); i++) {
-    printf("%d, ", targets[i]);
-  }
-
-  printf("Current Layout: [");
-  for (int i = 0; i < permutation.size(); i++) {
-    printf("%d, ", permutation[i]);
-  }
+  // printf("Current Layout: [");
+  // for (int i = 0; i < permutation.size(); i++) {
+  //   printf("%d, ", permutation[i]);
+  // }
 }
 
 template <typename DT>

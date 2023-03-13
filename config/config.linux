@@ -2,14 +2,17 @@
 
 echo " Defaults for Linux machine"
 
+CC=gcc
+CXX=g++
+ 
 # set CUQUANTUM dir
 CUQUANTUM_DIR=~/qs/cuquantum-linux-x86_64-22.11.0.13-archive
 
 # set CUDA dir in case cmake cannot autodetect a path
-CUDA_DIR=/usr/local/cuda-11.7
+CUDA_DIR=/opt/nvidia/hpc_sdk/Linux_x86_64/22.5/cuda/11.7
 
 # set nccl dir
-NCCL_DIR=~/nccl/build
+NCCL_DIR=/global/common/software/nersc/pm-2022q4/sw/nccl-2.15.5-ofi-r4
 
 # using simulator
 QUARTZ_USE_SIMULATOR=ON

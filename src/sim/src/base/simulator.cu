@@ -317,6 +317,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
     NCCLCHECK(ncclGroupEnd());
 
+    float shuffle_average = 0;
     for (int i = 0; i < n_devices; i++) {
       HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
       // profiling
@@ -328,7 +329,9 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       cudaEventDestroy(t_end[i]);
       printf("[NCCL Rank %d] Shuffle Time: %.2fms\n", device_phy_to_logical.at(myRank * n_devices + i),
              elapsed);
+      shuffle_average += elapsed;
     }
+    shuffle_time.push_back(shuffle_average);
 
     // update perm/pos after global
     int idx = 0;
@@ -540,6 +543,13 @@ template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
     printf("[NCCL Rank %d] Total Simulation Time: %.2fms\n",
            myRank * n_devices + i, elapsed);
   }
+
+  if (myRank == 0) {
+    for (int i = 0; i < shuffle_time.size(); i++) {
+      printf("[MPI Rank %d]: Shuffle %d cost %.2fms on average.\n", myRank, i, shuffle_time[i]);
+    }
+  }
+  
 
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));

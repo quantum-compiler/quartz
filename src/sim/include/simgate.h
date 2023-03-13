@@ -83,12 +83,12 @@ struct KernelGate {
 
   KernelGate(KernelGateType type_, int controlQubit_, char controlIsGlobal_,
              int targetQubit_, char targetIsGlobal_, const qComplex mat[2][2])
-      : KernelGate(type_, 2, -1, controlQubit_, controlIsGlobal_, targetQubit_,
+      : KernelGate(type_, -1, 2, controlQubit_, controlIsGlobal_, targetQubit_,
                    targetIsGlobal_, mat) {}
 
   KernelGate(KernelGateType type_, int targetQubit_, char targetIsGlobal_,
              const qComplex mat[2][2])
-      : KernelGate(type_, 2, -1, 2, -1, targetQubit_, targetIsGlobal_, mat) {}
+      : KernelGate(type_, -1, 2, -1, 2, targetQubit_, targetIsGlobal_, mat) {}
 
   KernelGate() = default;
 

@@ -116,6 +116,8 @@ private:
   cudaEvent_t start[MAX_DEVICES], end[MAX_DEVICES];
   // for SHM method
   std::vector<unsigned int *> threadBias;
+  // for log
+  std::vector<float> shuffle_time;
 };
 
 } // namespace sim

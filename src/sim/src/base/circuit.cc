@@ -220,8 +220,9 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
   int idx = 0;
-  int num_fuse = 0;
-  int num_shm = 0;
+  num_fuse = 0;
+  num_shm = 0;
+  num_shuffle = schedules.size()-1;
   for (auto &schedule : schedules) {
     // add shuffle gate
     if (idx == 0) {
@@ -337,6 +338,11 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             kernelgates.push_back(kg);
           }
           else if (gate->gate->get_num_control_qubits() == 0) {
+            if(!local_mask[qubit_indices[0]]) {
+                // assert(gate->gate->tp != quartz::GateType::h);
+                // FIXME: skip this incorrect schedule in runtime for now
+                if(gate->gate->tp == quartz::GateType::h) continue;
+            }
             qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
             qindex mask = active_qubits_logical;
             char isGlobalTarget = (mask >> qubit_indices[0]) & 1;
@@ -397,7 +403,7 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
     }
   }
   
-  printf("Finish Simulating!\n");
+  printf("Finish Simulating! Total: %d FUSE Kernel, %d SHM Kernel, %d Shuffles.\n", num_fuse, num_shm, num_shuffle);
   simulator.Destroy();
   printf("Destroyed the simulator\n");
 }

@@ -65,6 +65,9 @@ public:
   std::vector<std::vector<KernelGate>> shm_gates;
   std::vector<qindex> active_logical_qs;
   std::vector<SimGateType> task_map;
+  int num_fuse = 0;
+  int num_shm = 0;
+  int num_shuffle = 0;
 };
 } // namespace qcircuit
 

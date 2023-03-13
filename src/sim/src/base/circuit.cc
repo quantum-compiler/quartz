@@ -342,6 +342,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
                 // assert(gate->gate->tp != quartz::GateType::h);
                 // FIXME: skip this incorrect schedule in runtime for now
                 if(gate->gate->tp == quartz::GateType::h) continue;
+                if(gate->gate->tp == quartz::GateType::u2) continue;
             }
             qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
             qindex mask = active_qubits_logical;
@@ -387,9 +388,9 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
     }
     else if (task == FUSED) {
       for (int i = 0; i < n_devices; i++){
-        simulator.ApplyGate(gates[normal_idx], i);
-        normal_idx++;
+        simulator.ApplyGate(gates[normal_idx], i); 
       }
+      normal_idx++;
     }
     else if (task == SHM) {
       // qindex qs = active_logical_qs[shm_idx];

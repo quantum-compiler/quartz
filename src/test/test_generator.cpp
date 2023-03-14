@@ -13,7 +13,7 @@ int main() {
                    true /*restrict_search_space*/, /*unique_parameters=*/false);
   for (const auto &it : dataset.dataset) {
     bool is_first = true;
-    DAG *first_dag = NULL;
+    CircuitSeq *first_dag = NULL;
     for (auto &dag : it.second) {
       if (is_first) {
         first_dag = dag.get();
@@ -25,7 +25,7 @@ int main() {
   }
 
   QASMParser parser(&ctx);
-  DAG *dag = NULL;
+  CircuitSeq *dag = NULL;
   parser.load_qasm("test.qasm", dag);
   return 0;
 }

@@ -14,6 +14,7 @@ public:
              {0, 0, 1, 0},
              {0, 1 / std::sqrt(2), 0, -1 / std::sqrt(2)}}) {}
   MatrixBase *get_matrix() override { return &mat; }
+  int get_num_control_qubits() const override { return 1; }
   Matrix<4> mat;
 };
 

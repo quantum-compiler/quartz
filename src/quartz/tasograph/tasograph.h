@@ -2,10 +2,10 @@
 
 #include "../context/context.h"
 #include "../context/rule_parser.h"
-#include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
 #include "../parser/qasm_parser.h"
+#include "quartz/circuitseq/circuitseq.h"
 
 #include <chrono>
 #include <fstream>
@@ -176,9 +176,9 @@ class GraphXfer;
 class Graph {
 public:
   Graph(Context *ctx);
-  Graph(Context *ctx, const DAG *dag);
+  Graph(Context *ctx, const CircuitSeq *seq);
   Graph(const Graph &graph);
-  [[nodiscard]] std::unique_ptr<DAG> to_dag() const;
+  [[nodiscard]] std::unique_ptr<CircuitSeq> to_circuit_sequence() const;
   void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;

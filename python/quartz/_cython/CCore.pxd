@@ -70,22 +70,22 @@ cdef extern from "context/context.h" namespace "quartz":
 
 ctypedef Context* Context_ptr
 
-cdef extern from "dag/dag.h" namespace "quartz":
-    cdef cppclass DAG:
-        DAG(int, int) except +
+cdef extern from "circuitseq/circuitseq.h" namespace "quartz":
+    cdef cppclass CircuitSeq:
+        CircuitSeq(int, int) except +
         int get_num_qubits() const
         int get_num_input_parameters() const
         int get_num_total_parameters() const
         int get_num_internal_parameters() const
         int get_num_gates() const
 
-ctypedef DAG* DAG_ptr
+ctypedef CircuitSeq* CircuitSeq_ptr
 
 cdef extern from "tasograph/substitution.h" namespace "quartz":
     cdef cppclass GraphXfer:
-        GraphXfer(Context_ptr, const DAG_ptr, const DAG_ptr) except +
+        GraphXfer(Context_ptr, const CircuitSeq_ptr, const CircuitSeq_ptr) except +
         @staticmethod
-        GraphXfer* create_GraphXfer(Context_ptr,const DAG_ptr ,const DAG_ptr, bool no_increase)
+        GraphXfer* create_GraphXfer(Context_ptr,const CircuitSeq_ptr ,const CircuitSeq_ptr, bool no_increase)
         @staticmethod
         GraphXfer* create_GraphXfer_from_qasm_str(Context_ptr, const string &, const string &)
         int num_src_op()
@@ -109,7 +109,7 @@ cdef extern from "tasograph/tasograph.h" namespace "quartz":
 cdef extern from "tasograph/tasograph.h" namespace "quartz":
     cdef cppclass Graph:
         Graph(Context *) except +
-        Graph(Context *, const DAG *) except +
+        Graph(Context *, const CircuitSeq *) except +
         bool xfer_appliable(GraphXfer *, Op) except +
         shared_ptr[Graph] apply_xfer(GraphXfer *, Op, bool) except +
         pair[shared_ptr[Graph], vector[int]] apply_xfer_and_track_node(GraphXfer *, Op, bool) except +
@@ -140,11 +140,11 @@ cdef extern from "dataset/equivalence_set.h" namespace "quartz":
         EquivalenceSet() except +
         int num_equivalence_classes() const
         bool load_json(Context *, const string)
-        vector[vector[DAG_ptr]] get_all_equivalence_sets() except +
+        vector[vector[CircuitSeq_ptr]] get_all_equivalence_sets() except +
 
 
 cdef extern from "parser/qasm_parser.h" namespace "quartz":
     cdef cppclass QASMParser:
         QASMParser(Context *)
-        bool load_qasm(const string &, DAG *&) except +
-        bool load_qasm_str(const string &, DAG *&) except +
+        bool load_qasm(const string &, CircuitSeq *&) except +
+        bool load_qasm_str(const string &, CircuitSeq *&) except +

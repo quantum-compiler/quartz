@@ -1211,14 +1211,22 @@ get_schedules(const CircuitSeq &sequence,
             }
           }
           bool executed_any_gate = false;
-          for (int j = 0; j < (int)single_qubit_gate_to_execute.size(); j++) {
-            int index = single_qubit_gate_to_execute[j];
+          for (int k = 0; k < (int)single_qubit_gate_to_execute.size(); k++) {
+            int index = single_qubit_gate_to_execute[k];
             bool executable = true;
             for (auto &wire : sequence.gates[index]->input_wires) {
-              if (wire->is_qubit() && schedule.is_local_qubit(wire->index) &&
-                  !current_kernel_qubits[wire->index]) {
-                executable = false; // not local in this kernel
-                break;
+              if (wire->is_qubit()) {
+                if (schedule.is_local_qubit(wire->index)) {
+                  if (!current_kernel_qubits[wire->index]) {
+                    executable = false; // not local in this kernel
+                    break;
+                  }
+                } else {
+                  if (!sequence.gates[index]->gate->is_sparse()) {
+                    executable = false; // not executable globally
+                    break;
+                  }
+                }
               }
             }
             if (executable) {
@@ -1236,10 +1244,10 @@ get_schedules(const CircuitSeq &sequence,
               }
               // Erase the gate from |single_qubit_gate_to_execute|.
               single_qubit_gate_to_execute.erase(
-                  single_qubit_gate_to_execute.begin() + j);
-              // Because we have |j++| at the end of this iteration of the
+                  single_qubit_gate_to_execute.begin() + k);
+              // Because we have |k++| at the end of this iteration of the
               // for loop, we need to cancel the effect here.
-              j--;
+              k--;
             }
           }
           return executed_any_gate;

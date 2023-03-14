@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 """
-We represent a matrix as list of list of pairs, where a pair
+We represent a matrix as list of pairs, where a pair
 is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
@@ -12,7 +12,8 @@ import os
 import sys
 
 import z3
-from gates import add, compute, get_matrix, neg  # for searching phase factors
+
+from .gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -214,7 +215,7 @@ def phase_shift(vec, lam):
 
 
 def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
-    # Warning: If DAG::hash() is modified, this function should be modified correspondingly.
+    # Warning: If CircuitSeq::hash() is modified, this function should be modified correspondingly.
     dag_meta = dag[0]
     num_total_params = dag_meta[meta_index_num_total_parameters]
     if (
@@ -680,13 +681,13 @@ def find_equivalences(
         num_hashtags = len(data)
         num_dags = sum(len(dags) for dags in data.values())
         num_potential_equivalences = num_dags - num_hashtags
-        # first process hashtags with only 1 DAG
+        # first process hashtags with only 1 CircuitSeq
         for hashtag, dags in data.items():
             if len(dags) == 1:
                 output_dict[hashtag + "_0"] = [dags[0]]
                 num_different_dags_with_same_hash[hashtag] = 1
         print(
-            f"Processed {len(output_dict)} hash values that had only 1 DAG, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more DAGs..."
+            f"Processed {len(output_dict)} hash values that had only 1 circuit sequence, now processing the remaining {len(data) - len(output_dict)} ones with 2 or more circuit sequences..."
         )
         # now process hashtags with >1 DAGs
         with mp.Pool() as pool:
@@ -727,10 +728,10 @@ def find_equivalences(
 
             # A map from other hashtags to corresponding phase shifts.
             other_hashtags = defaultdict(dict)
-            # |other_hashtags[other_hash][None]| indicates that if it's possible that a DAG with |other_hash|
-            #    is equivalent with a DAG with |hashtag| without phase shifts.
+            # |other_hashtags[other_hash][None]| indicates that if it's possible that a CircuitSeq with |other_hash|
+            #    is equivalent with a CircuitSeq with |hashtag| without phase shifts.
             # |other_hashtags[other_hash][phase_shift_id]| is a list of DAGs with |hashtag| that can be equivalent
-            #    to a DAG with |other_hash| under phase shift |phase_shift_id|.
+            #    to a CircuitSeq with |other_hash| under phase shift |phase_shift_id|.
             assert len(dags) > 0
             for dag in dags:
                 dag_meta = dag[0]
@@ -742,7 +743,7 @@ def find_equivalences(
                         # phase shift id is item[1]
                         assert isinstance(item, list)
                         assert len(item) == 2
-                        # We need the exact parameter in |dag|, so we cannot use the representative DAG |dags[0]|.
+                        # We need the exact parameter in |dag|, so we cannot use the representative CircuitSeq |dags[0]|.
                         other_hashtags[item[0]][item[1]] = other_hashtags[item[0]].get(
                             item[1], []
                         ) + [dag]
@@ -798,7 +799,7 @@ def find_equivalences(
                         # Pruning: we only need to try each input parameter once.
                         input_param_tried = False
                         for dag in dag_list:
-                            # Warning: If DAG::hash() is modified,
+                            # Warning: If CircuitSeq::hash() is modified,
                             # the expression |is_fixed_for_all_dags| should be modified correspondingly.
                             is_fixed_for_all_dags = (
                                 0
@@ -819,7 +820,7 @@ def find_equivalences(
                                     input_param_tried = True
                             equivalent_called_2 += 1
                             possible_num_equivalences_under_phase_shift += 1
-                            # |phase_shift_id[0]| is the DAG generating this phase shift id.
+                            # |phase_shift_id[0]| is the CircuitSeq generating this phase shift id.
                             if equivalent(
                                 dag,
                                 other_dag,

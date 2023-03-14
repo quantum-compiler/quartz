@@ -1,9 +1,9 @@
 # distutils: language = c++
 
 from CCore cimport (
-    DAG,
+    CircuitSeq,
+    CircuitSeq_ptr,
     Context,
-    DAG_ptr,
     Edge,
     EquivalenceSet,
     Gate,
@@ -148,18 +148,18 @@ cdef class PyGate:
 
 
 cdef class PyDAG:
-    cdef DAG_ptr dag
+    cdef CircuitSeq_ptr dag
 
     def __cinit__(self, *, int num_qubits=-1, int num_input_params=-1):
         if num_qubits >= 0 and num_input_params >= 0:
-            self.dag = new DAG(num_qubits, num_input_params)
+            self.dag = new CircuitSeq(num_qubits, num_input_params)
         else:
             self.dag = NULL
 
     def __dealloc__(self):
         pass
 
-    cdef set_this(self, DAG_ptr dag_):
+    cdef set_this(self, CircuitSeq_ptr dag_):
         self.dag = dag_
         return self
 

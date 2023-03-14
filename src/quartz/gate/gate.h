@@ -16,8 +16,17 @@ public:
   virtual MatrixBase *get_matrix(const std::vector<ParamType> &params);
   virtual ParamType compute(const std::vector<ParamType> &input_params);
   [[nodiscard]] virtual bool is_commutative() const; // for traditional gates
-  [[nodiscard]] virtual bool
-  is_symmetric() const; // for 2-qubit gates; currently unused (always false)
+  /**
+   * @return True iff the gate is a multi-qubit gate and the gate remains
+   * the same under any qubit permutation (e.g., CZ, CP, CCZ, SWAP).
+   */
+  [[nodiscard]] virtual bool is_symmetric() const;
+  // Returns true iff the number of non-zero elements in the matrix
+  // representation of the quantum gate is exactly 2 to the power of num_qubits.
+  [[nodiscard]] virtual bool is_sparse() const;
+  // Returns the number of control qubits for controlled gates; or 0 if it is
+  // not a controlled gate.
+  [[nodiscard]] virtual int get_num_control_qubits() const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] bool is_parameter_gate() const;

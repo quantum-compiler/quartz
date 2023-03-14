@@ -10,7 +10,7 @@ void test_context_shift(const std::string &filename, Context *src_ctx,
                         Context *dst_ctx, RuleParser *rule_parser) {
 
   QASMParser qasm_parser(src_ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(filename, dag)) {
     std::cout << "Parser failed" << std::endl;
     return;

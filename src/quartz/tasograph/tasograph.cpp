@@ -73,31 +73,32 @@ void Graph::_construct_pos_2_logical_qubit() {
 
 Graph::Graph(Context *ctx) : context(ctx), special_op_guid(0) {}
 
-Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
-  // Guid for input qubit and input parameter nodes
-  int num_input_qubits = dag->get_num_qubits();
-  int num_input_params = dag->get_num_input_parameters();
+Graph::Graph(Context *ctx, const CircuitSeq *seq)
+    : context(ctx), special_op_guid(0) {
+  // Guid for input qubit and input parameter wires
+  int num_input_qubits = seq->get_num_qubits();
+  int num_input_params = seq->get_num_input_parameters();
   // Currently only 16383 vacant guid
   assert(num_input_qubits + num_input_params <= GUID_PRESERVED);
   std::vector<Op> input_qubits_op;
   std::vector<Op> input_params_op;
   input_qubits_op.reserve(num_input_qubits);
   input_params_op.reserve(num_input_params);
-  for (auto &node : dag->nodes) {
-    if (node->type == DAGNode::input_qubit) {
+  for (auto &node : seq->wires) {
+    if (node->type == CircuitWire::input_qubit) {
       auto input_qubit_op =
           Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit));
       input_qubits_op.push_back(input_qubit_op);
       input_qubit_op_2_qubit_idx[input_qubit_op] = node->index;
-    } else if (node->type == DAGNode::input_param) {
+    } else if (node->type == CircuitWire::input_param) {
       input_params_op.push_back(Op(context->next_global_unique_id(),
                                    ctx->get_gate(GateType::input_param)));
     }
   }
 
-  // Map all edges in dag to Op
-  std::map<DAGHyperEdge *, Op> edge_2_op;
-  for (auto &edge : dag->edges) {
+  // Map all gates in circuitseq to Op
+  std::map<CircuitGate *, Op> edge_2_op;
+  for (auto &edge : seq->gates) {
     auto e = edge.get();
     if (edge_2_op.find(e) == edge_2_op.end()) {
       Op op(ctx->next_global_unique_id(), edge->gate);
@@ -105,21 +106,21 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     }
   }
 
-  for (auto &node : dag->nodes) {
+  for (auto &node : seq->wires) {
     size_t srcIdx = -1; // Assumption: a node can have at most 1 input
     Op srcOp;
-    if (node->type == DAGNode::input_qubit) {
+    if (node->type == CircuitWire::input_qubit) {
       srcOp = input_qubits_op[node->index];
       srcIdx = 0;
-    } else if (node->type == DAGNode::input_param) {
+    } else if (node->type == CircuitWire::input_param) {
       srcOp = input_params_op[node->index];
       srcIdx = 0;
     } else {
-      assert(node->input_edges.size() == 1); // A node can have at most 1 input
-      auto input_edge = node->input_edges[0];
+      assert(node->input_gates.size() == 1); // A node can have at most 1 input
+      auto input_edge = node->input_gates[0];
       bool found = false;
-      for (srcIdx = 0; srcIdx < input_edge->output_nodes.size(); ++srcIdx) {
-        if (node.get() == input_edge->output_nodes[srcIdx]) {
+      for (srcIdx = 0; srcIdx < input_edge->output_wires.size(); ++srcIdx) {
+        if (node.get() == input_edge->output_wires[srcIdx]) {
           found = true;
           break;
         }
@@ -132,11 +133,11 @@ Graph::Graph(Context *ctx, const DAG *dag) : context(ctx), special_op_guid(0) {
     assert(srcIdx >= 0);
     assert(srcOp != Op::INVALID_OP);
 
-    for (auto output_edge : node->output_edges) {
+    for (auto output_edge : node->output_gates) {
       size_t dstIdx;
       bool found = false;
-      for (dstIdx = 0; dstIdx < output_edge->input_nodes.size(); ++dstIdx) {
-        if (node.get() == output_edge->input_nodes[dstIdx]) {
+      for (dstIdx = 0; dstIdx < output_edge->input_wires.size(); ++dstIdx) {
+        if (node.get() == output_edge->input_wires[dstIdx]) {
           found = true;
           break;
         }
@@ -162,7 +163,7 @@ Graph::Graph(const Graph &graph) {
   outEdges = graph.outEdges;
 }
 
-std::unique_ptr<DAG> Graph::to_dag() const {
+std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
   int num_input_qubits = get_num_qubits();
   int num_input_params = 0;
   std::unordered_map<Op, std::vector<int>, OpHash> op_2_param_idx;
@@ -183,7 +184,7 @@ std::unique_ptr<DAG> Graph::to_dag() const {
     }
   }
   // Sort input parameter index by guid.
-  // This is the order originally in DAG.
+  // This is the order originally in CircuitSeq.
   std::sort(guid_and_param_index.begin(), guid_and_param_index.end());
   std::vector<int> param_index_position(num_input_params, 0);
   for (int i = 0; i < num_input_params; i++) {
@@ -192,8 +193,8 @@ std::unique_ptr<DAG> Graph::to_dag() const {
   for (auto &it : op_2_param_idx) {
     it.second[0] = param_index_position[it.second[0]];
   }
-  // Construct the DAG.
-  auto dag = std::make_unique<DAG>(num_input_qubits, num_input_params);
+  // Construct the CircuitSeq.
+  auto seq = std::make_unique<CircuitSeq>(num_input_qubits, num_input_params);
 
   // Add parameter gates.
   int num_total_params = num_input_params;
@@ -220,7 +221,7 @@ std::unique_ptr<DAG> Graph::to_dag() const {
               op_2_param_idx[inedge.srcOp][inedge.srcIdx];
         }
         int output_param_index = 0;
-        bool ret = dag->add_gate(/*qubit_indices=*/{}, param_indices,
+        bool ret = seq->add_gate(/*qubit_indices=*/{}, param_indices,
                                  edge.dstOp.ptr, &output_param_index);
         assert(ret);
         // Each parameter gate contains 1 output parameter.
@@ -269,14 +270,14 @@ std::unique_ptr<DAG> Graph::to_dag() const {
                 op_2_param_idx[inedge.srcOp][inedge.srcIdx];
           }
         }
-        bool ret = dag->add_gate(qubit_indices, param_indices, edge.dstOp.ptr,
+        bool ret = seq->add_gate(qubit_indices, param_indices, edge.dstOp.ptr,
                                  nullptr);
         assert(ret);
         gates.push(edge.dstOp);
       }
     }
   }
-  return dag;
+  return seq;
 }
 
 size_t Graph::get_next_special_op_guid() {
@@ -606,8 +607,8 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (num_qubits != 0) {
-    // Add edges between the inputs and outputs of the to-be removed
-    // node Only add edges that connect qubits
+    // Add gates between the inputs and outputs of the to-be removed
+    // node Only add gates that connect qubits
     if (inEdges.find(oldOp) != inEdges.end() &&
         outEdges.find(oldOp) != outEdges.end()) {
       auto input_edges = inEdges[oldOp];
@@ -725,8 +726,8 @@ void Graph::constant_and_rotation_elimination() {
       }
     }
     // Won't remove node in op_queue
-    // Remove node won't change the in-degree of other nodes
-    // because we only remove poped nodes and their predecessors
+    // Remove node won't change the in-degree of other wires
+    // because we only remove poped wires and their predecessors
     if (op.ptr->is_parameter_gate()) {
       // Parameter gate, check if all its params are constant
       assert(inEdges.find(op) != inEdges.end());
@@ -781,6 +782,12 @@ void Graph::constant_and_rotation_elimination() {
         }
       }
     } else if (op.ptr->is_parametrized_gate()) {
+      // TODO: we shoud use matrix representation to check if a gate is identity
+      if (op.ptr->tp != GateType::rx && op.ptr->tp != GateType::ry &&
+          op.ptr->tp != GateType::rz && op.ptr->tp != GateType::u1 &&
+          op.ptr->tp != GateType::u3) {
+        continue;
+      }
       // Eliminate 0 rotation gates
       auto input_edges = inEdges[op];
       bool all_parameter_is_0 = true;
@@ -807,7 +814,7 @@ void Graph::constant_and_rotation_elimination() {
         }
       }
       if (all_parameter_is_0) {
-        // Delete all parameter nodes, they are all 0
+        // Delete all parameter wires, they are all 0
         for (const auto &e : input_edges) {
           if (e.dstIdx >= num_qubits) {
             remove_node(e.srcOp);
@@ -1384,10 +1391,18 @@ Graph::_from_qasm_stream(Context *ctx,
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
-    if (command == "OPENQASM") {
-      continue; // ignore this line
+    if (command == "//") {
+      continue; // comment, ignore this line
+    } else if (command == "") {
+      continue; // empty line, ignore this line
+    } else if (command == "OPENQASM") {
+      continue; // header, ignore this line
     } else if (command == "include") {
-      continue; // ignore this line
+      continue; // header, ignore this line
+    } else if (command == "barrier") {
+      continue; // file end, ignore this line
+    } else if (command == "measure") {
+      continue; // file end, ignore this line
     } else if (command == "creg") {
       continue; // ignore this line
     } else if (command == "qreg") {
@@ -1609,7 +1624,7 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
               xfer, node, context->has_parameterized_gate());
           if (new_graph) {
             optimized_graph.swap(new_graph);
-            // Update the nodes after applying a transformation.
+            // Update the wires after applying a transformation.
             all_nodes.clear();
             optimized_graph->topology_order_ops(all_nodes);
             optimized_this_xfer = true;
@@ -1659,15 +1674,15 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
   std::vector<GraphXfer *> xfers;
   for (const auto &equiv_set : eqs.get_all_equivalence_sets()) {
     bool first = true;
-    DAG *first_dag = nullptr;
+    CircuitSeq *first_dag = nullptr;
     for (const auto &dag : equiv_set) {
       if (first) {
         // Used raw pointer according to the GraphXfer API
         // May switch to smart pointer later
-        first_dag = new DAG(*dag);
+        first_dag = new CircuitSeq(*dag);
         first = false;
       } else {
-        DAG *other_dag = new DAG(*dag);
+        CircuitSeq *other_dag = new CircuitSeq(*dag);
         // first_dag is src, others are dst
         // if (first_dag->get_num_gates() !=
         // other_dag->get_num_gates()) {
@@ -1909,7 +1924,7 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
   auto eccs = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
   for (const auto &ecc : eccs) {
-    DAG *representative = ecc.front();
+    CircuitSeq *representative = ecc.front();
     /*int representative_depth = representative->get_circuit_depth();
     for (auto &circuit : ecc) {
       int circuit_depth = circuit->get_circuit_depth();
@@ -2236,7 +2251,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
   // input Op, output OpX, output Op can match. Because the source graphs is
-  // connected, by doing this we can traverse all nodes.
+  // connected, by doing this we can traverse all wires.
   bool fail = false;
   size_t idx = 0;
   while (idx < opx_op_dq.size()) {
@@ -2279,7 +2294,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         output_ops[e.srcIdx] = e.dstOp;
       }
     }
-    // Get all output OpX because we don't have output edges in GraphXfer
+    // Get all output OpX because we don't have output gates in GraphXfer
     for (auto &opx : xfer->srcOps) {
       for (auto &input_tensor : opx->inputs) {
         if (input_tensor.op == opx_) {
@@ -2336,7 +2351,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
   }
   if (!fail) {
-    // Check that output tensors with external edges are mapped
+    // Check that output tensors with external gates are mapped
     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
          mapped_ops_it != xfer->mappedOps.cend() && !fail; ++mapped_ops_it) {
       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
@@ -2383,7 +2398,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
   // input Op, output OpX, output Op can match. Because the source graphs is
-  // connected, by doing this we can traverse all nodes.
+  // connected, by doing this we can traverse all wires.
   bool fail = false;
   size_t idx = 0;
   while (idx < opx_op_dq.size()) {
@@ -2426,7 +2441,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
         output_ops[e.srcIdx] = e.dstOp;
       }
     }
-    // Get all output OpX because we don't have output edges in GraphXfer
+    // Get all output OpX because we don't have output gates in GraphXfer
     for (auto &opx : xfer->srcOps) {
       for (auto &input_tensor : opx->inputs) {
         if (input_tensor.op == opx_) {
@@ -2483,7 +2498,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
     }
   }
   if (!fail) {
-    // Check that output tensors with external edges are mapped
+    // Check that output tensors with external gates are mapped
     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
          mapped_ops_it != xfer->mappedOps.cend() && !fail; ++mapped_ops_it) {
       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
@@ -2543,7 +2558,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
   opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
   // input Op, output OpX, output Op can match. Because the source graphs is
-  // connected, by doing this we can traverse all nodes.
+  // connected, by doing this we can traverse all wires.
   bool fail = false;
   size_t idx = 0;
   while (idx < opx_op_dq.size()) {
@@ -2586,7 +2601,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
         output_ops[e.srcIdx] = e.dstOp;
       }
     }
-    // Get all output OpX because we don't have output edges in GraphXfer
+    // Get all output OpX because we don't have output gates in GraphXfer
     for (auto &opx : xfer->srcOps) {
       for (auto &input_tensor : opx->inputs) {
         if (input_tensor.op == opx_) {
@@ -2643,7 +2658,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
     }
   }
   if (!fail) {
-    // Check that output tensors with external edges are mapped
+    // Check that output tensors with external gates are mapped
     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
          mapped_ops_it != xfer->mappedOps.cend() && !fail; ++mapped_ops_it) {
       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
@@ -2676,7 +2691,7 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
   if (!fail) {
     std::unordered_set<Op, OpHash> op_set;
     // The destination graph in xfer is not an empty graph
-    // Add all nodes in the destination graph to op_set
+    // Add all wires in the destination graph to op_set
     if (!xfer->dstOps.empty()) {
       for (const auto &opx : xfer->dstOps) {
         if (opx->mapOp.ptr->is_quantum_gate()) {
@@ -2780,7 +2795,7 @@ Graph::appliable_xfers_parallel(Op op,
 //     }
 //     if (!pass)
 //       return std::shared_ptr<Graph>(nullptr);
-//     // Check that output tensors with external edges are mapped
+//     // Check that output tensors with external gates are mapped
 //     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
 //          mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
 //       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {

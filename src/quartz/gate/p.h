@@ -2,7 +2,7 @@
 
 #include "../math/matrix.h"
 #include "gate.h"
-#include <assert.h>
+#include <cassert>
 
 namespace quartz {
 class PGate : public Gate {
@@ -18,7 +18,8 @@ public:
     }
     return cached_matrices[phi].get();
   }
-  std::unordered_map<float, std::unique_ptr<Matrix<2>>> cached_matrices;
+  bool is_sparse() const override { return true; }
+  std::unordered_map<ParamType, std::unique_ptr<Matrix<2>>> cached_matrices;
 };
 
 } // namespace quartz

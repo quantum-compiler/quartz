@@ -14,7 +14,7 @@ void OpX::add_output(const TensorX &output) { outputs.push_back(output); }
 
 GraphXfer::GraphXfer(Context *_context) : context(_context), tensorId(0) {}
 
-bool GraphXfer::src_graph_connected(DAG *src_graph) {
+bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
   auto num_qubits = src_graph->get_num_qubits();
   int input_qubit_cnt = 0;
   std::vector<int> parent(num_qubits);
@@ -69,8 +69,9 @@ bool GraphXfer::src_graph_connected(DAG *src_graph) {
   return true;
 }
 
-GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
-                                       const DAG *dst_graph,
+GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
+                                       const CircuitSeq *src_graph,
+                                       const CircuitSeq *dst_graph,
                                        bool no_increase_gate_count) {
   // Remove common unused qubits
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
@@ -80,7 +81,8 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
     if (!src_graph->qubit_used(i) && !dst_graph->qubit_used(i))
       unused_qubits.push_back(i);
   }
-  DAG *src_dag = new DAG(*src_graph), *dst_dag = new DAG(*dst_graph);
+  CircuitSeq *src_dag = new CircuitSeq(*src_graph),
+             *dst_dag = new CircuitSeq(*dst_graph);
   bool ret = src_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
   ret = dst_dag->remove_unused_qubits(unused_qubits);
@@ -93,14 +95,14 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
 
   // TODO: remove common unused input parameters?
 
-  // Eliminate transfers where src dag has unused qubits
+  // Eliminate transfers where src circuitseq has unused qubits
   auto src_num_qubits = src_dag->get_num_qubits();
   for (int i = 0; i < src_num_qubits; ++i) {
     if (!src_dag->qubit_used(i))
       return nullptr;
   }
 
-  // Eliminate transfers where src dag has unused input parameters
+  // Eliminate transfers where src circuitseq has unused input parameters
   auto src_num_input_params = src_dag->get_num_input_parameters();
   for (int i = 0; i < src_num_input_params; ++i) {
     if (!src_dag->input_param_used(i))
@@ -111,11 +113,11 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
   assert(src_dag->get_num_input_parameters() ==
          dst_dag->get_num_input_parameters());
   GraphXfer *graphXfer = new GraphXfer(_context);
-  std::unordered_map<DAGNode *, TensorX> src_to_tx, dst_to_tx;
+  std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
   for (int i = 0; i < src_dag->get_num_qubits(); i++) {
-    DAGNode *src_node = src_dag->nodes[cnt].get();
-    DAGNode *dst_node = dst_dag->nodes[cnt++].get();
+    CircuitWire *src_node = src_dag->wires[cnt].get();
+    CircuitWire *dst_node = dst_dag->wires[cnt++].get();
     assert(src_node->is_qubit());
     assert(dst_node->is_qubit());
     assert(src_node->index == i);
@@ -125,8 +127,8 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
     dst_to_tx[dst_node] = qubit_tensor;
   }
   for (int i = 0; i < src_dag->get_num_input_parameters(); i++) {
-    DAGNode *src_node = src_dag->nodes[cnt].get();
-    DAGNode *dst_node = dst_dag->nodes[cnt++].get();
+    CircuitWire *src_node = src_dag->wires[cnt].get();
+    CircuitWire *dst_node = dst_dag->wires[cnt++].get();
     assert(src_node->is_parameter());
     assert(dst_node->is_parameter());
     assert(src_node->index == i);
@@ -135,38 +137,38 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
     src_to_tx[src_node] = parameter_tensor;
     dst_to_tx[dst_node] = parameter_tensor;
   }
-  for (size_t i = 0; i < src_dag->edges.size(); i++) {
-    DAGHyperEdge *e = src_dag->edges[i].get();
+  for (size_t i = 0; i < src_dag->gates.size(); i++) {
+    CircuitGate *e = src_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_nodes.size(); j++) {
-      assert(src_to_tx.find(e->input_nodes[j]) != src_to_tx.end());
-      TensorX input = src_to_tx[e->input_nodes[j]];
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_nodes.size(); j++) {
-      //   if (e->output_nodes[j]->is_qubit()) {
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      //   if (e->output_wires[j]->is_qubit()) {
       //     TensorX output(op, j);
       //     op->add_output(output);
-      //     src_to_tx[e->output_nodes[j]] = output;
+      //     src_to_tx[e->output_wires[j]] = output;
       //   }
       TensorX output(op, j);
       op->add_output(output);
-      src_to_tx[e->output_nodes[j]] = output;
+      src_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->srcOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_dag->edges.size(); i++) {
-    DAGHyperEdge *e = dst_dag->edges[i].get();
+  for (size_t i = 0; i < dst_dag->gates.size(); i++) {
+    CircuitGate *e = dst_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_nodes.size(); j++) {
-      TensorX input = dst_to_tx[e->input_nodes[j]];
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_nodes.size(); j++) {
-      //   if (e->output_nodes[j]->is_qubit()) {
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      //   if (e->output_wires[j]->is_qubit()) {
       TensorX output(op, j);
       op->add_output(output);
-      dst_to_tx[e->output_nodes[j]] = output;
+      dst_to_tx[e->output_wires[j]] = output;
       //   }
     }
     graphXfer->dstOps.push_back(op);
@@ -189,8 +191,8 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context, const DAG *src_graph,
 
 GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
     Context *_context, const std::string &src_str, const std::string &dst_str) {
-  DAG *src_dag = nullptr;
-  DAG *dst_dag = nullptr;
+  CircuitSeq *src_dag = nullptr;
+  CircuitSeq *dst_dag = nullptr;
   QASMParser parser = QASMParser(_context);
   parser.load_qasm_str(src_str, src_dag);
   parser.load_qasm_str(dst_str, dst_dag);
@@ -322,17 +324,17 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
   return std::make_pair(xfer_0, xfer_1);
 }
 
-GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
-                     const DAG *dst_graph)
+GraphXfer::GraphXfer(Context *_context, const CircuitSeq *src_graph,
+                     const CircuitSeq *dst_graph)
     : context(_context), tensorId(0) {
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   assert(src_graph->get_num_input_parameters() ==
          dst_graph->get_num_input_parameters());
-  std::unordered_map<DAGNode *, TensorX> src_to_tx, dst_to_tx;
+  std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
   for (int i = 0; i < src_graph->get_num_qubits(); i++) {
-    DAGNode *src_node = src_graph->nodes[cnt].get();
-    DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+    CircuitWire *src_node = src_graph->wires[cnt].get();
+    CircuitWire *dst_node = dst_graph->wires[cnt++].get();
     assert(src_node->is_qubit());
     assert(dst_node->is_qubit());
     assert(src_node->index == i);
@@ -342,8 +344,8 @@ GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
     dst_to_tx[dst_node] = qubit_tensor;
   }
   for (int i = 0; i < src_graph->get_num_input_parameters(); i++) {
-    DAGNode *src_node = src_graph->nodes[cnt].get();
-    DAGNode *dst_node = dst_graph->nodes[cnt++].get();
+    CircuitWire *src_node = src_graph->wires[cnt].get();
+    CircuitWire *dst_node = dst_graph->wires[cnt++].get();
     assert(src_node->is_parameter());
     assert(dst_node->is_parameter());
     assert(src_node->index == i);
@@ -352,38 +354,38 @@ GraphXfer::GraphXfer(Context *_context, const DAG *src_graph,
     src_to_tx[src_node] = parameter_tensor;
     dst_to_tx[dst_node] = parameter_tensor;
   }
-  for (size_t i = 0; i < src_graph->edges.size(); i++) {
-    DAGHyperEdge *e = src_graph->edges[i].get();
+  for (size_t i = 0; i < src_graph->gates.size(); i++) {
+    CircuitGate *e = src_graph->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_nodes.size(); j++) {
-      assert(src_to_tx.find(e->input_nodes[j]) != src_to_tx.end());
-      TensorX input = src_to_tx[e->input_nodes[j]];
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_nodes.size(); j++) {
-      //   if (e->output_nodes[j]->is_qubit()) {
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      //   if (e->output_wires[j]->is_qubit()) {
       //     TensorX output(op, j);
       //     op->add_output(output);
-      //     src_to_tx[e->output_nodes[j]] = output;
+      //     src_to_tx[e->output_wires[j]] = output;
       //   }
       TensorX output(op, j);
       op->add_output(output);
-      src_to_tx[e->output_nodes[j]] = output;
+      src_to_tx[e->output_wires[j]] = output;
     }
     srcOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_graph->edges.size(); i++) {
-    DAGHyperEdge *e = dst_graph->edges[i].get();
+  for (size_t i = 0; i < dst_graph->gates.size(); i++) {
+    CircuitGate *e = dst_graph->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_nodes.size(); j++) {
-      TensorX input = dst_to_tx[e->input_nodes[j]];
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_nodes.size(); j++) {
-      //   if (e->output_nodes[j]->is_qubit()) {
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      //   if (e->output_wires[j]->is_qubit()) {
       TensorX output(op, j);
       op->add_output(output);
-      dst_to_tx[e->output_nodes[j]] = output;
+      dst_to_tx[e->output_wires[j]] = output;
       //   }
     }
     dstOps.push_back(op);
@@ -411,10 +413,10 @@ bool GraphXfer::map_output(const TensorX &src, const TensorX &dst) {
 bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // This function takes in an OpX, and will check all its input and
   // output tensors. If there are tensors connecting it with other already
-  // mapped ops, check whether these edges exists in the given Graph. No
+  // mapped ops, check whether these gates exists in the given Graph. No
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
-  // be checked. This gauarentee that every edges are checked at the end.
+  // be checked. This gauarentee that every gates are checked at the end.
   // Check gate type
   if (op == Op::INVALID_OP)
     return false;
@@ -544,7 +546,7 @@ std::shared_ptr<Graph> GraphXfer::run_1_time(int depth, Graph *src_graph) {
       }
     if (!pass)
       return nullptr;
-    // Check that output tensors with external edges are mapped
+    // Check that output tensors with external gates are mapped
     for (auto opIt = mappedOps.cbegin(); opIt != mappedOps.cend(); opIt++) {
       const std::set<Edge, EdgeCompare> &list =
           src_graph->outEdges[opIt->first];
@@ -618,7 +620,7 @@ void GraphXfer::run(int depth, Graph *graph,
       }
     if (!pass)
       return;
-    // Check that all external edges are mapped outputs
+    // Check that all external gates are mapped outputs
     for (auto opIt = mappedOps.cbegin(); opIt != mappedOps.cend(); opIt++) {
       const std::set<Edge, EdgeCompare> &list = graph->outEdges[opIt->first];
       std::set<Edge, EdgeCompare>::const_iterator it;
@@ -689,7 +691,7 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 //   // Step 1: map dst ops
 //   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator opIt;
 //   std::vector<OpX *>::const_iterator dstIt;
-//   // Step 2: add edges to the graph
+//   // Step 2: add gates to the graph
 //   for (opIt = graph->inEdges.begin(); opIt != graph->inEdges.end(); opIt++)
 //     if (mappedOps.find(opIt->first) == mappedOps.end()) {
 //       // Unmapped ops
@@ -720,7 +722,7 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 //           newGraph->add_edge(it->srcOp, it->dstOp, it->srcIdx, it->dstIdx);
 //         }
 //     }
-//   // Step 3: add edges for mapped ops
+//   // Step 3: add gates for mapped ops
 //   for (dstIt = dstOps.begin(); dstIt != dstOps.end(); dstIt++) {
 //     OpX *dstOp = *dstIt;
 //     for (size_t i = 0; i < dstOp->inputs.size(); i++)
@@ -759,7 +761,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
   new_graph->inEdges = graph->inEdges;
   new_graph->outEdges = graph->outEdges;
 
-  // Step 1: add edges from mapped src -> unmapped dst
+  // Step 1: add gates from mapped src -> unmapped dst
   for (auto it = mappedOps.cbegin(); it != mappedOps.cend(); it++) {
     auto mapped_op = it->first;
     auto mapped_op_it = new_graph->outEdges.find(mapped_op);
@@ -796,7 +798,7 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
     new_graph->remove_node_wo_input_output_connect(it->first);
   }
 
-  // Step 3: add edges for mapped ops
+  // Step 3: add gates for mapped ops
   for (auto dst_op_it = dstOps.cbegin(); dst_op_it != dstOps.cend();
        dst_op_it++) {
     OpX *dst_opx = *dst_op_it;

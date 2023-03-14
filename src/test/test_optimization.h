@@ -1,7 +1,7 @@
 #pragma once
 
+#include "quartz/circuitseq/circuitseq.h"
 #include "quartz/context/context.h"
-#include "quartz/dag/dag.h"
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"
@@ -15,7 +15,7 @@ void test_optimization(Context *ctx, const std::string &file_name,
                        const std::string &equivalent_file_name,
                        bool use_simulated_annealing) {
   QASMParser qasm_parser(ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(file_name, dag)) {
     std::cerr << "Parser failed" << std::endl;
     return;

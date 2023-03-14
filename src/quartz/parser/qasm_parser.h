@@ -147,6 +147,7 @@ bool QASMParser::load_qasm_stream(
         // 0.123*pi/2,
         // 0.123
         // pi
+        // pi/2
         // 0.123/(2*pi)
         ParamType p;
         bool negative = token[0] == '-';
@@ -161,9 +162,13 @@ bool QASMParser::load_qasm_stream(
             if (token[2] == '*') {
               // pi*0.123
               p = std::stod(d) * PI;
-            } else {
+            } else if (token[2] == '/') {
               // pi/2
               p = PI / std::stod(d);
+            } else {
+              std::cerr << "Unsupported parameter format: " << token
+                        << std::endl;
+              assert(false);
             }
           }
         } else if (token.find("pi") != std::string::npos) {

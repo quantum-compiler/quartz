@@ -558,6 +558,13 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
       }
 
+      if (current_indices.empty()) {
+        // A global gate. Directly update.
+        update_f(f[~i & 1], current_status, current_cost,
+                 current_local_schedule);
+        continue;
+      }
+
       int absorbing_set_index = -1;
       int absorb_count = 0;
       for (int j = 0; j < (int)current_status.absorbing_qubits.size(); j++) {
@@ -915,6 +922,11 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                                   end_schedule.begin(), end_schedule.end());
     }
   }
+  if (result_schedule.sets.empty()) {
+    // All gates in this schedule are global.
+    // We need to create an empty kernel for them.
+    result_schedule.sets.emplace_back(std::vector<int>(), KernelType::fusion);
+  }
   // Translate the |result_schedule| into |kernels|.
   kernels.reserve(result_schedule.sets.size());
   std::vector<bool> executed(num_gates, false);
@@ -991,6 +1003,7 @@ get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
               bool absorb_single_qubit_gates) {
+  constexpr bool debug = false;
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
@@ -1012,13 +1025,25 @@ get_schedules(const CircuitSeq &sequence,
   // only computed when |absorb_single_qubit_gates| is true
   std::unordered_map<std::string, std::queue<int>> gate_indices;
 
+  if (debug) {
+    std::cout << "get_schedules for " << sequence.to_string() << std::endl;
+  }
+
   for (auto &local_qubit : local_qubits) {
     // Convert vector<int> to vector<bool>.
     local_qubit_mask.assign(num_qubits, false);
+    if (debug) {
+      std::cout << "local qubits: ";
+    }
     for (auto &i : local_qubit) {
       local_qubit_mask[i] = true;
+      if (debug) {
+        std::cout << i << " ";
+      }
     }
-    std::cout << std::endl;
+    if (debug) {
+      std::cout << std::endl;
+    }
     if (current_local_qubit_layout.empty()) {
       // First iteration. Take the initial layout from |local_qubits[0]|.
       current_local_qubit_layout = local_qubit;
@@ -1068,6 +1093,17 @@ get_schedules(const CircuitSeq &sequence,
           num_global_swaps--;
         }
       }
+    }
+    if (debug) {
+      std::cout << "current layout: local ";
+      for (auto &i : current_local_qubit_layout) {
+        std::cout << i << " ";
+      }
+      std::cout << ", global ";
+      for (auto &i : current_global_qubit_layout) {
+        std::cout << i << " ";
+      }
+      std::cout << std::endl;
     }
 
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());

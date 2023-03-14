@@ -8,11 +8,11 @@ import dgl
 import hydra
 import torch
 import torch.nn.functional as F
-from config.config import *
 from model.actor_critic import ActorCritic
 from utils import masked_softmax
 
 import quartz
+from config.config import *
 
 # TODO: De-duplicate the circuits
 # - A circuit should appear only once in the tree. This is because

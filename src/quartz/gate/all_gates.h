@@ -27,6 +27,7 @@
 #include "s.h"
 #include "sdg.h"
 #include "swap.h"
+#include "sx.h"
 #include "t.h"
 #include "tdg.h"
 #include "u1.h"

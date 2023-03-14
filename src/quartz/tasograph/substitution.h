@@ -3,6 +3,7 @@
 #include "../context/context.h"
 #include "../context/rule_parser.h"
 #include "../gate/gate_utils.h"
+#include "../parser/qasm_parser.h"
 #include "assert.h"
 #include "quartz/circuitseq/circuitseq.h"
 #include "tasograph.h"
@@ -106,6 +107,9 @@ public:
                                      const CircuitSeq *src_graph,
                                      const CircuitSeq *dst_graph,
                                      bool no_increase_gate_count = false);
+  static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
+                                                   const std::string &src_str,
+                                                   const std::string &dst_str);
   static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
                                                  Command src_cmd,
                                                  std::vector<Command> dst_cmds);

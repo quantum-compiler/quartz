@@ -1,0 +1,6 @@
+outputs
+**/wandb
+**/.mypy_cache
+**/log*
+**/*.log
+**/*.pt

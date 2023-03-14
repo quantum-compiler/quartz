@@ -189,6 +189,16 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   return graphXfer;
 }
 
+GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
+    Context *_context, const std::string &src_str, const std::string &dst_str) {
+  DAG *src_dag = nullptr;
+  DAG *dst_dag = nullptr;
+  QASMParser parser = QASMParser(_context);
+  parser.load_qasm_str(src_str, src_dag);
+  parser.load_qasm_str(dst_str, dst_dag);
+  return GraphXfer::create_GraphXfer(_context, src_dag, dst_dag);
+}
+
 GraphXfer *
 GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
                                         std::vector<Command> dst_cmds) {

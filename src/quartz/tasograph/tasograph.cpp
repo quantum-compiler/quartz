@@ -573,6 +573,7 @@ void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);
   int num_qubits = oldOp.ptr->get_num_qubits();
   if (inEdges.find(oldOp) != inEdges.end()) {
+    // Remove out edges of in-ops
     auto in_edges = inEdges[oldOp];
     for (auto edge : in_edges) {
       auto src_op = edge.srcOp;
@@ -589,6 +590,7 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (outEdges.find(oldOp) != outEdges.end()) {
+    // Remove in edges of out-ops
     auto out_edges = outEdges[oldOp];
     for (auto out_edge : out_edges) {
       auto dst_op = out_edge.dstOp;
@@ -705,7 +707,7 @@ void Graph::constant_and_rotation_elimination() {
   }
 
   // Construct in-degree map
-  std::map<Op, size_t> op_in_edges_cnt;
+  std::unordered_map<Op, size_t, OpHash> op_in_edges_cnt;
   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }
@@ -814,7 +816,7 @@ void Graph::constant_and_rotation_elimination() {
       if (all_parameter_is_0) {
         // Delete all parameter wires, they are all 0
         for (const auto &e : input_edges) {
-          if (e.dstIdx > num_qubits) {
+          if (e.dstIdx >= num_qubits) {
             remove_node(e.srcOp);
           }
         }
@@ -1377,6 +1379,8 @@ Graph::_from_qasm_stream(Context *ctx,
   std::string line;
   GateType gate_type;
   std::vector<Pos> pos_on_qubits;
+  std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
+  size_t total_num_qubits = 0;
   while (std::getline(qasm_stream, line)) {
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
@@ -1404,14 +1408,17 @@ Graph::_from_qasm_stream(Context *ctx,
     } else if (command == "qreg") {
       std::string token;
       getline(ss, token, ' ');
+      std::string qreg_name = token.substr(0, token.find('['));
+      qreg_name_2_start_idx[qreg_name] = total_num_qubits;
       size_t num_qubits = string_to_number(token);
-      pos_on_qubits.resize(num_qubits);
-      for (int i = 0; i < num_qubits; ++i) {
+      pos_on_qubits.resize(total_num_qubits + num_qubits);
+      for (int i = total_num_qubits; i < total_num_qubits + num_qubits; ++i) {
         auto op = graph->add_qubit(i);
         pos_on_qubits[i] = Pos(op, 0);
         // Construct input_qubit_op_2_qubit_idx
         graph->input_qubit_op_2_qubit_idx[op] = i;
       }
+      total_num_qubits += num_qubits;
       assert(!ss.good());
     } else if (is_gate_string(command, gate_type)) {
       Gate *gate = graph->context->get_gate(gate_type);
@@ -1433,6 +1440,7 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123*pi,
           // 0.123*pi/2,
           // 0.123
+          // pi/2
           // pi
           ParamType p;
           bool negative = token[0] == '-';
@@ -1447,9 +1455,13 @@ Graph::_from_qasm_stream(Context *ctx,
               if (token[2] == '*') {
                 // pi*0.123
                 p = std::stod(d) * PI;
-              } else {
+              } else if (token[2] == '/') {
                 // pi/2
                 p = PI / std::stod(d);
+              } else {
+                std::cerr << "Unsupported parameter format: " << token
+                          << std::endl;
+                assert(false);
               }
             }
           } else if (token.find("pi") != std::string::npos) {
@@ -1476,7 +1488,10 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx =
+              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;
@@ -1494,7 +1509,10 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx =
+              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;
@@ -2889,8 +2907,54 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-// TODO
-bool Graph::equal(const Graph &other) const { return true; }
+// This function compares two graphs
+// It construct a sequence of gates in topology order for each graph
+// Returns true if the two sequences are the same
+bool Graph::equal(const Graph &other) const {
+  double epsilon = 1e-6;
+  std::vector<Op> ops1, ops2;
+  topology_order_ops(ops1);
+  other.topology_order_ops(ops2);
+  if (ops1.size() != ops2.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < ops1.size(); i++) {
+    if (ops1[i].ptr->tp != ops2[i].ptr->tp) {
+      return false;
+    }
+    if (ops1[i].ptr->is_parametrized_gate()) {
+      // make sure all the parameters are the same
+      int num_params = ops1[i].ptr->get_num_parameters();
+      int num_qubits = ops1[i].ptr->get_num_qubits();
+      std::vector<ParamType> params1(num_params);
+      std::vector<ParamType> params2(num_params);
+      // assume no parameter gates
+      // all parameter gates have constant value
+      auto edges1 = inEdges.find(ops1[i])->second;
+      for (auto it = edges1.cbegin(); it != edges1.cend(); ++it) {
+        if (it->srcOp.ptr->tp == GateType::input_param) {
+          params1[it->dstIdx - num_qubits] =
+              constant_param_values.find(it->srcOp)->second;
+        }
+      }
+      auto edges2 = other.inEdges.find(ops2[i])->second;
+      for (auto it = edges2.cbegin(); it != edges2.cend(); ++it) {
+        if (it->srcOp.ptr->tp == GateType::input_param) {
+          params2[it->dstIdx - num_qubits] =
+              other.constant_param_values.find(it->srcOp)->second;
+        }
+      }
+      for (int j = 0; j < num_params; j++) {
+        if (std::abs(params1[j] - params2[j]) > epsilon) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+bool operator==(const Graph &g1, const Graph &g2) { return g1.equal(g2); }
 
 bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const {
   std::unordered_set<Pos, PosHash> mapped_input_pos;

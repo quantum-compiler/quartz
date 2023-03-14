@@ -106,7 +106,7 @@ public:
   static GraphXfer *create_GraphXfer(Context *_context,
                                      const CircuitSeq *src_graph,
                                      const CircuitSeq *dst_graph,
-                                     bool no_increase_gate_count = false);
+                                     bool equal_num_input_params = true);
   static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
                                                    const std::string &src_str,
                                                    const std::string &dst_str);

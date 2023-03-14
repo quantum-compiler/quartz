@@ -72,7 +72,7 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
                                        const CircuitSeq *src_graph,
                                        const CircuitSeq *dst_graph,
-                                       bool no_increase_gate_count) {
+                                       bool equal_num_input_params) {
   // Remove common unused qubits
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   auto qubit_num = src_graph->get_num_qubits();
@@ -87,11 +87,6 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   assert(ret);
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
-
-  // Eliminate transfers which increase gate count
-  if (no_increase_gate_count &&
-      src_dag->get_num_gates() < dst_dag->get_num_gates())
-    return nullptr;
 
   // TODO: remove common unused input parameters?
 
@@ -109,9 +104,12 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
       return nullptr;
   }
 
+  // If equal_num_input_params is set, then the number of input parameters
+  // must be equal
+  if (equal_num_input_params && src_dag->get_num_input_parameters() !=
+                                    dst_dag->get_num_input_parameters())
+    return nullptr;
   assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
-  assert(src_dag->get_num_input_parameters() ==
-         dst_dag->get_num_input_parameters());
   GraphXfer *graphXfer = new GraphXfer(_context);
   std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
@@ -196,7 +194,13 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
   QASMParser parser = QASMParser(_context);
   parser.load_qasm_str(src_str, src_dag);
   parser.load_qasm_str(dst_str, dst_dag);
-  return GraphXfer::create_GraphXfer(_context, src_dag, dst_dag);
+  auto graph_xfer =
+      GraphXfer::create_GraphXfer(_context, src_dag, dst_dag, false);
+  // Since both the src and dst graph are from qasm
+  // every parameters have a concrete value
+  // Now add every parameter to the GraphXfer object
+
+  return graph_xfer;
 }
 
 GraphXfer *

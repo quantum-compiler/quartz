@@ -1597,7 +1597,7 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
     for (int i = 0; i < ecc_size; i++) {
       if (graph_cost[i] != graph_cost[representative_id]) {
         auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
-                                                ecc[representative_id], false);
+                                                ecc[representative_id], true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }
@@ -1936,11 +1936,11 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
     for (auto &circuit : ecc) {
       if (circuit != representative) {
         auto xfer =
-            GraphXfer::create_GraphXfer(ctx, circuit, representative, false);
+            GraphXfer::create_GraphXfer(ctx, circuit, representative, true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }
-        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, false);
+        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }

@@ -33,23 +33,20 @@ def y(use_z3=True):
 def rx(theta, use_z3=True):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, 0), (0, -sin_theta)], [(0, -sin_theta),
-                                                (cos_theta, 0)]]
+    return [[(cos_theta, 0), (0, -sin_theta)], [(0, -sin_theta), (cos_theta, 0)]]
 
 
 def ry(theta, use_z3=True):
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, 0), (-sin_theta, 0)], [(sin_theta, 0),
-                                                (cos_theta, 0)]]
+    return [[(cos_theta, 0), (-sin_theta, 0)], [(sin_theta, 0), (cos_theta, 0)]]
 
 
 def rz(theta, use_z3=True):
     # e ^ {i * theta} = cos theta + i sin theta
     assert len(theta) == 2
     cos_theta, sin_theta = theta
-    return [[(cos_theta, -sin_theta), (0, 0)], [(0, 0),
-                                                (cos_theta, sin_theta)]]
+    return [[(cos_theta, -sin_theta), (0, 0)], [(0, 0), (cos_theta, sin_theta)]]
 
 
 def u1(theta, use_z3=True):
@@ -65,8 +62,7 @@ def u2(phi, l, use_z3=True):
     cos_l, sin_l = l
     if use_z3:
         return [
-            [(1 / z3.Sqrt(2), 0),
-             (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
+            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
             [
                 (1 / z3.Sqrt(2) * cos_phi, 1 / z3.Sqrt(2) * sin_phi),
                 (
@@ -144,16 +140,14 @@ def t(use_z3=True):
     if use_z3:
         return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, z3.Sqrt(2) / 2)]]
     else:
-        return [[(1, 0), (0, 0)], [(0, 0),
-                                   (math.sqrt(2) / 2, math.sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, math.sqrt(2) / 2)]]
 
 
 def tdg(use_z3=True):
     if use_z3:
         return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, -z3.Sqrt(2) / 2)]]
     else:
-        return [[(1, 0), (0, 0)],
-                [(0, 0), (math.sqrt(2) / 2, -math.sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, -math.sqrt(2) / 2)]]
 
 
 def z(use_z3=True):

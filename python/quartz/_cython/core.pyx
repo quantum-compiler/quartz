@@ -401,11 +401,11 @@ cdef class PyGraph:
 
         def __set__(self, nodes):
             self._nodes = nodes
-    
+
     property _hash:
         def __get__(self):
             return self._hash
-        
+
         def __set__(self, _hash):
             self._hash = _hash
 
@@ -418,7 +418,7 @@ cdef class PyGraph:
         else:
             self.graph = shared_ptr[Graph](NULL)
             self._hash = 0
-        
+
 
     def __dealloc__(self):
         self.graph.reset()

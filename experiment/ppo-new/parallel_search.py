@@ -1,18 +1,20 @@
-import torch
-import quartz
-import dgl
-from model.actor_critic import ActorCritic
-from utils import masked_softmax
-import torch.nn.functional as F
-from torch.distributions import Categorical
 import math
-from config.config import *
-import hydra
 import os
-import warnings
-from typing import cast, OrderedDict
-import time
 import random
+import time
+import warnings
+from typing import OrderedDict, cast
+
+import dgl
+import hydra
+import torch
+import torch.nn.functional as F
+from config.config import *
+from model.actor_critic import ActorCritic
+from torch.distributions import Categorical
+from utils import masked_softmax
+
+import quartz
 
 
 class ParallelSearchAgent:
@@ -50,34 +52,36 @@ class ParallelSearchAgent:
 
         self.none_count: int = 0
 
-    def expand(
-            self,
-            circuit_list: list[quartz.PyGraph]) -> list[quartz.PyGraph | None]:
-        b_circs: dgl.DGLGraph = dgl.batch([
-            circuit.to_dgl_graph() for circuit in circuit_list
-        ]).to(self.device)
+    def expand(self, circuit_list: list[quartz.PyGraph]) -> list[quartz.PyGraph | None]:
+        b_circs: dgl.DGLGraph = dgl.batch(
+            [circuit.to_dgl_graph() for circuit in circuit_list]
+        ).to(self.device)
         num_nodes: torch.Tensor = b_circs.batch_num_nodes()
         b_node_embeds: torch.Tensor = self.actor_critic.gnn(b_circs)
-        b_node_values: torch.Tensor = self.actor_critic.critic(
-            b_node_embeds).squeeze()
+        b_node_values: torch.Tensor = self.actor_critic.critic(b_node_embeds).squeeze()
         node_embeds_list: list[torch.Tensor] = torch.split(
-            b_node_embeds, num_nodes.tolist())
+            b_node_embeds, num_nodes.tolist()
+        )
 
         # Sample nodes
         node_values_list: list[torch.Tensor] = torch.split(
-            b_node_values, num_nodes.tolist())
-        temperatures = 1 / (torch.log(self.hit_rate * (num_nodes - 1) /
-                                      (1 - self.hit_rate)))
+            b_node_values, num_nodes.tolist()
+        )
+        temperatures = 1 / (
+            torch.log(self.hit_rate * (num_nodes - 1) / (1 - self.hit_rate))
+        )
 
         # Fetch node masks
         node_masks: list[torch.Tensor] = []
         for circ, node_value in zip(circuit_list, node_values_list):
             if circ not in self.node_soft_masks:
                 self.node_soft_masks[circ] = torch.zeros(
-                    (circ.gate_count, ), dtype=torch.bool).to(self.device)
+                    (circ.gate_count,), dtype=torch.bool
+                ).to(self.device)
             if circ not in self.node_hard_masks:
                 self.node_hard_masks[circ] = torch.zeros(
-                    (circ.gate_count, ), dtype=torch.bool).to(self.device)
+                    (circ.gate_count,), dtype=torch.bool
+                ).to(self.device)
                 # self.node_hard_masks[circ] = node_value < 1e-2
             node_soft_mask = self.node_soft_masks[circ]
             node_hard_mask = self.node_hard_masks[circ]
@@ -88,9 +92,11 @@ class ParallelSearchAgent:
 
         nodes: list[int] = [
             torch.multinomial(
-                F.softmax(node_values / temperature - node_mask * 1e10, dim=0),
-                1)[0].item() for node_values, temperature, node_mask in zip(
-                    node_values_list, temperatures, node_masks)
+                F.softmax(node_values / temperature - node_mask * 1e10, dim=0), 1
+            )[0].item()
+            for node_values, temperature, node_mask in zip(
+                node_values_list, temperatures, node_masks
+            )
         ]
 
         # Maintain node masks
@@ -99,21 +105,20 @@ class ParallelSearchAgent:
 
         # Construct masks
         mask: torch.Tensor = torch.zeros(
-            (self.num_workers, self.qtz.num_xfers), dtype=torch.bool)
+            (self.num_workers, self.qtz.num_xfers), dtype=torch.bool
+        )
         for i, (n, circ) in enumerate(zip(nodes, circuit_list)):
             appliable_xfers: list[int] = circ.available_xfers_parallel(
-                context=self.qtz, node=circ.get_node_from_id(id=n))
+                context=self.qtz, node=circ.get_node_from_id(id=n)
+            )
             mask[i][appliable_xfers] = True
 
         # Select xfers
         selected_node_embeds: list[torch.Tensor] = [
-            node_embeds[node]
-            for node_embeds, node in zip(node_embeds_list, nodes)
+            node_embeds[node] for node_embeds, node in zip(node_embeds_list, nodes)
         ]
-        b_selected_node_embeds: torch.Tensor = torch.stack(
-            selected_node_embeds, dim=0)
-        b_xfer_logits: torch.Tensor = self.actor_critic.actor(
-            b_selected_node_embeds)
+        b_selected_node_embeds: torch.Tensor = torch.stack(selected_node_embeds, dim=0)
+        b_xfer_logits: torch.Tensor = self.actor_critic.actor(b_selected_node_embeds)
         b_xfer_probs: torch.Tensor = masked_softmax(b_xfer_logits, mask)
         xfers: list[int] = torch.max(b_xfer_probs, dim=1)[1].tolist()
 
@@ -124,14 +129,16 @@ class ParallelSearchAgent:
             if xfer.is_nop:
                 new_circ_list.append(None)
                 self.node_hard_masks[circ][n] = True
-            elif circ.gate_count - xfer.src_gate_count + xfer.dst_gate_count > self.min_cost + self.max_cost_increase:
+            elif (
+                circ.gate_count - xfer.src_gate_count + xfer.dst_gate_count
+                > self.min_cost + self.max_cost_increase
+            ):
                 new_circ_list.append(None)
                 self.node_hard_masks[circ][n] = True
             else:
                 new_circ: quartz.PyGraph = circ.apply_xfer(
-                    xfer=xfer,
-                    node=circ.get_node_from_id(id=n),
-                    eliminate_rotation=True)
+                    xfer=xfer, node=circ.get_node_from_id(id=n), eliminate_rotation=True
+                )
                 new_circ_list.append(new_circ)
 
                 # If the circuit is large, it is not added to data structures
@@ -158,8 +165,9 @@ class ParallelSearchAgent:
     def run(self):
         start = time.time()
         expansion_cnt: int = 0
-        circuit_list: list[quartz.PyGraph
-                           | None] = [self.input_circuit] * self.num_workers
+        circuit_list: list[quartz.PyGraph | None] = [
+            self.input_circuit
+        ] * self.num_workers
         trajectory_len_list: list[int] = [0] * self.num_workers
         while True:
             expansion_cnt += 1
@@ -170,20 +178,20 @@ class ParallelSearchAgent:
                 # print(self.visit_cnt)
             with torch.no_grad():
                 circuit_list = self.expand(circuit_list)
-            visit_cnt_reversed = [
-                1 / self.visit_cnt[circ] for circ in self.circ_list
-            ]
+            visit_cnt_reversed = [1 / self.visit_cnt[circ] for circ in self.circ_list]
 
             for i, circuit in enumerate(circuit_list):
                 trajectory_len_list[i] += 1
-                if circuit is not None and trajectory_len_list[
-                        i] > self.max_trajectory_len:
+                if (
+                    circuit is not None
+                    and trajectory_len_list[i] > self.max_trajectory_len
+                ):
                     circuit = None
 
                 if circuit is None:
-                    circuit_list[i] = random.choices(self.circ_list,
-                                                     visit_cnt_reversed,
-                                                     k=1)[0]
+                    circuit_list[i] = random.choices(
+                        self.circ_list, visit_cnt_reversed, k=1
+                    )[0]
                     self.visit_cnt[circuit_list[i]] += 1
                     self.none_count += 1
                     trajectory_len_list[i] = 0
@@ -191,16 +199,15 @@ class ParallelSearchAgent:
 
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
-    os.chdir(
-        hydra.utils.get_original_cwd())  # set working dir to the original one
+    os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
 
     cfg: BaseConfig = config.c
     warnings.simplefilter('ignore')
 
     # Build quartz context
     qtz: quartz.QuartzContext = quartz.QuartzContext(
-        gate_set=['h', 'cx', 'x', 'rz', 'add'],
-        filename='../ecc_set/nam_ecc.json')
+        gate_set=['h', 'cx', 'x', 'rz', 'add'], filename='../ecc_set/nam_ecc.json'
+    )
 
     # Device
     device = torch.device("cuda:1")
@@ -208,7 +215,8 @@ def main(config: Config) -> None:
     # circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
     #     context=qtz, filename="../nam_circs/barenco_tof_10.qasm")
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
-        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
+        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm"
+    )
 
     # Load actor-critic network
     ckpt_path = "ckpts/iter_133.pt"
@@ -230,8 +238,7 @@ def main(config: Config) -> None:
     ).to(device)
 
     ckpt = torch.load(ckpt_path, map_location=device)
-    model_state_dict = cast(OrderedDict[str, torch.Tensor],
-                            ckpt['model_state_dict'])
+    model_state_dict = cast(OrderedDict[str, torch.Tensor], ckpt['model_state_dict'])
     actor_critic.load_state_dict(model_state_dict)
 
     parallel_search_agent = ParallelSearchAgent(

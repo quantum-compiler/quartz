@@ -9,12 +9,12 @@ import dgl
 import hydra
 import torch
 import torch.nn.functional as F
-from config.config import *
 from model.actor_critic import ActorCritic
 from torch.distributions import Categorical
 from utils import masked_softmax
 
 import quartz
+from config.config import *
 
 
 class ParallelSearchAgent:

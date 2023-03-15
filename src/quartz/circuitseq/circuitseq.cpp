@@ -308,9 +308,9 @@ void CircuitSeq::add_input_parameter() {
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;
   wire->index = num_input_parameters;
-  parameters.insert(parameters.begin() + num_qubits + num_input_parameters,
-                    wire.get());
-  wires.insert(wires.begin() + num_input_parameters, std::move(wire));
+  parameters.insert(parameters.begin() + num_input_parameters, wire.get());
+  wires.insert(wires.begin() + num_qubits + num_input_parameters,
+               std::move(wire));
 
   num_input_parameters++;
 

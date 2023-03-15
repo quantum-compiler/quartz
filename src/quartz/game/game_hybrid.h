@@ -566,6 +566,8 @@ namespace quartz {
             while (std::getline(original_qasm_file, tmp_file_line)) {
                 // ignore headings and annotations
                 if (tmp_file_line.empty()) continue;
+                if (tmp_file_line.size() == 1 && (tmp_file_line[0] == '\r' || tmp_file_line[0] == '\n')) continue;
+                if (tmp_file_line.size() == 2 && tmp_file_line[0] == '\r' && tmp_file_line[1] == '\n') continue;
                 if (tmp_file_line.rfind("//", 0) == 0) continue;
                 if (tmp_file_line.rfind("OPENQASM", 0) == 0) continue;
                 if (tmp_file_line.rfind("include", 0) == 0) continue;

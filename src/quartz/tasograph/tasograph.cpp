@@ -1235,6 +1235,8 @@ Graph::_from_qasm_stream(Context *ctx,
   while (std::getline(qasm_stream, line)) {
     // skip empty line
     if (line.empty()) continue;
+    if (line.size() == 1 && (line[0] == '\r' || line[0] == '\n')) continue;
+    if (line.size() == 2 && line[0] == '\r' && line[1] == '\n') continue;
     if (line[0] == ' ') line = line.substr(1);
 
     // repleace comma with space
@@ -1355,7 +1357,10 @@ Graph::_from_qasm_stream(Context *ctx,
         }
       }
     } else {
-      std::cout << "Unknown gate: " << command << std::endl;
+      std::cout << "Unknown gate: " << command << "!" << std::endl;
+      std::cout << "The bad line is: " << line << "!" << std::endl;
+      std::cout << "The bad line has size: " << line.size() << std::endl;
+      std::cout << int(line[0]) << std::endl;
       assert(false);
     }
   }

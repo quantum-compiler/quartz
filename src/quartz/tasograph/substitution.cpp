@@ -28,7 +28,7 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
     if (opx_num_qubits == 0)
       continue;
     else {
-      for (size_t i = 0; i < opx_num_qubits; ++i) {
+      for (int i = 0; i < opx_num_qubits; ++i) {
         if (opx->inputs[i].op == nullptr) {
           tensor_on_qubit[opx->outputs[i]] = input_qubit_cnt++;
           assert(input_qubit_cnt <= num_qubits);
@@ -36,7 +36,7 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
           tensor_on_qubit[opx->outputs[i]] = tensor_on_qubit[opx->inputs[i]];
         }
       }
-      for (size_t i = 1; i < opx_num_qubits; ++i) {
+      for (int i = 1; i < opx_num_qubits; ++i) {
         // Union operation
         int ori_l = tensor_on_qubit[opx->outputs[0]], l = ori_l;
         int ori_r = tensor_on_qubit[opx->outputs[i]], r = ori_r;
@@ -69,11 +69,42 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
   return true;
 }
 
-bool GraphXfer::parameter_is_symbolic(const TensorX &tensor) {
-  if (paramValues.find(tensor.idx) != paramValues.end())
+bool GraphXfer::is_input_qubit(const OpX *opx, int idx) const {
+  if (idx < 0 || idx >= context->get_gate(opx->type)->get_num_qubits())
+    // Invalid index or index larger than qubit range
     return false;
-  else
-    return true;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_input_parameter(const OpX *opx, int idx) const {
+  int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+  int num_params = context->get_gate(opx->type)->get_num_parameters();
+  if (idx < num_qubits || idx >= (num_qubits + num_params))
+    // Index out of parameter range
+    return false;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_symbolic_input_parameter(const OpX *opx, int idx) const {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) == paramValues.end())
+      return true;
+  }
+  return false;
+}
+
+bool GraphXfer::is_constant_input_parameter(const OpX *opx, int idx) const {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) != paramValues.end())
+      return true;
+  }
+  return false;
 }
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
@@ -537,6 +568,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
   // be checked. This gauarentee that every gates are checked at the end.
+
   // Check gate type
   if (op == Op::INVALID_OP)
     return false;
@@ -556,8 +588,17 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
         // Input is already mapped
         Op mappedOp = it->second.first;
         int mappedIdx = it->second.second;
-        if (!(graph->has_edge(mappedOp, op, mappedIdx, i)))
+        if (!(graph->has_edge(mappedOp, op, mappedIdx, i))) {
           return false;
+        }
+        if (is_constant_input_parameter(srcOp, i)) {
+          // Check if the constant input parameter is the same
+          auto xfer_param_value = paramValues.find(in.idx)->second;
+          auto graph_param_value =
+              graph->constant_param_values.find(mappedOp)->second;
+          if (std::abs(xfer_param_value - graph_param_value) > eps)
+            return false;
+        }
       } else {
         // Input haven't been mapped
         auto newit = newMapInputs.find(in.idx);
@@ -566,12 +607,28 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           int mappedIdx = newit->second.second;
           if (!(graph->has_edge(mappedOp, op, mappedIdx, i)))
             return false;
+          if (is_constant_input_parameter(srcOp, i)) {
+            // Check if the constant input parameter is the same
+            auto xfer_param_value = paramValues.find(in.idx)->second;
+            auto graph_param_value =
+                graph->constant_param_values.find(mappedOp)->second;
+            if (std::abs(xfer_param_value - graph_param_value) > eps)
+              return false;
+          }
         } else {
           std::set<Edge, EdgeCompare> list = graph->inEdges.find(op)->second;
           std::set<Edge, EdgeCompare>::const_iterator it2;
           for (it2 = list.begin(); it2 != list.end(); it2++) {
             Edge e = *it2;
             if (e.dstIdx == (int)i) {
+              if (is_constant_input_parameter(srcOp, i)) {
+                // Check if the constant input parameter is the same
+                auto xfer_param_value = paramValues.find(in.idx)->second;
+                auto graph_param_value =
+                    graph->constant_param_values.find(e.srcOp)->second;
+                if (std::abs(xfer_param_value - graph_param_value) > eps)
+                  return false;
+              }
               newMapInputs.insert(
                   std::make_pair(in.idx, std::make_pair(e.srcOp, e.srcIdx)));
               break;
@@ -961,7 +1018,6 @@ std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
   for (auto const &opx : v) {
     int num_qubits = context->get_gate(opx->type)->get_num_qubits();
     int num_params = context->get_gate(opx->type)->get_num_parameters();
-    int num_inputs = num_qubits + num_params;
 
     std::vector<int> input_qubits(num_qubits);
 

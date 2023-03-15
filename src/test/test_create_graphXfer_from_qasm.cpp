@@ -12,7 +12,7 @@ int main() {
   std::string src_str = "OPENQASM 2.0;\n"
                         "include \"qelib1.inc\";\n"
                         "qreg q[1];\n"
-                        "rz(pi/2) q[0];";
+                        "rz(pi) q[0];";
   std::string dst_str = "OPENQASM 2.0;\n"
                         "include \"qelib1.inc\";\n"
                         "qreg q[1];\n"
@@ -23,5 +23,10 @@ int main() {
 
   auto circuit = Graph::from_qasm_str(&ctx, src_str);
 
+  std::vector<Op> all_ops;
+  circuit->topology_order_ops(all_ops);
+  auto op = all_ops[0];
+  auto new_circuit = circuit->apply_xfer(graph_xfer, op);
+  std::cout << new_circuit->to_qasm() << std::endl;
   return 0;
 }

@@ -21,5 +21,7 @@ int main() {
       GraphXfer::create_GraphXfer_from_qasm_str(&ctx, src_str, dst_str);
   std::cout << graph_xfer->src_str() << graph_xfer->dst_str() << std::endl;
 
+  auto circuit = Graph::from_qasm_str(&ctx, src_str);
+
   return 0;
 }

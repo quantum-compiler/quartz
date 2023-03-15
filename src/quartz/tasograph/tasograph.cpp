@@ -2373,7 +2373,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
   }
   if (!fail) {
-    fail = !_loop_check_after_mapping(xfer);
+    fail = !_loop_check_after_matching(xfer);
   }
   while (!opx_op_dq.empty()) {
     auto opx_op_pair = opx_op_dq.back();
@@ -2956,7 +2956,7 @@ bool Graph::equal(const Graph &other) const {
 
 bool operator==(const Graph &g1, const Graph &g2) { return g1.equal(g2); }
 
-bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const {
+bool Graph::_loop_check_after_matching(GraphXfer *xfer) const {
   std::unordered_set<Pos, PosHash> mapped_input_pos;
   std::unordered_set<Pos, PosHash> mapped_output_pos;
   std::queue<Pos> q;

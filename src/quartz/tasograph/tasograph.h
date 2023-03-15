@@ -302,7 +302,7 @@ public:
   std::shared_ptr<Graph> ccz_flip_t(Context *ctx);
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
-  bool _loop_check_after_mapping(GraphXfer *xfer) const;
+  bool _loop_check_after_matching(GraphXfer *xfer) const;
 
 private:
   void replace_node(Op oldOp, Op newOp);

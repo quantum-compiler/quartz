@@ -320,9 +320,6 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
-  std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, size_t depth,
-                                         size_t ignore_depth,
-                                         size_t min_guid) const;
   // The common core part of the API xfer_appliable, apply_xfer, and
   // apply_xfer_and_track_node. Matches the src dag of xfer to the local dag
   // in the circuit whose topological-order root is op. If failed, it

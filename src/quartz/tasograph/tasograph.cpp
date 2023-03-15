@@ -1442,7 +1442,7 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123
           // pi/2
           // pi
-          ParamType p;
+          ParamType p = 0.0;
           bool negative = token[0] == '-';
           if (negative)
             token = token.substr(1);

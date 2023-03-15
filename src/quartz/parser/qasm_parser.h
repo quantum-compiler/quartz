@@ -149,7 +149,7 @@ bool QASMParser::load_qasm_stream(
         // pi
         // pi/2
         // 0.123/(2*pi)
-        ParamType p;
+        ParamType p = 0.0;
         bool negative = token[0] == '-';
         if (negative)
           token = token.substr(1);

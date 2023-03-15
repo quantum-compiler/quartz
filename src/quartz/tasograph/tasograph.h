@@ -260,7 +260,7 @@ public:
            int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  std::string to_qasm(bool print_result, bool print_id) const;
+  std::string to_qasm(bool print_result = false, bool print_id = false) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_id) const;
   template <class _CharT, class _Traits>

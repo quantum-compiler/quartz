@@ -13,15 +13,14 @@ int main() {
   //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
   //                GateType::cx, GateType::x, GateType::rz, GateType::add});
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::x, GateType::rz, GateType::add});
+               GateType::cx, GateType::x, GateType::t, GateType::tdg});
 
   auto graph = Graph::from_qasm_file(
-      &ctx,
-      "../experiment/t_tdg_h_cx_toffoli_flip_dataset/mod5_4.qasm.toffoli_flip");
+      &ctx, "../experiment/circs/t_tdg_circs/barenco_tof_3.qasm");
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "../Nam_complete_ECC_set.json")) {
+  if (!eqs.load_json(&ctx, "../clifford_t_305_complete_ECC_set.json")) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }

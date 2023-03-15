@@ -1,11 +1,11 @@
 #pragma once
 
+#include "../circuitseq/circuitseq.h"
 #include "../context/context.h"
 #include "../context/rule_parser.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
 #include "../parser/qasm_parser.h"
-#include "quartz/circuitseq/circuitseq.h"
 
 #include <chrono>
 #include <fstream>
@@ -172,6 +172,7 @@ struct EdgeCompare {
 };
 
 class GraphXfer;
+class OpX;
 
 class Graph {
 public:
@@ -322,6 +323,14 @@ private:
   std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, size_t depth,
                                          size_t ignore_depth,
                                          size_t min_guid) const;
+  // The common core part of the API xfer_appliable, apply_xfer, and
+  // apply_xfer_and_track_node. Matches the src dag of xfer to the local dag
+  // in the circuit whose topological-order root is op. If failed, it
+  // automatically unmaps the matched nodes. Otherwise, the caller should
+  // unmap the matched nodes after their work is done.
+  bool _pattern_matching(
+      GraphXfer *xfer, Op op,
+      std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const;
 
 public:
   size_t special_op_guid;

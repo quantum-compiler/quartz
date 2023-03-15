@@ -83,7 +83,10 @@ public:
             const CircuitSeq *dst_graph);
   bool src_graph_connected(CircuitSeq *src_graph);
   TensorX new_tensor(void);
-  bool parameter_is_symbolic(const TensorX &tensor);
+  bool is_input_qubit(const OpX *opx, int idx);
+  bool is_input_parameter(const OpX *opx, int idx);
+  bool is_symbolic_input_parameter(const OpX *opx, int idx);
+  bool is_constant_input_parameter(const OpX *opx, int idx);
   bool map_output(const TensorX &src, const TensorX &dst);
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
   void match(OpX *srcOp, Op op, const Graph *graph);

@@ -69,11 +69,42 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
   return true;
 }
 
-bool GraphXfer::parameter_is_symbolic(const TensorX &tensor) {
-  if (paramValues.find(tensor.idx) != paramValues.end())
+bool GraphXfer::is_input_qubit(const OpX *opx, int idx) {
+  if (idx < 0 || idx >= context->get_gate(opx->type)->get_num_qubits())
+    // Invalid index or index larger than qubit range
     return false;
-  else
-    return true;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_input_parameter(const OpX *opx, int idx) {
+  int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+  int num_params = context->get_gate(opx->type)->get_num_parameters();
+  if (idx < num_qubits || idx >= (num_qubits + num_params))
+    // Index out of parameter range
+    return false;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_symbolic_input_parameter(const OpX *opx, int idx) {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) == paramValues.end())
+      return true;
+  }
+  return false;
+}
+
+bool GraphXfer::is_constant_input_parameter(const OpX *opx, int idx) {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) != paramValues.end())
+      return true;
+  }
+  return false;
 }
 
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
@@ -537,6 +568,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
   // be checked. This gauarentee that every gates are checked at the end.
+
   // Check gate type
   if (op == Op::INVALID_OP)
     return false;

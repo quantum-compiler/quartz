@@ -69,6 +69,13 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
   return true;
 }
 
+bool GraphXfer::parameter_is_symbolic(const TensorX &tensor) {
+  if (paramValues.find(tensor.idx) != paramValues.end())
+    return false;
+  else
+    return true;
+}
+
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
                                        const CircuitSeq *src_graph,
                                        const CircuitSeq *dst_graph,

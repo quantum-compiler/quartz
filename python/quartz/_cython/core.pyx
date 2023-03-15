@@ -246,6 +246,8 @@ cdef class QuartzContext:
     cdef bool include_nop
 
     def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
+        """The no_increase parameter is deprecated"""
+        # TODO: remove no_increase
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -289,7 +291,7 @@ cdef class QuartzContext:
                     if j != k:
                         dag_ptr_0 = eq_sets[i][j]
                         dag_ptr_1 = eq_sets[i][k]
-                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, True)
                         if xfer != NULL:
                             self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
@@ -336,7 +338,7 @@ cdef class QuartzContext:
     def has_parameterized_gate(self) -> bool:
         return self.context.has_parameterized_gate()
 
-    def add_xfer(self, *, src_str: str, dst_str: str):
+    def add_xfer_from_qasm_str(self, *, src_str: str, dst_str: str):
         src_bytes = src_str.encode('utf-8')
         dst_bytes = dst_str.encode('utf-8')
         xfer = GraphXfer.create_GraphXfer_from_qasm_str(self.context, src_bytes, dst_bytes)

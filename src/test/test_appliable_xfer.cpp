@@ -35,7 +35,7 @@ int main() {
     for (auto circ_1 : eqcs) {
       for (auto circ_2 : eqcs) {
         if (circ_1 != circ_2) {
-          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_1, circ_2, false);
+          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_1, circ_2, true);
           if (xfer)
             xfers.emplace_back(xfer);
         }

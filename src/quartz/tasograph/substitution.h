@@ -83,6 +83,7 @@ public:
             const CircuitSeq *dst_graph);
   bool src_graph_connected(CircuitSeq *src_graph);
   TensorX new_tensor(void);
+  bool parameter_is_symbolic(const TensorX &tensor);
   bool map_output(const TensorX &src, const TensorX &dst);
   bool can_match(OpX *srcOp, Op op, const Graph *graph) const;
   void match(OpX *srcOp, Op op, const Graph *graph);
@@ -106,7 +107,7 @@ public:
   static GraphXfer *create_GraphXfer(Context *_context,
                                      const CircuitSeq *src_graph,
                                      const CircuitSeq *dst_graph,
-                                     bool no_increase_gate_count = false);
+                                     bool equal_num_input_params = true);
   static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
                                                    const std::string &src_str,
                                                    const std::string &dst_str);

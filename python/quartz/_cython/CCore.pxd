@@ -85,7 +85,7 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
     cdef cppclass GraphXfer:
         GraphXfer(Context_ptr, const CircuitSeq_ptr, const CircuitSeq_ptr) except +
         @staticmethod
-        GraphXfer* create_GraphXfer(Context_ptr,const CircuitSeq_ptr ,const CircuitSeq_ptr, bool no_increase)
+        GraphXfer* create_GraphXfer(Context_ptr,const CircuitSeq_ptr ,const CircuitSeq_ptr, bool equal_num_input_params)
         @staticmethod
         GraphXfer* create_GraphXfer_from_qasm_str(Context_ptr, const string &, const string &)
         int num_src_op()

@@ -135,7 +135,7 @@ namespace quartz {
 
         [[nodiscard]] State state() {
             return {device_edges, logical2physical, physical2logical,
-                    graph.convert_circuit_to_state(7, true),
+                    graph.convert_circuit_to_state(6, true),
                     is_initial_phase};
         }
 

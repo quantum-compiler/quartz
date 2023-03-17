@@ -8,7 +8,7 @@ using namespace quartz;
 int main() {
     // initialize the environment
     //  string circuit_file_name = "../circuit/nam-circuits/qasm_files/gf2^E5_mult_after_heavy.qasm";
-    string circuit_file_name = "../mbq_test.qasm";
+    string circuit_file_name = "../circuit/quartzphysical/qgan_qubit12.qasm";
     SimpleHybridEnv env = SimpleHybridEnv(
             // basic settings
             circuit_file_name, BackendType::IBM_Q27_FALCON, "../test_mapping_file.txt",

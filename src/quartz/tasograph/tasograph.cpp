@@ -760,23 +760,13 @@ void Graph::constant_and_rotation_elimination() {
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
         } else if (op.ptr->tp == GateType::neg) {
-          ParamType params[2], result = 0;
-          for (auto it = list.begin(); it != list.end(); ++it) {
-            auto edge = *it;
-            params[edge.dstIdx] = constant_param_values[edge.srcOp];
-            remove_node(edge.srcOp);
-          }
-          result = params[0] - params[1];
-
-          assert(outEdges[op].size() == 1);
-          auto output_dst_op = (*outEdges[op].begin()).dstOp;
-          auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
+          ParamType param = 0;
+          auto edge = *list.begin();
+          param = constant_param_values[edge.srcOp];
+          constant_param_values[edge.srcOp] = -param;
+          // Remove neg gate, the renewed parameter will be connected to other
+          // part of the circuit automatically
           remove_node(op);
-
-          Op merged_op(context->next_global_unique_id(),
-                       context->get_gate(GateType::input_param));
-          add_edge(merged_op, output_dst_op, 0, output_dst_idx);
-          constant_param_values[merged_op] = result;
         } else {
           assert(false && "Unimplemented parameter gates");
         }

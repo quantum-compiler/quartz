@@ -154,6 +154,42 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
 
   assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
 
+  // Warning: This pruning should be removed after we implement parameter
+  // expression simplification. This pruning relies on the following
+  // assumptions:
+  // 1. unique_parameters == true when generating ECC sets
+  // 2. the completeness of the ECC set
+  // Here we refuse to generate transformations whose src and dst circuits
+  // has parameter gates whose inputs are identical.
+
+  // Traverse all the gates
+  for (auto &gate_src : src_dag->gates) {
+    // Check if the gate is a parameter gate
+    if (gate_src->gate->is_parameter_gate()) {
+      for (auto &gate_dst : dst_dag->gates) {
+        // Check if the gate is a parameter gate
+        if (gate_dst->gate->is_parameter_gate()) {
+          // Check if the gate are the same type
+          if (gate_src->gate->tp == gate_dst->gate->tp) {
+            // Check if the gates have the same inputs
+            std::set<int> src_gate_input_idx, dst_gate_input_idx;
+            for (int i = 0; i < gate_src->input_wires.size(); ++i) {
+              src_gate_input_idx.insert(gate_src->input_wires[i]->index);
+              dst_gate_input_idx.insert(gate_dst->input_wires[i]->index);
+            }
+            if (src_gate_input_idx != dst_gate_input_idx)
+              continue;
+            // Check if the gates have the same outputs
+            if (gate_src->output_wires[0]->index !=
+                gate_dst->output_wires[0]->index)
+              continue;
+            return nullptr;
+          }
+        }
+      }
+    }
+  }
+
   GraphXfer *graphXfer = new GraphXfer(_context);
   std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;

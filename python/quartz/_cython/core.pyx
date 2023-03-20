@@ -1,9 +1,9 @@
 # distutils: language = c++
 
 from CCore cimport (
-    DAG,
+    CircuitSeq,
+    CircuitSeq_ptr,
     Context,
-    DAG_ptr,
     Edge,
     EquivalenceSet,
     Gate,
@@ -148,18 +148,18 @@ cdef class PyGate:
 
 
 cdef class PyDAG:
-    cdef DAG_ptr dag
+    cdef CircuitSeq_ptr dag
 
     def __cinit__(self, *, int num_qubits=-1, int num_input_params=-1):
         if num_qubits >= 0 and num_input_params >= 0:
-            self.dag = new DAG(num_qubits, num_input_params)
+            self.dag = new CircuitSeq(num_qubits, num_input_params)
         else:
             self.dag = NULL
 
     def __dealloc__(self):
         pass
 
-    cdef set_this(self, DAG_ptr dag_):
+    cdef set_this(self, CircuitSeq_ptr dag_):
         self.dag = dag_
         return self
 
@@ -195,6 +195,8 @@ cdef class PyXfer:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
             self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
+        else:
+            self.graphXfer = NULL
 
     def __dealloc__(self):
         pass
@@ -244,6 +246,8 @@ cdef class QuartzContext:
     cdef bool include_nop
 
     def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
+        """The no_increase parameter is deprecated"""
+        # TODO: remove no_increase
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -287,7 +291,7 @@ cdef class QuartzContext:
                     if j != k:
                         dag_ptr_0 = eq_sets[i][j]
                         dag_ptr_1 = eq_sets[i][k]
-                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, True)
                         if xfer != NULL:
                             self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
@@ -333,6 +337,13 @@ cdef class QuartzContext:
 
     def has_parameterized_gate(self) -> bool:
         return self.context.has_parameterized_gate()
+
+    def add_xfer_from_qasm_str(self, *, src_str: str, dst_str: str):
+        src_bytes = src_str.encode('utf-8')
+        dst_bytes = dst_str.encode('utf-8')
+        xfer = GraphXfer.create_GraphXfer_from_qasm_str(self.context, src_bytes, dst_bytes)
+        if xfer != NULL:
+            self.v_xfers.push_back(xfer)
 
     @property
     def num_equivalence_classes(self):
@@ -392,11 +403,11 @@ cdef class PyGraph:
 
         def __set__(self, nodes):
             self._nodes = nodes
-    
+
     property _hash:
         def __get__(self):
             return self._hash
-        
+
         def __set__(self, _hash):
             self._hash = _hash
 
@@ -409,7 +420,7 @@ cdef class PyGraph:
         else:
             self.graph = shared_ptr[Graph](NULL)
             self._hash = 0
-        
+
 
     def __dealloc__(self):
         self.graph.reset()

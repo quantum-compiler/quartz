@@ -26,9 +26,9 @@ bool RepresentativeSet::load_json(Context *ctx, const std::string &file_name) {
       break;
     }
 
-    // New DAG
+    // New CircuitSeq
     fin.unget(); // '['
-    auto dag = DAG::read_json(ctx, fin);
+    auto dag = CircuitSeq::read_json(ctx, fin);
     dags_.emplace_back(std::move(dag));
   }
   return true;
@@ -60,8 +60,8 @@ bool RepresentativeSet::save_json(const std::string &save_file_name) const {
 
 void RepresentativeSet::clear() { dags_.clear(); }
 
-std::vector<DAG *> RepresentativeSet::get_all_dags() const {
-  std::vector<DAG *> result;
+std::vector<CircuitSeq *> RepresentativeSet::get_all_dags() const {
+  std::vector<CircuitSeq *> result;
   result.reserve(dags_.size());
   for (const auto &dag : dags_) {
     result.push_back(dag.get());
@@ -69,7 +69,7 @@ std::vector<DAG *> RepresentativeSet::get_all_dags() const {
   return result;
 }
 
-void RepresentativeSet::insert(std::unique_ptr<DAG> dag) {
+void RepresentativeSet::insert(std::unique_ptr<CircuitSeq> dag) {
   dags_.push_back(std::move(dag));
 }
 
@@ -77,16 +77,17 @@ int RepresentativeSet::size() const { return (int)dags_.size(); }
 
 void RepresentativeSet::reserve(std::size_t new_cap) { dags_.reserve(new_cap); }
 
-std::vector<std::unique_ptr<DAG>> RepresentativeSet::extract() {
+std::vector<std::unique_ptr<CircuitSeq>> RepresentativeSet::extract() {
   return std::move(dags_);
 }
 
-void RepresentativeSet::set_dags(std::vector<std::unique_ptr<DAG>> dags) {
+void RepresentativeSet::set_dags(
+    std::vector<std::unique_ptr<CircuitSeq>> dags) {
   dags_ = std::move(dags);
 }
 
 void RepresentativeSet::sort() {
-  std::sort(dags_.begin(), dags_.end(), UniquePtrDAGComparator());
+  std::sort(dags_.begin(), dags_.end(), UniquePtrCircuitSeqComparator());
 }
 
 } // namespace quartz

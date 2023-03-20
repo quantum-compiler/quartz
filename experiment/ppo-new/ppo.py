@@ -18,7 +18,6 @@ import torch.distributed.rpc as rpc
 import torch.multiprocessing as mp
 import wandb
 from actor import PPOAgent
-from config.config import *
 from ds import *
 from icecream import ic  # type: ignore
 from IPython import embed  # type: ignore
@@ -30,6 +29,8 @@ from torch.distributions import Categorical
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tqdm import tqdm  # type: ignore
 from utils import *
+
+from config.config import *
 
 # import quartz # type: ignore
 

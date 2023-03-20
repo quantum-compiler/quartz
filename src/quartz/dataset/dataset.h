@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../context/context.h"
-#include "../dag/dag.h"
+#include "quartz/circuitseq/circuitseq.h"
+#include "quartz/context/context.h"
 
 #include <unordered_set>
 
@@ -14,7 +14,7 @@ public:
   // Return the number of DAGs removed.
   int remove_singletons(Context *ctx);
 
-  // Normalize each DAG to have the canonical representation.
+  // Normalize each CircuitSeq to have the canonical representation.
   // Return the number of DAGs removed.
   int normalize_to_canonical_representations(Context *ctx);
 
@@ -24,18 +24,21 @@ public:
   // This function runs in O(num_hash_values()).
   [[nodiscard]] int num_total_dags() const;
 
-  auto &operator[](const DAGHashType &val) { return dataset[val]; }
+  auto &operator[](const CircuitSeqHashType &val) { return dataset[val]; }
 
   // Returns true iff the hash value is new to the |dataset|.
-  bool insert(Context *ctx, std::unique_ptr<DAG> dag);
+  bool insert(Context *ctx, std::unique_ptr<CircuitSeq> dag);
 
-  // Inserts the dag to an existing set if the hash value plus or minus 1
+  // Inserts the circuitseq to an existing set if the hash value plus or minus 1
   // is found. Returns true iff there is no such existing set.
-  bool insert_to_nearby_set_if_exists(Context *ctx, std::unique_ptr<DAG> dag);
+  bool insert_to_nearby_set_if_exists(Context *ctx,
+                                      std::unique_ptr<CircuitSeq> dag);
 
   // Make this Dataset a brand new one.
   void clear();
 
-  std::unordered_map<DAGHashType, std::vector<std::unique_ptr<DAG>>> dataset;
+  std::unordered_map<CircuitSeqHashType,
+                     std::vector<std::unique_ptr<CircuitSeq>>>
+      dataset;
 };
 } // namespace quartz

@@ -35,7 +35,7 @@ int main() {
     for (auto circ_1 : eqcs) {
       for (auto circ_2 : eqcs) {
         if (circ_1 != circ_2) {
-          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_1, circ_2, false);
+          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_1, circ_2, true);
           if (xfer)
             xfers.emplace_back(xfer);
         }
@@ -45,7 +45,7 @@ int main() {
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
   QASMParser qasm_parser(&ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   const std::string qasm_str =
       "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[5];\nh q[4];\ncx "
       "q[3],q[4];\ntdg q[4];\ncx q[2],q[4];\nt q[4];\ncx q[3],q[4];\ntdg "

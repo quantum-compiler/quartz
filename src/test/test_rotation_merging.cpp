@@ -21,7 +21,7 @@ int main() {
   //                      GateType::tdg, GateType::cx, GateType::rz});
   Context union_ctx = union_contexts(&src_ctx, &dst_ctx);
   QASMParser qasm_parser(&union_ctx);
-  DAG *dag = nullptr;
+  CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(benchmark_filename, dag)) {
     std::cout << "Parser failed" << std::endl;
   }

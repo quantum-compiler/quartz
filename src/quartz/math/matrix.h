@@ -3,6 +3,7 @@
 #include "../utils/utils.h"
 #include <cstring>
 #include <iostream>
+#include <vector>
 
 namespace quartz {
 class MatrixBase {
@@ -16,6 +17,10 @@ public:
   virtual MatrixBase &operator*=(const MatrixBase &b) { return *this; }
   virtual void print() const {}
   virtual int size() const { return -1; }
+  virtual std::vector<ComplexType> flatten() {
+    std::vector<ComplexType> flattened_mat;
+    return flattened_mat;
+  }
   virtual ~MatrixBase() = default;
 };
 
@@ -76,6 +81,18 @@ public:
     }
   }
   int size() const { return kSize; }
+
+  std::vector<ComplexType> flatten() {
+    std::vector<ComplexType> flattened_mat;
+    flattened_mat.reserve(kSize * kSize);
+    for (int i = 0; i < kSize; i++) {
+      for (int j = 0; j < kSize; j++) {
+        flattened_mat.push_back(data_[i][j]);
+      }
+    }
+
+    return flattened_mat;
+  }
 
 private:
   ComplexType data_[kSize][kSize];

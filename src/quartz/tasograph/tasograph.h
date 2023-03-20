@@ -1,8 +1,8 @@
 #pragma once
 
+#include "../circuitseq/circuitseq.h"
 #include "../context/context.h"
 #include "../context/rule_parser.h"
-#include "../dag/dag.h"
 #include "../dataset/equivalence_set.h"
 #include "../gate/gate.h"
 #include "../parser/qasm_parser.h"
@@ -172,13 +172,14 @@ struct EdgeCompare {
 };
 
 class GraphXfer;
+class OpX;
 
 class Graph {
 public:
   Graph(Context *ctx);
-  Graph(Context *ctx, const DAG *dag);
+  Graph(Context *ctx, const CircuitSeq *seq);
   Graph(const Graph &graph);
-  [[nodiscard]] std::unique_ptr<DAG> to_dag() const;
+  [[nodiscard]] std::unique_ptr<CircuitSeq> to_circuit_sequence() const;
   void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
   bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
@@ -259,7 +260,7 @@ public:
            int timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  std::string to_qasm(bool print_result, bool print_id) const;
+  std::string to_qasm(bool print_result = false, bool print_id = false) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_id) const;
   template <class _CharT, class _Traits>
@@ -302,7 +303,7 @@ public:
   std::shared_ptr<Graph> ccz_flip_t(Context *ctx);
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
-  bool _loop_check_after_mapping(GraphXfer *xfer) const;
+  bool _loop_check_after_matching(GraphXfer *xfer) const;
 
 private:
   void replace_node(Op oldOp, Op newOp);
@@ -319,9 +320,14 @@ private:
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
-  std::shared_ptr<Graph> _match_rest_ops(GraphXfer *xfer, size_t depth,
-                                         size_t ignore_depth,
-                                         size_t min_guid) const;
+  // The common core part of the API xfer_appliable, apply_xfer, and
+  // apply_xfer_and_track_node. Matches the src dag of xfer to the local dag
+  // in the circuit whose topological-order root is op. If failed, it
+  // automatically unmaps the matched nodes. Otherwise, the caller should
+  // unmap the matched nodes after their work is done.
+  bool _pattern_matching(
+      GraphXfer *xfer, Op op,
+      std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const;
 
 public:
   size_t special_op_guid;

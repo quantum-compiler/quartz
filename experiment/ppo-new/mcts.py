@@ -1,16 +1,18 @@
-import torch
-import quartz
+import math
+import os
+import time
+import warnings
+from typing import OrderedDict, cast
+
 import dgl
+import hydra
+import torch
+import torch.nn.functional as F
 from model.actor_critic import ActorCritic
 from utils import masked_softmax
-import torch.nn.functional as F
-import math
+
+import quartz
 from config.config import *
-import hydra
-import os
-import warnings
-from typing import cast, OrderedDict
-import time
 
 # TODO: De-duplicate the circuits
 # - A circuit should appear only once in the tree. This is because
@@ -76,10 +78,14 @@ class MCTSAgent:
         # ucb_scores: torch.Tensor = node.P + self.c_0 * torch.sqrt(
         #     math.log(node.total_visit_count) /
         #     (1 + node.N)) - node.terminal_mask * 1e10
-        ucb_scores: torch.Tensor = node.Q + node.P * math.sqrt(
-            node.total_visit_count) / (1 + node.N) * (self.c_1 + math.log(
-                (node.total_visit_count + self.c_2 + 1) /
-                self.c_2)) - node.terminal_mask * 1e10
+        ucb_scores: torch.Tensor = (
+            node.Q
+            + node.P
+            * math.sqrt(node.total_visit_count)
+            / (1 + node.N)
+            * (self.c_1 + math.log((node.total_visit_count + self.c_2 + 1) / self.c_2))
+            - node.terminal_mask * 1e10
+        )
         # print(node.Q)
         # print(node.P * math.sqrt(node.total_visit_count) / (1 + node.N) *
         #       (self.c_1 + math.log(
@@ -117,11 +123,13 @@ class MCTSAgent:
         P_: list[torch.Tensor] = []
 
         # Compute mask
-        mask: torch.Tensor = torch.zeros((node.gate_count, self.qtz.num_xfers),
-                                         dtype=torch.bool)
+        mask: torch.Tensor = torch.zeros(
+            (node.gate_count, self.qtz.num_xfers), dtype=torch.bool
+        )
         for g in range(node.gate_count):
             appliable_xfers: list[int] = node.circuit.available_xfers_parallel(
-                context=self.qtz, node=node.circuit.get_node_from_id(id=g))
+                context=self.qtz, node=node.circuit.get_node_from_id(id=g)
+            )
             # appliable_xfers = appliable_xfers[:-1]  # remove NOP
             mask[g, appliable_xfers] = True
 
@@ -130,10 +138,10 @@ class MCTSAgent:
         # In evaluation, we use the argmax of the xfer policy
         dgl_graph: dgl.DGLGraph = node.circuit.to_dgl_graph().to(self.device)
         node_embeds: torch.Tensor = self.actor_critic.gnn(dgl_graph)
-        node_values: torch.Tensor = self.actor_critic.critic(
-            node_embeds).squeeze()
-        temperatures = 1 / (math.log(self.hit_rate * (node.gate_count - 1) /
-                                     (1 - self.hit_rate)))
+        node_values: torch.Tensor = self.actor_critic.critic(node_embeds).squeeze()
+        temperatures = 1 / (
+            math.log(self.hit_rate * (node.gate_count - 1) / (1 - self.hit_rate))
+        )
         softmax_node_values = F.softmax(node_values / temperatures, dim=0)
 
         # Decide which xfer to take at each node
@@ -153,7 +161,8 @@ class MCTSAgent:
                 new_circ: quartz.PyGraph = node.circuit.apply_xfer(
                     xfer=xfer,
                     node=node.circuit.get_node_from_id(id=g),
-                    eliminate_rotation=True)
+                    eliminate_rotation=True,
+                )
                 if new_circ.gate_count < self.min_cost:
                     print("New min cost: ", new_circ.gate_count)
                     exit(1)
@@ -175,8 +184,7 @@ class MCTSAgent:
 
         node.R = torch.Tensor(R_).to(self.device)
         node.P = torch.stack(P_)
-        node.terminal_mask = torch.zeros(node.R.shape,
-                                         dtype=torch.bool).to(self.device)
+        node.terminal_mask = torch.zeros(node.R.shape, dtype=torch.bool).to(self.device)
         # print(f"Expanding node with {len(node.child_nodes)} children")
         # Modify leaf flag
         node.is_leaf = False
@@ -189,13 +197,12 @@ class MCTSAgent:
         Q_: list[torch.Tensor] = []
         child_visit_count: int = len(node.child_nodes)
         total_value: torch.Tensor = 0
-        b_dgl_graph = dgl.batch([
-            n.circuit.to_dgl_graph().to(self.device) for n in node.child_nodes
-        ])
+        b_dgl_graph = dgl.batch(
+            [n.circuit.to_dgl_graph().to(self.device) for n in node.child_nodes]
+        )
         num_nodes: list[int] = [n.gate_count for n in node.child_nodes]
         b_node_embeds: torch.Tensor = self.actor_critic.gnn(b_dgl_graph)
-        b_values: torch.Tensor = self.actor_critic.critic(
-            b_node_embeds).squeeze()
+        b_values: torch.Tensor = self.actor_critic.critic(b_node_embeds).squeeze()
         values: list[torch.Tensor] = torch.split(b_values, num_nodes)
         for n, v in zip(node.child_nodes, values):
             Q_.append(torch.sum(v) - (n.gate_count - self.init_cost) * 10)
@@ -206,11 +213,17 @@ class MCTSAgent:
         node.total_visit_count = child_visit_count
         return child_visit_count, total_value
 
-    def backpropagate(self, node_sequence: list[Node], path: list[int],
-                      value: torch.Tensor, visit_count: int) -> None:
+    def backpropagate(
+        self,
+        node_sequence: list[Node],
+        path: list[int],
+        value: torch.Tensor,
+        visit_count: int,
+    ) -> None:
         for node, idx in zip(reversed(node_sequence[:-1]), reversed(path)):
-            node.Q[idx] = (node.Q[idx] * node.N[idx] + value) / (node.N[idx] +
-                                                                 visit_count)
+            node.Q[idx] = (node.Q[idx] * node.N[idx] + value) / (
+                node.N[idx] + visit_count
+            )
             # print(
             #     f"gate count: {node.gate_count}, visit count: {node.total_visit_count}, total nodes: {len(self.circ_set)}"
             # )
@@ -234,8 +247,7 @@ class MCTSAgent:
                     self.longest_path = len(path)
                 not_terminated: bool = self.expand(node_sequence[-1])
                 if not not_terminated:
-                    for node, idx in zip(reversed(node_sequence[:-1]),
-                                         reversed(path)):
+                    for node, idx in zip(reversed(node_sequence[:-1]), reversed(path)):
                         node.terminal_mask[idx] = True
                         node.child_nodes[idx] = None
                         if not torch.all(node.terminal_mask):
@@ -248,23 +260,23 @@ class MCTSAgent:
 @hydra.main(config_path='config', config_name='config')
 def main(config: Config) -> None:
     output_dir = os.path.abspath(os.curdir)  # get hydra output dir
-    os.chdir(
-        hydra.utils.get_original_cwd())  # set working dir to the original one
+    os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
 
     cfg: BaseConfig = config.c
     warnings.simplefilter('ignore')
 
     # Build quartz context
     qtz: quartz.QuartzContext = quartz.QuartzContext(
-        gate_set=['h', 'cx', 'x', 'rz', 'add'],
-        filename='../ecc_set/nam_ecc.json')
+        gate_set=['h', 'cx', 'x', 'rz', 'add'], filename='../ecc_set/nam_ecc.json'
+    )
 
     # Device
     device = torch.device("cuda:0")
 
     # Use the best circuit found in the PPO training
     circ: quartz.PyGraph = quartz.PyGraph().from_qasm(
-        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm")
+        context=qtz, filename="best_graphs/barenco_tof_3_cost_38.qasm"
+    )
 
     # Load actor-critic network
     ckpt_path = "ckpts/nam_iter_100.pt"
@@ -286,21 +298,22 @@ def main(config: Config) -> None:
     ).to(device)
 
     ckpt = torch.load(ckpt_path, map_location=device)
-    model_state_dict = cast(OrderedDict[str, torch.Tensor],
-                            ckpt['model_state_dict'])
+    model_state_dict = cast(OrderedDict[str, torch.Tensor], ckpt['model_state_dict'])
     actor_critic.load_state_dict(model_state_dict)
 
     # Initialize MCTS and run
     # TODO: tune the hyperparameters
-    mcts = MCTSAgent(gamma=1.00,
-                     c_1=32,
-                     c_2=19625,
-                     device=device,
-                     actor_critic=actor_critic,
-                     max_cost_increase=6,
-                     hit_rate=0.95,
-                     qtz=qtz,
-                     circuit=circ)
+    mcts = MCTSAgent(
+        gamma=1.00,
+        c_1=32,
+        c_2=19625,
+        device=device,
+        actor_critic=actor_critic,
+        max_cost_increase=6,
+        hit_rate=0.95,
+        qtz=qtz,
+        circuit=circ,
+    )
 
     mcts.run()
 

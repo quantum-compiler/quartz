@@ -11,13 +11,14 @@ import hydra
 import qtz
 import torch
 import wandb
-from config.config import *
 from ds import *
 from model.actor_critic import ActorCritic
 from natsort import natsorted
 from torch.distributions import Categorical
 from tqdm import tqdm  # type: ignore
 from utils import *
+
+from config.config import *
 
 
 @dataclass

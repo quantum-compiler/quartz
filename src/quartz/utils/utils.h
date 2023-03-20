@@ -8,7 +8,7 @@ using ComplexType = ArbComplex;
 #else
 using ComplexType = std::complex<double>;
 #endif
-using DAGHashType = unsigned long long;
+using CircuitSeqHashType = unsigned long long;
 using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair<unsigned long long, int>;
 using InputParamMaskType = unsigned long long;
@@ -16,12 +16,13 @@ using InputParamMaskType = unsigned long long;
 using namespace std::complex_literals; // so that we can write stuff like 1.0i
 
 namespace quartz {
-// Constants for DAG::hash()
-constexpr double kDAGHashMaxError = 1e-15;
+const ParamType PI = std::acos((ParamType)-1);
+// Constants for CircuitSeq::hash()
+constexpr double kCircuitSeqHashMaxError = 1e-15;
 constexpr bool kFingerprintInvariantUnderPhaseShift = true;
 // When |kFingerprintInvariantUnderPhaseShift| is false, the hash value is
-// kDAGHashAlpha * real() + (1 - kDAGHashAlpha) * imag().
-constexpr double kDAGHashAlpha = 0.233;
+// kCircuitSeqHashAlpha * real() + (1 - kCircuitSeqHashAlpha) * imag().
+constexpr double kCircuitSeqHashAlpha = 0.233;
 constexpr bool kCheckPhaseShiftInGenerator = false;
 static_assert(!(kFingerprintInvariantUnderPhaseShift &&
                 kCheckPhaseShiftInGenerator));

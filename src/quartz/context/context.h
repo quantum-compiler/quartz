@@ -12,7 +12,7 @@
 #include <vector>
 
 namespace quartz {
-class DAG;
+class CircuitSeq;
 
 class Context {
 public:
@@ -42,10 +42,10 @@ public:
 
   // These three functions are used in |Verifier::redundant()| for a version
   // of RepGen algorithm that does not invoke Python verifier.
-  void set_representative(std::unique_ptr<DAG> dag);
+  void set_representative(std::unique_ptr<CircuitSeq> seq);
   void clear_representatives();
-  bool get_possible_representative(const DAGHashType &hash_value,
-                                   DAG *&representative) const;
+  bool get_possible_representative(const CircuitSeqHashType &hash_value,
+                                   CircuitSeq *&representative) const;
 
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].
@@ -53,6 +53,13 @@ public:
 
 private:
   bool insert_gate(GateType tp);
+
+public:
+  // The parameters from the input QASM file.
+  // Written by QASMParser.
+  std::vector<ParamType> input_parameters;
+
+private:
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::vector<GateType> supported_gates_;
@@ -62,9 +69,9 @@ private:
   std::vector<Vector> random_hashing_distribution_;
   std::vector<ParamType> random_parameters_;
 
-  // A vector to store the representative DAGs.
-  std::vector<std::unique_ptr<DAG>> representative_dags_;
-  std::unordered_map<DAGHashType, DAG *> representatives_;
+  // A vector to store the representative circuit sequences.
+  std::vector<std::unique_ptr<CircuitSeq>> representative_seqs_;
+  std::unordered_map<CircuitSeqHashType, CircuitSeq *> representatives_;
   // Standard mersenne_twister_engine seeded with 0
   std::mt19937 gen{0};
 };

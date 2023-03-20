@@ -615,7 +615,7 @@ class PPOAgent:
         """compute embeds and use Critic to evaluate each node"""
         dgl_graphs: List[dgl.DGLGraph] = [g.to_dgl_graph() for g in cur_graphs]
         b_state: dgl.DGLGraph = dgl.batch(dgl_graphs).to(self.device)
-        num_nodes: torch.Tensor = (
+        num_nodes: torch.LongTensor = (
             b_state.batch_num_nodes()
         )  # (num_graphs, ) assert each elem > 0
         # (batch_num_nodes, embed_dim)
@@ -642,6 +642,10 @@ class PPOAgent:
         b_softmax_node_values_pad = F.softmax(
             b_node_values_pad / temperature.unsqueeze(1), dim=-1
         )
+        # b_softmax_node_values_pad = torch.isclose(
+        #     b_node_values_pad,
+        #     torch.max(b_node_values_pad, dim=-1, keepdim=True).values
+        # ).float()
         b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
         action_nodes: List[int] = b_sampled_nodes.tolist()
         """collect embeddings of sampled nodes"""
@@ -670,6 +674,10 @@ class PPOAgent:
             av_xfer_masks[i_eps][av_xfers] = True
         # end for
         softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
+        # softmax_xfer_logits = torch.isclose(
+        #     softmax_xfer_logits,
+        #     torch.max(softmax_xfer_logits, dim=-1, keepdim=True).values
+        # ).float()
         xfer_dists = Categorical(softmax_xfer_logits)
         action_xfers = xfer_dists.sample()
         action_xfer_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
@@ -815,6 +823,9 @@ class PPOAgent:
                 last_eps_end = last_eps_ends[i_eps]
                 graph_seq = graph_seqs[i_eps]
                 graph = cur_graphs[i_eps]
+                graph_buffer = self.graph_buffers[buffer_idx_list[i_eps]]
+                cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
+
                 graph_seq.append(graph)
                 action = Action(action_nodes[i_eps], action_xfers[i_eps])
                 next_graph, next_nodes = graph.apply_xfer_with_local_state_tracking(
@@ -837,7 +848,8 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    game_over = graph_cost > original_costs[i_eps] * max_cost_ratio
+                    # game_over = graph_cost > original_costs[i_eps] * max_cost_ratio
+                    game_over = graph_cost > cur_best_cost * max_cost_ratio
                     if self.limit_total_gate_count:
                         game_over |= (
                             graph.gate_count
@@ -894,7 +906,6 @@ class PPOAgent:
                 eps_list.info.append({})
 
                 """collect info for graph buffer"""
-                graph_buffer = self.graph_buffers[buffer_idx_list[i_eps]]
 
                 if i_step == last_eps_end + 1:
                     # the first step in an episode
@@ -915,7 +926,6 @@ class PPOAgent:
                 ):
                     graph_buffer.push_back(next_graph)
                     """best graph maintenance"""
-                    cur_best_cost = get_cost(graph_buffer.best_graph, self.cost_type)
                     if next_graph_cost < cur_best_cost:
                         # create a list of tuple: (graph, action taken on this graph, reward of action)
                         seq: List[Tuple[quartz.PyGraph, Action, float]] = []

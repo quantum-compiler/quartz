@@ -61,6 +61,7 @@ def get_gate_type_from_str(gate_type_str):
     if gate_type_str == "ry3": return GateType.ry3
     if gate_type_str == "rxx1": return GateType.rxx1
     if gate_type_str == "rxx3": return GateType.rxx3
+    if gate_type_str == "sx": return GateType.sx
 
 cdef class PyQASMParser:
     cdef QASMParser *parser
@@ -194,6 +195,8 @@ cdef class PyXfer:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
             self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
+        else:
+            self.graphXfer = NULL
 
     def __dealloc__(self):
         pass
@@ -243,6 +246,8 @@ cdef class QuartzContext:
     cdef bool include_nop
 
     def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
+        """The no_increase parameter is deprecated"""
+        # TODO: remove no_increase
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -286,7 +291,7 @@ cdef class QuartzContext:
                     if j != k:
                         dag_ptr_0 = eq_sets[i][j]
                         dag_ptr_1 = eq_sets[i][k]
-                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, no_increase)
+                        xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, True)
                         if xfer != NULL:
                             self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
@@ -332,6 +337,13 @@ cdef class QuartzContext:
 
     def has_parameterized_gate(self) -> bool:
         return self.context.has_parameterized_gate()
+
+    def add_xfer_from_qasm_str(self, *, src_str: str, dst_str: str):
+        src_bytes = src_str.encode('utf-8')
+        dst_bytes = dst_str.encode('utf-8')
+        xfer = GraphXfer.create_GraphXfer_from_qasm_str(self.context, src_bytes, dst_bytes)
+        if xfer != NULL:
+            self.v_xfers.push_back(xfer)
 
     @property
     def num_equivalence_classes(self):
@@ -383,6 +395,7 @@ cdef class PyNode:
 cdef class PyGraph:
     cdef shared_ptr[Graph] graph
     cdef object _nodes
+    cdef size_t _hash
 
     property nodes:
         def __get__(self):
@@ -391,19 +404,29 @@ cdef class PyGraph:
         def __set__(self, nodes):
             self._nodes = nodes
 
+    property _hash:
+        def __get__(self):
+            return self._hash
+
+        def __set__(self, _hash):
+            self._hash = _hash
+
     def __cinit__(self, *, QuartzContext context = None, PyDAG dag = None):
         self.nodes = []
         if context != None and dag != None:
             self.graph = make_shared[Graph](context.context, dag.dag)
             self.get_nodes()
+            self._hash = deref(self.graph).hash()
         else:
             self.graph = shared_ptr[Graph](NULL)
+            self._hash = 0
+
 
     def __dealloc__(self):
         self.graph.reset()
 
     def __hash__(self):
-        return deref(self.graph).hash()
+        return self._hash
 
     def get_nodes(self):
         gate_count = self.gate_count
@@ -421,6 +444,7 @@ cdef class PyGraph:
     cdef set_this(self, shared_ptr[Graph] graph_):
         self.graph = graph_
         self.get_nodes()
+        self._hash = deref(self.graph).hash()
         return self
 
     # TODO: deprecate this function
@@ -486,7 +510,7 @@ cdef class PyGraph:
         return self.nodes[id]
 
     def hash(self):
-        return deref(self.graph).hash()
+        return self._hash
 
     def all_edges(self):
         id_guid_mapping = {}
@@ -576,6 +600,11 @@ cdef class PyGraph:
 
     def __le__(self, other):
         return self.gate_count <= other.gate_count
+
+    def __eq__(self, other: PyGraph):
+        if other is None:
+            return False
+        return deref(self.graph).equal(deref(other.graph))
 
     @property
     def gate_count(self):

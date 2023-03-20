@@ -261,6 +261,13 @@ def rxx3(use_z3=True):
         ]
 
 
+def sx(use_z3=True):
+    return [
+        [(1 / 2, 1 / 2), (1 / 2, -1 / 2)],
+        [(1 / 2, -1 / 2), (1 / 2, 1 / 2)],
+    ]
+
+
 # functions exposed to verifier
 
 

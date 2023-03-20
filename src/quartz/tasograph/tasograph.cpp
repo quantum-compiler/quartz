@@ -573,6 +573,7 @@ void Graph::remove_node(Op oldOp) {
   assert(oldOp.ptr->tp != GateType::input_qubit);
   int num_qubits = oldOp.ptr->get_num_qubits();
   if (inEdges.find(oldOp) != inEdges.end()) {
+    // Remove out edges of in-ops
     auto in_edges = inEdges[oldOp];
     for (auto edge : in_edges) {
       auto src_op = edge.srcOp;
@@ -589,6 +590,7 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (outEdges.find(oldOp) != outEdges.end()) {
+    // Remove in edges of out-ops
     auto out_edges = outEdges[oldOp];
     for (auto out_edge : out_edges) {
       auto dst_op = out_edge.dstOp;
@@ -705,7 +707,7 @@ void Graph::constant_and_rotation_elimination() {
   }
 
   // Construct in-degree map
-  std::map<Op, size_t> op_in_edges_cnt;
+  std::unordered_map<Op, size_t, OpHash> op_in_edges_cnt;
   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }
@@ -758,23 +760,13 @@ void Graph::constant_and_rotation_elimination() {
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
         } else if (op.ptr->tp == GateType::neg) {
-          ParamType params[2], result = 0;
-          for (auto it = list.begin(); it != list.end(); ++it) {
-            auto edge = *it;
-            params[edge.dstIdx] = constant_param_values[edge.srcOp];
-            remove_node(edge.srcOp);
-          }
-          result = params[0] - params[1];
-
-          assert(outEdges[op].size() == 1);
-          auto output_dst_op = (*outEdges[op].begin()).dstOp;
-          auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
+          ParamType param = 0;
+          auto edge = *list.begin();
+          param = constant_param_values[edge.srcOp];
+          constant_param_values[edge.srcOp] = -param;
+          // Remove neg gate, the renewed parameter will be connected to other
+          // part of the circuit automatically
           remove_node(op);
-
-          Op merged_op(context->next_global_unique_id(),
-                       context->get_gate(GateType::input_param));
-          add_edge(merged_op, output_dst_op, 0, output_dst_idx);
-          constant_param_values[merged_op] = result;
         } else {
           assert(false && "Unimplemented parameter gates");
         }
@@ -814,7 +806,7 @@ void Graph::constant_and_rotation_elimination() {
       if (all_parameter_is_0) {
         // Delete all parameter wires, they are all 0
         for (const auto &e : input_edges) {
-          if (e.dstIdx > num_qubits) {
+          if (e.dstIdx >= num_qubits) {
             remove_node(e.srcOp);
           }
         }
@@ -1377,6 +1369,8 @@ Graph::_from_qasm_stream(Context *ctx,
   std::string line;
   GateType gate_type;
   std::vector<Pos> pos_on_qubits;
+  std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
+  size_t total_num_qubits = 0;
   while (std::getline(qasm_stream, line)) {
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
@@ -1404,14 +1398,17 @@ Graph::_from_qasm_stream(Context *ctx,
     } else if (command == "qreg") {
       std::string token;
       getline(ss, token, ' ');
+      std::string qreg_name = token.substr(0, token.find('['));
+      qreg_name_2_start_idx[qreg_name] = total_num_qubits;
       size_t num_qubits = string_to_number(token);
-      pos_on_qubits.resize(num_qubits);
-      for (int i = 0; i < num_qubits; ++i) {
+      pos_on_qubits.resize(total_num_qubits + num_qubits);
+      for (int i = total_num_qubits; i < total_num_qubits + num_qubits; ++i) {
         auto op = graph->add_qubit(i);
         pos_on_qubits[i] = Pos(op, 0);
         // Construct input_qubit_op_2_qubit_idx
         graph->input_qubit_op_2_qubit_idx[op] = i;
       }
+      total_num_qubits += num_qubits;
       assert(!ss.good());
     } else if (is_gate_string(command, gate_type)) {
       Gate *gate = graph->context->get_gate(gate_type);
@@ -1433,8 +1430,9 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123*pi,
           // 0.123*pi/2,
           // 0.123
+          // pi/2
           // pi
-          ParamType p;
+          ParamType p = 0.0;
           bool negative = token[0] == '-';
           if (negative)
             token = token.substr(1);
@@ -1447,9 +1445,13 @@ Graph::_from_qasm_stream(Context *ctx,
               if (token[2] == '*') {
                 // pi*0.123
                 p = std::stod(d) * PI;
-              } else {
+              } else if (token[2] == '/') {
                 // pi/2
                 p = PI / std::stod(d);
+              } else {
+                std::cerr << "Unsupported parameter format: " << token
+                          << std::endl;
+                assert(false);
               }
             }
           } else if (token.find("pi") != std::string::npos) {
@@ -1466,6 +1468,12 @@ Graph::_from_qasm_stream(Context *ctx,
           }
           if (negative)
             p = -p;
+          while (p < 0) {
+            p += 2 * PI;
+          }
+          while (p >= 2 * PI) {
+            p -= 2 * PI;
+          }
           auto src_op = graph->add_parameter(p);
           int src_idx = 0;
           auto dst_op = op;
@@ -1476,7 +1484,10 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx =
+              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;
@@ -1494,7 +1505,10 @@ Graph::_from_qasm_stream(Context *ctx,
           assert(ss.good());
           std::string token;
           ss >> token;
-          int qubit_idx = string_to_number(token);
+          std::string qreg_name = token.substr(0, token.find('['));
+          size_t qubit_idx_in_qreg = string_to_number(token);
+          size_t qubit_idx =
+              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
           if (qubit_idx != -1) {
             auto src_op = pos_on_qubits[qubit_idx].op;
             auto src_idx = pos_on_qubits[qubit_idx].idx;
@@ -1579,7 +1593,7 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
     for (int i = 0; i < ecc_size; i++) {
       if (graph_cost[i] != graph_cost[representative_id]) {
         auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
-                                                ecc[representative_id], false);
+                                                ecc[representative_id], true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }
@@ -1918,11 +1932,11 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
     for (auto &circuit : ecc) {
       if (circuit != representative) {
         auto xfer =
-            GraphXfer::create_GraphXfer(ctx, circuit, representative, false);
+            GraphXfer::create_GraphXfer(ctx, circuit, representative, true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }
-        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, false);
+        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
         }
@@ -2190,7 +2204,7 @@ Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
   std::shared_ptr<Graph> graph(new Graph(*this));
   std::shared_ptr<Graph> new_graph(nullptr);
   std::vector<Op> all_ops;
-  for (int i = 0; i < instruction.size();) {
+  for (size_t i = 0; i < instruction.size();) {
     all_ops.clear();
     graph->topology_order_ops(all_ops);
     for (auto op : all_ops) {
@@ -2222,22 +2236,23 @@ std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {
 }
 // std::shared_ptr<Graph> Graph::ccz_flip_greedy_u1() {}
 
-bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
+bool Graph::_pattern_matching(
+    GraphXfer *xfer, Op op,
+    std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const {
   if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
     return false;
   }
   std::unordered_set<OpX *> mapped_opx;
-  std::deque<std::pair<OpX *, Op>> opx_op_dq;
   xfer->match(*xfer->srcOps.begin(), op, this);
   mapped_opx.insert(*xfer->srcOps.begin());
-  opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
+  matched_opx_op_pairs_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
   // If an OpX is mapped to an Op, check whether their corresponding input OpX,
   // input Op, output OpX, output Op can match. Because the source graphs is
   // connected, by doing this we can traverse all wires.
   bool fail = false;
   size_t idx = 0;
-  while (idx < opx_op_dq.size()) {
-    auto opx_op_pair = opx_op_dq[idx];
+  while (idx < matched_opx_op_pairs_dq.size()) {
+    auto opx_op_pair = matched_opx_op_pairs_dq[idx];
     idx++;
     auto opx_ = opx_op_pair.first;
     auto op_ = opx_op_pair.second;
@@ -2263,7 +2278,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         } else {
           xfer->match(input_opx, input_ops[i], this);
           mapped_opx.insert(input_opx);
-          opx_op_dq.push_back(std::make_pair(input_opx, input_ops[i]));
+          matched_opx_op_pairs_dq.push_back(
+              std::make_pair(input_opx, input_ops[i]));
         }
       }
     }
@@ -2295,7 +2311,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
         } else {
           xfer->match(output_opx, output_ops[i], this);
           mapped_opx.insert(output_opx);
-          opx_op_dq.push_back(std::make_pair(output_opx, output_ops[i]));
+          matched_opx_op_pairs_dq.push_back(
+              std::make_pair(output_opx, output_ops[i]));
         }
       }
     }
@@ -2355,12 +2372,14 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     }
   }
   if (!fail) {
-    fail = !_loop_check_after_mapping(xfer);
+    fail = !_loop_check_after_matching(xfer);
   }
-  while (!opx_op_dq.empty()) {
-    auto opx_op_pair = opx_op_dq.back();
-    opx_op_dq.pop_back();
-    xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
+  if (fail) {
+    while (!matched_opx_op_pairs_dq.empty()) {
+      auto opx_op_pair = matched_opx_op_pairs_dq.back();
+      matched_opx_op_pairs_dq.pop_back();
+      xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
+    }
   }
   if (!fail) {
     assert(mapped_opx.size() == xfer->srcOps.size());
@@ -2368,160 +2387,52 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   return !fail;
 }
 
+bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
+  std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
+  auto success = _pattern_matching(xfer, op, matched_opx_op_pairs_dq);
+  if (!success)
+    // If failed, the unmatch is already done in _pattern_matching.
+    return false;
+  // Pattern matching succeed, unmatch mapped nodes.
+  while (!matched_opx_op_pairs_dq.empty()) {
+    auto opx_op_pair = matched_opx_op_pairs_dq.back();
+    matched_opx_op_pairs_dq.pop_back();
+    xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
+  }
+  return true;
+}
+
 std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
                                          bool eliminate_rotation) {
-  if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
-    return nullptr;
-  }
-  std::unordered_set<OpX *> mapped_opx;
-  std::deque<std::pair<OpX *, Op>> opx_op_dq;
-  xfer->match(*xfer->srcOps.begin(), op, this);
-  mapped_opx.insert(*xfer->srcOps.begin());
-  opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
-  // If an OpX is mapped to an Op, check whether their corresponding input OpX,
-  // input Op, output OpX, output Op can match. Because the source graphs is
-  // connected, by doing this we can traverse all wires.
-  bool fail = false;
-  size_t idx = 0;
-  while (idx < opx_op_dq.size()) {
-    auto opx_op_pair = opx_op_dq[idx];
-    idx++;
-    auto opx_ = opx_op_pair.first;
-    auto op_ = opx_op_pair.second;
-    auto num_input = opx_->inputs.size();
-    auto num_output = opx_->outputs.size();
-    // Get all input and output Op of op_ in an ordered list
-    std::vector<Op> input_ops(num_input, Op::INVALID_OP);
-    std::vector<Op> output_ops(num_output, Op::INVALID_OP);
-    std::vector<OpX *> output_opxs(num_output, nullptr);
-    if (inEdges.find(op_) != inEdges.end()) {
-      for (auto &e : inEdges.find(op_)->second) {
-        assert((size_t)e.dstIdx < num_input);
-        input_ops[e.dstIdx] = e.srcOp;
-      }
-    }
-    for (size_t i = 0; i < num_input; ++i) {
-      auto input_opx = opx_->inputs[i].op;
-      if (input_opx != nullptr &&
-          mapped_opx.find(input_opx) == mapped_opx.end()) {
-        if (!xfer->can_match(input_opx, input_ops[i], this)) {
-          fail = true;
-          break;
-        } else {
-          xfer->match(input_opx, input_ops[i], this);
-          mapped_opx.insert(input_opx);
-          opx_op_dq.push_back(std::make_pair(input_opx, input_ops[i]));
-        }
-      }
-    }
-    if (fail) {
-      break;
-    }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output gates in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
-    for (size_t i = 0; i < num_output; ++i) {
-      auto output_opx = output_opxs[i];
-      if (output_opx != nullptr &&
-          mapped_opx.find(output_opx) == mapped_opx.end()) {
-        if (!xfer->can_match(output_opx, output_ops[i], this)) {
-          fail = true;
-          break;
-        } else {
-          xfer->match(output_opx, output_ops[i], this);
-          mapped_opx.insert(output_opx);
-          opx_op_dq.push_back(std::make_pair(output_opx, output_ops[i]));
-        }
-      }
-    }
-    if (fail) {
-      break;
-    }
-  }
-  if (!fail) {
-    // Check qubit consistancy
-    std::set<int> qubits;
-    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
-         ++it) {
-      if (it->second.first.ptr->is_quantum_gate() ||
-          it->second.first.ptr->tp == GateType::input_qubit) {
-        // Only check inputs on a qubit
-        // Excluding input_param gates and arithmetic gates
-        Pos p = Pos(it->second.first, it->second.second);
-        auto q = pos_2_logical_qubit.find(p)->second;
-        if (qubits.find(q) != qubits.end()) {
-          fail = true;
-          break;
-        } else {
-          qubits.insert(q);
-        }
-      }
-    }
-  }
-  if (!fail) {
-    for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
-         ++dst_it) {
-      if (!fail) {
-        OpX *dstOp = *dst_it;
-        fail = !xfer->create_new_operator(dstOp, dstOp->mapOp);
-      }
-    }
-  }
-  if (!fail) {
-    // Check that output tensors with external gates are mapped
-    for (auto mapped_ops_it = xfer->mappedOps.cbegin();
-         mapped_ops_it != xfer->mappedOps.cend() && !fail; ++mapped_ops_it) {
-      if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
-        const std::set<Edge, EdgeCompare> &list =
-            outEdges.find(mapped_ops_it->first)->second;
-        for (auto edge_it = list.cbegin(); edge_it != list.cend() && !fail;
-             ++edge_it)
-          if (xfer->mappedOps.find(edge_it->dstOp) == xfer->mappedOps.end()) {
-            // dstOp is external, (srcOp, srcIdx) must be in
-            // mappedOutputs
-            TensorX srcTen;
-            srcTen.op = mapped_ops_it->second;
-            srcTen.idx = edge_it->srcIdx;
-            if (xfer->mappedOutputs.find(srcTen) == xfer->mappedOutputs.end()) {
-              fail = true;
-            }
-          }
-      }
-    }
-  }
+  // When eliminate_rotation is true, this function will eliminate all rotation
+  // whose parameters are all 0
+  std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
+  auto success = _pattern_matching(xfer, op, matched_opx_op_pairs_dq);
   std::shared_ptr<Graph> new_graph(nullptr);
-  if (!fail) {
+  if (!success)
+    // If failed, the unmatch is already done in _pattern_matching.
+    // Return nullptr.
+    return new_graph;
+
+  if (success) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
-      //   std::cout << "loop" << std::endl;
       new_graph.reset();
-      fail = true;
+      success = false;
     }
   }
-  if (!fail) {
+
+  if (success) {
     if (eliminate_rotation) {
       new_graph->constant_and_rotation_elimination();
     }
   }
-  while (!opx_op_dq.empty()) {
-    auto opx_op_pair = opx_op_dq.back();
-    opx_op_dq.pop_back();
+  // Pattern matching succeed, unmatch mapped nodes.
+  while (!matched_opx_op_pairs_dq.empty()) {
+    auto opx_op_pair = matched_opx_op_pairs_dq.back();
+    matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  if (!fail)
-    assert(mapped_opx.size() == xfer->srcOps.size());
   return new_graph;
 }
 
@@ -2530,147 +2441,23 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
                                  bool eliminate_rotation) {
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
-  if (!xfer->can_match(*xfer->srcOps.begin(), op, this)) {
-    return std::make_pair(std::shared_ptr<Graph>(nullptr), std::vector<int>());
-  }
-  std::unordered_set<OpX *> mapped_opx;
-  std::deque<std::pair<OpX *, Op>> opx_op_dq;
-  xfer->match(*xfer->srcOps.begin(), op, this);
-  mapped_opx.insert(*xfer->srcOps.begin());
-  opx_op_dq.push_back(std::make_pair(*xfer->srcOps.begin(), op));
-  // If an OpX is mapped to an Op, check whether their corresponding input OpX,
-  // input Op, output OpX, output Op can match. Because the source graphs is
-  // connected, by doing this we can traverse all wires.
-  bool fail = false;
-  size_t idx = 0;
-  while (idx < opx_op_dq.size()) {
-    auto opx_op_pair = opx_op_dq[idx];
-    idx++;
-    auto opx_ = opx_op_pair.first;
-    auto op_ = opx_op_pair.second;
-    auto num_input = opx_->inputs.size();
-    auto num_output = opx_->outputs.size();
-    // Get all input and output Op of op_ in an ordered list
-    std::vector<Op> input_ops(num_input, Op::INVALID_OP);
-    std::vector<Op> output_ops(num_output, Op::INVALID_OP);
-    std::vector<OpX *> output_opxs(num_output, nullptr);
-    if (inEdges.find(op_) != inEdges.end()) {
-      for (auto &e : inEdges.find(op_)->second) {
-        assert((size_t)e.dstIdx < num_input);
-        input_ops[e.dstIdx] = e.srcOp;
-      }
-    }
-    for (size_t i = 0; i < num_input; ++i) {
-      auto input_opx = opx_->inputs[i].op;
-      if (input_opx != nullptr &&
-          mapped_opx.find(input_opx) == mapped_opx.end()) {
-        if (!xfer->can_match(input_opx, input_ops[i], this)) {
-          fail = true;
-          break;
-        } else {
-          xfer->match(input_opx, input_ops[i], this);
-          mapped_opx.insert(input_opx);
-          opx_op_dq.push_back(std::make_pair(input_opx, input_ops[i]));
-        }
-      }
-    }
-    if (fail) {
-      break;
-    }
-    if (outEdges.find(op_) != outEdges.end()) {
-      for (auto &e : outEdges.find(op_)->second) {
-        assert((size_t)e.srcIdx < num_output);
-        output_ops[e.srcIdx] = e.dstOp;
-      }
-    }
-    // Get all output OpX because we don't have output gates in GraphXfer
-    for (auto &opx : xfer->srcOps) {
-      for (auto &input_tensor : opx->inputs) {
-        if (input_tensor.op == opx_) {
-          assert((size_t)input_tensor.idx < num_output);
-          output_opxs[input_tensor.idx] = opx;
-        }
-      }
-    }
-    for (size_t i = 0; i < num_output; ++i) {
-      auto output_opx = output_opxs[i];
-      if (output_opx != nullptr &&
-          mapped_opx.find(output_opx) == mapped_opx.end()) {
-        if (!xfer->can_match(output_opx, output_ops[i], this)) {
-          fail = true;
-          break;
-        } else {
-          xfer->match(output_opx, output_ops[i], this);
-          mapped_opx.insert(output_opx);
-          opx_op_dq.push_back(std::make_pair(output_opx, output_ops[i]));
-        }
-      }
-    }
-    if (fail) {
-      break;
-    }
-  }
-  if (!fail) {
-    // Check qubit consistancy
-    std::set<int> qubits;
-    for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
-         ++it) {
-      if (it->second.first.ptr->is_quantum_gate() ||
-          it->second.first.ptr->tp == GateType::input_qubit) {
-        // Only check inputs on a qubit
-        // Excluding input_param gates and arithmetic gates
-        Pos p = Pos(it->second.first, it->second.second);
-        auto q = pos_2_logical_qubit.find(p)->second;
-        if (qubits.find(q) != qubits.end()) {
-          fail = true;
-          break;
-        } else {
-          qubits.insert(q);
-        }
-      }
-    }
-  }
-  if (!fail) {
-    for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
-         ++dst_it) {
-      if (!fail) {
-        OpX *dstOp = *dst_it;
-        fail = !xfer->create_new_operator(dstOp, dstOp->mapOp);
-      }
-    }
-  }
-  if (!fail) {
-    // Check that output tensors with external gates are mapped
-    for (auto mapped_ops_it = xfer->mappedOps.cbegin();
-         mapped_ops_it != xfer->mappedOps.cend() && !fail; ++mapped_ops_it) {
-      if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
-        const std::set<Edge, EdgeCompare> &list =
-            outEdges.find(mapped_ops_it->first)->second;
-        for (auto edge_it = list.cbegin(); edge_it != list.cend() && !fail;
-             ++edge_it)
-          if (xfer->mappedOps.find(edge_it->dstOp) == xfer->mappedOps.end()) {
-            // dstOp is external, (srcOp, srcIdx) must be in
-            // mappedOutputs
-            TensorX srcTen;
-            srcTen.op = mapped_ops_it->second;
-            srcTen.idx = edge_it->srcIdx;
-            if (xfer->mappedOutputs.find(srcTen) == xfer->mappedOutputs.end()) {
-              fail = true;
-            }
-          }
-      }
-    }
-  }
+  std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
+  auto success = _pattern_matching(xfer, op, matched_opx_op_pairs_dq);
   std::shared_ptr<Graph> new_graph(nullptr);
   std::vector<int> node_trace;
-  if (!fail) {
+  if (!success)
+    // If failed, the unmatch is already done in _pattern_matching.
+    // Return nullptr.
+    return std::make_pair(new_graph, node_trace);
+
+  if (success) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
       new_graph.reset();
-      fail = true;
+      success = false;
     }
   }
-  if (!fail) {
+  if (success) {
     std::unordered_set<Op, OpHash> op_set;
     // The destination graph in xfer is not an empty graph
     // Add all wires in the destination graph to op_set
@@ -2704,13 +2491,12 @@ Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
       }
     }
   }
-  while (!opx_op_dq.empty()) {
-    auto opx_op_pair = opx_op_dq.back();
-    opx_op_dq.pop_back();
+  // Pattern matching succeed, unmatch mapped nodes.
+  while (!matched_opx_op_pairs_dq.empty()) {
+    auto opx_op_pair = matched_opx_op_pairs_dq.back();
+    matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  if (!fail)
-    assert(mapped_opx.size() == xfer->srcOps.size());
   return std::make_pair(new_graph, node_trace);
 }
 
@@ -2745,103 +2531,6 @@ Graph::appliable_xfers_parallel(Op op,
   }
   return appliable_xfer_v;
 }
-
-// bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
-//   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
-//     // Find a match for the given Op
-//     if (xfer->can_match(*it, op, this)) {
-//       xfer->match(*it, op, this);
-//       bool rest_match = _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(),
-//                                         op.guid) != nullptr;
-//       xfer->unmatch(*it, op, this);
-//       if (rest_match)
-//         return true;
-//     }
-//   }
-//   return false;
-// }
-
-// std::shared_ptr<Graph> Graph::_match_rest_ops(GraphXfer *xfer, size_t depth,
-//                                               size_t ignore_depth,
-//                                               size_t min_guid) const {
-//   // The parameter min_guid is the guid of the first mapped Op
-//   if (depth == xfer->srcOps.size()) {
-//     // Create dst operators
-//     bool pass = true;
-//     for (auto dst_it = xfer->dstOps.cbegin(); dst_it != xfer->dstOps.cend();
-//          ++dst_it) {
-//       if (pass) {
-//         OpX *dstOp = *dst_it;
-//         pass = (pass & xfer->create_new_operator(dstOp, dstOp->mapOp));
-//       }
-//     }
-//     if (!pass)
-//       return std::shared_ptr<Graph>(nullptr);
-//     // Check that output tensors with external gates are mapped
-//     for (auto mapped_ops_it = xfer->mappedOps.cbegin();
-//          mapped_ops_it != xfer->mappedOps.cend(); ++mapped_ops_it) {
-//       if (outEdges.find(mapped_ops_it->first) != outEdges.end()) {
-//         const std::set<Edge, EdgeCompare> &list =
-//             outEdges.find(mapped_ops_it->first)->second;
-//         for (auto edge_it = list.cbegin(); edge_it != list.cend(); ++edge_it)
-//           if (xfer->mappedOps.find(edge_it->dstOp) == xfer->mappedOps.end())
-//           {
-//             // dstOp is external, (srcOp, srcIdx) must be in
-//             // mappedOutputs
-//             TensorX srcTen;
-//             srcTen.op = mapped_ops_it->second;
-//             srcTen.idx = edge_it->srcIdx;
-//             if (xfer->mappedOutputs.find(srcTen) ==
-//             xfer->mappedOutputs.end()) {
-//               return std::shared_ptr<Graph>(nullptr);
-//             }
-//           }
-//       }
-//     }
-
-//     auto new_graph = xfer->create_new_graph(this);
-//     if (new_graph->has_loop()) {
-//       new_graph.reset();
-//       return new_graph;
-//     }
-//     return new_graph;
-//   }
-//   if (depth == ignore_depth) {
-//     return _match_rest_ops(xfer, depth + 1, ignore_depth, min_guid);
-//   }
-//   OpX *srcOp = xfer->srcOps[depth];
-//   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
-//     if (it->first.guid < min_guid)
-//       continue;
-//     if ((xfer->mappedOps.find(it->first) == xfer->mappedOps.end()) &&
-//         xfer->can_match(srcOp, it->first, this)) {
-//       Op match_op = it->first;
-//       // Check mapOutput
-//       xfer->match(srcOp, match_op, this);
-//       auto new_graph = _match_rest_ops(xfer, depth + 1, ignore_depth,
-//       min_guid); xfer->unmatch(srcOp, match_op, this); if (new_graph !=
-//       nullptr)
-//         return new_graph;
-//     }
-//   }
-//   return std::shared_ptr<Graph>(nullptr);
-// }
-
-// std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op) {
-//   for (auto it = xfer->srcOps.begin(); it != xfer->srcOps.end(); ++it) {
-//     // Find a match for the given Op
-//     if (xfer->can_match(*it, op, this)) {
-//       xfer->match(*it, op, this);
-//       auto new_graph =
-//           _match_rest_ops(xfer, 0, it - xfer->srcOps.begin(), op.guid);
-//       xfer->unmatch(*it, op, this);
-//       if (new_graph.get() != nullptr) {
-//         return new_graph;
-//       }
-//     }
-//   }
-//   return std::shared_ptr<Graph>(nullptr);
-// }
 
 void Graph::all_ops(std::vector<Op> &ops) {
   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
@@ -2889,10 +2578,56 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
   }
 }
 
-// TODO
-bool Graph::equal(const Graph &other) const { return true; }
+// This function compares two graphs
+// It construct a sequence of gates in topology order for each graph
+// Returns true if the two sequences are the same
+bool Graph::equal(const Graph &other) const {
+  double epsilon = 1e-6;
+  std::vector<Op> ops1, ops2;
+  topology_order_ops(ops1);
+  other.topology_order_ops(ops2);
+  if (ops1.size() != ops2.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < ops1.size(); i++) {
+    if (ops1[i].ptr->tp != ops2[i].ptr->tp) {
+      return false;
+    }
+    if (ops1[i].ptr->is_parametrized_gate()) {
+      // make sure all the parameters are the same
+      int num_params = ops1[i].ptr->get_num_parameters();
+      int num_qubits = ops1[i].ptr->get_num_qubits();
+      std::vector<ParamType> params1(num_params);
+      std::vector<ParamType> params2(num_params);
+      // assume no parameter gates
+      // all parameter gates have constant value
+      auto edges1 = inEdges.find(ops1[i])->second;
+      for (auto it = edges1.cbegin(); it != edges1.cend(); ++it) {
+        if (it->srcOp.ptr->tp == GateType::input_param) {
+          params1[it->dstIdx - num_qubits] =
+              constant_param_values.find(it->srcOp)->second;
+        }
+      }
+      auto edges2 = other.inEdges.find(ops2[i])->second;
+      for (auto it = edges2.cbegin(); it != edges2.cend(); ++it) {
+        if (it->srcOp.ptr->tp == GateType::input_param) {
+          params2[it->dstIdx - num_qubits] =
+              other.constant_param_values.find(it->srcOp)->second;
+        }
+      }
+      for (int j = 0; j < num_params; j++) {
+        if (std::abs(params1[j] - params2[j]) > epsilon) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
 
-bool Graph::_loop_check_after_mapping(GraphXfer *xfer) const {
+bool operator==(const Graph &g1, const Graph &g2) { return g1.equal(g2); }
+
+bool Graph::_loop_check_after_matching(GraphXfer *xfer) const {
   std::unordered_set<Pos, PosHash> mapped_input_pos;
   std::unordered_set<Pos, PosHash> mapped_output_pos;
   std::queue<Pos> q;

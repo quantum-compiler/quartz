@@ -401,13 +401,13 @@ class PPOMod:
                 """get embeds of seleted nodes and evaluate them by Critic"""
                 num_nodes: torch.LongTensor = exps.state.batch_num_nodes()
                 # (batch_num_nodes, embed_dim)
-                b_graph_embeds: torch.Tensor = self.ddp_ac_net(
+                b_node_embeds: torch.Tensor = self.ddp_ac_net(
                     exps.state, ActorCritic.gnn_name()
                 )
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device)  # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
                 selected_nodes = exps.action[:, 0] + nodes_offset
-                selected_node_embeds = b_graph_embeds[selected_nodes]
+                selected_node_embeds = b_node_embeds[selected_nodes]
                 # NOTE: this is the "new value" updated with the network's updates
                 selected_node_values: torch.Tensor = self.ddp_ac_net(
                     selected_node_embeds, ActorCritic.critic_name()

@@ -58,6 +58,7 @@ public:
   [[nodiscard]] int get_num_internal_parameters() const;
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] int get_circuit_depth() const;
+  [[nodiscard]] ParamType get_parameter_value(Context *ctx, int para_idx) const;
   [[nodiscard]] bool qubit_used(int qubit_index) const;
   // Used by a parameter gate is considered as used here.
   [[nodiscard]] bool input_param_used(int param_index) const;

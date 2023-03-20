@@ -309,7 +309,8 @@ void CircuitSeq::add_input_parameter() {
   wire->type = CircuitWire::input_param;
   wire->index = num_input_parameters;
   parameters.insert(parameters.begin() + num_input_parameters, wire.get());
-  wires.insert(wires.begin() + num_input_parameters, std::move(wire));
+  wires.insert(wires.begin() + num_qubits + num_input_parameters,
+               std::move(wire));
 
   num_input_parameters++;
 
@@ -597,6 +598,12 @@ int CircuitSeq::get_circuit_depth() const {
     }
   }
   return *std::max_element(depth.begin(), depth.end());
+}
+
+ParamType CircuitSeq::get_parameter_value(Context *ctx, int para_idx) const {
+  assert(para_idx >= 0 && para_idx < get_num_total_parameters());
+  assert(para_idx < ctx->input_parameters.size());
+  return ctx->input_parameters[para_idx];
 }
 
 bool CircuitSeq::qubit_used(int qubit_index) const {

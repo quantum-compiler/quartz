@@ -3,10 +3,16 @@
 using namespace quartz;
 
 int main() {
-  Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::rz, GateType::x});
-  auto graph = Graph::from_qasm_file(
-      &ctx, "../experiment/t_tdg_h_cx_toffoli_flip_dataset/"
-            "barenco_tof_3.qasm.toffoli_flip");
-  graph->to_qasm("a.qasm", false, false);
+  Context ctx({GateType::input_qubit, GateType::input_param, GateType::add,
+               GateType::cx, GateType::rz, GateType::x, GateType::h});
+  //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::add,
+  //                GateType::cz, GateType::rz, GateType::x, GateType::rx1,
+  //                GateType::rx3});
+  //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::add,
+  //                GateType::rx1, GateType::x, GateType::rx3, GateType::rz,
+  //                GateType::ry1, GateType::y, GateType::ry3, GateType::rxx1,
+  //                GateType::rxx3});
+  auto graph =
+      Graph::from_qasm_file(&ctx, "../experiment/nam_rm_circs/gf2^6_mult.qasm");
+  graph->to_qasm("test.qasm", false, false);
 }

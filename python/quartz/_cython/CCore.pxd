@@ -42,7 +42,8 @@ cdef extern from "gate/gate_utils.h" namespace "quartz":
         ry1,
         ry3,
         rxx1,
-        rxx3
+        rxx3,
+        sx
 
 cdef extern from "math/matrix.h" namespace "quartz":
     cdef cppclass MatrixBase:
@@ -84,7 +85,9 @@ cdef extern from "tasograph/substitution.h" namespace "quartz":
     cdef cppclass GraphXfer:
         GraphXfer(Context_ptr, const CircuitSeq_ptr, const CircuitSeq_ptr) except +
         @staticmethod
-        GraphXfer* create_GraphXfer(Context_ptr,const CircuitSeq_ptr ,const CircuitSeq_ptr, bool no_increase)
+        GraphXfer* create_GraphXfer(Context_ptr,const CircuitSeq_ptr ,const CircuitSeq_ptr, bool equal_num_input_params)
+        @staticmethod
+        GraphXfer* create_GraphXfer_from_qasm_str(Context_ptr, const string &, const string &)
         int num_src_op()
         int num_dst_op()
         string src_str()

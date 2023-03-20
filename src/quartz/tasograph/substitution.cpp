@@ -28,7 +28,7 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
     if (opx_num_qubits == 0)
       continue;
     else {
-      for (size_t i = 0; i < opx_num_qubits; ++i) {
+      for (int i = 0; i < opx_num_qubits; ++i) {
         if (opx->inputs[i].op == nullptr) {
           tensor_on_qubit[opx->outputs[i]] = input_qubit_cnt++;
           assert(input_qubit_cnt <= num_qubits);
@@ -36,7 +36,7 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
           tensor_on_qubit[opx->outputs[i]] = tensor_on_qubit[opx->inputs[i]];
         }
       }
-      for (size_t i = 1; i < opx_num_qubits; ++i) {
+      for (int i = 1; i < opx_num_qubits; ++i) {
         // Union operation
         int ori_l = tensor_on_qubit[opx->outputs[0]], l = ori_l;
         int ori_r = tensor_on_qubit[opx->outputs[i]], r = ori_r;
@@ -69,10 +69,52 @@ bool GraphXfer::src_graph_connected(CircuitSeq *src_graph) {
   return true;
 }
 
+bool GraphXfer::is_input_qubit(const OpX *opx, int idx) const {
+  if (idx < 0 || idx >= context->get_gate(opx->type)->get_num_qubits())
+    // Invalid index or index larger than qubit range
+    return false;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_input_parameter(const OpX *opx, int idx) const {
+  int num_qubits = context->get_gate(opx->type)->get_num_qubits();
+  int num_params = context->get_gate(opx->type)->get_num_parameters();
+  if (idx < num_qubits || idx >= (num_qubits + num_params))
+    // Index out of parameter range
+    return false;
+  if (opx->inputs[idx].op != nullptr)
+    // Not a input
+    return false;
+  return true;
+}
+
+bool GraphXfer::is_symbolic_input_parameter(const OpX *opx, int idx) const {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) == paramValues.end())
+      return true;
+  }
+  return false;
+}
+
+bool GraphXfer::is_constant_input_parameter(const OpX *opx, int idx) const {
+  if (is_input_parameter(opx, idx)) {
+    if (paramValues.find(opx->inputs[idx].idx) != paramValues.end())
+      return true;
+  }
+  return false;
+}
+
 GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
                                        const CircuitSeq *src_graph,
                                        const CircuitSeq *dst_graph,
-                                       bool no_increase_gate_count) {
+                                       bool equal_num_input_params) {
+  // TODO: equal_num_input_params should always be true now
+  // because we don't know which parameters are symbolic and
+  // which are constant values
+
   // Remove common unused qubits
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
   auto qubit_num = src_graph->get_num_qubits();
@@ -87,11 +129,6 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   assert(ret);
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
-
-  // Eliminate transfers which increase gate count
-  if (no_increase_gate_count &&
-      src_dag->get_num_gates() < dst_dag->get_num_gates())
-    return nullptr;
 
   // TODO: remove common unused input parameters?
 
@@ -109,12 +146,54 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
       return nullptr;
   }
 
+  // If equal_num_input_params is set, then the number of input parameters
+  // must be equal
+  if (equal_num_input_params && src_dag->get_num_input_parameters() !=
+                                    dst_dag->get_num_input_parameters())
+    return nullptr;
+
   assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
-  assert(src_dag->get_num_input_parameters() ==
-         dst_dag->get_num_input_parameters());
+
+  // Warning: This pruning should be removed after we implement parameter
+  // expression simplification. This pruning relies on the following
+  // assumptions:
+  // 1. unique_parameters == true when generating ECC sets
+  // 2. the completeness of the ECC set
+  // Here we refuse to generate transformations whose src and dst circuits
+  // has parameter gates whose inputs are identical.
+
+  // Traverse all the gates
+  for (auto &gate_src : src_dag->gates) {
+    // Check if the gate is a parameter gate
+    if (gate_src->gate->is_parameter_gate()) {
+      for (auto &gate_dst : dst_dag->gates) {
+        // Check if the gate is a parameter gate
+        if (gate_dst->gate->is_parameter_gate()) {
+          // Check if the gate are the same type
+          if (gate_src->gate->tp == gate_dst->gate->tp) {
+            // Check if the gates have the same inputs
+            std::set<int> src_gate_input_idx, dst_gate_input_idx;
+            for (int i = 0; i < gate_src->input_wires.size(); ++i) {
+              src_gate_input_idx.insert(gate_src->input_wires[i]->index);
+              dst_gate_input_idx.insert(gate_dst->input_wires[i]->index);
+            }
+            if (src_gate_input_idx != dst_gate_input_idx)
+              continue;
+            // Check if the gates have the same outputs
+            if (gate_src->output_wires[0]->index !=
+                gate_dst->output_wires[0]->index)
+              continue;
+            return nullptr;
+          }
+        }
+      }
+    }
+  }
+
   GraphXfer *graphXfer = new GraphXfer(_context);
   std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
+
   for (int i = 0; i < src_dag->get_num_qubits(); i++) {
     CircuitWire *src_node = src_dag->wires[cnt].get();
     CircuitWire *dst_node = dst_dag->wires[cnt++].get();
@@ -186,6 +265,124 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
 
   delete src_dag;
   delete dst_dag;
+  return graphXfer;
+}
+
+GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
+    Context *_context, const std::string &src_str, const std::string &dst_str) {
+  CircuitSeq *src_dag = nullptr;
+  CircuitSeq *dst_dag = nullptr;
+  QASMParser parser = QASMParser(_context);
+  auto ret = parser.load_qasm_str(src_str, src_dag);
+  assert(ret);
+  ret = parser.load_qasm_str(dst_str, dst_dag);
+  assert(ret);
+  // TODO: We want to use the create_GraphXfer api directly, however it is
+  // not ready
+  //   auto graph_xfer =
+  //       GraphXfer::create_GraphXfer(_context, src_dag, dst_dag, false);
+
+  // Remove common unused qubits
+  assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
+  auto qubit_num = src_dag->get_num_qubits();
+  std::vector<int> unused_qubits;
+  for (int i = 0; i < qubit_num; ++i) {
+    if (!src_dag->qubit_used(i) && !dst_dag->qubit_used(i))
+      unused_qubits.push_back(i);
+  }
+  ret = src_dag->remove_unused_qubits(unused_qubits);
+  assert(ret);
+  ret = dst_dag->remove_unused_qubits(unused_qubits);
+  assert(ret);
+  // Update number of qubits after removal
+  qubit_num = src_dag->get_num_qubits();
+
+  // Eliminate transfers where src circuitseq has unused qubits
+  auto src_num_qubits = src_dag->get_num_qubits();
+  for (int i = 0; i < src_num_qubits; ++i) {
+    if (!src_dag->qubit_used(i))
+      return nullptr;
+  }
+
+  GraphXfer *graphXfer = new GraphXfer(_context);
+  std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
+
+  for (int i = 0; i < src_dag->get_num_qubits(); i++) {
+    CircuitWire *src_node = src_dag->wires[i].get();
+    CircuitWire *dst_node = dst_dag->wires[i].get();
+    assert(src_node->is_qubit());
+    assert(dst_node->is_qubit());
+    assert(src_node->index == i);
+    assert(dst_node->index == i);
+    TensorX qubit_tensor = graphXfer->new_tensor();
+    src_to_tx[src_node] = qubit_tensor;
+    dst_to_tx[dst_node] = qubit_tensor;
+  }
+  // Since both the src and dst graph are from qasm
+  // every parameters have a concrete value
+  // Now add every parameter to the GraphXfer object
+  for (int i = 0; i < src_dag->get_num_input_parameters(); i++) {
+    CircuitWire *src_node = src_dag->wires[qubit_num + i].get();
+    assert(src_node->is_parameter());
+    assert(src_node->index == i);
+    TensorX parameter_tensor = graphXfer->new_tensor();
+    src_to_tx[src_node] = parameter_tensor;
+    graphXfer->paramValues[parameter_tensor.idx] =
+        src_dag->get_parameter_value(_context, src_node->index);
+  }
+  for (int i = 0; i < dst_dag->get_num_input_parameters(); i++) {
+    CircuitWire *dst_node = dst_dag->wires[qubit_num + i].get();
+    assert(dst_node->is_parameter());
+    assert(dst_node->index == i);
+    TensorX parameter_tensor = graphXfer->new_tensor();
+    dst_to_tx[dst_node] = parameter_tensor;
+    graphXfer->paramValues[parameter_tensor.idx] =
+        src_dag->get_parameter_value(_context, dst_node->index);
+  }
+  for (size_t i = 0; i < src_dag->gates.size(); i++) {
+    CircuitGate *e = src_dag->gates[i].get();
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      src_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->srcOps.push_back(op);
+  }
+  for (size_t i = 0; i < dst_dag->gates.size(); i++) {
+    CircuitGate *e = dst_dag->gates[i].get();
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      dst_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->dstOps.push_back(op);
+  }
+  for (int i = 0; i < src_dag->get_num_qubits(); i++) {
+    assert(src_to_tx.find(src_dag->outputs[i]) != src_to_tx.end());
+    assert(dst_to_tx.find(dst_dag->outputs[i]) != dst_to_tx.end());
+    graphXfer->map_output(src_to_tx[src_dag->outputs[i]],
+                          dst_to_tx[dst_dag->outputs[i]]);
+  }
+
+  if (!graphXfer->src_graph_connected(src_dag)) {
+    return nullptr;
+  }
+
+  delete src_dag;
+  delete dst_dag;
+  return graphXfer;
+
   return graphXfer;
 }
 
@@ -407,6 +604,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   // need to call this function with topological order. Because once both
   // the src op and the dst op are mapped, the edge connecting them will
   // be checked. This gauarentee that every gates are checked at the end.
+
   // Check gate type
   if (op == Op::INVALID_OP)
     return false;
@@ -426,8 +624,17 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
         // Input is already mapped
         Op mappedOp = it->second.first;
         int mappedIdx = it->second.second;
-        if (!(graph->has_edge(mappedOp, op, mappedIdx, i)))
+        if (!(graph->has_edge(mappedOp, op, mappedIdx, i))) {
           return false;
+        }
+        if (is_constant_input_parameter(srcOp, i)) {
+          // Check if the constant input parameter is the same
+          auto xfer_param_value = paramValues.find(in.idx)->second;
+          auto graph_param_value =
+              graph->constant_param_values.find(mappedOp)->second;
+          if (std::abs(xfer_param_value - graph_param_value) > eps)
+            return false;
+        }
       } else {
         // Input haven't been mapped
         auto newit = newMapInputs.find(in.idx);
@@ -436,12 +643,28 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           int mappedIdx = newit->second.second;
           if (!(graph->has_edge(mappedOp, op, mappedIdx, i)))
             return false;
+          if (is_constant_input_parameter(srcOp, i)) {
+            // Check if the constant input parameter is the same
+            auto xfer_param_value = paramValues.find(in.idx)->second;
+            auto graph_param_value =
+                graph->constant_param_values.find(mappedOp)->second;
+            if (std::abs(xfer_param_value - graph_param_value) > eps)
+              return false;
+          }
         } else {
           std::set<Edge, EdgeCompare> list = graph->inEdges.find(op)->second;
           std::set<Edge, EdgeCompare>::const_iterator it2;
           for (it2 = list.begin(); it2 != list.end(); it2++) {
             Edge e = *it2;
             if (e.dstIdx == (int)i) {
+              if (is_constant_input_parameter(srcOp, i)) {
+                // Check if the constant input parameter is the same
+                auto xfer_param_value = paramValues.find(in.idx)->second;
+                auto graph_param_value =
+                    graph->constant_param_values.find(e.srcOp)->second;
+                if (std::abs(xfer_param_value - graph_param_value) > eps)
+                  return false;
+              }
               newMapInputs.insert(
                   std::make_pair(in.idx, std::make_pair(e.srcOp, e.srcIdx)));
               break;
@@ -831,7 +1054,6 @@ std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
   for (auto const &opx : v) {
     int num_qubits = context->get_gate(opx->type)->get_num_qubits();
     int num_params = context->get_gate(opx->type)->get_num_parameters();
-    int num_inputs = num_qubits + num_params;
 
     std::vector<int> input_qubits(num_qubits);
 

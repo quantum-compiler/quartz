@@ -703,7 +703,14 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                                              current_merging_kernel_type);
             std::sort(local_schedule.sets.back().first.begin(),
                       local_schedule.sets.back().first.end());
-            new_cost += kernel_costs[current_merging_kernel.size()];
+            assert(current_merging_kernel_type == KernelType::fusion ||
+                   current_merging_kernel_type == KernelType::shared_memory);
+            // We record the cost here when closing the kernel.
+            if (current_merging_kernel_type == KernelType::fusion) {
+              new_cost += kernel_costs[current_merging_kernel.size()];
+            } else {
+              new_cost += kernel_cost.get_shared_memory_init_cost();
+            }
             std::vector<int> absorbing_set;
             for (auto &index : current_merging_kernel) {
               if (!current_index[index]) {

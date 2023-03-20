@@ -8,6 +8,17 @@
 #include "kernel.h"
 #include "simulator.h"
 
+__global__ void initData(int* ptr, int data) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  ptr[i] = data;
+  // printf("%d\n", ptr[i]);
+}
+
+__global__ void checkData(int* ptr, int size) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  assert(ptr[i] == (int) i / size);
+}
+
 namespace sim {
 // only support applying gates to local qubits, TODO: support batched gates application
 template <typename DT>
@@ -23,11 +34,11 @@ bool SimulatorCuQuantum<DT>::ApplyGate(Gate<DT> &gate, int device_id) {
   cudaDataType_t data_type = cuDT;
   custatevecComputeType_t compute_type = cuCompute;
 
-  printf("Targets: [");
-  for (int i = 0; i < gate.target.size(); i++) {
-    printf("(%d, %d) ", gate.target[i], permutation[gate.target[i]]);
-  }
-  printf("]\n");
+  // printf("Targets: [");
+  // for (int i = 0; i < gate.target.size(); i++) {
+  //   printf("(%d, %d) ", gate.target[i], permutation[gate.target[i]]);
+  // }
+  // printf("]\n");
 
   // check the size of external workspace
   HANDLE_ERROR(custatevecApplyMatrixGetWorkspaceSize(
@@ -127,7 +138,6 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
         qubit_group_map[permutation[i]] = local++;
     }
   }
-  printf("shm:%d\n", shm);
   for (int i = n_local; i < n_qubits; i++)
       qubit_group_map[permutation[i]] = global++;
 
@@ -301,6 +311,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
       // cudaEventCreate(&t_start[i]);
       // cudaEventCreate(&t_end[i]);
       HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+      HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
       // cudaEventCreateWithFlags(&t_start[i], cudaEventBlockingSync);
       // cudaEventCreateWithFlags(&t_end[i], cudaEventBlockingSync);
       cudaEventCreate(&t_start[i]);
@@ -312,8 +323,8 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     for (int i = 0; i < n_devices; ++i) {
       printf("My physical id:%d, %d\n", myRank * n_devices + i, global_mask);
       unsigned myncclrank = device_phy_to_logical.at(myRank * n_devices + i);
-      // all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
-      //         comms[i], s[i], global&(~global_mask), myncclrank);
+      all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
+              comms[i], s[i], global&(~global_mask), myncclrank);
     }
     NCCLCHECK(ncclGroupEnd());
 
@@ -331,7 +342,7 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
              elapsed);
       shuffle_average += elapsed;
     }
-    shuffle_time.push_back(shuffle_average);
+    shuffle_time.push_back(shuffle_average/n_devices);
 
     // update perm/pos after global
     int idx = 0;
@@ -514,8 +525,42 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
     device_phy_to_logical[i] = i;
   }
 
+  //NCCL warmpup
+  unsigned global = 0;
+  for (int i = n_global - 1; i >= 0; i--) {
+    global |= unsigned(1) << i;
+  }
+  int sendsize = subSvSize / (1 << n_global);
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+    initData<<<4*subSvSize/1024, 1024, 0, s[i]>>>((int*)d_sv[i], myRank * n_devices + i);
+  }
+  cudaDeviceSynchronize();
+  printf("[warmup] size total:%lld\n", sendsize*sizeof(qComplex));
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+    HANDLE_CUDA_ERROR(
+        cudaMalloc(&recv_buf[i], subSvSize * sizeof(cuDoubleComplex)));
+  }
+  NCCLCHECK(ncclGroupStart());
+  for (int i = 0; i < n_devices; ++i) {
+    unsigned myncclrank = device_phy_to_logical.at(myRank * n_devices + i);
+    all2all(d_sv[i], sendsize, ncclDouble, recv_buf[i], sendsize, ncclDouble,
+            comms[i], s[i], global, myncclrank);
+  }
+  NCCLCHECK(ncclGroupEnd());
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+    checkData<<<4*subSvSize/1024, 1024, 0, s[i]>>>((int*)recv_buf[i], 4*subSvSize/(nRanks*n_devices));
+  }
+  cudaDeviceSynchronize();
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+    HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
+  }
 
-  // for profiling TODO: considering using openmp for this parts
+
+  // start profiling for profiling TODO: considering using openmp for this parts
   for (int i = 0; i < n_devices; ++i) {
     // cudaEventCreate(&start[i]);
     // cudaEventCreate(&end[i]);
@@ -590,17 +635,28 @@ ncclResult_t SimulatorCuQuantum<DT>::all2all(
     }
     peer_idx |= (myncclrank & (~mask));
 
+    
+    // if(myncclrank == peer_idx) {
+    //   // cudaMemcpyAsync(
+    //   // static_cast<std::byte *>(sendbuff) + i * ncclTypeSize(senddatatype) * 2 * sendcount,
+    //   // static_cast<std::byte *>(recvbuff) + i * ncclTypeSize(senddatatype) * 2 * recvcount,
+    //   // sendcount * sizeof(qComplex),
+    //   // cudaMemcpyDeviceToDevice,
+    //   // stream);
+    //   continue;
+    // }
+
     printf("I am %d, mask %d, I am sending to %d\n", myncclrank, mask,
            peer_idx);
     
     unsigned peer_phy = device_logical_to_phy.at(peer_idx);
 
     auto a = NCCLSendrecv(static_cast<std::byte *>(sendbuff) +
-                              i * ncclTypeSize(senddatatype) * sendcount,
-                          sendcount, senddatatype, peer_phy,
+                              i * ncclTypeSize(senddatatype) * sendcount * 2,
+                          sendcount * 2, senddatatype, peer_phy,
                           static_cast<std::byte *>(recvbuff) +
-                              i * ncclTypeSize(recvdatatype) * recvcount,
-                          recvcount, comm, stream);
+                              i * ncclTypeSize(recvdatatype) * recvcount * 2,
+                          recvcount * 2, comm, stream);
     if (a)
       return a;
   }

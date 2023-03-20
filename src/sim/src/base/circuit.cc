@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
 
 #include "circuit.h"
 #include "quartz/gate/gate_utils.h"
@@ -213,9 +214,14 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   // fprintf(fout, " %d", result);
 
   // 2. DP, fuse gates and add shuffle gates
+  // quartz::KernelCost kernel_cost(
+  //     /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
+  //     /*shared_memory_init_cost=*/10,
+  //     /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
+  //     /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   quartz::KernelCost kernel_cost(
-      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
-      /*shared_memory_init_cost=*/10,
+      /*fusion_kernel_costs=*/{0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
+      /*shared_memory_init_cost=*/6,
       /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);
@@ -339,10 +345,11 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
           }
           else if (gate->gate->get_num_control_qubits() == 0) {
             if(!local_mask[qubit_indices[0]]) {
-                // assert(gate->gate->tp != quartz::GateType::h);
+                assert(gate->gate->tp != quartz::GateType::h);
+                assert(gate->gate->tp != quartz::GateType::u2);
                 // FIXME: skip this incorrect schedule in runtime for now
-                if(gate->gate->tp == quartz::GateType::h) continue;
-                if(gate->gate->tp == quartz::GateType::u2) continue;
+                // if(gate->gate->tp == quartz::GateType::h) continue;
+                // if(gate->gate->tp == quartz::GateType::u2) continue;
             }
             qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
             qindex mask = active_qubits_logical;
@@ -378,6 +385,7 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
     simulator.InitStateMulti(init_permutation);
 
   printf("Init State Vectors!\n");
+  auto start = std::chrono::system_clock::now();
 
   int normal_idx = 0;
   int shm_idx = 0;
@@ -406,6 +414,9 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
   
   printf("Finish Simulating! Total: %d FUSE Kernel, %d SHM Kernel, %d Shuffles.\n", num_fuse, num_shm, num_shuffle);
   simulator.Destroy();
+  auto end= std::chrono::system_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+  printf("Time Cost: %d us\n", int(duration.count()));
   printf("Destroyed the simulator\n");
 }
 
@@ -590,7 +601,7 @@ void qcircuit::Circuit<DT>::MatShuffle(M &res_mat, unsigned n_qubit,
 #define IS_HIGH_PART(part_id, logicIdx) ((part_id >> (pos[logicIdx] - n_local) & 1) > 0)
 template <typename DT>
 bool qcircuit::Circuit<DT>::getMat_per_device(quartz::Context *ctx, int part_id, quartz::Gate* gate, std::vector<int> qubit_indices, std::vector<ParamType>& params, std::vector<ComplexType>& res, unsigned &mask, std::vector<int>& perm) {
-  printf("Fusing gates for rank %d\n", part_id);
+  printf("Fusing gate %d(%d) for rank %d\n", gate->tp, gate->get_num_control_qubits(), part_id);
   if (gate->get_num_control_qubits() == 2) { //ccx
     int c2 = qubit_indices[0];
     int c1 = qubit_indices[1];

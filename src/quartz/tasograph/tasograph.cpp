@@ -607,8 +607,8 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (num_qubits != 0) {
-    // Add gates between the inputs and outputs of the to-be removed
-    // node Only add gates that connect qubits
+    // Add edges between the inputs and outputs of the to-be removed
+    // node. Only add edges that connect qubits
     if (inEdges.find(oldOp) != inEdges.end() &&
         outEdges.find(oldOp) != outEdges.end()) {
       auto input_edges = inEdges[oldOp];
@@ -764,9 +764,14 @@ void Graph::constant_and_rotation_elimination() {
           auto edge = *list.begin();
           param = constant_param_values[edge.srcOp];
           constant_param_values[edge.srcOp] = -param;
-          // Remove neg gate, the renewed parameter will be connected to other
-          // part of the circuit automatically
+          // Find destination
+          assert(outEdges[op].size() == 1);
+          auto output_dst_op = (*outEdges[op].begin()).dstOp;
+          auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
+          // Remove neg gate
           remove_node(op);
+          // Add edge that connects the renewed parameter to the rotation gate
+          add_edge(edge.srcOp, output_dst_op, 0, output_dst_idx);
         } else {
           assert(false && "Unimplemented parameter gates");
         }

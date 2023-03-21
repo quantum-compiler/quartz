@@ -466,19 +466,42 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         kernel_cost.get_shared_memory_gate_cost(current_gate.gate->tp);
     std::vector<bool> current_index(num_qubits, false);
     std::vector<int> current_indices;
+    // In shared-memory kernels, we only require target qubits to be active
+    // for controlled gates.
+    // For gates with a diagonal matrix like CZ, Z, CP, and P, we can put them
+    // in any shared-memory kernels.
+    std::vector<bool> current_target_index(num_qubits, false);
+    std::vector<int> current_target_indices;
+    int num_remaining_control_qubits =
+        current_gate.gate->get_num_control_qubits();
     current_indices.reserve(current_gate.input_wires.size());
     for (auto &input_wire : current_gate.input_wires) {
-      // We do not care about global qubits here.
-      if (input_wire->is_qubit() && is_local_qubit(input_wire->index)) {
-        current_index[input_wire->index] = true;
-        current_indices.push_back(input_wire->index);
-        if (debug) {
-          std::cout << "current index " << input_wire->index << std::endl;
+      if (input_wire->is_qubit()) {
+        num_remaining_control_qubits--;
+        // We do not care about global qubits here.
+        if (is_local_qubit(input_wire->index)) {
+          current_index[input_wire->index] = true;
+          current_indices.push_back(input_wire->index);
+          if (num_remaining_control_qubits < 0 &&
+              !current_gate.gate->is_diagonal()) {
+            // If the gate is diagonal, |current_target_indices| should be
+            // empty.
+            current_target_index[input_wire->index] = true;
+            current_target_indices.push_back(input_wire->index);
+            if (debug) {
+              std::cout << "target ";
+            }
+          }
+          if (debug) {
+            std::cout << "current index " << input_wire->index << std::endl;
+          }
         }
       }
     }
     std::sort(current_indices.begin(), current_indices.end());
     auto current_indices_hash = Status::get_hash(current_indices);
+    std::sort(current_target_indices.begin(), current_target_indices.end());
+    auto current_target_indices_hash = Status::get_hash(current_target_indices);
 
     // TODO: make these numbers configurable
     constexpr int kMaxNumOfStatus = 4000;
@@ -574,10 +597,49 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             if (absorbing_set_index == -1) {
               absorbing_set_index = j;
             } else if (absorbing_set_index != j) {
-              // not absorb-able
+              // touching 2 sets, so not absorb-able
               absorbing_set_index = -2;
               break;
             }
+          }
+        }
+        if (absorbing_set_index == -2) {
+          break;
+        }
+      }
+      if (absorbing_set_index >= 0 &&
+          current_status.absorbing_qubits[absorbing_set_index].second ==
+              KernelType::shared_memory) {
+        // For shared-memory kernels, we only need to have the target qubits
+        // in the absorbing kernel; but we need to have all control qubits
+        // not in any open kernels (nor other absorbing kernels, which is
+        // already checked before).
+        for (auto &s : current_status.sets) {
+          for (auto &qubit : s.first) {
+            if (current_index[qubit]) {
+              // touching an open kernel, so not absorb-able
+              absorb_count = -1;
+              break;
+            }
+          }
+          if (absorb_count == -1) {
+            break;
+          }
+        }
+        if (absorb_count != -1) {
+          // Count the target qubits in the absorbing kernel.
+          absorb_count = 0;
+          for (auto &qubit :
+               current_status.absorbing_qubits[absorbing_set_index].first) {
+            if (current_target_index[qubit]) {
+              absorb_count++;
+            }
+          }
+          if (absorb_count == current_target_indices.size()) {
+            // absorb-able
+            absorb_count = current_indices.size();
+          } else {
+            absorb_count = -1;
           }
         }
       }
@@ -958,13 +1020,24 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           break;
         }
       }
+      int num_remaining_control_qubits =
+          sequence_.gates[i]->gate->get_num_control_qubits();
       for (auto &wire : sequence_.gates[i]->input_wires) {
-        // We do not care about global qubits, but we need the local qubit to
-        // be local in this kernel.
-        if (wire->is_qubit() && is_local_qubit(wire->index) &&
-            !local_in_kernel[wire->index]) {
-          executable = false;
-          break;
+        if (wire->is_qubit()) {
+          num_remaining_control_qubits--;
+          // We do not care about global qubits, but we need the local qubit to
+          // be active in this kernel.
+          if (is_local_qubit(wire->index) && !local_in_kernel[wire->index]) {
+            // One exception is when the kernel is shared-memory, we only
+            // need the target qubits in controlled gates to be active; we
+            // don't need any qubits to be active in diagonal gates.
+            if (!(s.second == KernelType::shared_memory &&
+                  (num_remaining_control_qubits >= 0 ||
+                   sequence_.gates[i]->gate->is_diagonal()))) {
+              executable = false;
+              break;
+            }
+          }
         }
       }
       if (executable) {

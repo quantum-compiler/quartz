@@ -87,7 +87,7 @@ bool QASMParser::load_qasm_stream(
       continue; // comment, ignore this line
     } else if (command == "") {
       continue; // empty line, ignore this line
-    } else if (command == "OPENQASM") {
+    } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue; // header, ignore this line
     } else if (command == "include") {
       continue; // header, ignore this line

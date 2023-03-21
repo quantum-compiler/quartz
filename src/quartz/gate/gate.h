@@ -17,15 +17,28 @@ public:
   virtual ParamType compute(const std::vector<ParamType> &input_params);
   [[nodiscard]] virtual bool is_commutative() const; // for traditional gates
   /**
-   * @return True iff the gate is a multi-qubit gate and the gate remains
+   * @return True if the gate is a multi-qubit gate and the gate remains
    * the same under any qubit permutation (e.g., CZ, CP, CCZ, SWAP).
+   * Default value is false.
    */
   [[nodiscard]] virtual bool is_symmetric() const;
-  // Returns true iff the number of non-zero elements in the matrix
-  // representation of the quantum gate is exactly 2 to the power of num_qubits.
+  /**
+   * @return True if the number of non-zero elements in the matrix
+   * representation of the quantum gate is exactly 2 to the power of num_qubits.
+   * Default value is false.
+   */
   [[nodiscard]] virtual bool is_sparse() const;
-  // Returns the number of control qubits for controlled gates; or 0 if it is
-  // not a controlled gate.
+  /**
+   * @return True if the matrix representation of the quantum gate is a
+   * diagonal matrix (e.g., Z, CZ, P, CP).
+   * Default value is false.
+   */
+  [[nodiscard]] virtual bool is_diagonal() const;
+  /**
+   * @return The number of control qubits for controlled gates; or 0 if it is
+   * not a controlled gate.
+   * Default value is 0.
+   */
   [[nodiscard]] virtual int get_num_control_qubits() const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;

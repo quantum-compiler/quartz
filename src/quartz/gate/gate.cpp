@@ -25,6 +25,8 @@ bool Gate::is_symmetric() const { return false; }
 
 bool Gate::is_sparse() const { return false; }
 
+bool Gate::is_diagonal() const { return false; }
+
 int Gate::get_num_control_qubits() const { return 0; }
 
 int Gate::get_num_qubits() const { return num_qubits; }

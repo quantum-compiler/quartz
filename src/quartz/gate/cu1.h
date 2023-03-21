@@ -22,6 +22,7 @@ public:
     return cached_matrices[phi].get();
   }
   bool is_sparse() const override { return true; }
+  bool is_diagonal() const override { return true; }
   int get_num_control_qubits() const override { return 1; }
   std::unordered_map<ParamType, std::unique_ptr<Matrix<4>>> cached_matrices;
 };

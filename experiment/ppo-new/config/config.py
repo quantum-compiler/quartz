@@ -7,6 +7,7 @@ from config.base_config import BaseConfig
 from config.ibm2_config import *
 from config.ibm_config import *
 from config.ionq_config import *
+from config.nam2_config import *
 from config.nam_config import *
 from config.rig_config import *
 from config.tdg_config import *
@@ -41,6 +42,11 @@ cs.store(group="c", name="nam_rm_mp", node=NamRMMPConfig)
 cs.store(group="c", name="nam_test", node=NamTestConfig)
 cs.store(group="c", name="nam_alltest", node=NamAllTestConfig)
 cs.store(group="c", name="nam_convert", node=NamConvertConfig)
+
+cs.store(group="c", name="nam2", node=Nam2Config)
+cs.store(group="c", name="nam2_ft", node=Nam2FTConfig)
+cs.store(group="c", name="nam2_mp", node=Nam2MPConfig)
+cs.store(group="c", name="nam2_rm_mp", node=Nam2RMMPConfig)
 
 cs.store(group="c", name="ibm", node=IBMConfig)
 cs.store(group="c", name="ibm_ft", node=IBMFTConfig)

@@ -64,6 +64,7 @@ cs.store(group="c", name="tdg", node=TdgConfig)
 cs.store(group="c", name="tdg_ft", node=TdgFTConfig)
 cs.store(group="c", name="tdg_mp", node=TdgMPConfig)
 cs.store(group="c", name="tdg_rm_mp", node=TdgRMMPConfig)
+cs.store(group="c", name="tdg_test", node=TdgTestConfig)
 
 cs.store(group="c", name="rig", node=RigConfig)
 cs.store(group="c", name="rig_ft", node=RigFTConfig)

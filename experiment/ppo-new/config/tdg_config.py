@@ -93,7 +93,7 @@ class TdgRMMPConfig(TdgConfig):
 
 
 @dataclass
-class IBM2TestConfig(TestConfig):
+class TdgTestConfig(TestConfig):
     # quartz
     gate_set: List[str] = field(
         default_factory=lambda: [

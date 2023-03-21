@@ -68,14 +68,14 @@ bool QASMParser::load_qasm_stream(
   std::unordered_map<ParamType, int> parameters;
   int num_total_params = context->input_parameters.size();
 
-  while (std::getline(qasm_stream, line)) {
+  while (std::getline(qasm_stream, line, ';')) {
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space
     find_and_replace_first(line, "(", " ");
     find_and_replace_last(line, ")", " ");
-    // Ignore semicolon at the end
-    find_and_replace_all(line, ";", "");
+    // Ignore end of line
+    find_and_replace_all(line, "\n", "");
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');

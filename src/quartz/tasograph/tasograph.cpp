@@ -1376,13 +1376,13 @@ Graph::_from_qasm_stream(Context *ctx,
   std::vector<Pos> pos_on_qubits;
   std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
   size_t total_num_qubits = 0;
-  while (std::getline(qasm_stream, line)) {
+  while (std::getline(qasm_stream, line, ';')) {
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
     find_and_replace_all(line, "(", " ");
     find_and_replace_all(line, ")", " ");
-    // ignore semicolon at the end
-    find_and_replace_all(line, ";", "");
+    // ignore end of line
+    find_and_replace_all(line, "\n", "");
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
@@ -1390,7 +1390,7 @@ Graph::_from_qasm_stream(Context *ctx,
       continue; // comment, ignore this line
     } else if (command == "") {
       continue; // empty line, ignore this line
-    } else if (command == "OPENQASM") {
+    } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue; // header, ignore this line
     } else if (command == "include") {
       continue; // header, ignore this line

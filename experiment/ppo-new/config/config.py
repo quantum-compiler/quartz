@@ -47,6 +47,7 @@ cs.store(group="c", name="nam2", node=Nam2Config)
 cs.store(group="c", name="nam2_ft", node=Nam2FTConfig)
 cs.store(group="c", name="nam2_mp", node=Nam2MPConfig)
 cs.store(group="c", name="nam2_rm_mp", node=Nam2RMMPConfig)
+cs.store(group="c", name="nam2_test", node=Nam2TestConfig)
 
 cs.store(group="c", name="ibm", node=IBMConfig)
 cs.store(group="c", name="ibm_ft", node=IBMFTConfig)

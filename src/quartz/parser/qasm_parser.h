@@ -76,6 +76,9 @@ bool QASMParser::load_qasm_stream(
     find_and_replace_last(line, ")", " ");
     // Ignore end of line
     find_and_replace_all(line, "\n", "");
+    while (line.front() == ' ') {
+      line.erase(0, 1);
+    }
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');

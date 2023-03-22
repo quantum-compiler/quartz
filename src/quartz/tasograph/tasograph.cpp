@@ -1383,6 +1383,9 @@ Graph::_from_qasm_stream(Context *ctx,
     find_and_replace_all(line, ")", " ");
     // ignore end of line
     find_and_replace_all(line, "\n", "");
+    while (line.front() == ' ') {
+      line.erase(0, 1);
+    }
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');

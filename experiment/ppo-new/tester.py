@@ -387,9 +387,12 @@ class Tester:
         # (num_graphs, action_dim)
         softmax_xfer_logits = masked_softmax(xfer_logits, av_xfer_masks)
         # NOTE: sample or max ?
-        action_xfers: List[int] = (
-            torch.multinomial(softmax_xfer_logits, num_samples=1).flatten().tolist()
-        )
+        # action_xfers: List[int] = (
+        #     torch.multinomial(softmax_xfer_logits, num_samples=1).flatten().tolist()
+        # )
+        action_xfers: List[int] = torch.max(
+            softmax_xfer_logits, dim=-1, keepdim=False
+        ).values.tolist()
         next_circs: List[quartz.PyGraph] = []
         for i_circ, circ in enumerate(cur_circs):
             xfer: quartz.PyXfer = qtz.quartz_context.get_xfer_from_id(

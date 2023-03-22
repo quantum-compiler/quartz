@@ -607,8 +607,8 @@ void Graph::remove_node(Op oldOp) {
     }
   }
   if (num_qubits != 0) {
-    // Add gates between the inputs and outputs of the to-be removed
-    // node Only add gates that connect qubits
+    // Add edges between the inputs and outputs of the to-be removed
+    // node. Only add edges that connect qubits
     if (inEdges.find(oldOp) != inEdges.end() &&
         outEdges.find(oldOp) != outEdges.end()) {
       auto input_edges = inEdges[oldOp];
@@ -749,6 +749,10 @@ void Graph::constant_and_rotation_elimination() {
             remove_node(edge.srcOp);
           }
           result = params[0] + params[1];
+          // Normalize result to [0, 2pi)
+          result = std::fmod(result, 2 * PI);
+          if (result < 0)
+            result += 2 * PI;
 
           assert(outEdges[op].size() == 1);
           auto output_dst_op = (*outEdges[op].begin()).dstOp;
@@ -760,13 +764,23 @@ void Graph::constant_and_rotation_elimination() {
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
         } else if (op.ptr->tp == GateType::neg) {
-          ParamType param = 0;
+          ParamType param = 0, result = 0;
           auto edge = *list.begin();
           param = constant_param_values[edge.srcOp];
-          constant_param_values[edge.srcOp] = -param;
-          // Remove neg gate, the renewed parameter will be connected to other
-          // part of the circuit automatically
+          result = -param;
+          // Normalize result to [0, 2pi)
+          result = std::fmod(result, 2 * PI);
+          if (result < 0)
+            result += 2 * PI;
+          constant_param_values[edge.srcOp] = result;
+          // Find destination
+          assert(outEdges[op].size() == 1);
+          auto output_dst_op = (*outEdges[op].begin()).dstOp;
+          auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
+          // Remove neg gate
           remove_node(op);
+          // Add edge that connects the renewed parameter to the rotation gate
+          add_edge(edge.srcOp, output_dst_op, 0, output_dst_idx);
         } else {
           assert(false && "Unimplemented parameter gates");
         }
@@ -1277,6 +1291,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
       assert(op.ptr->is_quantum_gate()); // Should not have any
                                          // arithmetic gates
       std::ostringstream iss;
+      iss << std::setprecision(10) << std::fixed;
       iss << gate_type_name(op.ptr->tp);
       int num_qubits = op.ptr->get_num_qubits();
       auto in_edges = inEdges.find(op)->second;
@@ -1371,13 +1386,16 @@ Graph::_from_qasm_stream(Context *ctx,
   std::vector<Pos> pos_on_qubits;
   std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
   size_t total_num_qubits = 0;
-  while (std::getline(qasm_stream, line)) {
+  while (std::getline(qasm_stream, line, ';')) {
     // repleace comma with space
     find_and_replace_all(line, ",", " ");
     find_and_replace_all(line, "(", " ");
     find_and_replace_all(line, ")", " ");
-    // ignore semicolon at the end
-    find_and_replace_all(line, ";", "");
+    // ignore end of line
+    find_and_replace_all(line, "\n", "");
+    while (line.front() == ' ') {
+      line.erase(0, 1);
+    }
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
@@ -1385,7 +1403,7 @@ Graph::_from_qasm_stream(Context *ctx,
       continue; // comment, ignore this line
     } else if (command == "") {
       continue; // empty line, ignore this line
-    } else if (command == "OPENQASM") {
+    } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue; // header, ignore this line
     } else if (command == "include") {
       continue; // header, ignore this line

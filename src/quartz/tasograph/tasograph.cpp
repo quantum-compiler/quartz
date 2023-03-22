@@ -749,6 +749,10 @@ void Graph::constant_and_rotation_elimination() {
             remove_node(edge.srcOp);
           }
           result = params[0] + params[1];
+          // Normalize result to [0, 2pi)
+          result = std::fmod(result, 2 * PI);
+          if (result < 0)
+            result += 2 * PI;
 
           assert(outEdges[op].size() == 1);
           auto output_dst_op = (*outEdges[op].begin()).dstOp;
@@ -760,10 +764,15 @@ void Graph::constant_and_rotation_elimination() {
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
           constant_param_values[merged_op] = result;
         } else if (op.ptr->tp == GateType::neg) {
-          ParamType param = 0;
+          ParamType param = 0, result = 0;
           auto edge = *list.begin();
           param = constant_param_values[edge.srcOp];
-          constant_param_values[edge.srcOp] = -param;
+          result = -param;
+          // Normalize result to [0, 2pi)
+          result = std::fmod(result, 2 * PI);
+          if (result < 0)
+            result += 2 * PI;
+          constant_param_values[edge.srcOp] = result;
           // Find destination
           assert(outEdges[op].size() == 1);
           auto output_dst_op = (*outEdges[op].begin()).dstOp;
@@ -1282,6 +1291,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
       assert(op.ptr->is_quantum_gate()); // Should not have any
                                          // arithmetic gates
       std::ostringstream iss;
+      iss << std::setprecision(10) << std::fixed;
       iss << gate_type_name(op.ptr->tp);
       int num_qubits = op.ptr->get_num_qubits();
       auto in_edges = inEdges.find(op)->second;

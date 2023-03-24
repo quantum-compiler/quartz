@@ -194,7 +194,7 @@ cdef class PyXfer:
         elif is_nop:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
-            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
+            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, True)
         else:
             self.graphXfer = NULL
 

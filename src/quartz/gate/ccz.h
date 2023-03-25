@@ -20,6 +20,7 @@ public:
   MatrixBase *get_matrix() override { return &mat; }
   bool is_symmetric() const override { return true; }
   bool is_sparse() const override { return true; }
+  bool is_diagonal() const override { return true; }
   int get_num_control_qubits() const override { return 2; }
   Matrix<8> mat;
 };

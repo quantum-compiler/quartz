@@ -11,6 +11,7 @@ public:
 
   MatrixBase *get_matrix() override { return &mat; }
   bool is_sparse() const override { return true; }
+  bool is_diagonal() const override { return true; }
   Matrix<2> mat;
 };
 

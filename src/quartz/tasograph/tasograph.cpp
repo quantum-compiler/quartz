@@ -2421,7 +2421,7 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
 }
 
 std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
-                                         bool eliminate_rotation) {
+                                         bool eliminate_rotation) const {
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
@@ -2456,7 +2456,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
 
 std::pair<std::shared_ptr<Graph>, std::vector<int>>
 Graph::apply_xfer_and_track_node(GraphXfer *xfer, Op op,
-                                 bool eliminate_rotation) {
+                                 bool eliminate_rotation) const {
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;

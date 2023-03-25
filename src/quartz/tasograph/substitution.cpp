@@ -1084,7 +1084,10 @@ std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
     for (auto const &idx : input_qubits) {
       oss << " " << idx;
     }
-    oss << std::endl;
+    oss << ";";
+
+    if (opx != v.back())
+      oss << " ";
 
     for (int i = 0; i < num_qubits; ++i) {
       mp[opx->outputs[i]] = input_qubits[i];

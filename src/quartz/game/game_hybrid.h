@@ -729,9 +729,11 @@ namespace quartz {
             std::deque<OutputGateRepresentation> pending_gate_queue;
 
             // output the header
+            // #qreg should be equal to the number of physical registers (since the circuit is mapped)
+            // #creg stores the measurement result of each (original) logical qubit
             output_qasm_file << "OPENQASM 2.0;\n";
             output_qasm_file << "include \"qelib1.inc\";\n";
-            output_qasm_file << "qreg q[" << original_qasm_qubit_count << "];\n";
+            output_qasm_file << "qreg q[" << physical_qubit_num << "];\n";
             output_qasm_file << "creg meas[" << original_qasm_qubit_count << "];\n";
 
             // output the initial single qubit gates (i.e. gates attached to input_qubits)

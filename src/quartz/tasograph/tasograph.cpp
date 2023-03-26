@@ -2412,15 +2412,13 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
     // If failed, the unmatch is already done in _pattern_matching.
     return false;
   success = _loop_check_after_matching(xfer);
-  if (!success)
-    return false;
   // Pattern matching succeed, unmatch mapped nodes.
   while (!matched_opx_op_pairs_dq.empty()) {
     auto opx_op_pair = matched_opx_op_pairs_dq.back();
     matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  return true;
+  return success;
 }
 
 std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,

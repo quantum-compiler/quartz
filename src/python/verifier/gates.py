@@ -115,6 +115,17 @@ def cx(use_z3=True):
     ]
 
 
+def cp(phi, use_z3=True):
+    assert len(phi) == 2
+    cos_phi, sin_phi = phi
+    return [
+        [(1, 0), (0, 0), (0, 0), (0, 0)],
+        [(0, 0), (1, 0), (0, 0), (0, 0)],
+        [(0, 0), (0, 0), (1, 0), (0, 0)],
+        [(0, 0), (0, 0), (0, 0), (cos_phi, sin_phi)],
+    ]
+
+
 def h(use_z3=True):
     if use_z3:
         return [

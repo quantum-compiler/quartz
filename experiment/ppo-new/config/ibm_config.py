@@ -11,9 +11,10 @@ class IBMConfig(BaseConfig):
             'sx',
             'rz',
             'add',
+            'neg',
         ]
     )
-    ecc_file: str = '../ecc_set/ibm_3_2_5_ecc.json'
+    ecc_file: str = '../ecc_set/ibm_325_ecc.json'
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(
@@ -86,9 +87,10 @@ class IBMTestConfig(TestConfig):
             'sx',
             'rz',
             'add',
+            'neg',
         ]
     )
-    ecc_file: str = '../ecc_set/ibm_3_2_5_ecc.json'
+    ecc_file: str = '../ecc_set/ibm_325_ecc.json'
     input_graphs: List[InputGraph] = field(
         default_factory=lambda: [
             InputGraph(

@@ -43,10 +43,10 @@ public:
    */
   static bool compute_end_schedule(
       const KernelCost &kernel_cost,
-      const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
+      const std::vector<KernelInDP> &kernels,
       const std::vector<bool> &is_shared_memory_cacheline_qubit,
       KernelCostType &result_cost,
-      std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
+      std::vector<KernelInDP> *result_kernels);
 
   /**
    * Compute the schedule using dynamic programming.

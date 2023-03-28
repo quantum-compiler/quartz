@@ -799,10 +799,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
       }
       // Sort the absorbing kernels in ascending order.
-      std::sort(new_absorbing_kernels.begin(), new_absorbing_kernels.end(),
-                [](auto &s1, auto &s2) {
-                  return s1.active_qubits[0] < s2.active_qubits[0];
-                });
+      std::sort(new_absorbing_kernels.begin(), new_absorbing_kernels.end());
 
       if (intersect_kernel_indices.empty()) {
         // Optimization:
@@ -826,7 +823,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       // Main search in the DP. (TODO)
       // Keep track of the schedule during the search.
       LocalSchedule local_schedule = current_local_schedule;
-      std::vector<std::pair<std::vector<int>, KernelType>> absorbing_sets_stack;
+      std::vector<KernelInDP> absorbing_kernels_stack;
       // Keep track of which kernels are merged during the search.
       std::vector<bool> kernel_merged(num_kernels, false);
       for (auto &index : intersect_kernel_indices) {
@@ -834,10 +831,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         kernel_merged[index] = true;
       }
       auto search_merging_kernels =
-          [&](auto &this_ref, const std::vector<int> &current_gate_kernel,
-              KernelType current_gate_kernel_type,
-              const std::vector<int> &current_merging_kernel,
-              KernelType current_merging_kernel_type,
+          [&](auto &this_ref, const KernelInDP &current_gate_kernel,
+              const KernelInDP &current_merging_kernel,
               const KernelCostType &cost, int touching_set_index,
               int kernel_index) -> void {
         if (kernel_index == num_kernels) {
@@ -845,33 +840,59 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           // "touching set".
           touching_set_index++;
           auto new_cost = cost;
-          if (!current_merging_kernel.empty()) {
+          if (!current_merging_kernel.active_qubits.empty() ||
+              !current_merging_kernel.touching_qubits.empty()) {
             // Because we are not merging this kernel with the current
             // gate, we need to record the merged kernel.
-            local_schedule.sets.emplace_back(current_merging_kernel,
-                                             current_merging_kernel_type);
-            std::sort(local_schedule.sets.back().first.begin(),
-                      local_schedule.sets.back().first.end());
-            assert(current_merging_kernel_type == KernelType::fusion ||
-                   current_merging_kernel_type == KernelType::shared_memory);
+            local_schedule.kernels.push_back(current_merging_kernel);
+            assert(current_merging_kernel.tp == KernelType::fusion ||
+                   current_merging_kernel.tp == KernelType::shared_memory);
             // We record the cost here when closing the kernel.
-            if (current_merging_kernel_type == KernelType::fusion) {
-              new_cost += kernel_costs[current_merging_kernel.size()];
+            if (current_merging_kernel.tp == KernelType::fusion) {
+              assert(current_merging_kernel.touching_qubits.empty());
+              new_cost +=
+                  kernel_costs[current_merging_kernel.active_qubits.size()];
             } else {
               new_cost += kernel_cost.get_shared_memory_init_cost();
+              // We update the |touching_qubits| for |current_merging_kernel|
+              // here.
+              std::vector<bool> in_current_kernel(num_qubits, false);
+              for (auto &index : current_merging_kernel.active_qubits) {
+                in_current_kernel[index] = true;
+              }
+              // Recompute the touching qubits.
+              local_schedule.kernels.back().touching_qubits.clear();
+              for (auto &index : current_merging_kernel.touching_qubits) {
+                if (!in_current_kernel[index]) {
+                  local_schedule.kernels.back().touching_qubits.push_back(
+                      index);
+                  in_current_kernel[index] = true;
+                }
+              }
             }
-            std::vector<int> absorbing_set;
-            for (auto &index : current_merging_kernel) {
+            std::sort(local_schedule.kernels.back().active_qubits.begin(),
+                      local_schedule.kernels.back().active_qubits.end());
+            std::sort(local_schedule.kernels.back().touching_qubits.begin(),
+                      local_schedule.kernels.back().touching_qubits.end());
+
+            // Compute the absorbing kernel.
+            KernelInDP absorbing_kernel({}, {}, current_merging_kernel.tp);
+            for (auto &index : local_schedule.kernels.back().active_qubits) {
               if (!current_index[index]) {
                 // As long as the current gate does not block the qubit |index|,
                 // we can execute a gate at the qubit |index| later in the
                 // kernel |current_merging_kernel|.
-                absorbing_set.push_back(index);
+                absorbing_kernel.active_qubits.push_back(index);
               }
             }
-            std::sort(absorbing_set.begin(), absorbing_set.end());
-            absorbing_sets_stack.emplace_back(absorbing_set,
-                                              current_merging_kernel_type);
+            for (auto &index : local_schedule.kernels.back().touching_qubits) {
+              if (!current_target_index[index]) {
+                // Similarly, we block the target qubits in the
+                // |touching_qubits| set.
+                absorbing_kernel.touching_qubits.push_back(index);
+              }
+            }
+            absorbing_kernels_stack.push_back(absorbing_kernel);
           }
           if (touching_set_index == (int)intersect_kernel_indices.size()) {
             // We have searched everything.
@@ -879,22 +900,25 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             Status new_status;
             for (int j = 0; j < num_kernels; j++) {
               if (!kernel_merged[j]) {
-                new_status.sets.push_back(current_status.sets[j]);
+                new_status.open_kernels.push_back(
+                    current_status.open_kernels[j]);
               }
             }
             // Insert the new open kernel.
-            new_status.insert_set(current_gate_kernel,
-                                  current_gate_kernel_type);
+            new_status.insert_set(current_gate_kernel);
             // Insert the absorbing kernels.
-            new_status.absorbing_qubits = new_absorbing_kernels;
-            new_status.absorbing_qubits.insert(
-                new_status.absorbing_qubits.end(), absorbing_sets_stack.begin(),
-                absorbing_sets_stack.end());
+            new_status.absorbing_kernels = new_absorbing_kernels;
+            new_status.absorbing_kernels.reserve(
+                new_absorbing_kernels.size() + absorbing_kernels_stack.size());
+            // Push the absorbing kernels if |active_qubits| is not empty.
+            for (auto &absorbing_kernel : absorbing_kernels_stack) {
+              if (!absorbing_kernel.active_qubits.empty()) {
+                new_status.absorbing_kernels.push_back(absorbing_kernel);
+              }
+            }
             // Sort the absorbing sets in ascending order.
-            std::sort(
-                new_status.absorbing_qubits.begin(),
-                new_status.absorbing_qubits.end(),
-                [](auto &s1, auto &s2) { return s1.first[0] < s2.first[0]; });
+            std::sort(new_status.absorbing_kernels.begin(),
+                      new_status.absorbing_kernels.end());
             new_status.compute_hash();
             update_f(f_next, new_status, new_cost, local_schedule);
           } else {
@@ -902,121 +926,157 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
             // Try to merge the "touching set" with the current gate first.
             bool merging_is_always_better = false;
             if (current_status
-                    .sets[intersect_kernel_indices[touching_set_index]]
-                    .second == current_gate_kernel_type) {
+                    .open_kernels[intersect_kernel_indices[touching_set_index]]
+                    .tp == current_gate_kernel.tp) {
               // We only merge kernels of the same type.
               auto new_gate_kernel = current_gate_kernel;
+              // We update the |touching_qubits| for |current_gate_kernel| here.
               for (auto &index :
                    current_status
-                       .sets[intersect_kernel_indices[touching_set_index]]
-                       .first) {
-                if (!current_index[index]) {
-                  new_gate_kernel.push_back(index);
+                       .open_kernels
+                           [intersect_kernel_indices[touching_set_index]]
+                       .active_qubits) {
+                if (!current_target_index[index]) {
+                  new_gate_kernel.active_qubits.push_back(index);
+                  auto index_pos =
+                      std::find(new_gate_kernel.touching_qubits.begin(),
+                                new_gate_kernel.touching_qubits.end(), index);
+                  if (index_pos != new_gate_kernel.touching_qubits.end()) {
+                    // Remove this active qubit from |touching_qubits|.
+                    new_gate_kernel.touching_qubits.erase(index_pos);
+                  }
                 }
               }
-              if (new_gate_kernel.size() == current_gate_kernel.size()) {
+              for (auto &index :
+                   current_status
+                       .open_kernels
+                           [intersect_kernel_indices[touching_set_index]]
+                       .touching_qubits) {
+                if (!current_index[index]) {
+                  if (std::find(new_gate_kernel.active_qubits.begin(),
+                                new_gate_kernel.active_qubits.end(),
+                                index) == new_gate_kernel.active_qubits.end()) {
+                    if (std::find(new_gate_kernel.touching_qubits.begin(),
+                                  new_gate_kernel.touching_qubits.end(),
+                                  index) ==
+                        new_gate_kernel.touching_qubits.end()) {
+                      // Only add to |touching_qubits| if it doesn't exist in
+                      // |active_qubits| or |touching_qubits|.
+                      new_gate_kernel.touching_qubits.push_back(index);
+                    }
+                  }
+                }
+              }
+              if (new_gate_kernel.active_qubits.size() ==
+                  current_gate_kernel.active_qubits.size()) {
                 // An optimization: if we merge a kernel with the current gate
-                // and the size remain unchanged, we always want to merge the
-                // kernel with the current gate.
+                // and the size of active qubits remain unchanged, we always
+                // want to merge the kernel with the current gate.
                 merging_is_always_better = true;
               }
-              assert(current_gate_kernel_type == KernelType::fusion ||
-                     current_gate_kernel_type == KernelType::shared_memory);
+              assert(current_gate_kernel.tp == KernelType::fusion ||
+                     current_gate_kernel.tp == KernelType::shared_memory);
               bool kernel_size_ok = false;
-              if (current_gate_kernel_type == KernelType::fusion) {
-                kernel_size_ok =
-                    new_gate_kernel.size() <= max_fusion_kernel_size;
+              if (current_gate_kernel.tp == KernelType::fusion) {
+                assert(new_gate_kernel.touching_qubits.empty());
+                kernel_size_ok = new_gate_kernel.active_qubits.size() <=
+                                 max_fusion_kernel_size;
               } else {
-                if (new_gate_kernel.size() <= shared_memory_kernel_size) {
+                if (new_gate_kernel.active_qubits.size() <=
+                    shared_memory_kernel_size) {
                   kernel_size_ok = true;
                 } else {
                   // Check cacheline qubits.
                   int num_cacheline_qubits = 0;
-                  for (const auto &qubit : new_gate_kernel) {
+                  for (const auto &qubit : new_gate_kernel.active_qubits) {
                     if (is_shared_memory_cacheline_qubit[qubit]) {
                       num_cacheline_qubits++;
                     }
                   }
-                  kernel_size_ok =
-                      new_gate_kernel.size() - num_cacheline_qubits <=
-                      shared_memory_kernel_size;
+                  kernel_size_ok = new_gate_kernel.active_qubits.size() -
+                                       num_cacheline_qubits <=
+                                   shared_memory_kernel_size;
                 }
               }
               if (kernel_size_ok) {
-                std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
+                std::sort(new_gate_kernel.active_qubits.begin(),
+                          new_gate_kernel.active_qubits.end());
+                std::sort(new_gate_kernel.touching_qubits.begin(),
+                          new_gate_kernel.touching_qubits.end());
                 // If we merge a kernel with the current gate, we do not need
                 // to search for other kernels to merge together.
-                this_ref(this_ref, new_gate_kernel, current_gate_kernel_type,
-                         /*current_merging_kernel=*/std::vector<int>(),
-                         /*current_merging_kernel_type=*/KernelType(), new_cost,
+                // So the |kernel_index| is |num_kernels| instead of 0.
+                this_ref(this_ref, new_gate_kernel,
+                         /*current_merging_kernel=*/KernelInDP(), new_cost,
                          touching_set_index,
                          /*kernel_index=*/num_kernels);
               }
             }
             if (!merging_is_always_better) {
               // Try to not merge the "touching set" with the current gate.
-              this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
+              this_ref(this_ref, current_gate_kernel,
                        /*current_merging_kernel=*/
-                       current_status
-                           .sets[intersect_kernel_indices[touching_set_index]]
-                           .first,
-                       /*current_merging_kernel_type=*/
-                       current_status
-                           .sets[intersect_kernel_indices[touching_set_index]]
-                           .second,
+                       current_status.open_kernels
+                           [intersect_kernel_indices[touching_set_index]],
                        new_cost, touching_set_index, /*kernel_index=*/0);
             }
           }
-          if (!current_merging_kernel.empty()) {
+          if (!current_merging_kernel.active_qubits.empty() ||
+              !current_merging_kernel.touching_qubits.empty()) {
             // Restore the merged kernel stack.
-            local_schedule.sets.pop_back();
-            absorbing_sets_stack.pop_back();
+            local_schedule.kernels.pop_back();
+            absorbing_kernels_stack.pop_back();
           }
           return;
         }
         // We can always try not to merge with this kernel.
-        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
-                 current_merging_kernel, current_merging_kernel_type, cost,
+        this_ref(this_ref, current_gate_kernel, current_merging_kernel, cost,
                  touching_set_index, kernel_index + 1);
         if (kernel_merged[kernel_index]) {
           // This kernel is already considered. Continue to the next one.
           return;
         }
-        if (current_status.sets[kernel_index].second !=
-            current_merging_kernel_type) {
+        if (current_status.open_kernels[kernel_index].tp !=
+            current_merging_kernel.tp) {
           // We don't merge kernels with different types.
           return;
         }
-        assert(current_merging_kernel_type == KernelType::fusion ||
-               current_merging_kernel_type == KernelType::shared_memory);
+        assert(current_merging_kernel.tp == KernelType::fusion ||
+               current_merging_kernel.tp == KernelType::shared_memory);
         bool kernel_size_ok = false;
-        if (current_merging_kernel_type == KernelType::fusion) {
-          kernel_size_ok = current_merging_kernel.size() +
-                               current_status.sets[kernel_index].first.size() <=
+        if (current_merging_kernel.tp == KernelType::fusion) {
+          assert(current_merging_kernel.touching_qubits.empty());
+          assert(current_status.open_kernels[kernel_index]
+                     .touching_qubits.empty());
+          kernel_size_ok = current_merging_kernel.active_qubits.size() +
+                               current_status.open_kernels[kernel_index]
+                                   .active_qubits.size() <=
                            max_fusion_kernel_size;
         } else {
-          if (current_merging_kernel.size() +
-                  current_status.sets[kernel_index].first.size() <=
+          if (current_merging_kernel.active_qubits.size() +
+                  current_status.open_kernels[kernel_index]
+                      .active_qubits.size() <=
               shared_memory_kernel_size) {
             kernel_size_ok = true;
           } else {
             // Check cacheline qubits.
             int num_cacheline_qubits = 0;
-            for (const auto &qubit : current_merging_kernel) {
+            for (const auto &qubit : current_merging_kernel.active_qubits) {
               if (is_shared_memory_cacheline_qubit[qubit]) {
                 num_cacheline_qubits++;
               }
             }
-            for (const auto &qubit : current_status.sets[kernel_index].first) {
+            for (const auto &qubit :
+                 current_status.open_kernels[kernel_index].active_qubits) {
               if (is_shared_memory_cacheline_qubit[qubit]) {
                 num_cacheline_qubits++;
               }
             }
-            kernel_size_ok =
-                current_merging_kernel.size() +
-                    current_status.sets[kernel_index].first.size() -
-                    num_cacheline_qubits <=
-                shared_memory_kernel_size;
+            kernel_size_ok = current_merging_kernel.active_qubits.size() +
+                                 current_status.open_kernels[kernel_index]
+                                     .active_qubits.size() -
+                                 num_cacheline_qubits <=
+                             shared_memory_kernel_size;
           }
         }
         if (!kernel_size_ok) {
@@ -1026,14 +1086,19 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
         // Merge this kernel.
         auto new_merging_kernel = current_merging_kernel;
-        new_merging_kernel.insert(
-            new_merging_kernel.end(),
-            current_status.sets[kernel_index].first.begin(),
-            current_status.sets[kernel_index].first.end());
+        new_merging_kernel.active_qubits.insert(
+            new_merging_kernel.active_qubits.end(),
+            current_status.open_kernels[kernel_index].active_qubits.begin(),
+            current_status.open_kernels[kernel_index].active_qubits.end());
+        // We only record the set of |touching_qubits| and remove duplicates
+        // later.
+        new_merging_kernel.touching_qubits.insert(
+            new_merging_kernel.touching_qubits.end(),
+            current_status.open_kernels[kernel_index].touching_qubits.begin(),
+            current_status.open_kernels[kernel_index].touching_qubits.end());
         kernel_merged[kernel_index] = true;
         // Continue the search.
-        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
-                 new_merging_kernel, current_merging_kernel_type, cost,
+        this_ref(this_ref, current_gate_kernel, new_merging_kernel, cost,
                  touching_set_index, kernel_index + 1);
         // Restore the |kernel_merged| status.
         kernel_merged[kernel_index] = false;
@@ -1042,17 +1107,15 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       // kernel_index=num_kernels, so that we can decide whether to merge the
       // first "touching set" with the current gate or not inside the search.
       search_merging_kernels(
-          search_merging_kernels, /*current_gate_kernel=*/current_indices,
-          /*current_gate_kernel_type=*/KernelType::fusion,
-          /*current_merging_kernel=*/std::vector<int>(),
-          /*current_merging_kernel_type=*/KernelType(), /*cost=*/current_cost,
+          search_merging_kernels,
+          /*current_gate_kernel=*/current_single_gate_fusion_kernel,
+          /*current_merging_kernel=*/KernelInDP(), /*cost=*/current_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
       // For shared-memory kernels, we account for the gate cost now.
       search_merging_kernels(
-          search_merging_kernels, /*current_gate_kernel=*/current_indices,
-          /*current_gate_kernel_type=*/KernelType::shared_memory,
-          /*current_merging_kernel=*/std::vector<int>(),
-          /*current_merging_kernel_type=*/KernelType(),
+          search_merging_kernels,
+          /*current_gate_kernel=*/current_single_gate_shared_memory_kernel,
+          /*current_merging_kernel=*/KernelInDP(),
           /*cost=*/current_cost + current_gate_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
@@ -1071,8 +1134,8 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   for (auto &it : f[num_gates & 1]) {
     // Compute the end schedule and get the one with minimal total cost.
     KernelCostType cost;
-    std::vector<std::pair<std::vector<int>, KernelType>> end_schedule;
-    compute_end_schedule(kernel_cost, it.first.sets,
+    std::vector<KernelInDP> end_schedule;
+    compute_end_schedule(kernel_cost, it.first.open_kernels,
                          is_shared_memory_cacheline_qubit, cost, &end_schedule);
     if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;

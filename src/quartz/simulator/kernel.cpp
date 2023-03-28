@@ -60,6 +60,10 @@ bool KernelInDP::operator==(const KernelInDP &b) const {
   return true;
 }
 
+bool KernelInDP::operator<(const KernelInDP &b) const {
+  return active_qubits[0] < b.active_qubits[0];
+}
+
 std::string KernelInDP::to_string() const {
   std::string result;
   result += kernel_type_name(tp);

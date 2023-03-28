@@ -464,23 +464,52 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
         for (const auto &idx : context->get_supported_quantum_gates()) {
           Gate *gate = context->get_gate(idx);
           if (gate->get_num_qubits() == 2) {
-            assert(gate->get_num_parameters() == 0);
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
-            assert(ret);
-            try_to_add_to_result(dag);
-            ret = dag->remove_last_gate();
-            assert(ret);
-            if (!gate->is_commutative()) {
-              std::swap(qubit_indices[0], qubit_indices[1]);
-              ret = dag->add_gate(qubit_indices, parameter_indices, gate,
-                                  nullptr);
-              assert(ret);
-              try_to_add_to_result(dag);
-              ret = dag->remove_last_gate();
-              assert(ret);
-              std::swap(qubit_indices[0], qubit_indices[1]);
-            }
+            auto search_parameters =
+                [&](int num_remaining_parameters,
+                    const InputParamMaskType &current_usage_mask, auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+                  if (num_remaining_parameters == 0) {
+                    bool ret = dag->add_gate(qubit_indices, parameter_indices,
+                                             gate, nullptr);
+                    assert(ret);
+                    try_to_add_to_result(dag);
+                    ret = dag->remove_last_gate();
+                    assert(ret);
+                    if (!gate->is_commutative()) {
+                      std::swap(qubit_indices[0], qubit_indices[1]);
+                      ret = dag->add_gate(qubit_indices, parameter_indices,
+                                          gate, nullptr);
+                      assert(ret);
+                      try_to_add_to_result(dag);
+                      ret = dag->remove_last_gate();
+                      assert(ret);
+                      std::swap(qubit_indices[0], qubit_indices[1]);
+                    }
+                    return;
+                  }
+
+                  for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+                    if (unique_parameters) {
+                      if (current_usage_mask & input_param_masks[p1]) {
+                        // p1 contains an already used input parameter.
+                        continue;
+                      }
+                      parameter_indices.push_back(p1);
+                      search_parameters_ref(num_remaining_parameters - 1,
+                                            current_usage_mask |
+                                                input_param_masks[p1],
+                                            search_parameters_ref);
+                      parameter_indices.pop_back();
+                    } else {
+                      parameter_indices.push_back(p1);
+                      search_parameters_ref(num_remaining_parameters - 1,
+                                            /*unused*/ 0,
+                                            search_parameters_ref);
+                      parameter_indices.pop_back();
+                    }
+                  }
+                };
+            search_parameters(gate->get_num_parameters(),
+                              input_param_usage_mask, search_parameters);
           }
         }
         qubit_indices.pop_back();

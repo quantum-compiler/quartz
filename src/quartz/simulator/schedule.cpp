@@ -1137,29 +1137,34 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     std::vector<KernelInDP> end_schedule;
     compute_end_schedule(kernel_cost, it.first.open_kernels,
                          is_shared_memory_cacheline_qubit, cost, &end_schedule);
-    if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
+    if (result_schedule.kernels.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;
       result_schedule = it.second.second;
-      result_schedule.sets.insert(result_schedule.sets.end(),
-                                  end_schedule.begin(), end_schedule.end());
+      result_schedule.kernels.insert(result_schedule.kernels.end(),
+                                     end_schedule.begin(), end_schedule.end());
     }
   }
-  if (result_schedule.sets.empty()) {
+  if (result_schedule.kernels.empty()) {
     // All gates in this schedule are global.
     // We need to create an empty kernel for them.
-    result_schedule.sets.emplace_back(std::vector<int>(), KernelType::fusion);
+    result_schedule.kernels.emplace_back(std::vector<int>(), std::vector<int>(),
+                                         KernelType::fusion);
   }
   // Translate the |result_schedule| into |kernels|.
-  kernels.reserve(result_schedule.sets.size());
+  kernels.reserve(result_schedule.kernels.size());
   std::vector<bool> executed(num_gates, false);
   cost_ = min_cost;
   int start_gate_index = 0; // an optimization
-  for (auto &s : result_schedule.sets) {
+  for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
     CircuitSeq current_seq(num_qubits, sequence_.get_num_input_parameters());
-    std::vector<bool> local_in_kernel(num_qubits, false);
-    for (auto &index : s.first) {
-      local_in_kernel[index] = true;
+    std::vector<bool> active_in_kernel(num_qubits, false);
+    for (auto &index : s.active_qubits) {
+      active_in_kernel[index] = true;
+    }
+    std::vector<bool> touched_in_kernel(num_qubits, false);
+    for (auto &index : s.touching_qubits) {
+      touched_in_kernel[index] = true;
     }
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
@@ -1180,13 +1185,17 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           num_remaining_control_qubits--;
           // We do not care about global qubits, but we need the local qubit to
           // be active in this kernel.
-          if (is_local_qubit(wire->index) && !local_in_kernel[wire->index]) {
+          if (is_local_qubit(wire->index) && !active_in_kernel[wire->index]) {
             // One exception is when the kernel is shared-memory, we only
             // need the target qubits in controlled gates to be active; we
             // don't need any qubits to be active in diagonal gates.
-            if (!(s.second == KernelType::shared_memory &&
+            // Although we could execute all gates satisfying this, we do not
+            // execute gates with control qubits being an untouched non-active
+            // local qubit because the DP suggests executing it elsewhere.
+            if (!(s.tp == KernelType::shared_memory &&
                   (num_remaining_control_qubits >= 0 ||
-                   sequence_.gates[i]->gate->is_diagonal()))) {
+                   sequence_.gates[i]->gate->is_diagonal()) &&
+                  touched_in_kernel[wire->index])) {
               executable = false;
               break;
             }
@@ -1198,15 +1207,24 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         executed[i] = true;
         current_seq.add_gate(sequence_.gates[i].get());
       } else {
-        // Block the qubits.
-        for (auto &wire : sequence_.gates[i]->input_wires) {
-          if (wire->is_qubit()) {
-            qubit_blocked[wire->index] = true;
+        // Block the non-control qubits if the gate is not a symmetric
+        // controlled gate.
+        if (sequence_.gates[i]->gate->get_num_control_qubits() == 0 ||
+            !sequence_.gates[i]->gate->is_symmetric()) {
+          num_remaining_control_qubits =
+              sequence_.gates[i]->gate->get_num_control_qubits();
+          for (auto &wire : sequence_.gates[i]->input_wires) {
+            if (wire->is_qubit()) {
+              num_remaining_control_qubits--;
+              if (num_remaining_control_qubits < 0) {
+                qubit_blocked[wire->index] = true;
+              }
+            }
           }
         }
       }
     }
-    kernels.emplace_back(current_seq, s.first, s.second);
+    kernels.emplace_back(current_seq, s.active_qubits, s.tp);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }

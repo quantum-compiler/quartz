@@ -9,6 +9,30 @@ quartz_parser: quartz.PyQASMParser
 has_parameterized_gate: bool
 
 
+def ibm_add_xfer(context: quartz.QuartzContext):
+    equivalent_circ_pairs = [
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(pi) q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(pi) q[0]; sx q[0];',
+        ),
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(pi/2) q[0]; sx q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(pi/2) q[0]; sx q[0]; rz(pi/2) q[0];',
+        ),
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(3*pi/2) q[0]; sx q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(3*pi/2) q[0]; sx q[0]; rz(3*pi/2) q[0];',
+        ),
+    ]
+
+    for circ_pair in equivalent_circ_pairs:
+        print(circ_pair)
+        context.add_xfer_from_qasm_str(src_str=circ_pair[0], dst_str=circ_pair[1])
+        context.add_xfer_from_qasm_str(src_str=circ_pair[1], dst_str=circ_pair[0])
+
+    return context
+
+
 def init_quartz_context(
     gate_set: List[str],
     ecc_file_path: str,
@@ -26,6 +50,8 @@ def init_quartz_context(
     )
     quartz_parser = quartz.PyQASMParser(context=quartz_context)
     has_parameterized_gate = quartz_context.has_parameterized_gate()
+    if 'ibm_325_ecc' in ecc_file_path:
+        quartz_context = ibm_add_xfer(quartz_context)
 
 
 def qasm_to_graph_th_dag(qasm_str: str) -> quartz.PyGraph:

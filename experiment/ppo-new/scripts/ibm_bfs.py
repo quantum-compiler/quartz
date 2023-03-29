@@ -8,6 +8,30 @@ import wandb
 import quartz
 
 
+def ibm_add_xfer(context: quartz.QuartzContext):
+    equivalent_circ_pairs = [
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(pi) q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(pi) q[0]; sx q[0];',
+        ),
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(pi/2) q[0]; sx q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(pi/2) q[0]; sx q[0]; rz(pi/2) q[0];',
+        ),
+        (
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; sx q[0]; rz(3*pi/2) q[0]; sx q[0];',
+            'OpenQASM 2.0; include "qelib1.inc"; qreg q[1]; rz(3*pi/2) q[0]; sx q[0]; rz(3*pi/2) q[0];',
+        ),
+    ]
+
+    for circ_pair in equivalent_circ_pairs:
+        print(circ_pair)
+        context.add_xfer_from_qasm_str(src_str=circ_pair[0], dst_str=circ_pair[1])
+        context.add_xfer_from_qasm_str(src_str=circ_pair[1], dst_str=circ_pair[0])
+
+    return context
+
+
 def optimize(
     context: quartz.QuartzContext,
     init_circ: quartz.PyGraph,
@@ -16,6 +40,7 @@ def optimize(
     print_message: bool = True,
     max_candidate_len: int = 1_000_000,
     timeout: int = 86400,
+    output_dir: str = 'bfs_outputs',
 ) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.gate_count, init_circ)]
     hash_set = set([init_circ.hash()])
@@ -96,6 +121,12 @@ def optimize(
                         best_circ = new_circ
                         print(f"[{circ_name}] better circuit is found!", flush=True)
                         print_and_log()
+                        # save circuits
+                        os.makedirs(f'{output_dir}/{circ_name}', exist_ok=True)
+                        circ_file = f'{output_dir}/{circ_name}/{best_gate_cnt}_{int(time.time() - t_start)}.qasm'
+                        with open(circ_file, 'w') as f:
+                            f.write(best_circ.to_qasm_str())
+                        print(f'[{circ_name}] wrote {circ_file} .', flush=True)
 
     return best_gate_cnt, best_circ
 
@@ -110,11 +141,19 @@ if __name__ == '__main__':
         wandb_mode = sys.argv[3]
 
     context = quartz.QuartzContext(
-        gate_set=['x', 'cx', 'sx', 'rz', 'add'],
-        filename='../ecc_set/ibm_3_2_5_ecc.json',
+        gate_set=[
+            'x',
+            'cx',
+            'sx',
+            'rz',
+            'add',
+            'neg',
+        ],
+        filename='../ecc_set/ibm_325_ecc.json',
         no_increase=False,
         include_nop=True,
     )
+    context = ibm_add_xfer(context)
     circ = quartz.PyGraph.from_qasm(
         context=context, filename=f"../circs/ibm_circs/{circ_name}.qasm"
     )
@@ -127,7 +166,13 @@ if __name__ == '__main__':
     )
 
     best_gate_cnt, best_circ = optimize(
-        context, circ, circ_name, max_candidate_len=2000, timeout=6 * 3600
+        context,
+        circ,
+        circ_name,
+        max_candidate_len=2000,
+        timeout=6 * 3600,
+        upper_limit=1.0001,
+        output_dir=output_dir,
     )
 
     os.makedirs(output_dir, exist_ok=True)

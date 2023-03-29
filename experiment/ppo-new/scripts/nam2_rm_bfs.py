@@ -96,6 +96,12 @@ def optimize(
                         best_circ = new_circ
                         print(f"[{circ_name}] better circuit is found!", flush=True)
                         print_and_log()
+                        # save circuits
+                        os.makedirs(circ_name, exist_ok=True)
+                        circ_file = f'{circ_name}/{best_gate_cnt}_{int(time.time() - t_start)}.qasm'
+                        with open(circ_file, 'w') as f:
+                            f.write(best_circ.to_qasm_str())
+                        print(f'[{circ_name}] wrote {circ_file} .', flush=True)
 
     return best_gate_cnt, best_circ
 
@@ -134,7 +140,12 @@ if __name__ == '__main__':
     )
 
     best_gate_cnt, best_circ = optimize(
-        context, circ, circ_name, max_candidate_len=2000, timeout=6 * 3600
+        context,
+        circ,
+        circ_name,
+        max_candidate_len=2000,
+        timeout=6 * 3600,
+        upper_limit=1.0001,
     )
 
     os.makedirs(output_dir, exist_ok=True)

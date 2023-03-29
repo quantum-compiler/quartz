@@ -16,6 +16,7 @@ def optimize(
     print_message: bool = True,
     max_candidate_len: int = 1_000_000,
     timeout: int = 86400,
+    output_dir: str = 'bfs_outputs',
 ) -> tuple[int, quartz.PyGraph]:
     candidate = [(init_circ.gate_count, init_circ)]
     hash_set = set([init_circ.hash()])
@@ -97,8 +98,8 @@ def optimize(
                         print(f"[{circ_name}] better circuit is found!", flush=True)
                         print_and_log()
                         # save circuits
-                        os.makedirs(circ_name, exist_ok=True)
-                        circ_file = f'{circ_name}/{best_gate_cnt}_{int(time.time() - t_start)}.qasm'
+                        os.makedirs(f'{output_dir}/{circ_name}', exist_ok=True)
+                        circ_file = f'{output_dir}/{circ_name}/{best_gate_cnt}_{int(time.time() - t_start)}.qasm'
                         with open(circ_file, 'w') as f:
                             f.write(best_circ.to_qasm_str())
                         print(f'[{circ_name}] wrote {circ_file} .', flush=True)
@@ -146,6 +147,7 @@ if __name__ == '__main__':
         max_candidate_len=2000,
         timeout=6 * 3600,
         upper_limit=1.0001,
+        output_dir=output_dir,
     )
 
     os.makedirs(output_dir, exist_ok=True)

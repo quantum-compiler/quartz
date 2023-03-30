@@ -1,5 +1,7 @@
 #include "kernel.h"
 
+#include <cassert>
+
 namespace quartz {
 std::string kernel_type_name(KernelType tp) {
   switch (tp) {
@@ -61,7 +63,21 @@ bool KernelInDP::operator==(const KernelInDP &b) const {
 }
 
 bool KernelInDP::operator<(const KernelInDP &b) const {
-  return active_qubits[0] < b.active_qubits[0];
+  // Put all kernels with non-empty |active_qubits| at the beginning.
+  if (!active_qubits.empty() && !b.active_qubits.empty()) {
+    // And sort them in ascending order of the first active qubit.
+    return active_qubits[0] < b.active_qubits[0];
+  } else if (active_qubits.empty() != b.active_qubits.empty()) {
+    // If this |active_qubits| is not empty, this is smaller.
+    return b.active_qubits.empty();
+  } else {
+    // Assume we don't have kernels with empty |active_qubits| and empty
+    // |touching_qubits|.
+    assert(!touching_qubits.empty() && !b.touching_qubits.empty());
+    // Sort kernels with empty |active_qubits| in ascending order of the first
+    // touching qubit.
+    return touching_qubits[0] < b.touching_qubits[0];
+  }
 }
 
 std::string KernelInDP::to_string() const {

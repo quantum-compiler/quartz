@@ -465,7 +465,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           }
         }
       };
-  constexpr bool debug = true;
+  constexpr bool debug = false;
   if (debug) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
@@ -1312,7 +1312,7 @@ get_schedules(const CircuitSeq &sequence,
   std::deque<std::vector<bool>> have_dense_single_qubit_gate;
 
   if (debug) {
-    std::cout << "get_schedules for " << sequence.to_string() << std::endl;
+    std::cout << "get_schedules for " << sequence.to_string(true) << std::endl;
   }
 
   for (auto &local_qubit : local_qubits) {
@@ -1495,8 +1495,9 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    result.emplace_back(current_seq, current_local_qubit_layout,
-                        current_global_qubit_layout, ctx);
+    result.emplace_back(
+        current_seq, current_local_qubit_layout, current_global_qubit_layout,
+        kernel_cost.get_shared_memory_num_cacheline_qubits(), ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
@@ -1544,15 +1545,24 @@ get_schedules(const CircuitSeq &sequence,
         for (int k = 0; k < (int)single_qubit_gate_to_execute.size(); k++) {
           int index = single_qubit_gate_to_execute[k];
           bool executable = true;
+          int control_qubit_count =
+              sequence.gates[index]->gate->get_num_control_qubits();
           for (auto &wire : sequence.gates[index]->input_wires) {
             if (wire->is_qubit()) {
+              control_qubit_count--;
               if (schedule.is_local_qubit(wire->index)) {
-                if (!current_kernel_qubits[wire->index]) {
+                if (control_qubit_count < 0 &&
+                    !current_kernel_qubits[wire->index] &&
+                    !(schedule.kernels[i].type == KernelType::shared_memory &&
+                      sequence.gates[index]->gate->is_diagonal())) {
                   executable = false; // not local in this kernel
                   break;
                 }
               } else {
-                if (!sequence.gates[index]->gate->is_sparse()) {
+                if (control_qubit_count < 0 &&
+                    (sequence.gates[index]->gate->get_num_qubits() == 1
+                         ? !sequence.gates[index]->gate->is_sparse()
+                         : !sequence.gates[index]->gate->is_diagonal())) {
                   executable = false; // not executable globally
                   break;
                 }
@@ -1591,7 +1601,12 @@ get_schedules(const CircuitSeq &sequence,
           // We can execute dense single-qubit gates on these qubits.
           have_dense_single_qubit_gate.front()[qubit] = false;
         }
+      }
 
+      for (int i = 0; i < schedule.get_num_kernels(); i++) {
+        // TODO: For shared-memory kernels with the number of qubits not the
+        //  maximum, we want to execute some dense single-qubit gates here
+        //  (this optimization is not implemented yet).
         try_to_execute_single_qubit_gates(i, 0);
 
         // Purposely using |schedule.kernels[i].gates.gates.size()| because we
@@ -1638,17 +1653,46 @@ get_schedules(const CircuitSeq &sequence,
             /*qubits=*/std::vector<int>(), /*type=*/KernelType::shared_memory);
         int remaining_free_qubits =
             kernel_cost.get_shared_memory_num_free_qubits();
-        for (int j = 0; j < num_qubits; j++) {
-          if (have_dense_single_qubit_gate.front()[j]) {
-            if (!schedule.is_shared_memory_cacheline_qubit(j)) {
+        for (int index = 0; index < num_qubits; index++) {
+          if (have_dense_single_qubit_gate.front()[index]) {
+            if (!schedule.is_shared_memory_cacheline_qubit(index)) {
               if (!remaining_free_qubits) {
-                // TODO
+                // We cannot put qubit |index| into this kernel.
+                // Close this kernel now.
+                try_to_execute_single_qubit_gates(
+                    (int)schedule.kernels.size() - 1, 0);
+                // Then we execute the gates in this kernel.
+                for (int j = 0;
+                     j < (int)schedule.kernels.back().gates.gates.size(); j++) {
+                  auto &gate = schedule.kernels.back().gates.gates[j];
+                  auto &gate_indices_queue = gate_indices[gate->to_string()];
+                  assert(!gate_indices_queue.empty());
+
+                  // We execute the gate now.
+                  const int original_index = gate_indices_queue.front();
+                  for (auto &next_single_qubit_gate :
+                       next_single_qubit_gates[original_index]) {
+                    single_qubit_gate_indices[next_single_qubit_gate]
+                        .second.erase(original_index);
+                    if (single_qubit_gate_indices[next_single_qubit_gate]
+                            .second.empty()) {
+                      single_qubit_gate_to_execute.push_back(
+                          single_qubit_gate_indices[next_single_qubit_gate]
+                              .first);
+                      // Insert the gate after this gate.
+                      try_to_execute_single_qubit_gates(
+                          (int)schedule.kernels.size() - 1, j + 1);
+                    }
+                  }
+                  gate_indices_queue.pop();
+                }
                 break;
               }
               remaining_free_qubits--;
             }
-            have_dense_single_qubit_gate.front()[j] = false;
-            schedule.kernels.back().qubits.push_back(j);
+            num_leftover_dense_single_qubit_gates--;
+            have_dense_single_qubit_gate.front()[index] = false;
+            schedule.kernels.back().qubits.push_back(index);
           }
         }
       }

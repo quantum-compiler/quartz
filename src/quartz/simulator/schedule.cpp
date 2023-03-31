@@ -1651,6 +1651,7 @@ get_schedules(const CircuitSeq &sequence,
             /*gates=*/CircuitSeq(num_qubits,
                                  sequence.get_num_input_parameters()),
             /*qubits=*/std::vector<int>(), /*type=*/KernelType::shared_memory);
+        schedule.cost_ += kernel_cost.get_shared_memory_init_cost();
         int remaining_free_qubits =
             kernel_cost.get_shared_memory_num_free_qubits();
         for (int index = 0; index < num_qubits; index++) {

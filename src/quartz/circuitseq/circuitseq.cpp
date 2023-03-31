@@ -930,8 +930,8 @@ std::string CircuitSeq::to_string(bool line_number) const {
     if (line_number) {
       char buffer[20]; // enough to store any int
       int max_line_number_width =
-          std::max(1, (int)std::floor(std::log10(num_gates - 0.01)));
-      sprintf(buffer, "% *d", max_line_number_width, i);
+          std::max(1, (int)std::ceil(std::log10(num_gates - 0.01)));
+      sprintf(buffer, "%*d", max_line_number_width, i);
       result += std::string(buffer) + ": ";
     } else {
       result += "  ";

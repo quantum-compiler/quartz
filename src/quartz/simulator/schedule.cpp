@@ -1659,34 +1659,6 @@ get_schedules(const CircuitSeq &sequence,
             if (!schedule.is_shared_memory_cacheline_qubit(index)) {
               if (!remaining_free_qubits) {
                 // We cannot put qubit |index| into this kernel.
-                // Close this kernel now.
-                try_to_execute_single_qubit_gates(
-                    (int)schedule.kernels.size() - 1, 0);
-                // Then we execute the gates in this kernel.
-                for (int j = 0;
-                     j < (int)schedule.kernels.back().gates.gates.size(); j++) {
-                  auto &gate = schedule.kernels.back().gates.gates[j];
-                  auto &gate_indices_queue = gate_indices[gate->to_string()];
-                  assert(!gate_indices_queue.empty());
-
-                  // We execute the gate now.
-                  const int original_index = gate_indices_queue.front();
-                  for (auto &next_single_qubit_gate :
-                       next_single_qubit_gates[original_index]) {
-                    single_qubit_gate_indices[next_single_qubit_gate]
-                        .second.erase(original_index);
-                    if (single_qubit_gate_indices[next_single_qubit_gate]
-                            .second.empty()) {
-                      single_qubit_gate_to_execute.push_back(
-                          single_qubit_gate_indices[next_single_qubit_gate]
-                              .first);
-                      // Insert the gate after this gate.
-                      try_to_execute_single_qubit_gates(
-                          (int)schedule.kernels.size() - 1, j + 1);
-                    }
-                  }
-                  gate_indices_queue.pop();
-                }
                 break;
               }
               remaining_free_qubits--;
@@ -1695,6 +1667,34 @@ get_schedules(const CircuitSeq &sequence,
             have_dense_single_qubit_gate.front()[index] = false;
             schedule.kernels.back().qubits.push_back(index);
           }
+        }
+        // Close this kernel now.
+        try_to_execute_single_qubit_gates(
+            (int)schedule.kernels.size() - 1, 0);
+        // Then we execute the gates in this kernel.
+        for (int j = 0;
+             j < (int)schedule.kernels.back().gates.gates.size(); j++) {
+          auto &gate = schedule.kernels.back().gates.gates[j];
+          auto &gate_indices_queue = gate_indices[gate->to_string()];
+          assert(!gate_indices_queue.empty());
+
+          // We execute the gate now.
+          const int original_index = gate_indices_queue.front();
+          for (auto &next_single_qubit_gate :
+               next_single_qubit_gates[original_index]) {
+            single_qubit_gate_indices[next_single_qubit_gate]
+                .second.erase(original_index);
+            if (single_qubit_gate_indices[next_single_qubit_gate]
+                    .second.empty()) {
+              single_qubit_gate_to_execute.push_back(
+                  single_qubit_gate_indices[next_single_qubit_gate]
+                      .first);
+              // Insert the gate after this gate.
+              try_to_execute_single_qubit_gates(
+                  (int)schedule.kernels.size() - 1, j + 1);
+            }
+          }
+          gate_indices_queue.pop();
         }
       }
       have_dense_single_qubit_gate.pop_front();

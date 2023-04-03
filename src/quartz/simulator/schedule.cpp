@@ -1,6 +1,7 @@
 #include "schedule.h"
 #include "quartz/pybind/pybind.h"
 
+#include <deque>
 #include <queue>
 #include <stack>
 #include <unordered_set>
@@ -9,13 +10,19 @@ namespace quartz {
 
 Schedule::Schedule(const CircuitSeq &sequence,
                    const std::vector<int> &local_qubit,
-                   const std::vector<int> &global_qubit, Context *ctx)
+                   const std::vector<int> &global_qubit,
+                   int num_shared_memory_cacheline_qubits, Context *ctx)
     : cost_(), sequence_(sequence), local_qubit_(local_qubit),
       global_qubit_(global_qubit), ctx_(ctx) {
   assert(local_qubit.size() + global_qubit.size() == sequence.get_num_qubits());
+  assert(local_qubit.size() >= num_shared_memory_cacheline_qubits);
   local_qubit_mask_.assign(sequence.get_num_qubits(), false);
-  for (auto &i : local_qubit) {
-    local_qubit_mask_[i] = true;
+  shared_memory_cacheline_qubit_mask_.assign(sequence.get_num_qubits(), false);
+  for (int i = 0; i < (int)local_qubit.size(); i++) {
+    local_qubit_mask_[local_qubit[i]] = true;
+    if (i < num_shared_memory_cacheline_qubits) {
+      shared_memory_cacheline_qubit_mask_[i] = true;
+    }
   }
 }
 
@@ -78,12 +85,14 @@ bool Schedule::is_local_qubit(int index) const {
   return local_qubit_mask_[index];
 }
 
+bool Schedule::is_shared_memory_cacheline_qubit(int index) const {
+  return shared_memory_cacheline_qubit_mask_[index];
+}
+
 bool Schedule::compute_end_schedule(
-    const KernelCost &kernel_cost,
-    const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
-    const std::vector<bool> &is_shared_memory_cacheline_qubit,
+    const KernelCost &kernel_cost, const std::vector<KernelInDP> &kernels,
     KernelCostType &result_cost,
-    std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels) {
+    std::vector<KernelInDP> *result_kernels) const {
   const auto &kernel_costs = kernel_cost.get_fusion_kernel_costs();
   const int num_kernels = (int)kernels.size();
   const int optimal_fusion_kernel_size =
@@ -99,22 +108,23 @@ bool Schedule::compute_end_schedule(
   }
   result_cost = 0;
   for (int i = 0; i < num_kernels; i++) {
-    assert(kernels[i].first.size() > 0);
-    if (kernels[i].second == KernelType::fusion) {
-      if (kernels[i].first.size() >= optimal_fusion_kernel_size) {
+    if (kernels[i].tp == KernelType::fusion) {
+      // Assume all fusion kernels are not empty.
+      assert(!kernels[i].active_qubits.empty());
+      if (kernels[i].active_qubits.size() >= optimal_fusion_kernel_size) {
         // Greedily try to use the optimal kernel size for fusion kernels.
         // Copy the large fusion kernels to the result.
         if (result_kernels != nullptr) {
           result_kernels->emplace_back(kernels[i]);
         }
-        result_cost += kernel_costs[kernels[i].first.size()];
+        result_cost += kernel_costs[kernels[i].active_qubits.size()];
       } else {
-        fusion_kernels_of_size[kernels[i].first.size()].push_back(i);
+        fusion_kernels_of_size[kernels[i].active_qubits.size()].push_back(i);
       }
-    } else if (kernels[i].second == KernelType::shared_memory) {
-      int kernel_size = kernels[i].first.size();
-      for (auto &qubit : kernels[i].first) {
-        if (is_shared_memory_cacheline_qubit[qubit]) {
+    } else if (kernels[i].tp == KernelType::shared_memory) {
+      int kernel_size = (int)kernels[i].active_qubits.size();
+      for (auto &qubit : kernels[i].active_qubits) {
+        if (is_shared_memory_cacheline_qubit(qubit)) {
           // Exclude shared-memory cacheline qubits.
           kernel_size--;
         }
@@ -137,17 +147,23 @@ bool Schedule::compute_end_schedule(
   // Greedily merge the small fusion kernels.
   while (true) {
     bool has_any_remaining_kernel = false;
-    std::vector<int> current_kernel;
+    KernelInDP current_kernel({}, {}, KernelType::fusion);
     int current_kernel_size = 0;
     for (int i = optimal_fusion_kernel_size - 1; i >= 1; i--) {
       while (!fusion_kernels_of_size[i].empty()) {
         if (current_kernel_size + i <= optimal_fusion_kernel_size) {
           // Add a kernel of size i to the current kernel.
           if (result_kernels != nullptr) {
-            current_kernel.insert(
-                current_kernel.end(),
-                kernels[fusion_kernels_of_size[i].back()].first.begin(),
-                kernels[fusion_kernels_of_size[i].back()].first.end());
+            current_kernel.active_qubits.insert(
+                current_kernel.active_qubits.end(),
+                kernels[fusion_kernels_of_size[i].back()].active_qubits.begin(),
+                kernels[fusion_kernels_of_size[i].back()].active_qubits.end());
+            current_kernel.touching_qubits.insert(
+                current_kernel.touching_qubits.end(),
+                kernels[fusion_kernels_of_size[i].back()]
+                    .touching_qubits.begin(),
+                kernels[fusion_kernels_of_size[i].back()]
+                    .touching_qubits.end());
           }
           current_kernel_size += i;
           fusion_kernels_of_size[i].pop_back();
@@ -160,9 +176,12 @@ bool Schedule::compute_end_schedule(
     if (current_kernel_size != 0) {
       result_cost += kernel_costs[current_kernel_size];
       if (result_kernels != nullptr) {
-        std::sort(current_kernel.begin(), current_kernel.end());
-        result_kernels->emplace_back(std::move(current_kernel),
-                                     KernelType::fusion);
+        // Sort active qubits.
+        std::sort(current_kernel.active_qubits.begin(),
+                  current_kernel.active_qubits.end());
+        // Fusion kernels should not have |touching_qubits|.
+        assert(current_kernel.touching_qubits.empty());
+        result_kernels->emplace_back(std::move(current_kernel));
       }
     }
     if (!has_any_remaining_kernel) {
@@ -173,17 +192,25 @@ bool Schedule::compute_end_schedule(
   // Greedily merge the small shared-memory kernels.
   while (true) {
     bool has_any_remaining_kernel = false;
-    std::vector<int> current_kernel;
+    KernelInDP current_kernel({}, {}, KernelType::shared_memory);
     int current_kernel_size = 0;
-    for (int i = max_shared_memory_kernel_size - 1; i >= 1; i--) {
+    for (int i = max_shared_memory_kernel_size - 1; i >= 0; i--) {
       while (!shared_memory_kernels_of_size[i].empty()) {
         if (current_kernel_size + i <= max_shared_memory_kernel_size) {
           // Add a kernel of size i to the current kernel.
           if (result_kernels != nullptr) {
-            current_kernel.insert(
-                current_kernel.end(),
-                kernels[shared_memory_kernels_of_size[i].back()].first.begin(),
-                kernels[shared_memory_kernels_of_size[i].back()].first.end());
+            current_kernel.active_qubits.insert(
+                current_kernel.active_qubits.end(),
+                kernels[shared_memory_kernels_of_size[i].back()]
+                    .active_qubits.begin(),
+                kernels[shared_memory_kernels_of_size[i].back()]
+                    .active_qubits.end());
+            current_kernel.touching_qubits.insert(
+                current_kernel.touching_qubits.end(),
+                kernels[shared_memory_kernels_of_size[i].back()]
+                    .touching_qubits.begin(),
+                kernels[shared_memory_kernels_of_size[i].back()]
+                    .touching_qubits.end());
           }
           current_kernel_size += i;
           shared_memory_kernels_of_size[i].pop_back();
@@ -196,9 +223,32 @@ bool Schedule::compute_end_schedule(
     if (current_kernel_size != 0) {
       result_cost += kernel_cost.get_shared_memory_init_cost();
       if (result_kernels != nullptr) {
-        std::sort(current_kernel.begin(), current_kernel.end());
-        result_kernels->emplace_back(std::move(current_kernel),
-                                     KernelType::shared_memory);
+        // Sort and eliminate duplicate qubits.
+        std::sort(current_kernel.active_qubits.begin(),
+                  current_kernel.active_qubits.end());
+        int num_qubits = 0;
+        for (auto &index : current_kernel.active_qubits) {
+          num_qubits = std::max(num_qubits, index + 1);
+        }
+        for (auto &index : current_kernel.touching_qubits) {
+          num_qubits = std::max(num_qubits, index + 1);
+        }
+        std::vector<bool> in_current_kernel(num_qubits, false);
+        for (auto &index : current_kernel.active_qubits) {
+          in_current_kernel[index] = true;
+        }
+        // Recompute the touching qubits.
+        std::vector<int> new_touching_qubits;
+        for (auto &index : current_kernel.touching_qubits) {
+          if (!in_current_kernel[index]) {
+            new_touching_qubits.push_back(index);
+            in_current_kernel[index] = true;
+          }
+        }
+        current_kernel.touching_qubits = new_touching_qubits;
+        std::sort(current_kernel.touching_qubits.begin(),
+                  current_kernel.touching_qubits.end());
+        result_kernels->emplace_back(std::move(current_kernel));
       }
     }
     if (!has_any_remaining_kernel) {
@@ -223,12 +273,7 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   assert(max_kernel_size >= 2);
   // We have not computed the schedule before.
   assert(kernels.empty());
-  std::vector<bool> is_shared_memory_cacheline_qubit(num_qubits, false);
-  assert(local_qubit_.size() >= shared_memory_cacheline_size);
-  for (int i = 0; i < shared_memory_cacheline_size; i++) {
-    // These are the shared-memory cacheline qubits.
-    is_shared_memory_cacheline_qubit[local_qubit_[i]] = true;
-  }
+  // A state for dynamic programming.
   struct Status {
   public:
     static size_t get_hash(const std::vector<int> &s) {
@@ -239,85 +284,106 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       return result;
     }
     void compute_hash() {
-      // XXX: We are not using |absorbing_qubits| to compute the hash.
+      // XXX: We are not using |absorbing_kernels| to compute the hash.
       // If we decide to use it in the future, we need to search for every
-      // place we modify |absorbing_qubits| and update all places where we
+      // place we modify |absorbing_kernels| and update all places where we
       // update the hash manually.
       hash = 0;
-      for (const auto &s : sets) {
-        hash ^= get_hash(s.first) + (size_t)s.second;
+      for (const auto &s : open_kernels) {
+        hash ^= s.get_hash();
       }
     }
-    void insert_set(const std::vector<int> &s, KernelType tp) {
+    void insert_set(const KernelInDP &kernel) {
       int insert_position = 0;
-      while (insert_position < (int)sets.size() &&
-             sets[insert_position].first[0] < s[0]) {
+      while (insert_position < (int)open_kernels.size() &&
+             open_kernels[insert_position] < kernel) {
         insert_position++;
       }
-      sets.insert(sets.begin() + insert_position, std::make_pair(s, tp));
+      open_kernels.insert(open_kernels.begin() + insert_position, kernel);
     }
     [[nodiscard]] bool check_valid() const {
       std::vector<bool> has_qubit;
-      for (int i = 0; i < (int)sets.size(); i++) {
-        for (int j = 0; j < (int)sets[i].first.size(); j++) {
-          while (sets[i].first[j] >= has_qubit.size()) {
+      for (int i = 0; i < (int)open_kernels.size(); i++) {
+        for (int j = 0; j < (int)open_kernels[i].active_qubits.size(); j++) {
+          while (open_kernels[i].active_qubits[j] >= has_qubit.size()) {
             has_qubit.push_back(false);
           }
-          if (has_qubit[sets[i].first[j]]) {
-            std::cerr << "Invalid status: qubit " << sets[i].first[j]
-                      << " appears twice." << std::endl;
+          if (has_qubit[open_kernels[i].active_qubits[j]]) {
+            std::cerr << "Invalid status: qubit "
+                      << open_kernels[i].active_qubits[j]
+                      << " is active in two open kernels." << std::endl;
             std::cerr << to_string() << std::endl;
             return false;
           }
-          has_qubit[sets[i].first[j]] = true;
+          has_qubit[open_kernels[i].active_qubits[j]] = true;
         }
       }
-      for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
-        for (int j = 0; j < (int)absorbing_qubits[i].first.size(); j++) {
-          while (absorbing_qubits[i].first[j] >= has_qubit.size()) {
+      for (int i = 0; i < (int)absorbing_kernels.size(); i++) {
+        for (int j = 0; j < (int)absorbing_kernels[i].active_qubits.size();
+             j++) {
+          while (absorbing_kernels[i].active_qubits[j] >= has_qubit.size()) {
             has_qubit.push_back(false);
           }
-          if (has_qubit[absorbing_qubits[i].first[j]]) {
+          if (has_qubit[absorbing_kernels[i].active_qubits[j]]) {
             std::cerr << "Invalid status: qubit "
-                      << absorbing_qubits[i].first[j] << " appears twice."
+                      << absorbing_kernels[i].active_qubits[j]
+                      << " is active in two kernels." << std::endl;
+            std::cerr << to_string() << std::endl;
+            return false;
+          }
+          has_qubit[absorbing_kernels[i].active_qubits[j]] = true;
+        }
+      }
+      for (int i = 0; i < (int)open_kernels.size(); i++) {
+        for (int j = 0; j < (int)open_kernels[i].touching_qubits.size(); j++) {
+          while (open_kernels[i].touching_qubits[j] >= has_qubit.size()) {
+            has_qubit.push_back(false);
+          }
+          if (has_qubit[open_kernels[i].touching_qubits[j]]) {
+            std::cerr << "Invalid status: qubit "
+                      << open_kernels[i].touching_qubits[j]
+                      << " is active in one kernel and touching in another "
+                         "open kernel."
                       << std::endl;
             std::cerr << to_string() << std::endl;
             return false;
           }
-          has_qubit[absorbing_qubits[i].first[j]] = true;
+        }
+      }
+      for (int i = 0; i < (int)absorbing_kernels.size(); i++) {
+        for (int j = 0; j < (int)absorbing_kernels[i].touching_qubits.size();
+             j++) {
+          while (absorbing_kernels[i].touching_qubits[j] >= has_qubit.size()) {
+            has_qubit.push_back(false);
+          }
+          if (has_qubit[absorbing_kernels[i].touching_qubits[j]]) {
+            std::cerr << "Invalid status: qubit "
+                      << absorbing_kernels[i].touching_qubits[j]
+                      << " is active in one kernel and touching in another "
+                         "absorbing kernel."
+                      << std::endl;
+            std::cerr << to_string() << std::endl;
+            return false;
+          }
         }
       }
       return true;
     }
     bool operator==(const Status &b) const {
-      if (sets.size() != b.sets.size()) {
+      if (open_kernels.size() != b.open_kernels.size()) {
         return false;
       }
-      for (int i = 0; i < (int)sets.size(); i++) {
-        if (sets[i].first.size() != b.sets[i].first.size()) {
+      for (int i = 0; i < (int)open_kernels.size(); i++) {
+        if (!(open_kernels[i] == b.open_kernels[i])) {
           return false;
-        }
-        if (sets[i].second != b.sets[i].second) {
-          return false;
-        }
-        for (int j = 0; j < (int)sets[i].first.size(); j++) {
-          if (sets[i].first[j] != b.sets[i].first[j]) {
-            return false;
-          }
         }
       }
-      if (absorbing_qubits.size() != b.absorbing_qubits.size()) {
+      if (absorbing_kernels.size() != b.absorbing_kernels.size()) {
         return false;
       }
-      for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
-        if (absorbing_qubits[i].first.size() !=
-            b.absorbing_qubits[i].first.size()) {
+      for (int i = 0; i < (int)absorbing_kernels.size(); i++) {
+        if (!(absorbing_kernels[i] == b.absorbing_kernels[i])) {
           return false;
-        }
-        for (int j = 0; j < (int)absorbing_qubits[i].first.size(); j++) {
-          if (absorbing_qubits[i].first[j] != b.absorbing_qubits[i].first[j]) {
-            return false;
-          }
         }
       }
       return true;
@@ -325,36 +391,20 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     [[nodiscard]] std::string to_string() const {
       std::string result;
       result += "{";
-      for (int i = 0; i < (int)sets.size(); i++) {
-        result += kernel_type_name(sets[i].second);
-        result += "{";
-        for (int j = 0; j < (int)sets[i].first.size(); j++) {
-          result += std::to_string(sets[i].first[j]);
-          if (j != (int)sets[i].first.size() - 1) {
-            result += ", ";
-          }
-        }
-        result += "}";
-        if (i != (int)sets.size() - 1) {
+      for (int i = 0; i < (int)open_kernels.size(); i++) {
+        result += open_kernels[i].to_string();
+        if (i != (int)open_kernels.size() - 1) {
           result += ", ";
         }
       }
-      if (!absorbing_qubits.empty()) {
-        if (!sets.empty()) {
+      if (!absorbing_kernels.empty()) {
+        if (!open_kernels.empty()) {
           result += ", ";
         }
         result += "absorbing {";
-        for (int i = 0; i < (int)absorbing_qubits.size(); i++) {
-          result += kernel_type_name(absorbing_qubits[i].second);
-          result += "{";
-          for (int j = 0; j < (int)absorbing_qubits[i].first.size(); j++) {
-            result += std::to_string(absorbing_qubits[i].first[j]);
-            if (j != (int)absorbing_qubits[i].first.size() - 1) {
-              result += ", ";
-            }
-          }
-          result += "}";
-          if (i != (int)absorbing_qubits.size() - 1) {
+        for (int i = 0; i < (int)absorbing_kernels.size(); i++) {
+          result += absorbing_kernels[i].to_string();
+          if (i != (int)absorbing_kernels.size() - 1) {
             result += ", ";
           }
         }
@@ -363,12 +413,13 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       result += "}";
       return result;
     }
-    std::vector<std::pair<std::vector<int>, KernelType>> sets;
-    // The collection of sets of qubits such that although we have terminated
-    // some kernels operating on them, as long as there is a set in this
-    // collection and a gate in the sequence that is not depending on any
-    // qubits not in the set, we can execute the gate at no cost.
-    std::vector<std::pair<std::vector<int>, KernelType>> absorbing_qubits;
+    std::vector<KernelInDP> open_kernels;
+    // The collection of closed kernels such that, as long as there is a kernel
+    // in this collection and a gate in the sequence that is not depending on
+    // any qubits not in the kernel, we can execute the gate at no cost if
+    // this is a fusion kernel or the gate execution cost if this is a
+    // shared-memory kernel.
+    std::vector<KernelInDP> absorbing_kernels;
     size_t hash;
   };
   class StatusHash {
@@ -377,47 +428,22 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   };
   struct LocalSchedule {
   public:
-    [[nodiscard]] bool check_valid() const {
-      std::vector<bool> has_qubit;
-      for (int i = 0; i < (int)sets.size(); i++) {
-        for (int j = 0; j < (int)sets[i].first.size(); j++) {
-          while (sets[i].first[j] >= has_qubit.size()) {
-            has_qubit.push_back(false);
-          }
-          if (has_qubit[sets[i].first[j]]) {
-            std::cerr << "Invalid local schedule: qubit " << sets[i].first[j]
-                      << " appears twice." << std::endl;
-            return false;
-          }
-          has_qubit[sets[i].first[j]] = true;
-        }
-      }
-      return true;
-    }
     [[nodiscard]] std::string to_string() const {
       std::string result;
       result += "{";
-      for (int i = 0; i < (int)sets.size(); i++) {
-        result += kernel_type_name(sets[i].second);
-        result += "{";
-        for (int j = 0; j < (int)sets[i].first.size(); j++) {
-          result += std::to_string(sets[i].first[j]);
-          if (j != (int)sets[i].first.size() - 1) {
-            result += ", ";
-          }
-        }
-        result += "}";
-        if (i != (int)sets.size() - 1) {
+      for (int i = 0; i < (int)kernels.size(); i++) {
+        result += kernels[i].to_string();
+        if (i != (int)kernels.size() - 1) {
           result += ", ";
         }
       }
       result += "}";
       return result;
     }
-    std::vector<std::pair<std::vector<int>, KernelType>> sets;
+    std::vector<KernelInDP> kernels;
   };
-  // f[i][S].first: first i (1-indexed) gates, "status of kernels on the
-  // frontier" S, min cost of the kernels not on the frontier.
+  // f[i][S].first: first i (1-indexed) gates, "status of open kernels" S,
+  // min cost of the closed kernels.
   // f[i][S].second: the schedule to achieve min cost.
   std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
                      StatusHash>
@@ -454,12 +480,15 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     std::cout << std::endl;
     std::cout << sequence_.to_string() << std::endl;
   }
+  // The main DP loop.
   for (int i = 0; i < num_gates; i++) {
-    if (debug) {
-      std::cout << "DP: i=" << i << " size=" << f[i & 1].size() << std::endl;
-    }
     // Update from f[i & 1] to f[~i & 1].
-    f[~i & 1].clear();
+    auto &f_prev = f[i & 1];
+    auto &f_next = f[~i & 1];
+    if (debug) {
+      std::cout << "DP: i=" << i << " size=" << f_prev.size() << std::endl;
+    }
+    f_next.clear();
     // Get the qubit indices of the current gate.
     auto &current_gate = *sequence_.gates[i];
     auto current_gate_cost =
@@ -499,14 +528,32 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       }
     }
     std::sort(current_indices.begin(), current_indices.end());
-    auto current_indices_hash = Status::get_hash(current_indices);
     std::sort(current_target_indices.begin(), current_target_indices.end());
-    auto current_target_indices_hash = Status::get_hash(current_target_indices);
+
+    // Precompute the single-gate kernels because they may be used many times
+    // during the DP.
+    // Note that the |touching_qubits| is always empty in fusion kernels.
+    KernelInDP current_single_gate_fusion_kernel(current_indices, {},
+                                                 KernelType::fusion);
+    auto current_single_gate_fusion_kernel_hash =
+        current_single_gate_fusion_kernel.get_hash();
+    KernelInDP current_single_gate_shared_memory_kernel(
+        current_target_indices, {}, KernelType::shared_memory);
+    current_single_gate_shared_memory_kernel.touching_qubits.reserve(
+        current_indices.size() - current_target_indices.size());
+    for (auto &qubit : current_indices) {
+      if (!current_target_index[qubit]) {
+        current_single_gate_shared_memory_kernel.touching_qubits.push_back(
+            qubit);
+      }
+    }
+    auto current_single_gate_shared_memory_kernel_hash =
+        current_single_gate_shared_memory_kernel.get_hash();
 
     // TODO: make these numbers configurable
-    constexpr int kMaxNumOfStatus = 4000;
-    constexpr int kShrinkToNumOfStatus = 2000;
-    if (f[i & 1].size() > kMaxNumOfStatus) {
+    constexpr int kMaxNumOfStatus = 2000;
+    constexpr int kShrinkToNumOfStatus = 1000;
+    if (f_prev.size() > kMaxNumOfStatus) {
       // Pruning.
       std::vector<std::pair<
           KernelCostType,
@@ -514,27 +561,26 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
                              StatusHash>::iterator>>
           costs;
       if (debug) {
-        std::cout << "Shrink f[" << i << "] from " << f[i & 1].size()
+        std::cout << "Shrink f[" << i << "] from " << f_prev.size()
                   << " elements to " << kShrinkToNumOfStatus << " elements."
                   << std::endl;
       }
-      costs.reserve(f[i & 1].size());
+      costs.reserve(f_prev.size());
       KernelCostType lowest_cost, highest_cost; // for debugging
-      for (auto it = f[i & 1].begin(); it != f[i & 1].end(); it++) {
+      for (auto it = f_prev.begin(); it != f_prev.end(); it++) {
         // Use the current "end" cost as a heuristic.
         // TODO: profile the running time of |compute_end_schedule| and see
         //  if an approximation optimization is necessary.
         KernelCostType result_cost;
-        compute_end_schedule(kernel_cost, it->first.sets,
-                             is_shared_memory_cacheline_qubit, result_cost,
+        compute_end_schedule(kernel_cost, it->first.open_kernels, result_cost,
                              /*result_kernels=*/nullptr);
         costs.emplace_back(std::make_pair(result_cost + it->second.first, it));
         if (debug) {
-          if (it == f[i & 1].begin() ||
+          if (it == f_prev.begin() ||
               result_cost + it->second.first > highest_cost) {
             highest_cost = result_cost + it->second.first;
           }
-          if (it == f[i & 1].begin() ||
+          if (it == f_prev.begin() ||
               result_cost + it->second.first < lowest_cost) {
             lowest_cost = result_cost + it->second.first;
           }
@@ -549,9 +595,9 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           new_f;
       for (int j = 0; j < kShrinkToNumOfStatus; j++) {
         // Extract the node and insert to the new unordered_map.
-        new_f.insert(f[i & 1].extract(costs[j].second));
+        new_f.insert(f_prev.extract(costs[j].second));
       }
-      f[i & 1] = new_f;
+      f_prev = new_f;
       if (debug) {
         std::cout << "Costs shrank from [" << lowest_cost << ", "
                   << highest_cost << "] to [" << lowest_cost << ", "
@@ -564,15 +610,15 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
     Status tmp_status;
     LocalSchedule tmp_schedule;
 
-    for (auto &it : f[i & 1]) {
+    for (auto &it : f_prev) {
       auto &current_status = it.first;
       auto &current_cost = it.second.first;
       auto &current_local_schedule = it.second.second;
       assert(current_status.check_valid());
       if (debug) {
         KernelCostType tmp;
-        compute_end_schedule(kernel_cost, current_status.sets,
-                             is_shared_memory_cacheline_qubit, tmp, nullptr);
+        compute_end_schedule(kernel_cost, current_status.open_kernels, tmp,
+                             nullptr);
         tmp += current_cost;
         if (tmp < tmp_best_cost) {
           tmp_best_cost = tmp;
@@ -583,21 +629,28 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
 
       if (current_indices.empty()) {
         // A global gate. Directly update.
-        update_f(f[~i & 1], current_status, current_cost,
-                 current_local_schedule);
+        // XXX: we do not check dependencies on global gates.
+        // If the circuit sequence is
+        // CCX(0,1,2) CCX(0,3,4) X(0) CCX(0,1,2) CCX(0,3,4)
+        // and 0 is a global qubit,
+        // we may put two CCX(0,1,2)s into one kernel
+        // and two CCX(0,3,4)s into another kernel.
+        update_f(f_next, current_status, current_cost, current_local_schedule);
         continue;
       }
 
+      // Count the number of all qubits absorbed into active qubits first.
       int absorbing_set_index = -1;
       int absorb_count = 0;
-      for (int j = 0; j < (int)current_status.absorbing_qubits.size(); j++) {
-        for (auto &qubit : current_status.absorbing_qubits[j].first) {
+      for (int j = 0; j < (int)current_status.absorbing_kernels.size(); j++) {
+        for (auto &qubit : current_status.absorbing_kernels[j].active_qubits) {
           if (current_index[qubit]) {
             absorb_count++;
             if (absorbing_set_index == -1) {
               absorbing_set_index = j;
             } else if (absorbing_set_index != j) {
-              // touching 2 sets, so not absorb-able
+              // Touching 2 absorbing kernels' active qubits,
+              // so not absorb-able.
               absorbing_set_index = -2;
               break;
             }
@@ -607,68 +660,84 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           break;
         }
       }
-      if (absorbing_set_index >= 0 &&
-          current_status.absorbing_qubits[absorbing_set_index].second ==
-              KernelType::shared_memory) {
-        // For shared-memory kernels, we only need to have the target qubits
-        // in the absorbing kernel; but we need to have all control qubits
-        // not in any open kernels (nor other absorbing kernels, which is
-        // already checked before).
-        for (auto &s : current_status.sets) {
-          for (auto &qubit : s.first) {
-            if (current_index[qubit]) {
-              // touching an open kernel, so not absorb-able
-              absorb_count = -1;
-              break;
-            }
-          }
-          if (absorb_count == -1) {
-            break;
+      // Count the number of all qubits absorbed into touching qubits.
+      if (absorbing_set_index >= 0) {
+        for (auto &qubit : current_status.absorbing_kernels[absorbing_set_index]
+                               .touching_qubits) {
+          if (current_index[qubit]) {
+            absorb_count++;
           }
         }
-        if (absorb_count != -1) {
-          // Count the target qubits in the absorbing kernel.
+      } else if (absorbing_set_index == -1 && current_target_indices.empty()) {
+        assert(absorb_count == 0);
+        // If no absorbing kernels' active qubits touch the current gate's
+        // qubits, we can still probably absorb the gate if this gate does
+        // not have any target qubits.
+        for (int j = 0; j < (int)current_status.absorbing_kernels.size(); j++) {
           absorb_count = 0;
           for (auto &qubit :
-               current_status.absorbing_qubits[absorbing_set_index].first) {
-            if (current_target_index[qubit]) {
+               current_status.absorbing_kernels[j].touching_qubits) {
+            if (current_index[qubit]) {
               absorb_count++;
             }
           }
-          if (absorb_count == current_target_indices.size()) {
-            // absorb-able
-            absorb_count = current_indices.size();
-          } else {
-            absorb_count = -1;
+          if (absorb_count == current_indices.size()) {
+            // This kernel absorbs the gate.
+            absorbing_set_index = j;
+            break;
           }
         }
       }
       if (absorbing_set_index >= 0 && absorb_count == current_indices.size()) {
-        // Optimization:
-        // The current gate is absorbed by a previous kernel.
-        // Directly update.
-        assert(current_status.absorbing_qubits[absorbing_set_index].second ==
-                   KernelType::fusion ||
-               current_status.absorbing_qubits[absorbing_set_index].second ==
-                   KernelType::shared_memory);
-        if (current_status.absorbing_qubits[absorbing_set_index].second ==
-            KernelType::shared_memory) {
-          current_cost += current_gate_cost;
+        // We then check if all target qubits are active.
+        absorb_count = 0;
+        for (auto &qubit : current_status.absorbing_kernels[absorbing_set_index]
+                               .active_qubits) {
+          if (current_target_index[qubit]) {
+            absorb_count++;
+          }
         }
-        update_f(f[~i & 1], current_status, current_cost,
-                 current_local_schedule);
-        continue;
+        if (absorb_count == current_target_indices.size()) {
+          // Optimization:
+          // The current gate is absorbed by a previous kernel.
+          // Directly update.
+          assert(current_status.absorbing_kernels[absorbing_set_index].tp ==
+                     KernelType::fusion ||
+                 current_status.absorbing_kernels[absorbing_set_index].tp ==
+                     KernelType::shared_memory);
+          if (current_status.absorbing_kernels[absorbing_set_index].tp ==
+              KernelType::shared_memory) {
+            current_cost += current_gate_cost;
+          }
+          update_f(f_next, current_status, current_cost,
+                   current_local_schedule);
+          continue;
+        }
       }
 
-      const int num_kernels = current_status.sets.size();
-      std::vector<int> touching_set_indices, touching_size;
+      // Count the number of qubits intersecting with each open kernel.
+      const int num_kernels = current_status.open_kernels.size();
+      std::vector<int> intersect_kernel_indices, active_size, touching_size;
       for (int j = 0; j < num_kernels; j++) {
         bool touching_set_has_j = false;
-        for (auto &index : current_status.sets[j].first) {
+        for (auto &index : current_status.open_kernels[j].active_qubits) {
           if (current_index[index]) {
             if (!touching_set_has_j) {
               touching_set_has_j = true;
-              touching_set_indices.push_back(j);
+              intersect_kernel_indices.push_back(j);
+              active_size.push_back(1);
+              touching_size.push_back(0);
+            } else {
+              active_size.back()++;
+            }
+          }
+        }
+        for (auto &index : current_status.open_kernels[j].touching_qubits) {
+          if (current_index[index]) {
+            if (!touching_set_has_j) {
+              touching_set_has_j = true;
+              intersect_kernel_indices.push_back(j);
+              active_size.push_back(0);
               touching_size.push_back(1);
             } else {
               touching_size.back()++;
@@ -676,81 +745,110 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           }
         }
       }
-      if (touching_set_indices.size() == 1 &&
-          touching_size[0] == current_indices.size()) {
-        assert(absorb_count == 0);
-        // Optimization:
-        // The current gate is touching exactly one kernel on the frontier,
-        // and is subsumed by that kernel.
-        // Directly update.
-        assert(current_status.sets[touching_set_indices[0]].second ==
-                   KernelType::fusion ||
-               current_status.sets[touching_set_indices[0]].second ==
-                   KernelType::shared_memory);
-        if (current_status.sets[touching_set_indices[0]].second ==
-            KernelType::shared_memory) {
-          current_cost += current_gate_cost;
+      if (intersect_kernel_indices.size() == 1 &&
+          active_size[0] + touching_size[0] == current_indices.size()) {
+        int target_active_count = 0;
+        for (auto &qubit :
+             current_status.open_kernels[intersect_kernel_indices[0]]
+                 .active_qubits) {
+          if (current_target_index[qubit]) {
+            target_active_count++;
+          }
         }
-        update_f(f[~i & 1], current_status, current_cost,
-                 current_local_schedule);
-        continue;
+        if (target_active_count == current_target_indices.size()) {
+          // Optimization:
+          // The current gate is touching exactly one open kernel
+          // and is subsumed by that kernel.
+          // Directly update.
+          assert(current_status.open_kernels[intersect_kernel_indices[0]].tp ==
+                     KernelType::fusion ||
+                 current_status.open_kernels[intersect_kernel_indices[0]].tp ==
+                     KernelType::shared_memory);
+          if (current_status.open_kernels[intersect_kernel_indices[0]].tp ==
+              KernelType::shared_memory) {
+            current_cost += current_gate_cost;
+          }
+          update_f(f_next, current_status, current_cost,
+                   current_local_schedule);
+          continue;
+        }
       }
-      auto new_absorbing_qubits = current_status.absorbing_qubits;
-      if (absorb_count != 0) {
+
+      // For shared-memory kernels, we only need to have the target qubits
+      // in the absorbing kernel; but we need to have all control qubits
+      // not in any open kernels (nor other absorbing kernels, which is
+      // already checked before).
+      auto new_absorbing_kernels = current_status.absorbing_kernels;
+
+      // Update |absorbing_kernels|.
+      // Loop in reverse order so that we do not need to worry about
+      // the index change during removal.
+      for (int k = (int)new_absorbing_kernels.size() - 1; k >= 0; k--) {
         // Remove all qubits touching the current gate from the
-        // |absorbing_qubits| set collection.
+        // active qubits in |absorbing_kernels|.
         // Loop in reverse order so that we do not need to worry about
         // the index change during removal.
-        for (int k = (int)new_absorbing_qubits.size() - 1; k >= 0; k--) {
-          // Loop in reverse order so that we do not need to worry about
-          // the index change during removal.
-          for (int j = (int)new_absorbing_qubits[k].first.size() - 1; j >= 0;
-               j--) {
-            if (current_index[new_absorbing_qubits[k].first[j]]) {
-              new_absorbing_qubits[k].first.erase(
-                  new_absorbing_qubits[k].first.begin() + j);
-            }
-          }
-          if (new_absorbing_qubits[k].first.empty()) {
-            new_absorbing_qubits.erase(new_absorbing_qubits.begin() + k);
+        for (int j = (int)new_absorbing_kernels[k].active_qubits.size() - 1;
+             j >= 0; j--) {
+          if (current_index[new_absorbing_kernels[k].active_qubits[j]]) {
+            new_absorbing_kernels[k].active_qubits.erase(
+                new_absorbing_kernels[k].active_qubits.begin() + j);
           }
         }
-        // Sort the absorbing sets in ascending order.
-        std::sort(new_absorbing_qubits.begin(), new_absorbing_qubits.end(),
-                  [](auto &s1, auto &s2) { return s1.first[0] < s2.first[0]; });
+        // Remove all target qubits of the current gate from the
+        // touching qubits in |absorbing_kernels|.
+        // Loop in reverse order so that we do not need to worry about
+        // the index change during removal.
+        for (int j = (int)new_absorbing_kernels[k].touching_qubits.size() - 1;
+             j >= 0; j--) {
+          if (current_target_index[new_absorbing_kernels[k]
+                                       .touching_qubits[j]]) {
+            new_absorbing_kernels[k].touching_qubits.erase(
+                new_absorbing_kernels[k].touching_qubits.begin() + j);
+          }
+        }
+        // To make sorting easier, we remove the absorbing kernel whenever
+        // the active qubits set becomes empty (even if the touching qubits
+        // set is not empty).
+        if (new_absorbing_kernels[k].active_qubits.empty()) {
+          new_absorbing_kernels.erase(new_absorbing_kernels.begin() + k);
+        }
       }
-      if (touching_set_indices.empty()) {
+      // Sort the absorbing kernels in ascending order.
+      std::sort(new_absorbing_kernels.begin(), new_absorbing_kernels.end());
+
+      if (intersect_kernel_indices.empty()) {
         // Optimization:
         // The current gate is not touching any kernels on the frontier.
         // Directly add the gate to the frontier.
         auto new_status = current_status;
-        new_status.insert_set(current_indices, KernelType::fusion);
-        new_status.absorbing_qubits = new_absorbing_qubits;
-        new_status.hash ^= current_indices_hash;
-        update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
+        new_status.insert_set(current_single_gate_fusion_kernel);
+        new_status.absorbing_kernels = new_absorbing_kernels;
+        new_status.hash ^= current_single_gate_fusion_kernel_hash;
+        update_f(f_next, new_status, current_cost, current_local_schedule);
 
         new_status = current_status;
-        new_status.insert_set(current_indices, KernelType::shared_memory);
-        new_status.absorbing_qubits = new_absorbing_qubits;
-        new_status.hash ^= current_indices_hash;
+        new_status.insert_set(current_single_gate_shared_memory_kernel);
+        new_status.absorbing_kernels = new_absorbing_kernels;
+        new_status.hash ^= current_single_gate_shared_memory_kernel_hash;
         current_cost += current_gate_cost;
-        update_f(f[~i & 1], new_status, current_cost, current_local_schedule);
+        update_f(f_next, new_status, current_cost, current_local_schedule);
         continue;
       }
+
+      // Main search in the DP.
       // Keep track of the schedule during the search.
       LocalSchedule local_schedule = current_local_schedule;
-      std::vector<std::pair<std::vector<int>, KernelType>> absorbing_sets_stack;
+      std::vector<KernelInDP> absorbing_kernels_stack;
       // Keep track of which kernels are merged during the search.
       std::vector<bool> kernel_merged(num_kernels, false);
-      for (auto &index : touching_set_indices) {
+      for (auto &index : intersect_kernel_indices) {
         // These kernels are already considered -- treat them as merged.
         kernel_merged[index] = true;
       }
       auto search_merging_kernels =
-          [&](auto &this_ref, const std::vector<int> &current_gate_kernel,
-              KernelType current_gate_kernel_type,
-              const std::vector<int> &current_merging_kernel,
-              KernelType current_merging_kernel_type,
+          [&](auto &this_ref, const KernelInDP &current_gate_kernel,
+              const KernelInDP &current_merging_kernel,
               const KernelCostType &cost, int touching_set_index,
               int kernel_index) -> void {
         if (kernel_index == num_kernels) {
@@ -758,175 +856,258 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           // "touching set".
           touching_set_index++;
           auto new_cost = cost;
-          if (!current_merging_kernel.empty()) {
+          if (!current_merging_kernel.active_qubits.empty() ||
+              !current_merging_kernel.touching_qubits.empty()) {
             // Because we are not merging this kernel with the current
             // gate, we need to record the merged kernel.
-            local_schedule.sets.emplace_back(current_merging_kernel,
-                                             current_merging_kernel_type);
-            std::sort(local_schedule.sets.back().first.begin(),
-                      local_schedule.sets.back().first.end());
-            assert(current_merging_kernel_type == KernelType::fusion ||
-                   current_merging_kernel_type == KernelType::shared_memory);
+            local_schedule.kernels.push_back(current_merging_kernel);
+            assert(current_merging_kernel.tp == KernelType::fusion ||
+                   current_merging_kernel.tp == KernelType::shared_memory);
             // We record the cost here when closing the kernel.
-            if (current_merging_kernel_type == KernelType::fusion) {
-              new_cost += kernel_costs[current_merging_kernel.size()];
+            if (current_merging_kernel.tp == KernelType::fusion) {
+              assert(current_merging_kernel.touching_qubits.empty());
+              new_cost +=
+                  kernel_costs[current_merging_kernel.active_qubits.size()];
             } else {
               new_cost += kernel_cost.get_shared_memory_init_cost();
+              // We update the |touching_qubits| for |current_merging_kernel|
+              // here.
+              std::vector<bool> in_current_kernel(num_qubits, false);
+              for (auto &index : current_merging_kernel.active_qubits) {
+                in_current_kernel[index] = true;
+              }
+              // Recompute the touching qubits.
+              local_schedule.kernels.back().touching_qubits.clear();
+              for (auto &index : current_merging_kernel.touching_qubits) {
+                if (!in_current_kernel[index]) {
+                  local_schedule.kernels.back().touching_qubits.push_back(
+                      index);
+                  in_current_kernel[index] = true;
+                }
+              }
             }
-            std::vector<int> absorbing_set;
-            for (auto &index : current_merging_kernel) {
+            std::sort(local_schedule.kernels.back().active_qubits.begin(),
+                      local_schedule.kernels.back().active_qubits.end());
+            std::sort(local_schedule.kernels.back().touching_qubits.begin(),
+                      local_schedule.kernels.back().touching_qubits.end());
+
+            // Compute the absorbing kernel.
+            KernelInDP absorbing_kernel({}, {}, current_merging_kernel.tp);
+            for (auto &index : local_schedule.kernels.back().active_qubits) {
               if (!current_index[index]) {
                 // As long as the current gate does not block the qubit |index|,
                 // we can execute a gate at the qubit |index| later in the
                 // kernel |current_merging_kernel|.
-                absorbing_set.push_back(index);
+                absorbing_kernel.active_qubits.push_back(index);
               }
             }
-            std::sort(absorbing_set.begin(), absorbing_set.end());
-            absorbing_sets_stack.emplace_back(absorbing_set,
-                                              current_merging_kernel_type);
+            for (auto &index : local_schedule.kernels.back().touching_qubits) {
+              if (!current_target_index[index]) {
+                // Similarly, we block the target qubits in the
+                // |touching_qubits| set.
+                absorbing_kernel.touching_qubits.push_back(index);
+              }
+            }
+            absorbing_kernels_stack.push_back(absorbing_kernel);
           }
-          if (touching_set_index == (int)touching_set_indices.size()) {
+          if (touching_set_index == (int)intersect_kernel_indices.size()) {
             // We have searched everything.
             // Create the new Status object.
             Status new_status;
             for (int j = 0; j < num_kernels; j++) {
               if (!kernel_merged[j]) {
-                new_status.sets.push_back(current_status.sets[j]);
+                new_status.open_kernels.push_back(
+                    current_status.open_kernels[j]);
               }
             }
             // Insert the new open kernel.
-            new_status.insert_set(current_gate_kernel,
-                                  current_gate_kernel_type);
+            new_status.insert_set(current_gate_kernel);
             // Insert the absorbing kernels.
-            new_status.absorbing_qubits = new_absorbing_qubits;
-            new_status.absorbing_qubits.insert(
-                new_status.absorbing_qubits.end(), absorbing_sets_stack.begin(),
-                absorbing_sets_stack.end());
+            new_status.absorbing_kernels = new_absorbing_kernels;
+            new_status.absorbing_kernels.reserve(
+                new_absorbing_kernels.size() + absorbing_kernels_stack.size());
+            // Push the absorbing kernels if |active_qubits| is not empty.
+            for (auto &absorbing_kernel : absorbing_kernels_stack) {
+              if (!absorbing_kernel.active_qubits.empty()) {
+                new_status.absorbing_kernels.push_back(absorbing_kernel);
+              }
+            }
             // Sort the absorbing sets in ascending order.
-            std::sort(
-                new_status.absorbing_qubits.begin(),
-                new_status.absorbing_qubits.end(),
-                [](auto &s1, auto &s2) { return s1.first[0] < s2.first[0]; });
+            std::sort(new_status.absorbing_kernels.begin(),
+                      new_status.absorbing_kernels.end());
             new_status.compute_hash();
-            update_f(f[~i & 1], new_status, new_cost, local_schedule);
+            update_f(f_next, new_status, new_cost, local_schedule);
           } else {
             // Start a new iteration of searching.
             // Try to merge the "touching set" with the current gate first.
             bool merging_is_always_better = false;
-            if (current_status.sets[touching_set_indices[touching_set_index]]
-                    .second == current_gate_kernel_type) {
+            if (current_status
+                    .open_kernels[intersect_kernel_indices[touching_set_index]]
+                    .tp == current_gate_kernel.tp) {
               // We only merge kernels of the same type.
               auto new_gate_kernel = current_gate_kernel;
-              for (auto &index :
-                   current_status.sets[touching_set_indices[touching_set_index]]
-                       .first) {
-                if (!current_index[index]) {
-                  new_gate_kernel.push_back(index);
+              // We update the |touching_qubits| for |current_gate_kernel| here.
+              assert(current_gate_kernel.tp == KernelType::fusion ||
+                     current_gate_kernel.tp == KernelType::shared_memory);
+              if (current_gate_kernel.tp == KernelType::fusion) {
+                // Put everything into |active_qubits| if it is a fusion kernel.
+                for (auto &index :
+                     current_status
+                         .open_kernels
+                             [intersect_kernel_indices[touching_set_index]]
+                         .active_qubits) {
+                  if (!current_index[index]) {
+                    new_gate_kernel.active_qubits.push_back(index);
+                  }
+                }
+              } else {
+                // For shared-memory kernels, handle |active_qubits| and
+                // |touching_qubits| separately.
+                for (auto &index :
+                     current_status
+                         .open_kernels
+                             [intersect_kernel_indices[touching_set_index]]
+                         .active_qubits) {
+                  if (!current_target_index[index]) {
+                    new_gate_kernel.active_qubits.push_back(index);
+                    auto index_pos =
+                        std::find(new_gate_kernel.touching_qubits.begin(),
+                                  new_gate_kernel.touching_qubits.end(), index);
+                    if (index_pos != new_gate_kernel.touching_qubits.end()) {
+                      // Remove this active qubit from |touching_qubits|.
+                      new_gate_kernel.touching_qubits.erase(index_pos);
+                    }
+                  }
+                }
+                for (auto &index :
+                     current_status
+                         .open_kernels
+                             [intersect_kernel_indices[touching_set_index]]
+                         .touching_qubits) {
+                  if (!current_index[index]) {
+                    if (std::find(new_gate_kernel.active_qubits.begin(),
+                                  new_gate_kernel.active_qubits.end(), index) ==
+                        new_gate_kernel.active_qubits.end()) {
+                      if (std::find(new_gate_kernel.touching_qubits.begin(),
+                                    new_gate_kernel.touching_qubits.end(),
+                                    index) ==
+                          new_gate_kernel.touching_qubits.end()) {
+                        // Only add to |touching_qubits| if it doesn't exist in
+                        // |active_qubits| or |touching_qubits|.
+                        new_gate_kernel.touching_qubits.push_back(index);
+                      }
+                    }
+                  }
                 }
               }
-              if (new_gate_kernel.size() == current_gate_kernel.size()) {
+              if (new_gate_kernel.active_qubits.size() ==
+                  current_gate_kernel.active_qubits.size()) {
                 // An optimization: if we merge a kernel with the current gate
-                // and the size remain unchanged, we always want to merge the
-                // kernel with the current gate.
+                // and the size of active qubits remain unchanged, we always
+                // want to merge the kernel with the current gate.
                 merging_is_always_better = true;
               }
-              assert(current_gate_kernel_type == KernelType::fusion ||
-                     current_gate_kernel_type == KernelType::shared_memory);
               bool kernel_size_ok = false;
-              if (current_gate_kernel_type == KernelType::fusion) {
-                kernel_size_ok =
-                    new_gate_kernel.size() <= max_fusion_kernel_size;
+              if (current_gate_kernel.tp == KernelType::fusion) {
+                assert(new_gate_kernel.touching_qubits.empty());
+                kernel_size_ok = new_gate_kernel.active_qubits.size() <=
+                                 max_fusion_kernel_size;
               } else {
-                if (new_gate_kernel.size() <= shared_memory_kernel_size) {
+                if (new_gate_kernel.active_qubits.size() <=
+                    shared_memory_kernel_size) {
                   kernel_size_ok = true;
                 } else {
                   // Check cacheline qubits.
                   int num_cacheline_qubits = 0;
-                  for (const auto &qubit : new_gate_kernel) {
-                    if (is_shared_memory_cacheline_qubit[qubit]) {
+                  for (const auto &qubit : new_gate_kernel.active_qubits) {
+                    if (is_shared_memory_cacheline_qubit(qubit)) {
                       num_cacheline_qubits++;
                     }
                   }
-                  kernel_size_ok =
-                      new_gate_kernel.size() - num_cacheline_qubits <=
-                      shared_memory_kernel_size;
+                  kernel_size_ok = new_gate_kernel.active_qubits.size() -
+                                       num_cacheline_qubits <=
+                                   shared_memory_kernel_size;
                 }
               }
               if (kernel_size_ok) {
-                std::sort(new_gate_kernel.begin(), new_gate_kernel.end());
+                std::sort(new_gate_kernel.active_qubits.begin(),
+                          new_gate_kernel.active_qubits.end());
+                std::sort(new_gate_kernel.touching_qubits.begin(),
+                          new_gate_kernel.touching_qubits.end());
                 // If we merge a kernel with the current gate, we do not need
                 // to search for other kernels to merge together.
-                this_ref(this_ref, new_gate_kernel, current_gate_kernel_type,
-                         /*current_merging_kernel=*/std::vector<int>(),
-                         /*current_merging_kernel_type=*/KernelType(), new_cost,
+                // So the |kernel_index| is |num_kernels| instead of 0.
+                this_ref(this_ref, new_gate_kernel,
+                         /*current_merging_kernel=*/KernelInDP(), new_cost,
                          touching_set_index,
                          /*kernel_index=*/num_kernels);
               }
             }
             if (!merging_is_always_better) {
               // Try to not merge the "touching set" with the current gate.
-              this_ref(
-                  this_ref, current_gate_kernel, current_gate_kernel_type,
-                  /*current_merging_kernel=*/
-                  current_status.sets[touching_set_indices[touching_set_index]]
-                      .first,
-                  /*current_merging_kernel_type=*/
-                  current_status.sets[touching_set_indices[touching_set_index]]
-                      .second,
-                  new_cost, touching_set_index, /*kernel_index=*/0);
+              this_ref(this_ref, current_gate_kernel,
+                       /*current_merging_kernel=*/
+                       current_status.open_kernels
+                           [intersect_kernel_indices[touching_set_index]],
+                       new_cost, touching_set_index, /*kernel_index=*/0);
             }
           }
-          if (!current_merging_kernel.empty()) {
+          if (!current_merging_kernel.active_qubits.empty() ||
+              !current_merging_kernel.touching_qubits.empty()) {
             // Restore the merged kernel stack.
-            local_schedule.sets.pop_back();
-            absorbing_sets_stack.pop_back();
+            local_schedule.kernels.pop_back();
+            absorbing_kernels_stack.pop_back();
           }
           return;
         }
         // We can always try not to merge with this kernel.
-        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
-                 current_merging_kernel, current_merging_kernel_type, cost,
+        this_ref(this_ref, current_gate_kernel, current_merging_kernel, cost,
                  touching_set_index, kernel_index + 1);
         if (kernel_merged[kernel_index]) {
           // This kernel is already considered. Continue to the next one.
           return;
         }
-        if (current_status.sets[kernel_index].second !=
-            current_merging_kernel_type) {
+        if (current_status.open_kernels[kernel_index].tp !=
+            current_merging_kernel.tp) {
           // We don't merge kernels with different types.
           return;
         }
-        assert(current_merging_kernel_type == KernelType::fusion ||
-               current_merging_kernel_type == KernelType::shared_memory);
+        assert(current_merging_kernel.tp == KernelType::fusion ||
+               current_merging_kernel.tp == KernelType::shared_memory);
         bool kernel_size_ok = false;
-        if (current_merging_kernel_type == KernelType::fusion) {
-          kernel_size_ok = current_merging_kernel.size() +
-                               current_status.sets[kernel_index].first.size() <=
+        if (current_merging_kernel.tp == KernelType::fusion) {
+          assert(current_merging_kernel.touching_qubits.empty());
+          assert(current_status.open_kernels[kernel_index]
+                     .touching_qubits.empty());
+          kernel_size_ok = current_merging_kernel.active_qubits.size() +
+                               current_status.open_kernels[kernel_index]
+                                   .active_qubits.size() <=
                            max_fusion_kernel_size;
         } else {
-          if (current_merging_kernel.size() +
-                  current_status.sets[kernel_index].first.size() <=
+          if (current_merging_kernel.active_qubits.size() +
+                  current_status.open_kernels[kernel_index]
+                      .active_qubits.size() <=
               shared_memory_kernel_size) {
             kernel_size_ok = true;
           } else {
             // Check cacheline qubits.
             int num_cacheline_qubits = 0;
-            for (const auto &qubit : current_merging_kernel) {
-              if (is_shared_memory_cacheline_qubit[qubit]) {
+            for (const auto &qubit : current_merging_kernel.active_qubits) {
+              if (is_shared_memory_cacheline_qubit(qubit)) {
                 num_cacheline_qubits++;
               }
             }
-            for (const auto &qubit : current_status.sets[kernel_index].first) {
-              if (is_shared_memory_cacheline_qubit[qubit]) {
+            for (const auto &qubit :
+                 current_status.open_kernels[kernel_index].active_qubits) {
+              if (is_shared_memory_cacheline_qubit(qubit)) {
                 num_cacheline_qubits++;
               }
             }
-            kernel_size_ok =
-                current_merging_kernel.size() +
-                    current_status.sets[kernel_index].first.size() -
-                    num_cacheline_qubits <=
-                shared_memory_kernel_size;
+            kernel_size_ok = current_merging_kernel.active_qubits.size() +
+                                 current_status.open_kernels[kernel_index]
+                                     .active_qubits.size() -
+                                 num_cacheline_qubits <=
+                             shared_memory_kernel_size;
           }
         }
         if (!kernel_size_ok) {
@@ -936,14 +1117,19 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         }
         // Merge this kernel.
         auto new_merging_kernel = current_merging_kernel;
-        new_merging_kernel.insert(
-            new_merging_kernel.end(),
-            current_status.sets[kernel_index].first.begin(),
-            current_status.sets[kernel_index].first.end());
+        new_merging_kernel.active_qubits.insert(
+            new_merging_kernel.active_qubits.end(),
+            current_status.open_kernels[kernel_index].active_qubits.begin(),
+            current_status.open_kernels[kernel_index].active_qubits.end());
+        // We only record the set of |touching_qubits| and remove duplicates
+        // later.
+        new_merging_kernel.touching_qubits.insert(
+            new_merging_kernel.touching_qubits.end(),
+            current_status.open_kernels[kernel_index].touching_qubits.begin(),
+            current_status.open_kernels[kernel_index].touching_qubits.end());
         kernel_merged[kernel_index] = true;
         // Continue the search.
-        this_ref(this_ref, current_gate_kernel, current_gate_kernel_type,
-                 new_merging_kernel, current_merging_kernel_type, cost,
+        this_ref(this_ref, current_gate_kernel, new_merging_kernel, cost,
                  touching_set_index, kernel_index + 1);
         // Restore the |kernel_merged| status.
         kernel_merged[kernel_index] = false;
@@ -952,17 +1138,15 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
       // kernel_index=num_kernels, so that we can decide whether to merge the
       // first "touching set" with the current gate or not inside the search.
       search_merging_kernels(
-          search_merging_kernels, /*current_gate_kernel=*/current_indices,
-          /*current_gate_kernel_type=*/KernelType::fusion,
-          /*current_merging_kernel=*/std::vector<int>(),
-          /*current_merging_kernel_type=*/KernelType(), /*cost=*/current_cost,
+          search_merging_kernels,
+          /*current_gate_kernel=*/current_single_gate_fusion_kernel,
+          /*current_merging_kernel=*/KernelInDP(), /*cost=*/current_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
       // For shared-memory kernels, we account for the gate cost now.
       search_merging_kernels(
-          search_merging_kernels, /*current_gate_kernel=*/current_indices,
-          /*current_gate_kernel_type=*/KernelType::shared_memory,
-          /*current_merging_kernel=*/std::vector<int>(),
-          /*current_merging_kernel_type=*/KernelType(),
+          search_merging_kernels,
+          /*current_gate_kernel=*/current_single_gate_shared_memory_kernel,
+          /*current_merging_kernel=*/KernelInDP(),
           /*cost=*/current_cost + current_gate_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
@@ -981,32 +1165,37 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
   for (auto &it : f[num_gates & 1]) {
     // Compute the end schedule and get the one with minimal total cost.
     KernelCostType cost;
-    std::vector<std::pair<std::vector<int>, KernelType>> end_schedule;
-    compute_end_schedule(kernel_cost, it.first.sets,
-                         is_shared_memory_cacheline_qubit, cost, &end_schedule);
-    if (result_schedule.sets.empty() || cost + it.second.first < min_cost) {
+    std::vector<KernelInDP> end_schedule;
+    compute_end_schedule(kernel_cost, it.first.open_kernels, cost,
+                         &end_schedule);
+    if (result_schedule.kernels.empty() || cost + it.second.first < min_cost) {
       min_cost = cost + it.second.first;
       result_schedule = it.second.second;
-      result_schedule.sets.insert(result_schedule.sets.end(),
-                                  end_schedule.begin(), end_schedule.end());
+      result_schedule.kernels.insert(result_schedule.kernels.end(),
+                                     end_schedule.begin(), end_schedule.end());
     }
   }
-  if (result_schedule.sets.empty()) {
+  if (result_schedule.kernels.empty()) {
     // All gates in this schedule are global.
     // We need to create an empty kernel for them.
-    result_schedule.sets.emplace_back(std::vector<int>(), KernelType::fusion);
+    result_schedule.kernels.emplace_back(std::vector<int>(), std::vector<int>(),
+                                         KernelType::fusion);
   }
   // Translate the |result_schedule| into |kernels|.
-  kernels.reserve(result_schedule.sets.size());
+  kernels.reserve(result_schedule.kernels.size());
   std::vector<bool> executed(num_gates, false);
   cost_ = min_cost;
   int start_gate_index = 0; // an optimization
-  for (auto &s : result_schedule.sets) {
+  for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
     CircuitSeq current_seq(num_qubits, sequence_.get_num_input_parameters());
-    std::vector<bool> local_in_kernel(num_qubits, false);
-    for (auto &index : s.first) {
-      local_in_kernel[index] = true;
+    std::vector<bool> active_in_kernel(num_qubits, false);
+    for (auto &index : s.active_qubits) {
+      active_in_kernel[index] = true;
+    }
+    std::vector<bool> touched_in_kernel(num_qubits, false);
+    for (auto &index : s.touching_qubits) {
+      touched_in_kernel[index] = true;
     }
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
@@ -1027,13 +1216,17 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
           num_remaining_control_qubits--;
           // We do not care about global qubits, but we need the local qubit to
           // be active in this kernel.
-          if (is_local_qubit(wire->index) && !local_in_kernel[wire->index]) {
+          if (is_local_qubit(wire->index) && !active_in_kernel[wire->index]) {
             // One exception is when the kernel is shared-memory, we only
             // need the target qubits in controlled gates to be active; we
             // don't need any qubits to be active in diagonal gates.
-            if (!(s.second == KernelType::shared_memory &&
+            // Although we could execute all gates satisfying this, we do not
+            // execute gates with control qubits being an untouched non-active
+            // local qubit because the DP suggests executing it elsewhere.
+            if (!(s.tp == KernelType::shared_memory &&
                   (num_remaining_control_qubits >= 0 ||
-                   sequence_.gates[i]->gate->is_diagonal()))) {
+                   sequence_.gates[i]->gate->is_diagonal()) &&
+                  touched_in_kernel[wire->index])) {
               executable = false;
               break;
             }
@@ -1045,15 +1238,24 @@ bool Schedule::compute_kernel_schedule(const KernelCost &kernel_cost) {
         executed[i] = true;
         current_seq.add_gate(sequence_.gates[i].get());
       } else {
-        // Block the qubits.
-        for (auto &wire : sequence_.gates[i]->input_wires) {
-          if (wire->is_qubit()) {
-            qubit_blocked[wire->index] = true;
+        // Block the non-control qubits if the gate is not a symmetric
+        // controlled gate.
+        if (sequence_.gates[i]->gate->get_num_control_qubits() == 0 ||
+            !sequence_.gates[i]->gate->is_symmetric()) {
+          num_remaining_control_qubits =
+              sequence_.gates[i]->gate->get_num_control_qubits();
+          for (auto &wire : sequence_.gates[i]->input_wires) {
+            if (wire->is_qubit()) {
+              num_remaining_control_qubits--;
+              if (num_remaining_control_qubits < 0) {
+                qubit_blocked[wire->index] = true;
+              }
+            }
           }
         }
       }
     }
-    kernels.emplace_back(current_seq, s.first, s.second);
+    kernels.emplace_back(current_seq, s.active_qubits, s.tp);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
@@ -1104,9 +1306,13 @@ get_schedules(const CircuitSeq &sequence,
   // |gate_string|;
   // only computed when |absorb_single_qubit_gates| is true
   std::unordered_map<std::string, std::queue<int>> gate_indices;
+  // |have_dense_single_qubit_gate[i][j]|: if there is a dense single-qubit gate
+  // on qubit |j| that is not executed yet in the |i|-th stage;
+  // only computed when |absorb_single_qubit_gates| is true
+  std::deque<std::vector<bool>> have_dense_single_qubit_gate;
 
   if (debug) {
-    std::cout << "get_schedules for " << sequence.to_string() << std::endl;
+    std::cout << "get_schedules for " << sequence.to_string(true) << std::endl;
   }
 
   for (auto &local_qubit : local_qubits) {
@@ -1186,6 +1392,10 @@ get_schedules(const CircuitSeq &sequence,
       std::cout << std::endl;
     }
 
+    if (absorb_single_qubit_gates) {
+      have_dense_single_qubit_gate.emplace_back(num_qubits, false);
+    }
+
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
@@ -1243,11 +1453,17 @@ get_schedules(const CircuitSeq &sequence,
           }
           assert(num_local_qubit > 0);
           if (num_local_qubit == 1) {
+            // TODO: push all the single-qubit gates towards the end of the
+            // schedule and update the controlled gates correspondingly.
+
             // Do not put single-qubit gates into |current_seq|.
             // Compute the dependency here.
             std::unordered_set<int> depending_gates;
             for (auto &wire : sequence.gates[i]->input_wires) {
               if (wire->is_qubit()) {
+                if (!sequence.gates[i]->gate->is_sparse()) {
+                  have_dense_single_qubit_gate.back()[wire->index] = true;
+                }
                 if (last_gate_index[wire->index] != -1) {
                   // Use std::unordered_set to remove duplicates automatically.
                   depending_gates.insert(last_gate_index[wire->index]);
@@ -1279,8 +1495,9 @@ get_schedules(const CircuitSeq &sequence,
         }
       }
     }
-    result.emplace_back(current_seq, current_local_qubit_layout,
-                        current_global_qubit_layout, ctx);
+    result.emplace_back(
+        current_seq, current_local_qubit_layout, current_global_qubit_layout,
+        kernel_cost.get_shared_memory_num_cacheline_qubits(), ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
@@ -1311,65 +1528,86 @@ get_schedules(const CircuitSeq &sequence,
     int current_kernel_qubits_last_updated_i = -1;
     std::vector<bool> current_kernel_qubits(num_qubits, false);
     for (auto &schedule : result) {
-      // avoid cache conflict with other |schedule|s
-      current_kernel_qubits_last_updated_i = -1;
-      for (int i = 0; i < schedule.get_num_kernels(); i++) {
-        auto try_to_execute_single_qubit_gates =
-            [&](int insert_location) -> bool {
-          if (single_qubit_gate_to_execute.empty()) {
-            return false;
+      auto try_to_execute_single_qubit_gates =
+          [&](int i, int insert_location) -> bool {
+        // |i| is the kernel id (|kernels[i]|).
+        if (single_qubit_gate_to_execute.empty()) {
+          return false;
+        }
+        if (current_kernel_qubits_last_updated_i != i) {
+          current_kernel_qubits_last_updated_i = i;
+          current_kernel_qubits.assign(num_qubits, false);
+          for (auto &qubit : schedule.kernels[i].qubits) {
+            current_kernel_qubits[qubit] = true;
           }
-          if (current_kernel_qubits_last_updated_i != i) {
-            current_kernel_qubits_last_updated_i = i;
-            current_kernel_qubits.assign(num_qubits, false);
-            for (auto &qubit : schedule.kernels[i].qubits) {
-              current_kernel_qubits[qubit] = true;
-            }
-          }
-          bool executed_any_gate = false;
-          for (int k = 0; k < (int)single_qubit_gate_to_execute.size(); k++) {
-            int index = single_qubit_gate_to_execute[k];
-            bool executable = true;
-            for (auto &wire : sequence.gates[index]->input_wires) {
-              if (wire->is_qubit()) {
-                if (schedule.is_local_qubit(wire->index)) {
-                  if (!current_kernel_qubits[wire->index]) {
-                    executable = false; // not local in this kernel
-                    break;
-                  }
-                } else {
-                  if (!sequence.gates[index]->gate->is_sparse()) {
-                    executable = false; // not executable globally
-                    break;
-                  }
+        }
+        bool executed_any_gate = false;
+        for (int k = 0; k < (int)single_qubit_gate_to_execute.size(); k++) {
+          int index = single_qubit_gate_to_execute[k];
+          bool executable = true;
+          int control_qubit_count =
+              sequence.gates[index]->gate->get_num_control_qubits();
+          for (auto &wire : sequence.gates[index]->input_wires) {
+            if (wire->is_qubit()) {
+              control_qubit_count--;
+              if (schedule.is_local_qubit(wire->index)) {
+                if (control_qubit_count < 0 &&
+                    !current_kernel_qubits[wire->index] &&
+                    !(schedule.kernels[i].type == KernelType::shared_memory &&
+                      sequence.gates[index]->gate->is_diagonal())) {
+                  executable = false; // not local in this kernel
+                  break;
+                }
+              } else {
+                if (control_qubit_count < 0 &&
+                    (sequence.gates[index]->gate->get_num_qubits() == 1
+                         ? !sequence.gates[index]->gate->is_sparse()
+                         : !sequence.gates[index]->gate->is_diagonal())) {
+                  executable = false; // not executable globally
+                  break;
                 }
               }
             }
-            if (executable) {
-              executed_any_gate = true;
-              // Insert the gate to
-              // |schedule.kernels[i].gates[insert_location]|.
-              // Note that we don't update |next_single_qubit_gates| here.
-              schedule.kernels[i].gates.insert_gate(
-                  insert_location, sequence.gates[index].get());
-              assert(schedule.kernels[i].type == KernelType::fusion ||
-                     schedule.kernels[i].type == KernelType::shared_memory);
-              if (schedule.kernels[i].type == KernelType::shared_memory) {
-                schedule.cost_ += kernel_cost.get_shared_memory_gate_cost(
-                    sequence.gates[index]->gate->tp);
-              }
-              // Erase the gate from |single_qubit_gate_to_execute|.
-              single_qubit_gate_to_execute.erase(
-                  single_qubit_gate_to_execute.begin() + k);
-              // Because we have |k++| at the end of this iteration of the
-              // for loop, we need to cancel the effect here.
-              k--;
-            }
           }
-          return executed_any_gate;
-        };
+          if (executable) {
+            executed_any_gate = true;
+            // Insert the gate to
+            // |schedule.kernels[i].gates[insert_location]|.
+            // Note that we don't update |next_single_qubit_gates| here.
+            schedule.kernels[i].gates.insert_gate(insert_location,
+                                                  sequence.gates[index].get());
+            assert(schedule.kernels[i].type == KernelType::fusion ||
+                   schedule.kernels[i].type == KernelType::shared_memory);
+            if (schedule.kernels[i].type == KernelType::shared_memory) {
+              schedule.cost_ += kernel_cost.get_shared_memory_gate_cost(
+                  sequence.gates[index]->gate->tp);
+            }
+            // Erase the gate from |single_qubit_gate_to_execute|.
+            single_qubit_gate_to_execute.erase(
+                single_qubit_gate_to_execute.begin() + k);
+            // Because we have |k++| at the end of this iteration of the
+            // for loop, we need to cancel the effect here.
+            k--;
+          }
+        }
+        return executed_any_gate;
+      };
 
-        try_to_execute_single_qubit_gates(0);
+      // avoid cache conflict with other |schedule|s
+      current_kernel_qubits_last_updated_i = -1;
+
+      for (int i = 0; i < schedule.get_num_kernels(); i++) {
+        for (auto &qubit : schedule.kernels[i].qubits) {
+          // We can execute dense single-qubit gates on these qubits.
+          have_dense_single_qubit_gate.front()[qubit] = false;
+        }
+      }
+
+      for (int i = 0; i < schedule.get_num_kernels(); i++) {
+        // TODO: For shared-memory kernels with the number of qubits not the
+        //  maximum, we want to execute some dense single-qubit gates here
+        //  (this optimization is not implemented yet).
+        try_to_execute_single_qubit_gates(i, 0);
 
         // Purposely using |schedule.kernels[i].gates.gates.size()| because we
         // may modify |schedule.kernels[i].gates.gates| in this loop.
@@ -1389,12 +1627,75 @@ get_schedules(const CircuitSeq &sequence,
               single_qubit_gate_to_execute.push_back(
                   single_qubit_gate_indices[next_single_qubit_gate].first);
               // Insert the gate after this gate.
-              try_to_execute_single_qubit_gates(j + 1);
+              try_to_execute_single_qubit_gates(i, j + 1);
             }
           }
           gate_indices_queue.pop();
         }
       }
+
+      // Before terminating this stage, we need to execute all the leftover
+      // dense single-qubit gates.
+      // TODO: an optimization can be performed here: we want to delay them
+      //  to the next stage if we can.
+      // TODO: we're simply creating shared-memory kernels here without
+      //  checking optimality.
+      int num_leftover_dense_single_qubit_gates = 0;
+      for (int j = 0; j < num_qubits; j++) {
+        if (have_dense_single_qubit_gate.front()[j]) {
+          num_leftover_dense_single_qubit_gates++;
+        }
+      }
+      while (num_leftover_dense_single_qubit_gates > 0) {
+        schedule.kernels.emplace_back(
+            /*gates=*/CircuitSeq(num_qubits,
+                                 sequence.get_num_input_parameters()),
+            /*qubits=*/std::vector<int>(), /*type=*/KernelType::shared_memory);
+        schedule.cost_ += kernel_cost.get_shared_memory_init_cost();
+        int remaining_free_qubits =
+            kernel_cost.get_shared_memory_num_free_qubits();
+        for (int index = 0; index < num_qubits; index++) {
+          if (have_dense_single_qubit_gate.front()[index]) {
+            if (!schedule.is_shared_memory_cacheline_qubit(index)) {
+              if (!remaining_free_qubits) {
+                // We cannot put qubit |index| into this kernel.
+                break;
+              }
+              remaining_free_qubits--;
+            }
+            num_leftover_dense_single_qubit_gates--;
+            have_dense_single_qubit_gate.front()[index] = false;
+            schedule.kernels.back().qubits.push_back(index);
+          }
+        }
+        // Close this kernel now.
+        try_to_execute_single_qubit_gates((int)schedule.kernels.size() - 1, 0);
+        // Then we execute the gates in this kernel.
+        for (int j = 0; j < (int)schedule.kernels.back().gates.gates.size();
+             j++) {
+          auto &gate = schedule.kernels.back().gates.gates[j];
+          auto &gate_indices_queue = gate_indices[gate->to_string()];
+          assert(!gate_indices_queue.empty());
+
+          // We execute the gate now.
+          const int original_index = gate_indices_queue.front();
+          for (auto &next_single_qubit_gate :
+               next_single_qubit_gates[original_index]) {
+            single_qubit_gate_indices[next_single_qubit_gate].second.erase(
+                original_index);
+            if (single_qubit_gate_indices[next_single_qubit_gate]
+                    .second.empty()) {
+              single_qubit_gate_to_execute.push_back(
+                  single_qubit_gate_indices[next_single_qubit_gate].first);
+              // Insert the gate after this gate.
+              try_to_execute_single_qubit_gates(
+                  (int)schedule.kernels.size() - 1, j + 1);
+            }
+          }
+          gate_indices_queue.pop();
+        }
+      }
+      have_dense_single_qubit_gate.pop_front();
     }
     for (auto &single_qubit_gate : single_qubit_gate_to_execute) {
       std::cerr << "Single-qubit gate " << single_qubit_gate

@@ -18,12 +18,15 @@ namespace quartz {
 class Schedule {
 public:
   Schedule(const CircuitSeq &sequence, const std::vector<int> &local_qubit,
-           const std::vector<int> &global_qubit, Context *ctx);
+           const std::vector<int> &global_qubit,
+           int num_shared_memory_cacheline_qubits, Context *ctx);
 
   // Compute the number of down sets for the circuit sequence.
   [[nodiscard]] size_t num_down_sets();
 
   [[nodiscard]] bool is_local_qubit(int index) const;
+
+  [[nodiscard]] bool is_shared_memory_cacheline_qubit(int index) const;
 
   /**
    * Compute which kernels to merge together at the end using a greedy
@@ -32,21 +35,15 @@ public:
    * result.
    * @param kernel_cost The cost function of kernels.
    * @param kernels The non-intersecting kernels to be merged.
-   * @param is_shared_memory_cacheline_qubit A vector of size equal to the
-   * number of qubits, denoting if the qubits are in the shared-memory
-   * cacheline. When in doubt, it is safe to pass in a vector of |num_qubits|
-   * false's.
    * @param result_cost The sum of the cost of the resulting merged kernels.
    * @param result_kernels The resulting merged kernels, or nullptr if it is
    * not necessary to record them.
    * @return True iff the computation succeeds.
    */
-  static bool compute_end_schedule(
-      const KernelCost &kernel_cost,
-      const std::vector<std::pair<std::vector<int>, KernelType>> &kernels,
-      const std::vector<bool> &is_shared_memory_cacheline_qubit,
-      KernelCostType &result_cost,
-      std::vector<std::pair<std::vector<int>, KernelType>> *result_kernels);
+  bool compute_end_schedule(const KernelCost &kernel_cost,
+                            const std::vector<KernelInDP> &kernels,
+                            KernelCostType &result_cost,
+                            std::vector<KernelInDP> *result_kernels) const;
 
   /**
    * Compute the schedule using dynamic programming.
@@ -82,6 +79,9 @@ private:
 
   // The mask for local qubits.
   std::vector<bool> local_qubit_mask_;
+
+  // The mask for shared-memory cacheline qubits.
+  std::vector<bool> shared_memory_cacheline_qubit_mask_;
 
   Context *ctx_;
 };

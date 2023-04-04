@@ -922,12 +922,20 @@ void CircuitSeq::print(Context *ctx) const {
   }
 }
 
-std::string CircuitSeq::to_string() const {
+std::string CircuitSeq::to_string(bool line_number) const {
   std::string result;
   result += "CircuitSeq {\n";
   const int num_gates = (int)gates.size();
   for (int i = 0; i < num_gates; i++) {
-    result += "  ";
+    if (line_number) {
+      char buffer[20]; // enough to store any int
+      int max_line_number_width =
+          std::max(1, (int)std::ceil(std::log10(num_gates - 0.01)));
+      sprintf(buffer, "%*d", max_line_number_width, i);
+      result += std::string(buffer) + ": ";
+    } else {
+      result += "  ";
+    }
     result += gates[i]->to_string();
     result += "\n";
   }

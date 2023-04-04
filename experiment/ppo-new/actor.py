@@ -606,7 +606,7 @@ class PPOAgent:
             best_g = buffer.best_graph
             best_cost = get_cost(best_g, self.cost_type)
             best_qasm = best_g.to_qasm_str()
-            best_path = os.path.join(output_dir, f'{buffer.name}.qasm')
+            best_path = os.path.join(output_dir, f'{buffer.name}_{best_cost}.qasm')
             with open(best_path, 'w') as f:
                 f.write(best_qasm)
 

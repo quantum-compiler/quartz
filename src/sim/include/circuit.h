@@ -54,7 +54,11 @@ public:
   
   // states info kept for doing compilation
   std::vector<unsigned> permutation;
+  std::vector<std::vector<unsigned>> permutation_record;
   std::vector<unsigned> pos;
+  std::vector<std::vector<unsigned>> pos_record;
+  std::vector<std::vector<int2>> local_swap_record;
+  std::vector<unsigned> global_swap_record;
   std::vector<bool> local_mask;
   std::map<int, int> qubit_group_map_fusion;
 

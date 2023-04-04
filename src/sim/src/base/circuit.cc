@@ -253,6 +253,9 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
       for (int i = 0; i < permutation.size(); i++) {
         printf("%d, ", permutation[i]);
       }
+
+      permutation_record.push_back(permutation);
+      pos.push_back(pos);
       idx++;
     }
     else {
@@ -824,6 +827,7 @@ bool qcircuit::Circuit<DT>::getMat_per_device(quartz::Context *ctx, int part_id,
 template <typename DT>
 void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
   
+  std::vector<int2> local_swap;
   std::vector<int> new_global_pos;
   int nGlobalSwaps = n_global;
   int nLocalSwaps = 0;
@@ -836,8 +840,10 @@ void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
   
   unsigned local_mask = 0;
   unsigned global_mask = 0;
+  unsigned global = 0;
   int j1 = 0;
   for (int i = n_global - 1; i >= 0; i--) {
+    global |= unsigned(1) << i;
     if(new_global_pos[i] >= n_local) {
       global_mask |= 1 << (new_global_pos[i] - n_local);
       nGlobalSwaps--;
@@ -851,6 +857,10 @@ void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
         nLocalSwaps++;
         for (int j = num_swaps - 1; j >= 0; j--) {
           if(!(local_mask >> j & 1)) {
+            int2 swap;
+            swap.x = new_global_pos[i];
+            swap.y = n_local - num_swaps + j;
+            local_swap.push_back(swap);
             std::swap(pos[permutation[new_global_pos[i]]], pos[permutation[n_local - num_swaps + j]]);
             std::swap(permutation[new_global_pos[i]], permutation[n_local - num_swaps + j]);
             local_mask |= 1 << j;
@@ -868,6 +878,11 @@ void qcircuit::Circuit<DT>::update_layout(std::vector<int> targets) {
       nGlobalSwaps--;
     }     
   }
+
+  permutation_record.push_back(permutation);
+  pos_record.push_back(pos);
+  local_swap_record.push_back(local_swap);
+  global_swap_record.push_back(global&(~global_mask));
 
   // printf("Current Layout: [");
   // for (int i = 0; i < permutation.size(); i++) {

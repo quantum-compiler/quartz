@@ -43,7 +43,7 @@ void sim::top_level_task(
                 "_indep_qiskit_29" +
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
-                                         config.num_local_qubits);
+                                         config.num_local_qubits, (1 << (config.num_all_qubits - config.num_local_qubits)), 0, 1);
   // circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
   // DistributedSimulator simulator(config, circuit);
   // simulator.run();
@@ -120,6 +120,20 @@ int main(int argc, char **argv) {
     registrar.set_leaf();
     Runtime::preregister_task_variant<DistributedSimulator::sv_comp_task>(
         registrar, "Gate Compute Task");
+  }
+  {
+    TaskVariantRegistrar registrar(SHUFFLE_TASK_ID, "Shuffle");
+    registrar.add_constraint(ProcessorConstraint(Processor::TOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<DistributedSimulator::shuffle_task>(
+        registrar, "Shuffle Task");
+  }
+  {
+    TaskVariantRegistrar registrar(STORE_TASK_ID, "Store");
+    registrar.add_constraint(ProcessorConstraint(Processor::TOC_PROC));
+    registrar.set_leaf();
+    Runtime::preregister_task_variant<DistributedSimulator::store_task>(
+        registrar, "Store Task");
   }
   {
     TaskVariantRegistrar registrar(GPU_SV_INIT_TASK_ID, "GPU SV Init");

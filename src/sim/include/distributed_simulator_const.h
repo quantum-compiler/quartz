@@ -3,6 +3,7 @@
 
 #define MAX_NUM_WORKERS 128
 #define MAX_NUM_QUBITS 64
+#define MAX_CPU_SV_INPUT 128
 #define MAX_TENSOR_DIM 4
 #define MAX_GATE_MATRIX_SIZE (2 * 8 * (1 << 6) * (1 << 6))
 // Pre-assigned const flags
@@ -42,6 +43,8 @@ enum TaskIDs {
   CPU_SV_INIT_TASK_ID,
   GPU_SV_INIT_TASK_ID,
   GATE_COMP_TASK_ID,
+  SHUFFLE_TASK_ID,
+  STORE_TASK_ID,
   NCCL_GETUNIQUEID_TASK_ID,
   // Custom tasks
   CUSTOM_GPU_TASK_ID_FIRST,

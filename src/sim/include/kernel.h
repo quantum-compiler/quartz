@@ -11,3 +11,7 @@ void ApplyGatesSHM(int gridDim, qComplex *deviceStateVec,
                    unsigned int *threadBias, int numLocalQubits, int numGates,
                    unsigned int blockHot, unsigned int enumerate,
                    cudaStream_t &stream, int gpuID);
+void LegionApplyGatesSHM(int gridDim, qComplex *deviceStateVec,
+                   unsigned int *threadBias, int numLocalQubits, int numGates,
+                   unsigned int blockHot, unsigned int enumerate,
+                   cudaStream_t &stream, int *loArr, int *shiftAt);

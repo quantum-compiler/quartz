@@ -21,6 +21,10 @@ public:
   [[nodiscard]] std::vector<int> get_qubit_indices() const;
   // Get the control qubit indices of the gate if it is a controlled gate.
   [[nodiscard]] std::vector<int> get_control_qubit_indices() const;
+  // Get the "insular" qubit indices of the gate.
+  [[nodiscard]] std::vector<int> get_insular_qubit_indices() const;
+  // Get the "non-insular" qubit indices of the gate.
+  [[nodiscard]] std::vector<int> get_non_insular_qubit_indices() const;
   [[nodiscard]] std::string to_string() const;
   std::vector<CircuitWire *> input_wires; // Include parameters!
   std::vector<CircuitWire *> output_wires;

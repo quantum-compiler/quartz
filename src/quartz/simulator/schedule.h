@@ -52,10 +52,15 @@ public:
    * gate (e.g., X). A kernel with one CCX is assumed to have 1/4 of the
    * cost of a kernel with X.
    * @param kernel_cost The cost function of kernels.
+   * @param non_insular_qubit_indices The set of non-insular qubit indices
+   * for each gate, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
    * @return True iff the computation succeeds. The results are stored in
    * the member variables |kernels|, |kernel_qubits|, and |cost_|.
    */
-  bool compute_kernel_schedule(const KernelCost &kernel_cost);
+  bool compute_kernel_schedule(
+      const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {});
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
@@ -95,7 +100,6 @@ private:
  * @param ctx The Context object.
  * @param absorb_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
- * TODO: check if it's entangled or not
  * @return The kernel schedule for each stage.
  */
 std::vector<Schedule>

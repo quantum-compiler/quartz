@@ -27,7 +27,7 @@ class IBMConfig(BaseConfig):
 
 @dataclass
 class IBMFTConfig(IBMConfig):
-    wandb: WandbConfig = WandbConfig.new_project('IBM-Finetune-02')
+    wandb: WandbConfig = WandbConfig.new_project('IBM-Finetune-03')
     greedy_sample: bool = True
     k_epochs: int = 20
     lr_gnn: float = 3e-4

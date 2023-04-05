@@ -28,7 +28,7 @@ class Nam2Config(BaseConfig):
 
 @dataclass
 class Nam2FTConfig(Nam2Config):
-    wandb: WandbConfig = WandbConfig.new_project('Nam2-Finetune-02')
+    wandb: WandbConfig = WandbConfig.new_project('Nam2-Finetune-04')
     greedy_sample: bool = True
     k_epochs: int = 20
     lr_gnn: float = 3e-4

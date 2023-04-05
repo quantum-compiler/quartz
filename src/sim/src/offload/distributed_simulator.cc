@@ -135,13 +135,13 @@ bool DistributedSimulator::create_regions() {
       std::vector<IndexPartition> shuffle_ip;
       Point<1> extent_hi;
       Point<1> extent_lo;
-      extent_hi[0] = (ext_hi[0] - ext_lo[0] +  n_partition) / n_partition - 1;
+      extent_hi[0] = (ext_hi[0] + n_partition) / n_partition - 1;
       extent_lo[0] = 0;
       Transform<1, 1> trans;
       trans[0][0] = extent_hi[0] + 1;
       for (size_t k = 0; k < n_partition / total_gpus; k++) {
         extent_lo[0] = k * total_gpus * trans[0][0];
-        extent_hi[0] = extent_lo[0] + (ext_hi[0] - ext_lo[0] +  n_partition) / n_partition - 1;
+        extent_hi[0] = extent_lo[0] + (ext_hi[0] +  n_partition) / n_partition - 1;
         for (int j = 0; j < total_gpus; j++) {
           extent_lo[0] += transform[0][0];
           extent_hi[0] += transform[0][0];
@@ -373,7 +373,7 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
           cur_all2all_group = i / num_batches;
           cur_batch = i % num_batches;
         }
-        for (&lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(parallel_degree)) {
+        for (auto &lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(parallel_degree)) {
           int field_idx = 0;
           ArgumentMap argmap;
           Domain domain = runtime->get_index_space_domain(ctx, stage_parallel_is.at(parallel_degree));
@@ -509,7 +509,7 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
 
         int gpu_sv_id = 0;
 
-        for (&lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(1)) {
+        for (auto &lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(1)) {
           int field_idx = 0;
           ArgumentMap argmap;
           Domain domain = runtime->get_index_space_domain(ctx, stage_parallel_is.at(1));

@@ -46,7 +46,7 @@ public:
     Legion::coord_t num_local_qubits;
     Legion::coord_t num_all_qubits;
     int chunk_id;
-    int* threadBias;
+    unsigned* threadBias;
     int* loIdx_device;
     int* shiftAt_device;
   };
@@ -94,30 +94,9 @@ private:
   unsigned pos[MAX_QUBIT];
 };
 
-KernelGate getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID, unsigned* pos, unsigned n_local);
+KernelGate getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID, const unsigned* pos, unsigned n_local);
 
-KernelGateType toU(KernelGateType type) {
-    switch (type) {
-      case KernelGateType::CCX:
-        return KernelGateType::X;
-      case KernelGateType::CNOT:
-        return KernelGateType::X;
-      case KernelGateType::CY:
-        return KernelGateType::Y;
-      case KernelGateType::CZ:
-        return KernelGateType::Z;
-      case KernelGateType::CRX:
-        return KernelGateType::RX;
-      case KernelGateType::CRY:
-        return KernelGateType::RY;
-      case KernelGateType::CU1:
-        return KernelGateType::U1;
-      case KernelGateType::CRZ:
-        return KernelGateType::RZ;
-      default:
-          assert(false);
-    }
-}
+KernelGateType toU(KernelGateType type);
 
 void top_level_task(Legion::Task const *task,
                              std::vector<Legion::PhysicalRegion> const &regions,

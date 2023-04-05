@@ -24,6 +24,25 @@ namespace sim {
     }                                                                          \
   };
 
+#define FatalError(s)                                                          \
+  do {                                                                         \
+    std::stringstream _where, _message;                                        \
+    _where << __FILE__ << ':' << __LINE__;                                     \
+    _message << std::string(s) + "\n" << __FILE__ << ':' << __LINE__;          \
+    std::cerr << _message.str() << "\nAborting...\n";                          \
+    assert(false);                                                             \
+    exit(1);                                                                   \
+  } while (0)
+  
+#define checkCUDA(status)                                                      \
+  do {                                                                         \
+    std::stringstream _error;                                                  \
+    if (status != 0) {                                                         \
+      _error << "Cuda failure: " << status;                                    \
+      FatalError(_error.str());                                                \
+    }                                                                          \
+  } while (0)
+
 template <typename FT, int N, typename T = Legion::coord_t>
 using AccessorRO =
     Legion::FieldAccessor<READ_ONLY, FT, N, T, Realm::AffineAccessor<FT, N, T>>;

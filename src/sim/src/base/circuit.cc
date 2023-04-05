@@ -255,7 +255,7 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
       }
 
       permutation_record.push_back(permutation);
-      pos.push_back(pos);
+      pos_record.push_back(pos);
       idx++;
     }
     else {

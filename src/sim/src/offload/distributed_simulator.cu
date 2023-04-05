@@ -9,7 +9,7 @@ DistributedSimulator::cuda_init_task(Task const *task,
                                      std::vector<PhysicalRegion> const &regions,
                                      Context ctx, Runtime *runtime) {
   cudaStream_t stream;
-  get_legion_stream(&stream);
+  cudaStreamCreate(&stream);
   DSConfig const *config = (DSConfig *)task->args;
   DSHandler handle;
   handle.workSpaceSize = (size_t)4 * 1024 * 1024 * 1024; // 1GB work space
@@ -37,7 +37,7 @@ DistributedSimulator::cuda_init_task(Task const *task,
   }
   handle.ncclComm = nullptr;
   handle.vecDataType = config->state_vec_data_type;
-  HANDLE_CUDA_ERROR(cudaMalloc(&handle.threadBias, sizeof(qindex) << THREAD_DEP));
+  cudaMalloc(&handle.threadBias, sizeof(qindex) << THREAD_DEP);
   // for SHM method
   // initControlIdx
   int loIdx_host[10][10][128];
@@ -108,7 +108,7 @@ void DistributedSimulator::shuffle_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   cudaStream_t stream;
-  get_legion_stream(&stream);
+  cudaStreamCreate(&stream);
   DSHandler const *handler = (DSHandler *)task->local_args;
   GenericTensorAccessorW gpu_state_vector = helperGetGenericTensorAccessorWO(
       handler->vecDataType, regions[0], task->regions[0], FID_DATA, ctx, runtime);
@@ -133,7 +133,7 @@ void DistributedSimulator::store_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   cudaStream_t stream;
-  get_legion_stream(&stream);
+  cudaStreamCreate(&stream);
   DSHandler const *handler = (DSHandler *)task->local_args;
   GenericTensorAccessorR gpu_state_vector = helperGetGenericTensorAccessorRO(
       handler->vecDataType, regions[0], task->regions[0], FID_DATA, ctx, runtime);
@@ -162,12 +162,13 @@ void DistributedSimulator::sv_comp_task(
       handler->vecDataType, regions[0], task->regions[0], FID_DATA, ctx, runtime);
 
   cudaStream_t stream;
-  get_legion_stream(&stream);
+  cudaStreamCreate(&stream);
   unsigned const nIndexBits = handler->num_local_qubits;
   int fused_idx = 0;
   int shm_idx = 0;
   int fused_start = info->fused_idx;
   int shm_start = info->shm_idx;
+  FusedGate* fgates = info->fgates;
 
   for (int task_id = 0; task_id < info->num_tasks; task_id++) {
     if (info->task_map[task_id] == FUSED) {
@@ -230,7 +231,7 @@ void DistributedSimulator::sv_comp_task(
         hostThreadBias[i] = j;
       }
 
-      HANDLE_CUDA_ERROR(cudaMemcpyAsync(handler->threadBias, hostThreadBias,
+      checkCUDA(cudaMemcpyAsync(handler->threadBias, hostThreadBias,
                                       sizeof(hostThreadBias),
                                       cudaMemcpyHostToDevice, stream));
 
@@ -252,8 +253,11 @@ void DistributedSimulator::sv_comp_task(
       // 1. reset all the gates' target/control qubit to group qubit id
       // 2. generate per-device schedule
       int num_kgates = info->task_num_gates[task_id];
-      KernelGate* kernelgates = info->kgates[shm_idx+shm_start];
+      KernelGate* kgates = info->kgates;
+      KernelGate* kernelgates = &kgates[shm_idx+shm_start];
       KernelGate hostGates[num_kgates];
+      int* loIdx_device = handler->loIdx_device;
+      int* shiftAt_device = handler->shiftAt_device;
       assert(num_kgates < MAX_GATE);
       for (size_t i = 0; i < num_kgates; i++) {
           hostGates[i] = getGate(kernelgates[i], handler->chunk_id, logicQubitset, qubit_group_map, info->pos, n_local);
@@ -263,7 +267,7 @@ void DistributedSimulator::sv_comp_task(
       
       copyGatesToSymbol(hostGates, num_kgates, stream, 0);
       LegionApplyGatesSHM(gridDim, (qComplex *)state_vector.get_void_ptr(), handler->threadBias, n_local,
-                    num_kgates, blockHot, enumerate, stream, handler->loIdx_device, handler->shiftAt_device);
+                    num_kgates, blockHot, enumerate, stream, loIdx_device, shiftAt_device);
 
       shm_idx += num_kgates;
 
@@ -281,9 +285,9 @@ void DistributedSimulator::sv_comp_task(
     swap.y = info->local_swap[i*2+1];
     LocalIndexBitSwaps.push_back(swap);
   }
-  HANDLE_ERROR(custatevecSwapIndexBits(
+  custatevecSwapIndexBits(
           handler->statevec, state_vector.get_void_ptr(), data_type, nIndexBits, LocalIndexBitSwaps.data(),
-          info->nLocalSwaps, maskBitString, maskOrdering, maskLen));
+          info->nLocalSwaps, maskBitString, maskOrdering, maskLen);
 
   return;
   
@@ -293,7 +297,7 @@ void DistributedSimulator::sv_comp_task(
 #define IS_LOCAL_QUBIT(logicIdx) (pos[logicIdx] < n_local)
 #define IS_HIGH_PART(part_id, logicIdx) ((part_id >> (pos[logicIdx] - n_local) & 1) > 0)
 
-KernelGate sim::getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID, unsigned* pos, unsigned n_local) {
+KernelGate sim::getGate(const KernelGate& gate, int part_id, qindex relatedLogicQb, const std::map<int, int>& toID, const unsigned* pos, unsigned n_local) {
     qComplex mat_[2][2] = {make_qComplex(gate.r00, gate.i00), make_qComplex(gate.r01, gate.i01), make_qComplex(gate.r10, gate.i10), make_qComplex(gate.r11, gate.i11)};
     if (gate.controlQubit2 != -1) { // 2 control-qubit
         // Assume no CC-Diagonal
@@ -514,5 +518,28 @@ KernelGate sim::getGate(const KernelGate& gate, int part_id, qindex relatedLogic
         } else { // IS_LOCAL_QUBIT(t) -> U(t)
             return KernelGate(gate.type, toID.at(t), 1 - IS_SHARE_QUBIT(t), mat_);
         }
+    }
+}
+
+KernelGateType sim::toU(KernelGateType type) {
+    switch (type) {
+      case KernelGateType::CCX:
+        return KernelGateType::X;
+      case KernelGateType::CNOT:
+        return KernelGateType::X;
+      case KernelGateType::CY:
+        return KernelGateType::Y;
+      case KernelGateType::CZ:
+        return KernelGateType::Z;
+      case KernelGateType::CRX:
+        return KernelGateType::RX;
+      case KernelGateType::CRY:
+        return KernelGateType::RY;
+      case KernelGateType::CU1:
+        return KernelGateType::U1;
+      case KernelGateType::CRZ:
+        return KernelGateType::RZ;
+      default:
+          assert(false);
     }
 }

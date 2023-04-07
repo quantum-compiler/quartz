@@ -29,19 +29,19 @@ public:
   [[nodiscard]] bool is_shared_memory_cacheline_qubit(int index) const;
 
   /**
-   * Compute which kernels to merge together at the end using a greedy
+   * Compute which open kernels to merge together at the end using a greedy
    * algorithm, assuming there are no other kernels after the given ones.
    * The greedy algorithm is approximate -- it might not give the optimal
    * result.
    * @param kernel_cost The cost function of kernels.
-   * @param kernels The non-intersecting kernels to be merged.
+   * @param open_kernels The non-intersecting open kernels to be merged.
    * @param result_cost The sum of the cost of the resulting merged kernels.
    * @param result_kernels The resulting merged kernels, or nullptr if it is
    * not necessary to record them.
    * @return True iff the computation succeeds.
    */
   bool compute_end_schedule(const KernelCost &kernel_cost,
-                            const std::vector<KernelInDP> &kernels,
+                            const std::vector<KernelInDP> &open_kernels,
                             KernelCostType &result_cost,
                             std::vector<KernelInDP> *result_kernels) const;
 

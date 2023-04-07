@@ -1415,9 +1415,8 @@ get_schedules(const CircuitSeq &sequence,
     }
 
     auto do_attach_single_qubit_gates =
-        [&single_qubit_gate_indices, &has_dense_single_qubit_gate](
+        [&single_qubit_gate_indices, &has_dense_single_qubit_gate, &debug](
             std::vector<std::vector<int>> &attach_to, int gate_id, int qubit) {
-          // constexpr does not need to be captured
           if (debug) {
             if (!single_qubit_gate_indices[qubit].empty()) {
               std::cout << "Attach single qubit gates";

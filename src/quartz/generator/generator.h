@@ -71,10 +71,13 @@ public:
           nullptr);
 
 private:
+  void initialize_supported_quantum_gates();
+
   void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,
            CircuitSeq *dag, std::vector<int> &used_parameters, Dataset &dataset,
            bool restrict_search_space, bool unique_parameters);
 
+  // Requires initialize_supported_quantum_gates() to be called first.
   // |dags[i]| is the DAGs with |i| gates.
   void bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
            int max_num_param_gates, Dataset &dataset,
@@ -88,6 +91,8 @@ private:
                            std::vector<std::unique_ptr<CircuitSeq>> &result);
 
   Context *context;
+  // |supported_quantum_gates_[i]|: supported quantum gates with |i| qubits.
+  std::vector<std::vector<GateType>> supported_quantum_gates_;
   Verifier verifier_;
 };
 

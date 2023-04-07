@@ -1415,8 +1415,17 @@ get_schedules(const CircuitSeq &sequence,
     }
 
     auto attach_single_qubit_gates =
-        [&single_qubit_gate_indices, &has_dense_single_qubit_gate](
+        [&single_qubit_gate_indices, &has_dense_single_qubit_gate, &debug](
             std::vector<std::vector<int>> &attach_to, int gate_id, int qubit) {
+          if (debug) {
+            if (!single_qubit_gate_indices[qubit].empty()) {
+              std::cout << "Attach single qubit gates";
+              for (auto &index : single_qubit_gate_indices[qubit]) {
+                std::cout << " " << index;
+              }
+              std::cout << " to " << gate_id << std::endl;
+            }
+          }
           attach_to[gate_id].insert(attach_to[gate_id].end(),
                                     single_qubit_gate_indices[qubit].begin(),
                                     single_qubit_gate_indices[qubit].end());
@@ -1440,32 +1449,12 @@ get_schedules(const CircuitSeq &sequence,
           break;
         }
       }
-      if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
-        if (!sequence.gates[i]->gate->is_symmetric()) {
-          // For controlled gates, we only need to have all target qubits local
-          // when it's not symmetric.
-          int control_qubit_count =
-              sequence.gates[i]->gate->get_num_control_qubits();
-          for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit() && control_qubit_count--) {
-              // Skip the control qubits.
-              continue;
-            }
-            if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
-              executable = false;
-              break;
-            }
-          }
-        }
-      } else if (sequence.gates[i]->gate->get_num_qubits() > 1 ||
-                 !sequence.gates[i]->gate->is_sparse()) {
-        // For non-controlled multi-qubit gates and non-sparse single-qubit
-        // gates, we need to have all qubits local.
-        for (auto &wire : sequence.gates[i]->input_wires) {
-          if (wire->is_qubit() && !local_qubit_mask[wire->index]) {
-            executable = false;
-            break;
-          }
+      std::vector<int> non_insular_qubits =
+          sequence.gates[i]->get_non_insular_qubit_indices();
+      for (auto &qubit : non_insular_qubits) {
+        if (!local_qubit_mask[qubit]) {
+          executable = false;
+          break;
         }
       }
       if (executable) {
@@ -1494,8 +1483,6 @@ get_schedules(const CircuitSeq &sequence,
             // Either a global gate or a multi-qubit gate.
             current_seq.add_gate(sequence.gates[i].get());
             // Attach single-qubit gates to this gate.
-            std::vector<int> non_insular_qubits =
-                sequence.gates[i]->get_non_insular_qubit_indices();
             for (auto &qubit : non_insular_qubits) {
               attach_single_qubit_gates(attach_front, i, qubit);
             }
@@ -1533,21 +1520,21 @@ get_schedules(const CircuitSeq &sequence,
               }
             }
 
+            // Only update them for gates that are passed into the DP.
             // Update |dp_sequence_position| and |non_insular_qubit_indices|.
             dp_sequence_position[i] = std::make_pair(
                 num_stage, (int)non_insular_qubit_indices[num_stage].size());
             non_insular_qubit_indices[num_stage].push_back(
                 std::move(non_insular_qubits));
-          }
-
-          // Update |last_gate_index|.
-          for (auto &wire : sequence.gates[i]->input_wires) {
-            if (wire->is_qubit()) {
-              last_gate_index[wire->index] = i;
+            // Update |last_gate_index|.
+            for (auto &wire : sequence.gates[i]->input_wires) {
+              if (wire->is_qubit()) {
+                last_gate_index[wire->index] = i;
+              }
             }
+            // Update |gate_indices|.
+            gate_indices[sequence.gates[i]->to_string()].push(i);
           }
-          // Update |gate_indices|.
-          gate_indices[sequence.gates[i]->to_string()].push(i);
         } else {
           current_seq.add_gate(sequence.gates[i].get());
         }
@@ -1561,6 +1548,36 @@ get_schedules(const CircuitSeq &sequence,
       }
     }
 
+    auto attach_back_and_update_insular = [&has_dense_single_qubit_gate,
+                                           &non_insular_qubit_indices,
+                                           &dp_sequence_position,
+                                           &last_gate_index,
+                                           &attach_single_qubit_gates,
+                                           &attach_back](int qubit) {
+      if (has_dense_single_qubit_gate[qubit]) {
+        if (std::find(non_insular_qubit_indices
+                          [dp_sequence_position[last_gate_index[qubit]].first]
+                          [dp_sequence_position[last_gate_index[qubit]].second]
+                              .begin(),
+                      non_insular_qubit_indices
+                          [dp_sequence_position[last_gate_index[qubit]].first]
+                          [dp_sequence_position[last_gate_index[qubit]].second]
+                              .end(),
+                      qubit) ==
+            non_insular_qubit_indices
+                [dp_sequence_position[last_gate_index[qubit]].first]
+                [dp_sequence_position[last_gate_index[qubit]].second]
+                    .end()) {
+          // This qubit is no longer insular.
+          non_insular_qubit_indices
+              [dp_sequence_position[last_gate_index[qubit]].first]
+              [dp_sequence_position[last_gate_index[qubit]].second]
+                  .push_back(qubit);
+        }
+      }
+      attach_single_qubit_gates(attach_back, last_gate_index[qubit], qubit);
+    };
+
     if (num_stage == (int)local_qubits.size() - 1) {
       // The last stage. We need to execute all the remaining single-qubit
       // gates.
@@ -1570,29 +1587,46 @@ get_schedules(const CircuitSeq &sequence,
             std::cerr << "Qubit " << qubit << " is not entangled." << std::endl;
             assert(false);
           }
-          if (has_dense_single_qubit_gate[qubit]) {
-            if (std::find(
-                    non_insular_qubit_indices
-                        [dp_sequence_position[last_gate_index[qubit]].first]
-                        [dp_sequence_position[last_gate_index[qubit]].second]
-                            .begin(),
-                    non_insular_qubit_indices
-                        [dp_sequence_position[last_gate_index[qubit]].first]
-                        [dp_sequence_position[last_gate_index[qubit]].second]
-                            .end(),
-                    qubit) ==
-                non_insular_qubit_indices
-                    [dp_sequence_position[last_gate_index[qubit]].first]
-                    [dp_sequence_position[last_gate_index[qubit]].second]
-                        .end()) {
-              // This qubit is no longer insular.
-              non_insular_qubit_indices
-                  [dp_sequence_position[last_gate_index[qubit]].first]
-                  [dp_sequence_position[last_gate_index[qubit]].second]
-                      .push_back(qubit);
+          attach_back_and_update_insular(qubit);
+        }
+      }
+    } else {
+      // Not the last stage, but we need to execute any single-qubit gate
+      // that operates on a qubit that will become global in the next stage.
+      for (int qubit = 0; qubit < num_qubits; qubit++) {
+        if (!single_qubit_gate_indices[qubit].empty() &&
+            std::find(local_qubits[num_stage + 1].begin(),
+                      local_qubits[num_stage + 1].end(),
+                      qubit) == local_qubits[num_stage + 1].end()) {
+          if (last_gate_index[qubit] == -1) {
+            if (debug) {
+              std::cout << "Single-qubit gate "
+                        << single_qubit_gate_indices[qubit][0] << ": "
+                        << sequence.gates[single_qubit_gate_indices[qubit][0]]
+                               ->to_string()
+                        << "not removed." << std::endl;
             }
+            int gate_id = single_qubit_gate_indices[qubit][0];
+            current_seq.add_gate(sequence.gates[gate_id].get());
+            // Only update them for gates that are passed into the DP.
+            // Update |dp_sequence_position| and |non_insular_qubit_indices|.
+            dp_sequence_position[gate_id] = std::make_pair(
+                num_stage, (int)non_insular_qubit_indices[num_stage].size());
+            non_insular_qubit_indices[num_stage].push_back(
+                sequence.gates[gate_id]->get_non_insular_qubit_indices());
+            // Update |last_gate_index|.
+            for (auto &wire : sequence.gates[gate_id]->input_wires) {
+              if (wire->is_qubit()) {
+                last_gate_index[wire->index] = gate_id;
+              }
+            }
+            // Update |gate_indices|.
+            gate_indices[sequence.gates[gate_id]->to_string()].push(gate_id);
+            // Remove the first gate because it is already added to the DP.
+            single_qubit_gate_indices[qubit].erase(
+                single_qubit_gate_indices[qubit].begin());
           }
-          attach_single_qubit_gates(attach_back, last_gate_index[qubit], qubit);
+          attach_back_and_update_insular(qubit);
         }
       }
     }

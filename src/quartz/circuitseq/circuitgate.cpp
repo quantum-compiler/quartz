@@ -45,6 +45,81 @@ std::vector<int> CircuitGate::get_control_qubit_indices() const {
   return result;
 }
 
+std::vector<int> CircuitGate::get_insular_qubit_indices() const {
+  if (gate->get_num_qubits() == 1) {
+    if (gate->is_sparse()) {
+      // Diagonal or anti-diagonal.
+      for (auto &wire : input_wires) {
+        if (wire->is_qubit()) {
+          return {wire->index};
+        }
+      }
+      assert(false);
+    } else {
+      return {};
+    }
+  }
+  if (gate->is_diagonal()) {
+    // All qubits are insular for diagonal gates.
+    return get_qubit_indices();
+  }
+  int remaining_control_qubits = gate->get_num_control_qubits();
+  if (remaining_control_qubits == 0) {
+    // No qubit are insular for multi-qubit non-controlled gates.
+    return {};
+  }
+  std::vector<int> result;
+  result.reserve(remaining_control_qubits);
+  for (auto &input_node : input_wires) {
+    // Control qubits always appear first.
+    if (input_node->is_qubit()) {
+      remaining_control_qubits--;
+      result.push_back(input_node->index);
+      if (remaining_control_qubits == 0) {
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+std::vector<int> CircuitGate::get_non_insular_qubit_indices() const {
+  if (gate->get_num_qubits() == 1) {
+    if (gate->is_sparse()) {
+      // Diagonal or anti-diagonal.
+      return {};
+    } else {
+      for (auto &wire : input_wires) {
+        if (wire->is_qubit()) {
+          return {wire->index};
+        }
+      }
+      assert(false);
+    }
+  }
+  if (gate->is_diagonal()) {
+    // All qubits are insular for diagonal gates.
+    return {};
+  }
+  int remaining_control_qubits = gate->get_num_control_qubits();
+  if (remaining_control_qubits == 0) {
+    // No qubit are insular for multi-qubit non-controlled gates.
+    return get_qubit_indices();
+  }
+  std::vector<int> result;
+  result.reserve(gate->get_num_qubits() - remaining_control_qubits);
+  for (auto &input_node : input_wires) {
+    // Control qubits always appear first.
+    if (input_node->is_qubit()) {
+      remaining_control_qubits--;
+      if (remaining_control_qubits < 0) {
+        result.push_back(input_node->index);
+      }
+    }
+  }
+  return result;
+}
+
 std::string CircuitGate::to_string() const {
   std::string result;
   if (output_wires.size() == 1) {

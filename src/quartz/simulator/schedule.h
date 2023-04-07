@@ -98,7 +98,7 @@ private:
  * @param local_qubits The local qubits in each stage.
  * @param kernel_cost The cost function of kernels.
  * @param ctx The Context object.
- * @param absorb_single_qubit_gates An optimization to reduce the running
+ * @param attach_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
  * @return The kernel schedule for each stage.
  */
@@ -106,7 +106,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool absorb_single_qubit_gates);
+              bool attach_single_qubit_gates);
 
 class PythonInterpreter;
 std::vector<std::vector<int>>

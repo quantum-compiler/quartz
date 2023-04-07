@@ -1280,7 +1280,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool absorb_single_qubit_gates) {
+              bool attach_single_qubit_gates) {
   constexpr bool debug = false;
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
@@ -1292,41 +1292,41 @@ get_schedules(const CircuitSeq &sequence,
   std::vector<bool> executed(num_gates, false);
   int start_gate_index = 0; // an optimization
 
-  // Variables for |absorb_single_qubit_gates|=true.
+  // Variables for |attach_single_qubit_gates|=true.
   // |single_qubit_gate_indices[i]|: the indices of single-qubit gates at the
   // |i|-th qubit after the last multi-qubit gate at the |i|-th qubit,
   // ignoring all global qubits;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::vector<std::vector<int>> single_qubit_gate_indices(num_qubits);
   // |has_dense_single_qubit_gate[i]|: if |single_qubit_gate_indices[i]|
   // includes a dense single-qubit gate or not;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::vector<bool> has_dense_single_qubit_gate(num_qubits, false);
   // |last_gate_index[i]|: the last gate touching the |i|-th qubit;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::vector<int> last_gate_index(num_qubits, -1);
   // |gate_indices[gate_string]|: the indices of gates with to_string() being
   // |gate_string|, used to restore the single-qubit gates;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::unordered_map<std::string, std::queue<int>> gate_indices;
   // |attach_front[j]|: the indices of single-qubit gates to be attached
   // to the |j|-th gate (which should be a multi-qubit gate);
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::vector<std::vector<int>> attach_front(num_gates);
   std::vector<std::vector<int>> attach_back(num_gates);
   // |dp_sequence_position[j]|: the stage and the position of the |j|-th gate in
   // the original sequence in |current_seq|;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   // |non_insular_qubit_indices[i][j]|: the set of non-insular qubits of the
   // |j|-th gate in |current_seq| in the |i|-th stage;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   std::vector<std::pair<int, int>> dp_sequence_position(num_gates);
   std::vector<std::vector<std::vector<int>>> non_insular_qubit_indices(
       local_qubits.size());
 
   // |have_dense_single_qubit_gate[i][j]|: if there is a dense single-qubit gate
   // on qubit |j| that is not executed yet in the |i|-th stage;
-  // only computed when |absorb_single_qubit_gates| is true
+  // only computed when |attach_single_qubit_gates| is true
   //  std::deque<std::vector<bool>> have_dense_single_qubit_gate;
   //  std::vector<std::pair<int, std::unordered_set<int>>>
   //      single_qubit_gate_indices_;
@@ -1414,9 +1414,10 @@ get_schedules(const CircuitSeq &sequence,
       std::cout << std::endl;
     }
 
-    auto attach_single_qubit_gates =
-        [&single_qubit_gate_indices, &has_dense_single_qubit_gate, &debug](
+    auto do_attach_single_qubit_gates =
+        [&single_qubit_gate_indices, &has_dense_single_qubit_gate](
             std::vector<std::vector<int>> &attach_to, int gate_id, int qubit) {
+          // constexpr does not need to be captured
           if (debug) {
             if (!single_qubit_gate_indices[qubit].empty()) {
               std::cout << "Attach single qubit gates";
@@ -1460,7 +1461,7 @@ get_schedules(const CircuitSeq &sequence,
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        if (absorb_single_qubit_gates) {
+        if (attach_single_qubit_gates) {
           // Get local qubits.
           std::vector<int> current_local_qubits;
           for (auto &wire : sequence.gates[i]->input_wires) {
@@ -1484,7 +1485,7 @@ get_schedules(const CircuitSeq &sequence,
             current_seq.add_gate(sequence.gates[i].get());
             // Attach single-qubit gates to this gate.
             for (auto &qubit : non_insular_qubits) {
-              attach_single_qubit_gates(attach_front, i, qubit);
+              do_attach_single_qubit_gates(attach_front, i, qubit);
             }
             for (auto &qubit : sequence.gates[i]->get_insular_qubit_indices()) {
               if (has_dense_single_qubit_gate[qubit]) {
@@ -1510,10 +1511,10 @@ get_schedules(const CircuitSeq &sequence,
                                 .end()) {
                   // It's better to attach them to the last gate because
                   // it's already non-insular.
-                  attach_single_qubit_gates(attach_back, last_gate_index[qubit],
-                                            qubit);
+                  do_attach_single_qubit_gates(attach_back,
+                                               last_gate_index[qubit], qubit);
                 } else {
-                  attach_single_qubit_gates(attach_front, i, qubit);
+                  do_attach_single_qubit_gates(attach_front, i, qubit);
                   // This qubit is no longer insular.
                   non_insular_qubits.push_back(qubit);
                 }
@@ -1552,7 +1553,7 @@ get_schedules(const CircuitSeq &sequence,
                                            &non_insular_qubit_indices,
                                            &dp_sequence_position,
                                            &last_gate_index,
-                                           &attach_single_qubit_gates,
+                                           &do_attach_single_qubit_gates,
                                            &attach_back](int qubit) {
       if (has_dense_single_qubit_gate[qubit]) {
         if (std::find(non_insular_qubit_indices
@@ -1575,7 +1576,7 @@ get_schedules(const CircuitSeq &sequence,
                   .push_back(qubit);
         }
       }
-      attach_single_qubit_gates(attach_back, last_gate_index[qubit], qubit);
+      do_attach_single_qubit_gates(attach_back, last_gate_index[qubit], qubit);
     };
 
     if (num_stage == (int)local_qubits.size() - 1) {
@@ -1649,7 +1650,7 @@ get_schedules(const CircuitSeq &sequence,
     schedule.compute_kernel_schedule(kernel_cost,
                                      non_insular_qubit_indices[num_stage]);
   }
-  if (absorb_single_qubit_gates) {
+  if (attach_single_qubit_gates) {
     // Restore the single-qubit gates.
     for (auto &schedule : result) {
       for (int i = 0; i < schedule.get_num_kernels(); i++) {

@@ -1269,7 +1269,11 @@ int Schedule::get_num_kernels() const { return (int)kernels.size(); }
 void Schedule::print_kernel_schedule() const {
   const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
-            << " kernels: cost = " << cost_ << std::endl;
+            << " kernels: cost = " << cost_ << ", local qubits";
+  for (auto &qubit : local_qubit_) {
+    std::cout << " " << qubit;
+  }
+  std::cout << std::endl;
   for (int i = 0; i < num_kernels; i++) {
     std::cout << "Kernel " << i << ": ";
     std::cout << kernels[i].to_string() << std::endl;

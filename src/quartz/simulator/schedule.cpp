@@ -120,7 +120,8 @@ bool Schedule::compute_end_schedule(
         }
         result_cost += kernel_costs[open_kernels[i].active_qubits.size()];
       } else {
-        fusion_kernels_of_size[open_kernels[i].active_qubits.size()].push_back(i);
+        fusion_kernels_of_size[open_kernels[i].active_qubits.size()].push_back(
+            i);
       }
     } else if (open_kernels[i].tp == KernelType::shared_memory) {
       int kernel_size = (int)open_kernels[i].active_qubits.size();
@@ -160,8 +161,10 @@ bool Schedule::compute_end_schedule(
           if (result_kernels != nullptr) {
             current_kernel.active_qubits.insert(
                 current_kernel.active_qubits.end(),
-                open_kernels[fusion_kernels_of_size[i].back()].active_qubits.begin(),
-                open_kernels[fusion_kernels_of_size[i].back()].active_qubits.end());
+                open_kernels[fusion_kernels_of_size[i].back()]
+                    .active_qubits.begin(),
+                open_kernels[fusion_kernels_of_size[i].back()]
+                    .active_qubits.end());
             current_kernel.touching_qubits.insert(
                 current_kernel.touching_qubits.end(),
                 open_kernels[fusion_kernels_of_size[i].back()]

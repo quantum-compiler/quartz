@@ -895,26 +895,39 @@ bool Schedule::compute_kernel_schedule(
                   kernel_costs[current_merging_kernel.active_qubits.size()];
             } else {
               new_cost += kernel_cost.get_shared_memory_init_cost();
-              // We update the |touching_qubits| for |current_merging_kernel|
-              // here.
-              std::vector<bool> in_current_kernel(num_qubits, false);
+              // We compute the |touching_qubits| for |current_merging_kernel|
+              // here. We assume every qubit that is not active can be
+              // touching here.
+              std::vector<bool> touching(num_qubits, true);
               for (auto &index : current_merging_kernel.active_qubits) {
-                in_current_kernel[index] = true;
+                touching[index] = false;
               }
-              // Recompute the touching qubits.
+              for (auto &kernel : current_status.open_kernels) {
+                for (auto &index : kernel.active_qubits) {
+                  touching[index] = false;
+                }
+              }
+              // TODO: this is a bit conservative: instead of not including
+              //  them in |touching_qubits| here, we can also remove the
+              //  previous absorbing kernel and include the qubits in
+              //  |touching_qubits| here. (This is for the following
+              //  absorbing kernel, not for the |local_schedule| here.)
+              for (auto &kernel : current_status.absorbing_kernels) {
+                for (auto &index : kernel.active_qubits) {
+                  touching[index] = false;
+                }
+              }
               local_schedule.kernels.back().touching_qubits.clear();
-              for (auto &index : current_merging_kernel.touching_qubits) {
-                if (!in_current_kernel[index]) {
+              for (int index = 0; index < num_qubits; index++) {
+                if (touching[index]) {
                   local_schedule.kernels.back().touching_qubits.push_back(
                       index);
-                  in_current_kernel[index] = true;
                 }
               }
             }
             std::sort(local_schedule.kernels.back().active_qubits.begin(),
                       local_schedule.kernels.back().active_qubits.end());
-            std::sort(local_schedule.kernels.back().touching_qubits.begin(),
-                      local_schedule.kernels.back().touching_qubits.end());
+            // |touching_qubits| is guaranteed to be sorted here.
 
             // Compute the absorbing kernel.
             KernelInDP absorbing_kernel({}, {}, current_merging_kernel.tp);
@@ -1146,12 +1159,8 @@ bool Schedule::compute_kernel_schedule(
             new_merging_kernel.active_qubits.end(),
             current_status.open_kernels[kernel_index].active_qubits.begin(),
             current_status.open_kernels[kernel_index].active_qubits.end());
-        // We only record the set of |touching_qubits| and remove duplicates
-        // later.
-        new_merging_kernel.touching_qubits.insert(
-            new_merging_kernel.touching_qubits.end(),
-            current_status.open_kernels[kernel_index].touching_qubits.begin(),
-            current_status.open_kernels[kernel_index].touching_qubits.end());
+        // We do not record the set of |touching_qubits| here;
+        // we will compute them right before doing the DP transition.
         kernel_merged[kernel_index] = true;
         // Continue the search.
         this_ref(this_ref, current_gate_kernel, new_merging_kernel, cost,
@@ -1216,7 +1225,10 @@ bool Schedule::compute_kernel_schedule(
     for (auto &index : s.touching_qubits) {
       touched_in_kernel[index] = true;
     }
+    // A non-insular qubit of a gate blocks this qubit.
     std::vector<bool> qubit_blocked(num_qubits, false);
+    // An insular qubit of a gate blocks this qubit.
+    std::vector<bool> qubit_insularly_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
       if (executed[i]) {
         continue;
@@ -1234,6 +1246,12 @@ bool Schedule::compute_kernel_schedule(
       } else {
         current_non_insular_indices =
             sequence_.gates[i]->get_non_insular_qubit_indices();
+      }
+      for (auto &qubit : current_non_insular_indices) {
+        if (qubit_insularly_blocked[qubit]) {
+          executable = false;
+          break;
+        }
       }
       if (s.tp == KernelType::fusion) {
         // For fusion kernels, we require all local qubits to be active.
@@ -1261,6 +1279,14 @@ bool Schedule::compute_kernel_schedule(
         // Block the non-insular qubits.
         for (auto &qubit : current_non_insular_indices) {
           qubit_blocked[qubit] = true;
+        }
+        // "Insularly" block the insular qubits so that we cannot execute any
+        // gate with the same non-insular qubit in this kernel.
+        // TODO: if we execute any gate with the same insular qubit later
+        //  in this kernel, we need to adjust the states for X gates
+        //  accordingly.
+        for (auto &qubit : sequence_.gates[i]->get_insular_qubit_indices()) {
+          qubit_insularly_blocked[qubit] = true;
         }
       }
     }

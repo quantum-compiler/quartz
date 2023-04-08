@@ -609,6 +609,7 @@ class PPOMod:
                             return tuning_dir
             return None
 
+        seed_all(self.cfg.seed + rank)
         self.cfg = cast(TestConfig, self.cfg)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""

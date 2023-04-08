@@ -130,7 +130,7 @@ int main() {
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
   std::vector<std::string> circuit_names = {
       "qft"
-//       "realamprandom"
+      // "realamprandom"
   };
   // 31 total qubits, 28 local qubits
   std::vector<int> num_qubits = {31};

@@ -29,19 +29,19 @@ public:
   [[nodiscard]] bool is_shared_memory_cacheline_qubit(int index) const;
 
   /**
-   * Compute which kernels to merge together at the end using a greedy
+   * Compute which open kernels to merge together at the end using a greedy
    * algorithm, assuming there are no other kernels after the given ones.
    * The greedy algorithm is approximate -- it might not give the optimal
    * result.
    * @param kernel_cost The cost function of kernels.
-   * @param kernels The non-intersecting kernels to be merged.
+   * @param open_kernels The non-intersecting open kernels to be merged.
    * @param result_cost The sum of the cost of the resulting merged kernels.
    * @param result_kernels The resulting merged kernels, or nullptr if it is
    * not necessary to record them.
    * @return True iff the computation succeeds.
    */
   bool compute_end_schedule(const KernelCost &kernel_cost,
-                            const std::vector<KernelInDP> &kernels,
+                            const std::vector<KernelInDP> &open_kernels,
                             KernelCostType &result_cost,
                             std::vector<KernelInDP> *result_kernels) const;
 
@@ -52,10 +52,15 @@ public:
    * gate (e.g., X). A kernel with one CCX is assumed to have 1/4 of the
    * cost of a kernel with X.
    * @param kernel_cost The cost function of kernels.
+   * @param non_insular_qubit_indices The set of non-insular qubit indices
+   * for each gate, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
    * @return True iff the computation succeeds. The results are stored in
    * the member variables |kernels|, |kernel_qubits|, and |cost_|.
    */
-  bool compute_kernel_schedule(const KernelCost &kernel_cost);
+  bool compute_kernel_schedule(
+      const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {});
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
@@ -93,16 +98,15 @@ private:
  * @param local_qubits The local qubits in each stage.
  * @param kernel_cost The cost function of kernels.
  * @param ctx The Context object.
- * @param absorb_single_qubit_gates An optimization to reduce the running
+ * @param attach_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
- * TODO: check if it's entangled or not
  * @return The kernel schedule for each stage.
  */
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool absorb_single_qubit_gates);
+              bool attach_single_qubit_gates);
 
 class PythonInterpreter;
 std::vector<std::vector<int>>

@@ -470,10 +470,10 @@ bool Schedule::compute_kernel_schedule(
   initial_status.compute_hash();
   f[0][initial_status] = std::make_pair(0, LocalSchedule());
   auto update_f =
-      [&](std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
-                             StatusHash> &f,
-          const Status &s, const KernelCostType &new_cost,
-          const LocalSchedule &local_schedule) {
+      [](std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
+                            StatusHash> &f,
+         const Status &s, const KernelCostType &new_cost,
+         const LocalSchedule &local_schedule) {
         auto it = f.find(s);
         if (it == f.end()) {
           f.insert(std::make_pair(s, std::make_pair(new_cost, local_schedule)));
@@ -920,7 +920,8 @@ bool Schedule::compute_kernel_schedule(
               local_schedule.kernels.back().touching_qubits.clear();
               for (int index = 0; index < num_qubits; index++) {
                 if (touching[index]) {
-                  local_schedule.kernels.back().touching_qubits.push_back(index);
+                  local_schedule.kernels.back().touching_qubits.push_back(
+                      index);
                 }
               }
             }

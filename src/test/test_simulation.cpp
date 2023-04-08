@@ -129,11 +129,11 @@ int main() {
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap});
   std::vector<std::string> circuit_names = {
-      "qft"
-      // "realamprandom"
+//      "qft"
+       "realamprandom"
   };
   // 31 total qubits, 28 local qubits
-  std::vector<int> num_qubits = {31};
+  std::vector<int> num_qubits = {28};
   std::vector<int> num_local_qubits;
   for (int i = 28; i <= 28; i++) {
     num_local_qubits.push_back(i);

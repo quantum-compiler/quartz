@@ -2695,4 +2695,112 @@ bool Graph::_loop_check_after_matching(GraphXfer *xfer) const {
   }
   return true;
 }
+std::shared_ptr<Graph>
+Graph::subgraph(const std::unordered_set<Op, OpHash> &ops) const {
+  // ops should not contain OPs whose type is input_qubit
+  // ops should form a connnected graph
+  std::shared_ptr<Graph> new_graph(new Graph(context));
+  new_graph->special_op_guid = special_op_guid;
+  int num_qubits = 0;
+  // Add new qubits
+  for (const auto op : ops) {
+    if (op.ptr->tp == GateType::input_param) {
+      continue;
+    }
+    // Traverse op's input edges
+    auto in_edges = inEdges.find(op)->second;
+    int op_num_qubits = op.ptr->get_num_qubits();
+    for (const auto e : in_edges) {
+      if (e.dstIdx < op_num_qubits) {
+        auto src_op = e.srcOp;
+        // Add input qubits
+        if (ops.find(src_op) == ops.end()) {
+          Op new_qubit_op = new_graph->add_qubit(num_qubits);
+          new_graph->add_edge(new_qubit_op, op, 0, e.dstIdx);
+          new_graph->input_qubit_op_2_qubit_idx[new_qubit_op] = num_qubits++;
+        } else {
+          new_graph->add_edge(src_op, op, e.srcIdx, e.dstIdx);
+        }
+      } else {
+        // Add input parameters
+        assert(e.srcOp.ptr->tp == GateType::input_param);
+        assert(ops.find(e.srcOp) != ops.end());
+        new_graph->add_edge(e.srcOp, op, e.srcIdx, e.dstIdx);
+        // Add constant values if the parameter have one
+        if (constant_param_values.find(e.srcOp) !=
+            constant_param_values.end()) {
+          new_graph->constant_param_values[e.srcOp] =
+              constant_param_values.find(e.srcOp)->second;
+        }
+      }
+    }
+  }
+  new_graph->_construct_pos_2_logical_qubit();
+  return new_graph;
+}
+
+std::vector<std::shared_ptr<Graph>>
+Graph::topology_partition(const int partition_gate_count) const {
+  std::unordered_map<Op, int, OpHash> op_in_degree;
+  std::stack<Op> op_s;
+  std::vector<std::unordered_set<Op, OpHash>> op_sets;
+  std::vector<int> op_set_sizes;
+  op_sets.push_back(std::unordered_set<Op, OpHash>());
+  op_set_sizes.push_back(0);
+  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
+    if (it->first.ptr->tp == GateType::input_qubit) {
+      op_s.push(it->first);
+    }
+  }
+
+  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
+    op_in_degree[it->first] = it->first.ptr->get_num_qubits();
+  }
+
+  while (!op_s.empty()) {
+    auto op = op_s.top();
+    op_s.pop();
+
+    // Maintain the in-degree of the destination ops
+    if (outEdges.find(op) != outEdges.end()) {
+      auto op_out_edges = outEdges.find(op)->second;
+      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
+           ++e_it) {
+        assert(op_in_degree[e_it->dstOp] > 0);
+        op_in_degree[e_it->dstOp]--;
+        if (op_in_degree[e_it->dstOp] == 0) {
+          op_s.push(e_it->dstOp);
+        }
+      }
+    }
+
+    if (op.ptr->tp == GateType::input_qubit) {
+      continue;
+    }
+    if (op_set_sizes.back() < partition_gate_count) {
+      op_sets.back().insert(op);
+      op_set_sizes.back() += 1;
+    } else {
+      op_sets.push_back(std::unordered_set<Op, OpHash>());
+      op_set_sizes.push_back(0);
+      op_sets.back().insert(op);
+      op_set_sizes.back() += 1;
+    }
+
+    // Put all the parameters of op into the current set
+    auto in_edges = inEdges.find(op)->second;
+    int num_qubits = op.ptr->get_num_qubits();
+    for (const auto e : in_edges) {
+      if (e.dstIdx >= num_qubits) {
+        op_sets.back().insert(e.srcOp);
+      }
+    }
+  }
+
+  std::vector<std::shared_ptr<Graph>> subgraphs;
+  for (const auto &op_set : op_sets) {
+    subgraphs.push_back(subgraph(op_set));
+  }
+  return subgraphs;
+}
 }; // namespace quartz

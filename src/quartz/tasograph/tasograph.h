@@ -13,6 +13,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <stack>
 #include <unordered_map>
 #include <vector>
 
@@ -304,6 +305,10 @@ public:
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
   bool _loop_check_after_matching(GraphXfer *xfer) const;
+  std::shared_ptr<Graph>
+  subgraph(const std::unordered_set<Op, OpHash> &ops) const;
+  std::vector<std::shared_ptr<Graph>>
+  topology_partition(const int partition_gate_count) const;
 
 private:
   void replace_node(Op oldOp, Op newOp);

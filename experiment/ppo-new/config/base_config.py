@@ -128,6 +128,7 @@ class BaseConfig:
     time_budget: str = ''
 
     # logging
+    wandb_run_name_suffix: str = ''
     best_graph_output_dir: str = 'best_graphs'
     output_full_seq: bool = False
     full_seq_path: str = ''  # for read in

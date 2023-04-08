@@ -226,7 +226,9 @@ class PPOMod:
         if self.rank == 0:
             run_name: str | None = None
             if len(self.cfg.input_graphs) == 1:
-                run_name = self.cfg.input_graphs[0].name
+                run_name = (
+                    self.cfg.input_graphs[0].name + self.cfg.wandb_run_name_suffix
+                )
             wandb.init(
                 project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
@@ -607,6 +609,7 @@ class PPOMod:
                             return tuning_dir
             return None
 
+        seed_all(self.cfg.seed + rank)
         self.cfg = cast(TestConfig, self.cfg)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""

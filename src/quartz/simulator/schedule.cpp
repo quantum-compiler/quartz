@@ -469,7 +469,21 @@ bool Schedule::compute_kernel_schedule(
   Status initial_status;
   initial_status.compute_hash();
   f[0][initial_status] = std::make_pair(0, LocalSchedule());
-  constexpr bool debug = true;
+  auto update_f =
+      [&](std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
+                             StatusHash> &f,
+          const Status &s, const KernelCostType &new_cost,
+          const LocalSchedule &local_schedule) {
+        auto it = f.find(s);
+        if (it == f.end()) {
+          f.insert(std::make_pair(s, std::make_pair(new_cost, local_schedule)));
+        } else {
+          if (new_cost < it->second.first) {
+            it->second = std::make_pair(new_cost, local_schedule);
+          }
+        }
+      };
+  constexpr bool debug = false;
   if (debug) {
     std::cout << "Start DP:" << std::endl;
     std::cout << "Local qubits: ";
@@ -486,39 +500,6 @@ bool Schedule::compute_kernel_schedule(
   }
   // The main DP loop.
   for (int i = 0; i < num_gates; i++) {
-    bool flag = false;
-    auto update_f =
-        [&](std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
-                              StatusHash> &f,
-           const Status &s, const KernelCostType &new_cost,
-           const LocalSchedule &local_schedule) {
-          auto it = f.find(s);
-          KernelCostType tmp;
-          compute_end_schedule(kernel_cost, s.open_kernels, tmp,
-                               nullptr);
-          tmp += new_cost;
-          // 437:
-          // 7570220673878116
-          // 438 7570215506801787
-          // 439 7570215638005994
-          // 440 7570220672193306
-          // 441 7570288638655467
-          // 442 7568214769237689
-          // 443 7377394183162852
-          // 444 2029967494992
-          if (i == 438 && s.hash == 7570215506801787llu) {
-            std::cout << "AAA " << s.hash << " " << new_cost << " " << s.to_string() << std::endl;
-            std::cout << "BBB " << local_schedule.to_string() << std::endl;
-            flag = true;
-          }
-          if (it == f.end()) {
-            f.insert(std::make_pair(s, std::make_pair(new_cost, local_schedule)));
-          } else {
-            if (new_cost < it->second.first) {
-              it->second = std::make_pair(new_cost, local_schedule);
-            }
-          }
-        };
     // Update from f[i & 1] to f[~i & 1].
     auto &f_prev = f[i & 1];
     auto &f_next = f[~i & 1];
@@ -646,7 +627,7 @@ bool Schedule::compute_kernel_schedule(
       }
     }
 
-    if (i >= 444 && i <= 445) {
+    if (debug) {
       KernelCostType tmp_best_cost = 1e100;
       Status tmp_status;
       LocalSchedule tmp_schedule;
@@ -675,7 +656,6 @@ bool Schedule::compute_kernel_schedule(
       auto &current_cost = it.second.first;
       auto &current_local_schedule = it.second.second;
       assert(current_status.check_valid());
-      flag = false;
 
       if (current_indices.empty()) {
         // A global gate. Directly update.
@@ -1202,10 +1182,6 @@ bool Schedule::compute_kernel_schedule(
           /*current_merging_kernel=*/KernelInDP(),
           /*cost=*/current_cost + current_gate_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
-      if (flag) {
-        std::cout << "hash " << current_status.hash << " " << current_status.to_string() << std::endl;
-        std::cout << "QAQ " << i << " " << current_local_schedule.to_string() << std::endl;
-      }
     }
   } // end of for (int i = 0; i < num_gates; i++)
   if (f[num_gates & 1].empty()) {
@@ -1347,7 +1323,7 @@ get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
               bool attach_single_qubit_gates) {
-  constexpr bool debug = true;
+  constexpr bool debug = false;
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();

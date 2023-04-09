@@ -1827,8 +1827,8 @@ get_schedules(const CircuitSeq &sequence,
                   1);
               k++;
             }
-            if (std::find(control_state.begin(), control_state.end(), false) !=
-                control_state.end()) {
+            if (!std::all_of(control_state.begin(), control_state.end(),
+                             [](bool v) { return v; })) {
               // Not a simple controlled gate
               schedule.kernels[i].gates.gates[j]->gate =
                   ctx->get_general_controlled_gate(

@@ -1,6 +1,7 @@
 #include "circuitgate.h"
 #include "circuitwire.h"
 
+#include <algorithm>
 #include <cassert>
 
 namespace quartz {
@@ -135,8 +136,8 @@ std::string CircuitGate::to_string() const {
   result += gate_type_name(gate->tp);
   if (gate->get_num_control_qubits() > 0) {
     auto control_state = gate->get_control_state();
-    if (std::find(control_state.begin(), control_state.end(), false) !=
-        control_state.end()) {
+    if (!std::all_of(control_state.begin(), control_state.end(),
+                     [](bool v) { return v; })) {
       // Not a simple controlled gate
       result += "[";
       for (const auto &value : control_state) {

@@ -246,8 +246,6 @@ cdef class QuartzContext:
     cdef bool include_nop
 
     def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
-        """The no_increase parameter is deprecated"""
-        # TODO: remove no_increase
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -292,8 +290,11 @@ cdef class QuartzContext:
                         dag_ptr_0 = eq_sets[i][j]
                         dag_ptr_1 = eq_sets[i][k]
                         xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, True)
-                        if xfer != NULL:
-                            self.v_xfers.push_back(xfer)
+                        if xfer == NULL:
+                            continue
+                        if no_increase and xfer.num_dst_op() - xfer.num_src_op() > 0:
+                            continue
+                        self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
 
     cdef load_json(self, filename):

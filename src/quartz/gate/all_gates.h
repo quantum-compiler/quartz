@@ -9,6 +9,7 @@
 #include "cx.h"
 #include "cz.h"
 #include "gate.h"
+#include "general_controlled_gate.h"
 #include "h.h"
 #include "input_param.h"
 #include "input_qubit.h"

@@ -29,6 +29,10 @@ bool Gate::is_diagonal() const { return false; }
 
 int Gate::get_num_control_qubits() const { return 0; }
 
+std::vector<bool> Gate::get_control_state() const {
+  return std::vector<bool>(get_num_control_qubits(), true);
+}
+
 int Gate::get_num_qubits() const { return num_qubits; }
 
 int Gate::get_num_parameters() const { return num_parameters; }

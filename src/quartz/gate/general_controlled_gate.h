@@ -71,6 +71,9 @@ public:
     // Same as the original gate
     return controlled_gate_->get_num_control_qubits();
   }
+  std::vector<bool> get_control_state() const override {
+    return state_;
+  }
   Gate *controlled_gate_;
   std::vector<bool> state_;
 };

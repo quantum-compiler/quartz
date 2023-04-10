@@ -224,7 +224,7 @@ namespace quartz {
                     // execute all executable gates
                     int executed_gate_count = _execute_all_executable_gates();
                     executed_logical_gate_count += executed_gate_count;
-                    return 0 + executed_gate_count;
+                    return 0;
                 }
 
                 // STEP 1: put swap into history & change mapping tables
@@ -264,7 +264,7 @@ namespace quartz {
                     // Last step, need to execute gates
                     int executed_gate_count = _execute_all_executable_gates();
                     executed_logical_gate_count += executed_gate_count;
-                    return initial_phase_reward + executed_gate_count;
+                    return initial_phase_reward;
                 }
             } else {
                 // In stage 2, we should have PhysicalFront action space
@@ -311,7 +311,7 @@ namespace quartz {
                 // double new_circuit_cost = imp_cost + executed_gate_count + SWAPCOST;
                 // Reward imp_reward = original_circuit_cost - new_circuit_cost;
                 // ------------------------------------------------------------------------- //
-                return -SWAPCOST + executed_gate_count;
+                return -SWAPCOST;
             }
         }
 

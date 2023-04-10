@@ -23,7 +23,7 @@ namespace quartz {
                   original_qasm_file_path(qasm_file_path) {
             /// A simple hybrid environment that does not use curriculum
             // initialize context, graph and device
-            std::cout << "c env is compiled with state size 6. (version 2.5.4)" << std::endl;
+            std::cout << "c env is compiled with state size 6. (version 2.5.5a1) [This is ablation on reward signal!]" << std::endl;
             context = std::make_shared<Context>(Context({GateType::h, GateType::cx, GateType::t,
                                                          GateType::tdg, GateType::input_qubit, GateType::s,
                                                          GateType::sdg, GateType::x, GateType::z, GateType::rz,

@@ -295,7 +295,8 @@ public:
                                     bool eliminate_rotation = false) const;
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
   apply_xfer_and_track_node(GraphXfer *xfer, Op op,
-                            bool eliminate_rotation = false) const;
+                            bool eliminate_rotation = false,
+                            int predecessor_layers = 1) const;
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;

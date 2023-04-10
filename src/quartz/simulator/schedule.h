@@ -47,10 +47,16 @@ public:
 
   /**
    * Compute the schedule using dynamic programming.
-   * A kernel with a single controlled gate (e.g., CX) is assumed to have
-   * half of the cost of a kernel with a single corresponding non-controlled
-   * gate (e.g., X). A kernel with one CCX is assumed to have 1/4 of the
-   * cost of a kernel with X.
+   * Note that it is possible for this DP to give wrong results only when
+   * there are both X gate and controlled gates: it assumes we can swap
+   * single-qubit sparse gates with adjacent controlled gates if the
+   * single-qubit gate operates on the same qubit as the control qubit of
+   * the controlled gate. For example, it may reorder
+   * X(Q0) CZ(Q0, Q1)
+   * to
+   * CZ(Q0, Q1) X(Q0)
+   * where the correct schedule should be
+   * CZ[0](Q0, Q1) X(Q0).
    * @param kernel_cost The cost function of kernels.
    * @param non_insular_qubit_indices The set of non-insular qubit indices
    * for each gate, if any of them should be considered differently from

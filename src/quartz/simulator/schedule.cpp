@@ -851,22 +851,42 @@ bool Schedule::compute_kernel_schedule(
       }
       // Sort the absorbing kernels in ascending order.
       std::sort(new_absorbing_kernels.begin(), new_absorbing_kernels.end());
+      auto update_absorbing_kernels_for_new_fusion_kernel = [&]() {
+        // For fusion kernels, we need to update the |absorbing_kernels|'s
+        // |touching_qubits| again.
+        // Loop in reverse order so that we do not need to worry about
+        // the index change during removal.
+        for (int k = (int)new_absorbing_kernels.size() - 1; k >= 0; k--) {
+          // Remove all qubits of the current gate from the
+          // touching qubits in |absorbing_kernels|.
+          // Loop in reverse order so that we do not need to worry about
+          // the index change during removal.
+          for (int j = (int)new_absorbing_kernels[k].touching_qubits.size() - 1;
+               j >= 0; j--) {
+            if (current_index[new_absorbing_kernels[k].touching_qubits[j]]) {
+              new_absorbing_kernels[k].touching_qubits.erase(
+                  new_absorbing_kernels[k].touching_qubits.begin() + j);
+            }
+          }
+        }
+      };
 
       if (intersect_kernel_indices.empty()) {
         // Optimization:
         // The current gate is not touching any kernels on the frontier.
         // Directly add the gate to the frontier.
         auto new_status = current_status;
-        new_status.insert_set(current_single_gate_fusion_kernel);
-        new_status.absorbing_kernels = new_absorbing_kernels;
-        new_status.hash ^= current_single_gate_fusion_kernel_hash;
-        update_f(f_next, new_status, current_cost, current_local_schedule);
-
-        new_status = current_status;
         new_status.insert_set(current_single_gate_shared_memory_kernel);
         new_status.absorbing_kernels = new_absorbing_kernels;
         new_status.hash ^= current_single_gate_shared_memory_kernel_hash;
-        current_cost += current_gate_cost;
+        update_f(f_next, new_status, current_cost + current_gate_cost,
+                 current_local_schedule);
+
+        update_absorbing_kernels_for_new_fusion_kernel();
+        new_status = current_status;
+        new_status.insert_set(current_single_gate_fusion_kernel);
+        new_status.absorbing_kernels = new_absorbing_kernels;
+        new_status.hash ^= current_single_gate_fusion_kernel_hash;
         update_f(f_next, new_status, current_cost, current_local_schedule);
         continue;
       }
@@ -950,8 +970,13 @@ bool Schedule::compute_kernel_schedule(
               }
             }
             for (auto &index : local_schedule.kernels.back().touching_qubits) {
-              if (!current_non_insular_index[index]) {
+              if (!current_non_insular_index[index] &&
+                  (!current_index[index] ||
+                   current_gate_kernel.tp == KernelType::shared_memory)) {
                 // Similarly, we block the target qubits in the
+                // |touching_qubits| set.
+                // If the current gate is in a fusion kernel, we also need
+                // to block the insular qubits in the current gate in the
                 // |touching_qubits| set.
                 absorbing_kernel.touching_qubits.push_back(index);
               }
@@ -1181,17 +1206,19 @@ bool Schedule::compute_kernel_schedule(
       // Start the search with touching_set_index=-1 and
       // kernel_index=num_kernels, so that we can decide whether to merge the
       // first "touching set" with the current gate or not inside the search.
-      search_merging_kernels(
-          search_merging_kernels,
-          /*current_gate_kernel=*/current_single_gate_fusion_kernel,
-          /*current_merging_kernel=*/KernelInDP(), /*cost=*/current_cost,
-          /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
       // For shared-memory kernels, we account for the gate cost now.
       search_merging_kernels(
           search_merging_kernels,
           /*current_gate_kernel=*/current_single_gate_shared_memory_kernel,
           /*current_merging_kernel=*/KernelInDP(),
           /*cost=*/current_cost + current_gate_cost,
+          /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
+
+      update_absorbing_kernels_for_new_fusion_kernel();
+      search_merging_kernels(
+          search_merging_kernels,
+          /*current_gate_kernel=*/current_single_gate_fusion_kernel,
+          /*current_merging_kernel=*/KernelInDP(), /*cost=*/current_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
   } // end of for (int i = 0; i < num_gates; i++)
@@ -1382,15 +1409,27 @@ get_schedules(const CircuitSeq &sequence,
   std::vector<std::vector<KernelCostType>> shared_memory_gate_costs(
       local_qubits.size());
 
-  // |have_dense_single_qubit_gate[i][j]|: if there is a dense single-qubit gate
-  // on qubit |j| that is not executed yet in the |i|-th stage;
-  // only computed when |attach_single_qubit_gates| is true
-  //  std::deque<std::vector<bool>> have_dense_single_qubit_gate;
-  //  std::vector<std::pair<int, std::unordered_set<int>>>
-  //      single_qubit_gate_indices_;
+  // |should_flip_control_qubit[i][j]|: if the |j|-th qubit in the |i|-th gate
+  // should be flipped if we remove all single-qubit sparse non-diagonal gates
+  // (e.g., X gate)
+  // |flipping[i]|: if the |i|-th qubit is flipped now if we remove them
+  std::vector<std::vector<bool>> should_flip_control_qubit(num_gates);
+  std::vector<bool> flipping(num_qubits, false);
 
   if (debug) {
     std::cout << "get_schedules for " << sequence.to_string(true) << std::endl;
+  }
+
+  for (int i = 0; i < num_gates; i++) {
+    if (sequence.gates[i]->gate->get_num_qubits() == 1 &&
+        sequence.gates[i]->gate->is_sparse() &&
+        !sequence.gates[i]->gate->is_diagonal()) {
+      flipping[sequence.gates[i]->get_min_qubit_index()].flip();
+    } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
+      for (auto &qubit : sequence.gates[i]->get_control_qubit_indices()) {
+        should_flip_control_qubit[i].push_back(flipping[qubit]);
+      }
+    }
   }
 
   int num_stage = -1;
@@ -1544,6 +1583,14 @@ get_schedules(const CircuitSeq &sequence,
             // the matrix on the local qubit is sparse.
             if (!sequence.gates[i]->gate->is_sparse()) {
               has_dense_single_qubit_gate[current_local_qubits[0]] = true;
+            }
+
+            if (sequence.gates[i]->gate->tp == GateType::cx ||
+                sequence.gates[i]->gate->tp == GateType::ccx) {
+              std::cerr << "Warning: CX or CCX gate attached to another gate. "
+                        << "The schedule may be different for each device, "
+                        << "but we only output the schedule for the device "
+                        << "where CX or CCX is not executed here." << std::endl;
             }
           } else {
             // Either a global gate or a multi-qubit gate.
@@ -1729,13 +1776,21 @@ get_schedules(const CircuitSeq &sequence,
   }
   if (attach_single_qubit_gates) {
     // Restore the single-qubit gates.
+    // Adjust controlled gates.
+    flipping.assign(num_qubits, false);
     for (auto &schedule : result) {
       for (int i = 0; i < schedule.get_num_kernels(); i++) {
         // Returns the number of gates inserted.
         auto insert_single_qubit_gates =
-            [&schedule, &i, &sequence](const std::vector<int> &gate_indices,
-                                       int insert_location) {
+            [&schedule, &i, &sequence, &flipping](
+                const std::vector<int> &gate_indices, int insert_location) {
               for (auto &gate_index : gate_indices) {
+                if (sequence.gates[gate_index]->gate->get_num_qubits() == 1 &&
+                    sequence.gates[gate_index]->gate->is_sparse() &&
+                    !sequence.gates[gate_index]->gate->is_diagonal()) {
+                  flipping[sequence.gates[gate_index]->get_min_qubit_index()]
+                      .flip();
+                }
                 schedule.kernels[i].gates.insert_gate(
                     insert_location, sequence.gates[gate_index].get());
                 insert_location++;
@@ -1750,10 +1805,44 @@ get_schedules(const CircuitSeq &sequence,
           auto &gate_indices_queue = gate_indices[gate->to_string()];
           assert(!gate_indices_queue.empty());
 
-          // We execute the gate now.
           const int original_index = gate_indices_queue.front();
           gate_indices_queue.pop();
           j += insert_single_qubit_gates(attach_front[original_index], j);
+
+          // We execute the gate now.
+          std::vector<bool> control_state;
+          if (schedule.kernels[i]
+                  .gates.gates[j]
+                  ->gate->get_num_control_qubits() > 0) {
+            assert(schedule.kernels[i]
+                       .gates.gates[j]
+                       ->gate->get_num_control_qubits() ==
+                   (int)should_flip_control_qubit[original_index].size());
+            int k = 0;
+            for (auto &qubit : schedule.kernels[i]
+                                   .gates.gates[j]
+                                   ->get_control_qubit_indices()) {
+              control_state.push_back(
+                  should_flip_control_qubit[original_index][k] ^ flipping[k] ^
+                  1);
+              k++;
+            }
+            if (!std::all_of(control_state.begin(), control_state.end(),
+                             [](bool v) { return v; })) {
+              // Not a simple controlled gate
+              schedule.kernels[i].gates.gates[j]->gate =
+                  ctx->get_general_controlled_gate(
+                      schedule.kernels[i].gates.gates[j]->gate->tp,
+                      control_state);
+            }
+          }
+          if (schedule.kernels[i].gates.gates[j]->gate->get_num_qubits() == 1 &&
+              schedule.kernels[i].gates.gates[j]->gate->is_sparse() &&
+              !schedule.kernels[i].gates.gates[j]->gate->is_diagonal()) {
+            flipping[schedule.kernels[i].gates.gates[j]->get_min_qubit_index()]
+                .flip();
+          }
+
           j += insert_single_qubit_gates(attach_back[original_index], j + 1);
         }
       }

@@ -12,7 +12,7 @@ DistributedSimulator::cuda_init_task(Task const *task,
   cudaStreamCreate(&stream);
   DSConfig const *config = (DSConfig *)task->args;
   DSHandler handle;
-  handle.workSpaceSize = (size_t)4 * 1024 * 1024 * 1024; // 1GB work space
+  handle.workSpaceSize = (size_t)4 * 1024 * 1024 * 1024; // 4GB work space
   handle.num_local_qubits = config->num_local_qubits;
   handle.num_all_qubits = config->num_all_qubits;
   printf("Num_local_qubits = %lld\n", handle.num_local_qubits);
@@ -100,7 +100,6 @@ void DistributedSimulator::sv_init_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   // TODO: implement this function
-  printf("SV Init...\n");
   return;
 }
 
@@ -142,6 +141,11 @@ void DistributedSimulator::store_task(
 
   Domain domain = runtime->get_index_space_domain(
       ctx, task->regions[0].region.get_index_space());
+  Domain domain2 = runtime->get_index_space_domain(
+      ctx, task->regions[1].region.get_index_space());
+    
+  assert(domain.get_volume()==domain2.get_volume());
+  
   
   cudaMemcpyAsync(cpu_sv.get_void_ptr(),
             gpu_state_vector.get_void_ptr(),

@@ -38,7 +38,7 @@ struct FusedGate {
   // qindex target_physical = 0;
   // qindex control_physical = 0;
 
-  qComplex matrix[MAX_TOTAL_DEVICES*(1<<MAX_KERNEL_SIZE)];
+  qComplex matrix[MAX_TOTAL_DEVICES*(1<<MAX_KERNEL_SIZE)*(1<<MAX_KERNEL_SIZE)];
 
   FusedGate(const Gate<qreal> &gate) {
     num_target = gate.num_target;

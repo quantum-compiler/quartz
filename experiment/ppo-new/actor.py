@@ -174,6 +174,7 @@ class PPOAgent:
         max_eps_len: int,
         min_eps_len: int,
         subgraph_opt: bool,
+        xfer_pred_layers: int,
         output_full_seq: bool,
         output_dir: str,
         vmem_perct_limit: float,
@@ -191,6 +192,7 @@ class PPOAgent:
         self.invalid_reward = invalid_reward
         self.limit_total_gate_count = limit_total_gate_count
         self.subgraph_opt = subgraph_opt
+        self.xfer_pred_layers = xfer_pred_layers
 
         """networks related"""
         self.ac_net = ac_net  # NOTE: just a ref
@@ -839,6 +841,7 @@ class PPOAgent:
                     node=graph.get_node_from_id(id=action.node),
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
                     eliminate_rotation=qtz.has_parameterized_gate,
+                    predecessor_layers=self.xfer_pred_layers,
                 )
                 """parse result, compute reward"""
                 reward: float = 0.0

@@ -17,7 +17,7 @@ NCCL_DIR=~/nccl/build
 QUARTZ_USE_SIMULATOR=ON
 
 # backend
-USE_LEGION=ON
+USE_LEGION=OFF
 
 . $(dirname $0)/config.inc
 run_cmake $*

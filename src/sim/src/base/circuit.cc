@@ -219,9 +219,19 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
   //     /*shared_memory_init_cost=*/10,
   //     /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
   //     /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
+  // quartz::KernelCost kernel_cost(
+  //     /*fusion_kernel_costs=*/{0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
+  //     /*shared_memory_init_cost=*/6,
+  //     /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
+  //     /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
+  // quartz::KernelCost kernel_cost(
+  //     /*fusion_kernel_costs=*/{0, 20, 20, 20, 20, 20, 25.8, 32.4},
+  //     /*shared_memory_init_cost=*/10,
+  //     /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
+  //     /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   quartz::KernelCost kernel_cost(
-      /*fusion_kernel_costs=*/{0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
-      /*shared_memory_init_cost=*/6,
+      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
+      /*shared_memory_init_cost=*/10,
       /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.8; },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   auto schedules = get_schedules(*seq, local_qubits, kernel_cost, ctx, /*absorb_single_qubit_gates=*/true);

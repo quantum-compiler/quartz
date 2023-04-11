@@ -19,6 +19,17 @@ __global__ void checkData(int* ptr, int size) {
   assert(ptr[i] == (int) i / size);
 }
 
+__global__ void checkState(qComplex* ptr, qComplex* ptr2) {
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i==0)
+    printf("hello\n");
+  const double eps = 1.0e-5;
+  const double diffx = ptr[i].x - ptr2[i].x;
+  const double diffy = ptr[i].y - ptr2[i].y;
+  assert(abs(diffx) < eps);
+  assert(abs(diffy) < eps);
+}
+
 namespace sim {
 // only support applying gates to local qubits, TODO: support batched gates application
 template <typename DT>
@@ -572,7 +583,7 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   }
   qComplex one = make_qComplex(1.0, 0.0);
   if (myRank == 0) {
-    HANDLE_CUDA_ERROR(cudaMemcpyAsync(d_sv[0], &one, sizeof(qComplex), cudaMemcpyHostToDevice, s[0])); 
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(d_sv[0], &one, sizeof(qComplex), cudaMemcpyHostToDevice, s[0]));
   }
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
@@ -615,20 +626,28 @@ template <typename DT> bool SimulatorCuQuantum<DT>::Destroy(bool dump_results) {
   }
   
   FILE *f = nullptr;
+  std::vector<qComplex> results_hyquas;
+  results_hyquas.resize(subSvSize);
+  
+  if(dump_results) {
+    FILE* f = fopen("/home/ubuntu/HyQuas/build/qft28-result.log", "rb");
+    fread((void*)results_hyquas.data(), sizeof(qreal), 2*subSvSize, f);
+    fclose(f);
+    printf("finish reading hyquas results..\n");
+    void* hyquas;
+    HANDLE_CUDA_ERROR(
+        cudaMalloc(&hyquas, subSvSize * sizeof(qComplex)));
+    cudaMemcpy(hyquas, (void*)results_hyquas.data(), subSvSize * sizeof(qComplex) , cudaMemcpyHostToDevice);
+    checkState<<<subSvSize/1024, 1024, 0, s[0]>>>((qComplex*)hyquas, (qComplex*)d_sv[0]);
+    HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
+    HANDLE_CUDA_ERROR(cudaFree(hyquas));
+  }
+  
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_ERROR(custatevecDestroy(handle_[i]));
-    if(dump_results) {
-      h_sv[i] = (void*) malloc(subSvSize * sizeof(qComplex));
-      cudaMemcpy(h_sv[i], d_sv[i], subSvSize * sizeof(qComplex) , cudaMemcpyDeviceToHost);
-      f = fopen("result.log", "wb");
-      fwrite(h_sv[i], sizeof(qreal), 2*subSvSize, f);
-    }
     HANDLE_CUDA_ERROR(cudaFree(d_sv[i]));
     ncclCommDestroy(comms[i]);
-  }
-  if(dump_results) {
-    fclose(f);
   }
 
   HANDLE_CUDA_ERROR(cudaDeviceSynchronize());

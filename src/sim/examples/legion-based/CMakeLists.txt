@@ -9,6 +9,7 @@ set(CPU_SRC
 cuda_add_executable(${project_target} ${CPU_SRC})
 target_include_directories(${project_target} PRIVATE ${QSIM_INCLUDE_DIRS} ${CMAKE_INSTALL_INCLUDEDIR})
 message("QSIM_INCLUDE_DIRS: ${QSIM_INCLUDE_DIRS}")
+message("CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
 target_link_libraries(${project_target} -Wl,--whole-archive quansim -Wl,--no-whole-archive ${QSIM_EXT_LIBRARIES})
 
 set(BIN_DEST "bin")

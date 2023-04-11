@@ -1,5 +1,4 @@
 #include "cuda_helper.h"
-#include "simgate.h"
 #include "circuit.h"
 #include "mapper.h"
 

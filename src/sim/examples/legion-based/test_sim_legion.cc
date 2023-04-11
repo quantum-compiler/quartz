@@ -25,28 +25,28 @@ void sim::top_level_task(
     Task const *task, std::vector<PhysicalRegion> const &regions, Context ctx,
     Runtime *runtime) {
   DSConfig config;
-  bool use_ilp = false;
-  quartz::init_python_interpreter();
+  bool use_ilp = true;
+  // quartz::init_python_interpreter();
   quartz::PythonInterpreter interpreter;
   quartz::Context qtz({GateType::input_qubit, GateType::input_param,
-                        GateType::h, GateType::x, GateType::ry, GateType::u2,
-                        GateType::u3, GateType::cx, GateType::cz, GateType::cp,
-                        GateType::swap});
+                       GateType::h, GateType::x, GateType::ry, GateType::u2,
+                       GateType::u3, GateType::cx, GateType::cz, GateType::cp,
+                       GateType::p, GateType::z, GateType::swap});
   // auto seq = quartz::CircuitSeq::from_qasm_file(
   //     &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_") +
   //               std::to_string(config.num_all_qubits) + "q/qft"
   //               "_indep_qiskit_" + std::to_string(config.num_all_qubits) +
   //               ".qasm");
   auto seq = quartz::CircuitSeq::from_qasm_file(
-      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_29") +
+      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_28") +
                 "q/dj"
-                "_indep_qiskit_29" +
+                "_indep_qiskit_28" +
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
                                          config.num_local_qubits, (1 << (config.num_all_qubits - config.num_local_qubits)), 0, 1);
-  // circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
-  // DistributedSimulator simulator(config, circuit);
-  // simulator.run();
+  circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
+  DistributedSimulator simulator(config, circuit);
+  simulator.run();
 }
 
 DSConfig::DSConfig() {
@@ -98,6 +98,11 @@ int main(int argc, char **argv) {
   // This needs to be set, otherwise NCCL will try to use group kernel launches,
   // which are not compatible with the Realm CUDA hijack.
   setenv("NCCL_LAUNCH_MODE", "PARALLEL", true);
+  setenv("PYTHONPATH", "/home/ubuntu/.local/lib/python3.8/site-packages", true /*overwrite*/);
+  quartz::init_python_interpreter();
+
+  char *python_path = getenv("PYTHONPATH");
+  printf("python path: %s\n", python_path);
 
   Runtime::set_top_level_task_id(TOP_LEVEL_TASK_ID);
   {

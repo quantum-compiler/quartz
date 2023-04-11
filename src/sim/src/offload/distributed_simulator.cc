@@ -42,6 +42,7 @@ void DistributedSimulator::init_devices() {
 }
 
 bool DistributedSimulator::create_regions() {
+  printf("Creating regions...\n");
   Context ctx = config.lg_ctx;
   Runtime* runtime = config.lg_hlr;
   // Creating index spaces / partitions
@@ -111,12 +112,12 @@ bool DistributedSimulator::create_regions() {
 
     int parallel_degree = n_partition < total_gpus ? n_partition : total_gpus;
     // task is
-    if (stage_parallel_is.find(parallel_degree) != stage_parallel_is.end()) {
+    if (stage_parallel_is.find(parallel_degree) == stage_parallel_is.end()) {
       Rect<1> task(Point<1>(0), Point<1>(parallel_degree - 1));
       this->stage_parallel_is[parallel_degree] = runtime->create_index_space(ctx, task);
     }
     // gpu sv
-    if (shuffle_ips_gpu.find(parallel_degree) != shuffle_ips_gpu.end()){
+    if (shuffle_ips_gpu.find(parallel_degree) == shuffle_ips_gpu.end()){
       std::vector<IndexPartition> shuffle_ip;
       Point<1> extent_hi;
       Point<1> extent_lo;
@@ -131,7 +132,7 @@ bool DistributedSimulator::create_regions() {
       shuffle_ips_gpu[parallel_degree] = shuffle_ip;
     }
     // cpu sv
-    if (shuffle_ips.find(n_partition) != shuffle_ips.end()){
+    if (shuffle_ips.find(n_partition) == shuffle_ips.end()){
       std::vector<IndexPartition> shuffle_ip;
       Point<1> extent_hi;
       Point<1> extent_lo;
@@ -143,12 +144,12 @@ bool DistributedSimulator::create_regions() {
         extent_lo[0] = k * total_gpus * trans[0][0];
         extent_hi[0] = extent_lo[0] + (ext_hi[0] +  n_partition) / n_partition - 1;
         for (int j = 0; j < total_gpus; j++) {
-          extent_lo[0] += transform[0][0];
-          extent_hi[0] += transform[0][0];
           Rect<1> shuffle_extent(extent_lo, extent_hi);
           IndexPartition s_ip = runtime->create_partition_by_restriction(
               ctx, is, stage_parallel_is.at(parallel_degree), trans, shuffle_extent);
           shuffle_ip.push_back(s_ip);
+          extent_lo[0] += transform[0][0];
+          extent_hi[0] += transform[0][0];
         }
 
       }
@@ -218,24 +219,26 @@ bool DistributedSimulator::init_state_vectors() {
     FutureMap fm = runtime->execute_index_space(ctx, launcher);
     fm.wait_all_results();
   }
+  printf("Init done..\n");
   return true;
 }
 
 bool DistributedSimulator::run() {
+  printf("Simulator (offloading) is running...\n");
   create_regions();
   init_devices();
   
   init_state_vectors();
 
   for (int i = 0; i < config.num_all_qubits; i++) {
-    permutation[i] = i;
     permutation[i] = circuit.init_permutation[i];
     pos[circuit.init_permutation[i]] = i;
   }
 
   FusedGate* fgates = (FusedGate*) malloc(MAX_FUSED_GATE*sizeof(FusedGate));
-  KernelGate* kgates = (KernelGate*) malloc(MAX_GATE*sizeof(KernelGate));
-  
+  printf("sizeof FusedGate: %lld\n", sizeof(FusedGate)/1024);
+  // KernelGate* kgates = (KernelGate*) malloc(MAX_GATE*sizeof(KernelGate));
+  KernelGate* kgates = nullptr;
   
   int fused_idx = 0;
   int shm_idx = 0;
@@ -259,6 +262,7 @@ bool DistributedSimulator::run() {
   // printf("hhhhh\n");
   
   while (current_task < circuit.task_map.size()) {
+    printf("batch id %d\n", batch_id);
     GateInfo info;
     info.batch_id = batch_id;
     info.use_buffer = use_buffer;
@@ -270,6 +274,7 @@ bool DistributedSimulator::run() {
     for (int i = current_task; i < circuit.task_map.size(); i++) {
       if (circuit.task_map[i] != SHUFFLE) {
         if (circuit.task_map[i] == FUSED) {
+          printf("fused: %d\n", fused_idx);
           FusedGate gate(circuit.gates[fused_idx+shuffle_idx]);
           fgates[fused_idx] = gate;
           fused_idx++;
@@ -279,6 +284,7 @@ bool DistributedSimulator::run() {
           current_task++;
         }
         else if (circuit.task_map[i] == SHM) {
+          printf("shm: %d\n", shm_idx);
           for (int j = 0; j < circuit.shm_gates[num_task_shm].size(); j++) {
             kgates[shm_idx] = circuit.shm_gates[num_task_shm][j];
             shm_idx++;
@@ -292,7 +298,7 @@ bool DistributedSimulator::run() {
         }
       }
       
-      if (circuit.task_map[i] == SHUFFLE || i == circuit.task_map.size() - 1) {
+      if (circuit.task_map[i] == SHUFFLE || i == (circuit.task_map.size() - 1)) {
         // launch previous batched gates if meet a shuffle op or meet the last task:
         for (int j = 0; j < config.num_all_qubits; j++) {
           info.permutation[j] = circuit.permutation_record[shuffle_idx][j];
@@ -320,11 +326,12 @@ bool DistributedSimulator::run() {
 }
 
 bool DistributedSimulator::apply_gates(const GateInfo &info) {
+  printf("Apply gates batch %d\n", info.batch_id);
   Context ctx = config.lg_ctx;
   Runtime* runtime = config.lg_hlr;
   int use_buffer = info.use_buffer;
   int num_sv_cpu = cpu_state_vectors.size() / 2;
-  for (size_t i = 0; i < cpu_state_vectors.size() / 2; i++) {
+  for (size_t i = 0; i < num_sv_cpu; i++) {
     std::pair<LogicalRegion, LogicalPartition> cpu_sv = cpu_state_vectors[i];
     std::pair<LogicalRegion, LogicalPartition> gpu_sv =
         gpu_state_vectors[i % gpu_state_vectors.size()];
@@ -373,11 +380,12 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
           cur_all2all_group = i / num_batches;
           cur_batch = i % num_batches;
         }
+        int idx = 0;
         for (auto &lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(parallel_degree)) {
           int field_idx = 0;
           ArgumentMap argmap;
           Domain domain = runtime->get_index_space_domain(ctx, stage_parallel_is.at(parallel_degree));
-          int idx = 0;
+          
           for (Domain::DomainPointIterator it(domain); it; it++) {
             unsigned my_chunk_idx = 0;
             unsigned pos1 = 0;
@@ -428,9 +436,10 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
               q++;
             }
 
-            std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[cpu_lp_idx/total_gpu+num_sv_cpu*use_buffer].at(n_swap);
+            std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[cpu_lp_idx/total_gpu+num_sv_cpu*use_buffer].at(n_partition);
+            printf("cpu lp part: %d, %d\n", cpu_lp_idx, cur_batch*total_gpu);
             launcher.add_region_requirement(
-                RegionRequirement(s_lp[cpu_lp_idx+cur_batch*total_gpu], 0 /*projection ID*/, READ_ONLY,
+                RegionRequirement(s_lp[cur_batch*total_gpu], 0 /*projection ID*/, READ_ONLY,
                                   EXCLUSIVE, cpu_state_vectors[cpu_lp_idx/total_gpu+num_sv_cpu*use_buffer].first, MAP_TO_ZC_MEMORY));
             launcher.add_field(field_idx++, FID_DATA);
           }
@@ -448,7 +457,7 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
       Domain domain = runtime->get_index_space_domain(ctx, parallel_is);
       int idx = 0;
       for (Domain::DomainPointIterator it(domain); it; it++) {
-        handlers[idx].chunk_id = chunk_id[idx];
+        handlers[idx].chunk_id = info.batch_id == 0? idx+i*(domain.hi()[0]+1) : chunk_id[idx];
         argmap.set_point(*it, TaskArgument(&handlers[idx++], sizeof(DSHandler)));
       }
       IndexLauncher launcher(
@@ -495,24 +504,16 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
         view.stride[0] = 1;
         view.start_device_id = 0;
 
-        int num_all2all_groups = total_gpu / parallel_degree;
-        int num_batches = n_partition / parallel_degree;
-        int cur_all2all_group = 0;
-        int cur_batch = 0;
-        if (total_gpu > n_partition) {
-          cur_all2all_group = i * num_all2all_groups;
-        }
-        else {
-          cur_all2all_group = i / num_batches;
-          cur_batch = i % num_batches;
-        }
-
         int gpu_sv_id = 0;
 
         for (auto &lp : gpu_sv_shuffle_lp[i % gpu_state_vectors.size()].at(1)) {
           int field_idx = 0;
           ArgumentMap argmap;
           Domain domain = runtime->get_index_space_domain(ctx, stage_parallel_is.at(1));
+          int idx = 0;
+          for (Domain::DomainPointIterator it(domain); it; it++) {
+            argmap.set_point(*it, TaskArgument(&handlers[idx++], sizeof(DSHandler)));
+          }
           IndexLauncher launcher(
               STORE_TASK_ID, stage_parallel_is.at(1), TaskArgument(NULL, 0),
               argmap, Predicate::TRUE_PRED, false /*must*/, 0 /*mapper_id*/, view.hash());
@@ -523,15 +524,17 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
           
           int my_chunk_id = chunk_id[gpu_sv_id];
           // add cpu sv as output
-          std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[my_chunk_id/total_gpu+num_sv_cpu*use_buffer].at(n_swap);
+          printf("my chunk id %d\n", my_chunk_id);
+          std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer)].at(1);
           launcher.add_region_requirement(
               RegionRequirement(s_lp[my_chunk_id%total_gpu], 0 /*projection ID*/, WRITE_ONLY,
-                                EXCLUSIVE, cpu_state_vectors[my_chunk_id/total_gpu+num_sv_cpu*use_buffer].first, MAP_TO_ZC_MEMORY));
+                                EXCLUSIVE, cpu_state_vectors[my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer)].first, MAP_TO_ZC_MEMORY));
           launcher.add_field(field_idx++, FID_DATA);
           
           runtime->execute_index_space(ctx, launcher);
-          view.start_device_id += 1;
+          view.start_device_id = (view.start_device_id + 1) % total_gpu;
           gpu_sv_id++;
+          printf("ok\n");
         }
         
       }

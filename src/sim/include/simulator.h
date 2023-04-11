@@ -73,7 +73,7 @@ public:
   bool ApplyKernelGates(std::vector<KernelGate> &kernelgates,
                         qindex logicQubitset);
   bool ApplyShuffle(Gate<DT> &gate);
-  bool Destroy();
+  bool Destroy(bool dump_results);
 
 private:
   ncclResult_t all2all(void *sendbuff, size_t sendcount,
@@ -92,6 +92,7 @@ private:
 public:
   custatevecHandle_t handle_[MAX_DEVICES];
   void *d_sv[MAX_DEVICES];
+  void *h_sv[MAX_DEVICES];
   // num_devices per node
   int n_devices;
   int subSvSize;

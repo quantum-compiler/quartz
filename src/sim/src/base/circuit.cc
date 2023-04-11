@@ -325,8 +325,9 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
           }
           auto *m = gate->gate->get_matrix(params);
           std::vector<std::complex<qreal>> mat = m->flatten();
-          // other way from quartz::GateType to KernelGateType?
+          // TODO: support general control gates
           // target and control will be converted to related qubit when executing
+          // TODO: general control gates
           if (gate->gate->get_num_control_qubits() == 2) {
             // don't want to hardcode..
             qComplex mat_[2][2] = {(mat[3*8+3].real(),mat[3*8+3].imag()), (mat[3*8+7].real(), mat[3*8+7].imag()), (mat[7*8+3].real(), mat[7*8+3].imag()), (mat[7*8+7].real(), mat[7*8+7].imag())};
@@ -350,9 +351,6 @@ bool qcircuit::Circuit<DT>::compile(quartz::CircuitSeq *seq,
             if(!local_mask[qubit_indices[0]]) {
                 assert(gate->gate->tp != quartz::GateType::h);
                 assert(gate->gate->tp != quartz::GateType::u2);
-                // FIXME: skip this incorrect schedule in runtime for now
-                // if(gate->gate->tp == quartz::GateType::h) continue;
-                // if(gate->gate->tp == quartz::GateType::u2) continue;
             }
             qComplex mat_[2][2] = {(mat[0].real(),mat[0].imag()), (mat[1].real(), mat[1].imag()), (mat[2].real(), mat[2].imag()), (mat[3].real(), mat[3].imag())};
             qindex mask = active_qubits_logical;
@@ -416,7 +414,7 @@ void qcircuit::Circuit<DT>::simulate(bool use_mpi) {
   }
   
   printf("Finish Simulating! Total: %d FUSE Kernel, %d SHM Kernel, %d Shuffles.\n", num_fuse, num_shm, num_shuffle);
-  simulator.Destroy();
+  simulator.Destroy(true);
   auto end= std::chrono::system_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
   printf("Time Cost: %d us\n", int(duration.count()));
@@ -432,6 +430,7 @@ bool qcircuit::Circuit<DT>::FuseGates(const quartz::Kernel &kernel,
   printf("Start fusing gates...\n");
   SimGateType g_type = FUSED;
   unsigned n_target = kernel.qubits.size();
+  assert(n_target!=0);
   unsigned n_control = 0;
   std::vector<int> target;
   std::vector<int> control;

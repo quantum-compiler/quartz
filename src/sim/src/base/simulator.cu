@@ -344,6 +344,12 @@ bool SimulatorCuQuantum<DT>::ApplyShuffle(Gate<DT> &gate) {
     }
     shuffle_time.push_back(shuffle_average/n_devices);
 
+    // swap recv_buf and d_sv
+    for (int i = 0; i < n_devices; ++i) {
+      void* tmp = recv_buf[i];
+      recv_buf[i] = d_sv[i];
+      d_sv[i] = tmp;
+    }
     // update perm/pos after global
     int idx = 0;
     for (int i = 0; i < n_global; i++) {
@@ -559,6 +565,19 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
     HANDLE_CUDA_ERROR(cudaFree(recv_buf[i]));
   }
 
+  // init d_sv, only state[0] = 1
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
+    HANDLE_CUDA_ERROR(cudaMemsetAsync(d_sv[i], 0, subSvSize * sizeof(qComplex), s[i]));
+  }
+  qComplex one = make_qComplex(1.0, 0.0);
+  if (myRank == 0) {
+    HANDLE_CUDA_ERROR(cudaMemcpyAsync(d_sv[0], &one, sizeof(qComplex), cudaMemcpyHostToDevice, s[0])); 
+  }
+  for (int i = 0; i < n_devices; i++) {
+    HANDLE_CUDA_ERROR(cudaStreamSynchronize(s[i]));
+  }
+
 
   // start profiling for profiling TODO: considering using openmp for this parts
   for (int i = 0; i < n_devices; ++i) {
@@ -575,7 +594,7 @@ bool SimulatorCuQuantum<DT>::InitStateMulti(
   return true;
 }
 
-template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
+template <typename DT> bool SimulatorCuQuantum<DT>::Destroy(bool dump_results) {
 
   // profiling
   for (int i = 0; i < n_devices; i++) {
@@ -595,12 +614,21 @@ template <typename DT> bool SimulatorCuQuantum<DT>::Destroy() {
     }
   }
   
-
+  FILE *f = nullptr;
   for (int i = 0; i < n_devices; i++) {
     HANDLE_CUDA_ERROR(cudaSetDevice(devices[i]));
     HANDLE_ERROR(custatevecDestroy(handle_[i]));
+    if(dump_results) {
+      h_sv[i] = (void*) malloc(subSvSize * sizeof(qComplex));
+      cudaMemcpy(h_sv[i], d_sv[i], subSvSize * sizeof(qComplex) , cudaMemcpyDeviceToHost);
+      f = fopen("result.log", "wb");
+      fwrite(h_sv[i], sizeof(qreal), 2*subSvSize, f);
+    }
     HANDLE_CUDA_ERROR(cudaFree(d_sv[i]));
     ncclCommDestroy(comms[i]);
+  }
+  if(dump_results) {
+    fclose(f);
   }
 
   HANDLE_CUDA_ERROR(cudaDeviceSynchronize());

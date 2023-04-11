@@ -111,6 +111,7 @@ class BaseConfig:
     agent_collect: bool = True
     agent_batch_size: int = 128
     subgraph_opt: bool = True
+    xfer_pred_layers: int = 1
 
     # training
     max_iterations: int = int(1e8)

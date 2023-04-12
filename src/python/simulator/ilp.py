@@ -100,8 +100,10 @@ def solve_ilp(
 
     print("Available solvers:", pulp.listSolvers(onlyAvailable=True))
     solver = pulp.HiGHS_CMD()
-    prob.solve(solver)
-    # prob.solve()
+    try:
+        prob.solve(solver)
+    except:
+        prob.solve()
     if print_solution:
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():

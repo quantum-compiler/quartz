@@ -152,13 +152,13 @@ int main() {
                                             "su2random",
                                             "twolocalrandom",
                                             "wstate"};
-  // 31 or 42 total qubits, 23-33 local qubits
+  // 31 or 42 total qubits, 23-42 local qubits
   std::vector<int> num_qubits = {31, 42};
   std::vector<int> num_local_qubits;
-  for (int i = 33; i >= 23; i--) {
+  for (int i = 42; i >= 23; i--) {
     num_local_qubits.push_back(i);
   }
-  FILE *fout = fopen("result.csv", "w");
+  FILE *fout = fopen("ilp_result.csv", "w");
   for (auto circuit : circuit_names) {
     fprintf(fout, "%s\n", circuit.c_str());
     for (int num_q : num_qubits) {
@@ -198,8 +198,9 @@ int main() {
         int ilp_result = (int)local_qubits.size();
         for (int j = 0; j < ilp_result; j++) {
           std::cout << "Stage " << j << ": ";
-          for (int k = 0; k < local_q; k++) {
-            std::cout << local_qubits[j][k] << " ";
+          std::cout << local_qubits.size() << " local qubits, ";
+          for (int k : local_qubits[j]) {
+            std::cout << k << " ";
           }
           std::cout << std::endl;
         }

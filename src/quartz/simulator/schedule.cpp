@@ -1853,7 +1853,8 @@ get_schedules(const CircuitSeq &sequence,
 
 std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
-                              Context *ctx, PythonInterpreter *interpreter) {
+                              Context *ctx, PythonInterpreter *interpreter,
+                              int answer_start_with) {
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<std::vector<int>> circuit_gate_qubits;
@@ -1907,7 +1908,7 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
       }
     }
   }
-  for (int num_iterations = 1; true; num_iterations++) {
+  for (int num_iterations = answer_start_with; true; num_iterations++) {
     auto result = interpreter->solve_ilp(
         circuit_gate_qubits, circuit_gate_executable_type, out_gate, num_qubits,
         num_local_qubits, num_iterations);

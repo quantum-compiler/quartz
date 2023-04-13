@@ -1,8 +1,10 @@
 #include "circuitgate.h"
 #include "circuitwire.h"
+#include "context/context.h"
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 
 namespace quartz {
 int CircuitGate::get_min_qubit_index() const {
@@ -154,6 +156,76 @@ std::string CircuitGate::to_string() const {
     }
   }
   result += ")";
+  return result;
+}
+
+std::string CircuitGate::to_qasm_style_string(Context *ctx,
+                                              int param_precision) const {
+  assert(gate->is_quantum_gate());
+  std::string result;
+  if (gate->get_num_control_qubits() > 0) {
+    auto control_state = gate->get_control_state();
+    if (!std::all_of(control_state.begin(), control_state.end(),
+                     [](bool v) { return v; })) {
+      // Not a simple controlled gate
+      auto control_qubits = get_control_qubit_indices();
+      for (int i = 0; i < (int)control_state.size(); i++) {
+        if (!control_state[i]) {
+          result += "x q[" + std::to_string(control_qubits[i]) + "];\n";
+        }
+      }
+    }
+  }
+
+  auto gate_name = gate_type_name(gate->tp);
+  std::transform(gate_name.begin(), gate_name.end(), gate_name.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  result += gate_name;
+  if (gate->get_num_parameters() > 0) {
+    int num_remaining_parameters = gate->get_num_parameters();
+    result += "(";
+    for (int j = 0; j < (int)input_wires.size(); j++) {
+      if (input_wires[j]->is_parameter()) {
+        assert(ctx->input_parameters.size() > input_wires[j]->index);
+        std::ostringstream out;
+        out.precision(param_precision);
+        out << std::fixed << ctx->input_parameters[input_wires[j]->index];
+        result += std::move(out).str();
+        num_remaining_parameters--;
+        if (num_remaining_parameters != 0) {
+          result += ",";
+        }
+      }
+    }
+    result += ")";
+  }
+  result += " ";
+  bool first_qubit = true;
+  for (int j = 0; j < (int)input_wires.size(); j++) {
+    if (input_wires[j]->is_qubit()) {
+      if (first_qubit) {
+        first_qubit = false;
+      } else {
+        result += ",";
+      }
+      result += "q[" + std::to_string(input_wires[j]->index) + "]";
+    }
+  }
+  result += ";\n";
+
+  if (gate->get_num_control_qubits() > 0) {
+    auto control_state = gate->get_control_state();
+    if (!std::all_of(control_state.begin(), control_state.end(),
+                     [](bool v) { return v; })) {
+      // Not a simple controlled gate
+      auto control_qubits = get_control_qubit_indices();
+      for (int i = 0; i < (int)control_state.size(); i++) {
+        if (!control_state[i]) {
+          result += "x q[" + std::to_string(control_qubits[i]) + "];\n";
+        }
+      }
+    }
+  }
   return result;
 }
 

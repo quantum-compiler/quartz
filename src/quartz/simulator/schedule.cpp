@@ -1713,91 +1713,124 @@ get_schedules(const CircuitSeq &sequence,
                                            qubit);
         };
 
-    if (num_stage == (int)local_qubits.size() - 1) {
-      // The last stage. We need to execute all the remaining single-qubit
-      // gates.
-      for (int qubit = 0; qubit < num_qubits; qubit++) {
-        if (!single_qubit_gate_indices[qubit].empty()) {
-          if (last_gate_index[qubit] == -1) {
-            std::cerr << "Qubit " << qubit << " is not entangled." << std::endl;
-            assert(false);
-          }
-          attach_back_and_update_insular_and_cost(qubit);
-        }
-      }
-    } else {
-      // Not the last stage, but we need to execute any single-qubit gate
-      // that operates on a qubit that will become global in the next stage.
-      std::vector<bool> local_in_next_stage(num_qubits, false);
+    // Attach some more single-qubit gates if necessary.
+    std::vector<bool> local_in_next_stage(num_qubits, false);
+    if (num_stage != (int)local_qubits.size() - 1) {
       for (auto &qubit : local_qubits[num_stage + 1]) {
         local_in_next_stage[qubit] = true;
       }
-      for (int qubit = 0; qubit < num_qubits; qubit++) {
-        bool need_to_attach = false;
-        if (!single_qubit_gate_indices[qubit].empty() &&
-            !local_in_next_stage[qubit]) {
-          if (debug) {
-            std::cout << "Attach single-qubit gates on qubit " << qubit
-                      << " because it will become global in the next stage."
-                      << std::endl;
-          }
-          need_to_attach = true;
+    }
+    for (int qubit = 0; qubit < num_qubits; qubit++) {
+      if (single_qubit_gate_indices[qubit].empty()) {
+        continue;
+      }
+      bool need_to_attach = false;
+      if (num_stage == (int)local_qubits.size() - 1) {
+        // The last stage. We need to execute all the remaining single-qubit
+        // gates.
+        if (last_gate_index[qubit] == -1) {
+          std::cerr << "Qubit " << qubit << " is not entangled." << std::endl;
+          assert(false);
         }
-        if (!need_to_attach && !single_qubit_gate_indices[qubit].empty()) {
-          for (auto &index : single_qubit_gate_indices[qubit]) {
-            for (auto &other_qubit :
-                 sequence.gates[index]->get_qubit_indices()) {
-              if (other_qubit != qubit && local_in_next_stage[other_qubit]) {
-                need_to_attach = true;
-                break;
-              }
-            }
-            if (need_to_attach) {
+        need_to_attach = true;
+      }
+      if (!need_to_attach && !local_in_next_stage[qubit]) {
+        // We need to execute any single-qubit gate
+        // that operates on a qubit that will become global in the next stage.
+        if (debug) {
+          std::cout << "Attach single-qubit gates on qubit " << qubit
+                    << " because it will become global in the next stage."
+                    << std::endl;
+        }
+        need_to_attach = true;
+      }
+      if (!need_to_attach) {
+        for (auto &index : single_qubit_gate_indices[qubit]) {
+          for (auto &other_qubit : sequence.gates[index]->get_qubit_indices()) {
+            if (other_qubit != qubit && local_in_next_stage[other_qubit]) {
+              need_to_attach = true;
               break;
             }
           }
-          if (need_to_attach && debug) {
-            std::cout << "Attach single-qubit gates on qubit " << qubit
-                      << " because there is at least one single-qubit gate"
-                         " that will become a multi-qubit gate in the next"
-                         " stage."
-                      << std::endl;
+          if (need_to_attach) {
+            break;
           }
         }
-        if (need_to_attach) {
-          if (last_gate_index[qubit] == -1) {
-            if (debug) {
-              std::cout << "Single-qubit gate "
-                        << single_qubit_gate_indices[qubit][0] << ": "
-                        << sequence.gates[single_qubit_gate_indices[qubit][0]]
-                               ->to_string()
-                        << "not removed." << std::endl;
-            }
-            int gate_id = single_qubit_gate_indices[qubit][0];
-            current_seq.add_gate(sequence.gates[gate_id].get());
-            // Only update them for gates that are passed into the DP.
-            // Update |dp_sequence_position| and |non_insular_qubit_indices|.
-            dp_sequence_position[gate_id] = std::make_pair(
-                num_stage, (int)non_insular_qubit_indices[num_stage].size());
-            non_insular_qubit_indices[num_stage].push_back(
-                sequence.gates[gate_id]->get_non_insular_qubit_indices());
-            shared_memory_gate_costs[num_stage].push_back(
-                kernel_cost.get_shared_memory_gate_cost(
-                    sequence.gates[gate_id]->gate->tp));
-            // Update |last_gate_index|.
-            for (auto &wire : sequence.gates[gate_id]->input_wires) {
-              if (wire->is_qubit()) {
-                last_gate_index[wire->index] = gate_id;
+        if (need_to_attach && debug) {
+          std::cout << "Attach single-qubit gates on qubit " << qubit
+                    << " because there is at least one single-qubit gate"
+                       " that will become a multi-qubit gate in the next"
+                       " stage."
+                    << std::endl;
+        }
+      }
+      if (need_to_attach) {
+        bool keep_single_qubit_gate = false;
+        if (last_gate_index[qubit] == -1) {
+          // Nowhere to attach.
+          keep_single_qubit_gate = true;
+        }
+        if (!keep_single_qubit_gate &&
+            dp_sequence_position[last_gate_index[qubit]].first != num_stage) {
+          // We need to be careful when it comes to cross-stage attaches.
+          std::vector<bool> local_in_other_stage(num_qubits, false);
+          for (auto &q :
+               local_qubits[dp_sequence_position[last_gate_index[qubit]]
+                                .first]) {
+            local_in_other_stage[q] = true;
+          }
+          if (!local_in_other_stage[qubit]) {
+            // We cannot attach because this is a global qubit in that stage.
+            keep_single_qubit_gate = true;
+          } else {
+            for (auto &index : single_qubit_gate_indices[qubit]) {
+              for (auto &other_qubit :
+                   sequence.gates[index]->get_qubit_indices()) {
+                if (other_qubit != qubit && local_in_other_stage[other_qubit]) {
+                  // We cannot attach because this gate will be a multi-qubit
+                  // gate in that stage.
+                  keep_single_qubit_gate = true;
+                  break;
+                }
+              }
+              if (keep_single_qubit_gate) {
+                break;
               }
             }
-            // Update |gate_indices|.
-            gate_indices[sequence.gates[gate_id]->to_string()].push(gate_id);
-            // Remove the first gate because it is already added to the DP.
-            single_qubit_gate_indices[qubit].erase(
-                single_qubit_gate_indices[qubit].begin());
           }
-          attach_back_and_update_insular_and_cost(qubit);
         }
+        if (keep_single_qubit_gate) {
+          if (debug) {
+            std::cout << "Single-qubit gate "
+                      << single_qubit_gate_indices[qubit][0] << ": "
+                      << sequence.gates[single_qubit_gate_indices[qubit][0]]
+                             ->to_string()
+                      << " is kept." << std::endl;
+          }
+          int gate_id = single_qubit_gate_indices[qubit][0];
+          current_seq.add_gate(sequence.gates[gate_id].get());
+          // Only update them for gates that are passed into the DP.
+          // Update |dp_sequence_position| and |non_insular_qubit_indices|.
+          dp_sequence_position[gate_id] = std::make_pair(
+              num_stage, (int)non_insular_qubit_indices[num_stage].size());
+          non_insular_qubit_indices[num_stage].push_back(
+              sequence.gates[gate_id]->get_non_insular_qubit_indices());
+          shared_memory_gate_costs[num_stage].push_back(
+              kernel_cost.get_shared_memory_gate_cost(
+                  sequence.gates[gate_id]->gate->tp));
+          // Update |last_gate_index|.
+          for (auto &wire : sequence.gates[gate_id]->input_wires) {
+            if (wire->is_qubit()) {
+              last_gate_index[wire->index] = gate_id;
+            }
+          }
+          // Update |gate_indices|.
+          gate_indices[sequence.gates[gate_id]->to_string()].push(gate_id);
+          // Remove the first gate because it is already added to the DP.
+          single_qubit_gate_indices[qubit].erase(
+              single_qubit_gate_indices[qubit].begin());
+        }
+        attach_back_and_update_insular_and_cost(qubit);
       }
     }
 
@@ -1828,7 +1861,7 @@ get_schedules(const CircuitSeq &sequence,
       for (int i = 0; i < schedule.get_num_kernels(); i++) {
         // Returns the number of gates inserted.
         auto insert_single_qubit_gates =
-            [&schedule, &i, &sequence, &flipping](
+            [&schedule, &i, &sequence, &flipping, &debug](
                 const std::vector<int> &gate_indices, int insert_location) {
               for (auto &gate_index : gate_indices) {
                 if (sequence.gates[gate_index]->gate->get_num_qubits() == 1 &&
@@ -1836,6 +1869,22 @@ get_schedules(const CircuitSeq &sequence,
                     !sequence.gates[gate_index]->gate->is_diagonal()) {
                   flipping[sequence.gates[gate_index]->get_min_qubit_index()]
                       .flip();
+                }
+                if (debug && schedule.kernels[i].type == KernelType::fusion) {
+                  for (auto &qubit :
+                       sequence.gates[gate_index]->get_qubit_indices()) {
+                    if (schedule.is_local_qubit(qubit) &&
+                        std::find(schedule.kernels[i].qubits.begin(),
+                                  schedule.kernels[i].qubits.end(),
+                                  qubit) == schedule.kernels[i].qubits.end()) {
+                      std::cerr
+                          << "Cannot restore gate " << gate_index << ": "
+                          << sequence.gates[gate_index]->to_string()
+                          << " in kernel " << schedule.kernels[i].to_string()
+                          << " because qubit " << qubit << " is not active."
+                          << std::endl;
+                    }
+                  }
                 }
                 schedule.kernels[i].gates.insert_gate(
                     insert_location, sequence.gates[gate_index].get());

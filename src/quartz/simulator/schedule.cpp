@@ -327,6 +327,12 @@ bool Schedule::compute_kernel_schedule(
     [[nodiscard]] bool check_valid() const {
       std::vector<bool> has_qubit;
       for (int i = 0; i < (int)open_kernels.size(); i++) {
+        if (open_kernels[i].tp == KernelType::fusion &&
+            !open_kernels[i].touching_qubits.empty()) {
+          std::cerr << "Invalid status: open kernel " << i
+                    << " has touching qubits." << std::endl;
+          return false;
+        }
         for (int j = 0; j < (int)open_kernels[i].active_qubits.size(); j++) {
           while (open_kernels[i].active_qubits[j] >= has_qubit.size()) {
             has_qubit.push_back(false);
@@ -342,6 +348,12 @@ bool Schedule::compute_kernel_schedule(
         }
       }
       for (int i = 0; i < (int)absorbing_kernels.size(); i++) {
+        if (absorbing_kernels[i].tp == KernelType::fusion &&
+            !absorbing_kernels[i].touching_qubits.empty()) {
+          std::cerr << "Invalid status: absorbing kernel " << i
+                    << " has touching qubits." << std::endl;
+          return false;
+        }
         for (int j = 0; j < (int)absorbing_kernels[i].active_qubits.size();
              j++) {
           while (absorbing_kernels[i].active_qubits[j] >= has_qubit.size()) {
@@ -1503,10 +1515,12 @@ get_schedules(const CircuitSeq &sequence,
       std::cout << "current layout: local ";
       for (auto &i : current_local_qubit_layout) {
         std::cout << i << " ";
+        assert(local_qubit_mask[i]);
       }
       std::cout << ", global ";
       for (auto &i : current_global_qubit_layout) {
         std::cout << i << " ";
+        assert(!local_qubit_mask[i]);
       }
       std::cout << std::endl;
     }
@@ -1714,11 +1728,43 @@ get_schedules(const CircuitSeq &sequence,
     } else {
       // Not the last stage, but we need to execute any single-qubit gate
       // that operates on a qubit that will become global in the next stage.
+      std::vector<bool> local_in_next_stage(num_qubits, false);
+      for (auto &qubit : local_qubits[num_stage + 1]) {
+        local_in_next_stage[qubit] = true;
+      }
       for (int qubit = 0; qubit < num_qubits; qubit++) {
+        bool need_to_attach = false;
         if (!single_qubit_gate_indices[qubit].empty() &&
-            std::find(local_qubits[num_stage + 1].begin(),
-                      local_qubits[num_stage + 1].end(),
-                      qubit) == local_qubits[num_stage + 1].end()) {
+            !local_in_next_stage[qubit]) {
+          if (debug) {
+            std::cout << "Attach single-qubit gates on qubit " << qubit
+                      << " because it will become global in the next stage."
+                      << std::endl;
+          }
+          need_to_attach = true;
+        }
+        if (!need_to_attach && !single_qubit_gate_indices[qubit].empty()) {
+          for (auto &index : single_qubit_gate_indices[qubit]) {
+            for (auto &other_qubit :
+                 sequence.gates[index]->get_qubit_indices()) {
+              if (other_qubit != qubit && local_in_next_stage[other_qubit]) {
+                need_to_attach = true;
+                break;
+              }
+            }
+            if (need_to_attach) {
+              break;
+            }
+          }
+          if (need_to_attach && debug) {
+            std::cout << "Attach single-qubit gates on qubit " << qubit
+                      << " because there is at least one single-qubit gate"
+                         " that will become a multi-qubit gate in the next"
+                         " stage."
+                      << std::endl;
+          }
+        }
+        if (need_to_attach) {
           if (last_gate_index[qubit] == -1) {
             if (debug) {
               std::cout << "Single-qubit gate "

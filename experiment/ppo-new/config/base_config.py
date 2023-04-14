@@ -105,7 +105,7 @@ class BaseConfig:
     limit_total_gate_count: bool = False
     batch_inference: bool = True
     dyn_eps_len: bool = True
-    max_eps_len: int = 300
+    max_eps_len: int = 600
     min_eps_len: int = 20
     greedy_sample: bool = False
     agent_collect: bool = True

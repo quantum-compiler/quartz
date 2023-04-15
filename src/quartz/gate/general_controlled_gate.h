@@ -38,14 +38,17 @@ public:
   // TODO: Cache the results, avoid memory leakage
   MatrixBase *get_matrix() override {
     auto result = new MatrixBase(*controlled_gate_->get_matrix());
-    permute_matrix(result);
+    // permute_matrix(result);
     return result;
   }
   // TODO: Cache the results, avoid memory leakage
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
-    auto result = new MatrixBase(*controlled_gate_->get_matrix(params));
-    permute_matrix(result);
-    return result;
+    // auto result = new MatrixBase(*controlled_gate_->get_matrix(params));
+    // printf("here3\n");
+    // permute_matrix(result);
+    // printf("here4\n");
+    // return result;
+    return controlled_gate_->get_matrix(params);
   }
   bool is_symmetric() const override {
     if (std::find(state_.begin(), state_.end(), false) == state_.end()) {

@@ -16,16 +16,19 @@ __global__ void initData(int* ptr, int data) {
 
 __global__ void checkData(int* ptr, int size) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i==0)
+    printf("hello checking all2all\n");
   assert(ptr[i] == (int) i / size);
 }
 
 __global__ void checkState(qComplex* ptr, qComplex* ptr2) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i==0)
-    printf("hello\n");
+    printf("hello checking states\n");
   const double eps = 1.0e-5;
   const double diffx = ptr[i].x - ptr2[i].x;
   const double diffy = ptr[i].y - ptr2[i].y;
+  // if(blockIdx.x==0&&threadIdx.x==0) printf("x(%f,%f),y(%f,%f)\n",ptr[i].x, ptr2[i].x, ptr[i].y, ptr2[i].y);
   assert(abs(diffx) < eps);
   assert(abs(diffy) < eps);
 }
@@ -151,6 +154,7 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
   }
   for (int i = n_local; i < n_qubits; i++)
       qubit_group_map[permutation[i]] = global++;
+
 
   // now we 
   // 1. reset all the gates' target/control qubit to group qubit id
@@ -625,16 +629,15 @@ template <typename DT> bool SimulatorCuQuantum<DT>::Destroy(bool dump_results) {
     }
   }
   
-  FILE *f = nullptr;
-  std::vector<qComplex> results_hyquas;
-  results_hyquas.resize(subSvSize);
-  
   if(dump_results) {
-    FILE* f = fopen("/home/ubuntu/HyQuas/build/qft28-result.log", "rb");
+    std::vector<qComplex> results_hyquas;
+    results_hyquas.resize(subSvSize);
+    FILE* f = fopen("/global/homes/z/zjia/qs/HyQuas/build/qftentangled-result-0.log", "rb");
     fread((void*)results_hyquas.data(), sizeof(qreal), 2*subSvSize, f);
     fclose(f);
     printf("finish reading hyquas results..\n");
     void* hyquas;
+    HANDLE_CUDA_ERROR(cudaSetDevice(devices[0]));
     HANDLE_CUDA_ERROR(
         cudaMalloc(&hyquas, subSvSize * sizeof(qComplex)));
     cudaMemcpy(hyquas, (void*)results_hyquas.data(), subSvSize * sizeof(qComplex) , cudaMemcpyHostToDevice);

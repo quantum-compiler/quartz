@@ -6,8 +6,6 @@
 OPENQASM 2.0;
 include "qelib1.inc";
 qreg q[31];
-creg c[31];
-creg meas[31];
 h q[30];
 cp(pi/2) q[30],q[29];
 h q[29];

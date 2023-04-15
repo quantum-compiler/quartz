@@ -294,6 +294,7 @@ __device__ void doCompute(int numGates, int *loArr, int *shiftAt) {
         }
         }
       } else {
+        // if(blockIdx.x==0&&threadIdx.x==0) printf("global target\n");
         assert(deviceGates[i].type == KernelGateType::CZ ||
                deviceGates[i].type == KernelGateType::CU1 ||
                deviceGates[i].type == KernelGateType::CRZ);
@@ -349,6 +350,7 @@ __device__ void doCompute(int numGates, int *loArr, int *shiftAt) {
         continue;
       }
       if (!targetIsGlobal) {
+        // if(blockIdx.x==0&&threadIdx.x==0) printf("global control%d, local target%d\n", controlQubit, targetQubit);
         int lo = loArr[(targetQubit * 11) << THREAD_DEP | threadIdx.x];
         int hi = lo ^ (1 << targetQubit) ^ (((1 << targetQubit) >> 3) & 7);
         int add[4];

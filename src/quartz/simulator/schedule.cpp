@@ -1368,6 +1368,33 @@ void Schedule::print_kernel_schedule() const {
   }
 }
 
+int Schedule::remove_empty_kernels(const KernelCost &kernel_cost) {
+  int num_empty_kernels = 0;
+  for (auto &kernel : kernels) {
+    if (kernel.gates.get_num_gates() == 0) {
+      num_empty_kernels++;
+      if (kernel.type == KernelType::fusion) {
+        cost_ -= kernel_cost.get_fusion_kernel_costs()[kernel.qubits.size()];
+      } else if (kernel.type == KernelType::shared_memory) {
+        cost_ -= kernel_cost.get_shared_memory_init_cost();
+      } else {
+        assert(false);
+      }
+    }
+  }
+  if (num_empty_kernels == 0) {
+    return 0;
+  }
+  auto prev_kernels = std::move(kernels);
+  kernels.clear();
+  for (auto &kernel : prev_kernels) {
+    if (kernel.gates.get_num_gates() != 0) {
+      kernels.push_back(std::move(kernel));
+    }
+  }
+  return num_empty_kernels;
+}
+
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
@@ -1539,9 +1566,9 @@ get_schedules(const CircuitSeq &sequence,
               std::cout << " to " << gate_id << std::endl;
             }
           }
-          KernelCostType result = 0;
+          KernelCostType res = 0;
           for (auto &index : single_qubit_gate_indices[qubit]) {
-            result += kernel_cost.get_shared_memory_gate_cost(
+            res += kernel_cost.get_shared_memory_gate_cost(
                 sequence.gates[index]->gate->tp);
           }
           attach_to[gate_id].insert(attach_to[gate_id].end(),
@@ -1549,7 +1576,7 @@ get_schedules(const CircuitSeq &sequence,
                                     single_qubit_gate_indices[qubit].end());
           single_qubit_gate_indices[qubit].clear();
           has_dense_single_qubit_gate[qubit] = false;
-          return result;
+          return res;
         };
 
     CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
@@ -1940,6 +1967,23 @@ get_schedules(const CircuitSeq &sequence,
 
           j += insert_single_qubit_gates(attach_back[original_index], j + 1);
         }
+      }
+    }
+  }
+  // Remove empty kernels and schedules.
+  bool has_empty_schedule = false;
+  for (auto &schedule : result) {
+    schedule.remove_empty_kernels(kernel_cost);
+    if (schedule.get_num_kernels() == 0) {
+      has_empty_schedule = true;
+    }
+  }
+  if (has_empty_schedule) {
+    auto prev_result = std::move(result);
+    result.clear();
+    for (auto &schedule : result) {
+      if (schedule.get_num_kernels() != 0) {
+        result.push_back(std::move(schedule));
       }
     }
   }

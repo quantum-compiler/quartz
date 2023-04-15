@@ -75,6 +75,12 @@ public:
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
 
+  /**
+   * Remove kernels with no gates and update the cost.
+   * @return The number of empty kernels removed.
+   */
+  int remove_empty_kernels(const KernelCost &kernel_cost);
+
   // The result simulation schedule. We will execute the kernels one by one,
   // and each kernel contains a sequence of gates.
   std::vector<Kernel> kernels;

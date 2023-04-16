@@ -12,7 +12,7 @@ extern __shared__ qindex blockBias;
 
 __device__ __constant__ qreal recRoot2 =
     0.70710678118654752440084436210485; // more elegant way?
-__constant__ KernelGate deviceGates[MAX_GATE];
+__constant__ KernelGate deviceGates[MAX_SHM_GATE_BATCH];
 
 std::vector<int *> loIdx_device;
 std::vector<int *> shiftAt_device;

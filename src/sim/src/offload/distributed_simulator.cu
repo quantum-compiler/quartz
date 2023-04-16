@@ -262,7 +262,7 @@ void DistributedSimulator::sv_comp_task(
       KernelGate hostGates[num_kgates];
       int* loIdx_device = handler->loIdx_device;
       int* shiftAt_device = handler->shiftAt_device;
-      assert(num_kgates < MAX_GATE);
+      assert(num_kgates < MAX_SHM_GATE_BATCH);
       for (size_t i = 0; i < num_kgates; i++) {
           hostGates[i] = getGate(kernelgates[i], handler->chunk_id, logicQubitset, qubit_group_map, info->pos, n_local);
       }

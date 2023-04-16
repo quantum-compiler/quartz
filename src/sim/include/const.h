@@ -26,13 +26,11 @@ typedef cuDoubleComplex qComplex;
 #endif
 
 #define SHARED_MEM_SIZE 10
-#define MAX_GATE 600
-#define MAX_FUSED_GATE 10
+#define MAX_SHM_GATE_BATCH 600
 #define THREAD_DEP 7
 #define MAX_KERNEL_SIZE 6
-#define MAX_BATCHED_TASKS 20
+#define MAX_BATCHED_TASKS 80
 #define MAX_DEVICES 4
-#define MAX_TOTAL_DEVICES 16
 #define MAX_QUBIT 40
 
 enum class KernelGateType {
@@ -67,16 +65,10 @@ enum class KernelGateType {
 };
 
 enum SimGateType {
-  CONTROL,
-  NORMAL,
   FUSED,
   SHM,
   SHUFFLE,
 };
 
-enum CompileMode {
-  HEUR,
-  ILP,
-};
 
 #endif // _CONST_H_

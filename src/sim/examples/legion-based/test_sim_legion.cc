@@ -38,12 +38,12 @@ void sim::top_level_task(
   //               "_indep_qiskit_" + std::to_string(config.num_all_qubits) +
   //               ".qasm");
   auto seq = quartz::CircuitSeq::from_qasm_file(
-      &qtz, std::string("/home/ubuntu/quartz-master/circuit/MQTBench_28") +
-                "q/dj"
-                "_indep_qiskit_28" +
+      &qtz, std::string("/home/ubuntu/quartz/circuit/MQTBench_") + std::to_string(config.num_all_qubits) +
+                "q/" + config.circuit +
+                "_indep_qiskit_" + std::to_string(config.num_all_qubits) + 
                 ".qasm");
   sim::qcircuit::Circuit<double> circuit(config.num_all_qubits,
-                                         config.num_local_qubits, (1 << (config.num_all_qubits - config.num_local_qubits)), 0, 1);
+                                         config.num_local_qubits, (unsigned(1) << (config.num_all_qubits - config.num_local_qubits)), 0, 1);
   circuit.compile(seq.get(), &qtz, &interpreter, use_ilp);
   DistributedSimulator simulator(config, circuit);
   simulator.run();
@@ -89,6 +89,10 @@ void DSConfig::parse_args(char **argv, int argc) {
     }
     if (!strcmp(argv[i], "--all-qubits")) {
       num_all_qubits = atoi(argv[++i]);
+      continue;
+    }
+    if ((!strcmp(argv[i], "--circuit"))) {
+      circuit = std::string(argv[++i]);
       continue;
     }
   }

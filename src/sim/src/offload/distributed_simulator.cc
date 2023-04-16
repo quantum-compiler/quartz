@@ -50,7 +50,7 @@ bool DistributedSimulator::create_regions() {
   Rect<1> task_rect(Point<1>(0), Point<1>(total_gpus - 1));
   this->parallel_is = runtime->create_index_space(ctx, task_rect);
   Rect<1> state_vec_rect(Point<1>(0),
-                         total_gpus * (1 << config.num_local_qubits) - 1);
+                         total_gpus * (size_t(1) << config.num_local_qubits) - 1);
   IndexSpaceT<1> is = runtime->create_index_space(ctx, state_vec_rect);
   Transform<1, 1> transform;
   Point<1> ext_hi;
@@ -78,10 +78,10 @@ bool DistributedSimulator::create_regions() {
   }
   // currently assume that 2^num_all_qubits is a multiplier of
   // 2^num_local_qubits * total_gpus
-  assert((1 << (size_t)config.num_all_qubits) % (state_vec_rect.hi[0] + 1) ==
+  assert((size_t(1) << (size_t)config.num_all_qubits) % (state_vec_rect.hi[0] + 1) ==
          0);
   size_t num_state_vectors =
-      (1 << (size_t)config.num_all_qubits) / (state_vec_rect.hi[0] + 1);
+      (size_t(1) << (size_t)config.num_all_qubits) / (state_vec_rect.hi[0] + 1);
   // on cpu we also have a buffer of the sv for shuffle
   for (size_t i = 0; i < 2 * num_state_vectors; i++) {
     LogicalRegion lr = runtime->create_logical_region(ctx, is, fs);
@@ -140,8 +140,8 @@ bool DistributedSimulator::create_regions() {
       extent_lo[0] = 0;
       Transform<1, 1> trans;
       trans[0][0] = extent_hi[0] + 1;
-      for (size_t k = 0; k < n_partition / total_gpus; k++) {
-        extent_lo[0] = k * total_gpus * trans[0][0];
+      for (size_t k = 0; k < n_partition / parallel_degree; k++) {
+        extent_lo[0] = k * parallel_degree * trans[0][0];
         extent_hi[0] = extent_lo[0] + (ext_hi[0] +  n_partition) / n_partition - 1;
         for (int j = 0; j < total_gpus; j++) {
           Rect<1> shuffle_extent(extent_lo, extent_hi);
@@ -225,6 +225,8 @@ bool DistributedSimulator::init_state_vectors() {
 
 bool DistributedSimulator::run() {
   printf("Simulator (offloading) is running...\n");
+  Context ctx = config.lg_ctx;
+  Runtime* runtime = config.lg_hlr;
   create_regions();
   init_devices();
   
@@ -235,10 +237,16 @@ bool DistributedSimulator::run() {
     pos[circuit.init_permutation[i]] = i;
   }
 
-  FusedGate* fgates = (FusedGate*) malloc(MAX_FUSED_GATE*sizeof(FusedGate));
-  printf("sizeof FusedGate: %lld\n", sizeof(FusedGate)/1024);
-  // KernelGate* kgates = (KernelGate*) malloc(MAX_GATE*sizeof(KernelGate));
-  KernelGate* kgates = nullptr;
+  size_t num_fused_gates = circuit.gates.size() - circuit.local_swap_record.size();
+  size_t num_shm_gates = 0;
+  for (int i=0; i < circuit.shm_gates.size(); i++) {
+    num_shm_gates += circuit.shm_gates[i].size();
+  }
+  assert( num_fused_gates+circuit.shm_gates.size() <= MAX_BATCHED_TASKS);
+  FusedGate* fgates = (FusedGate*) malloc(num_fused_gates*sizeof(FusedGate));
+  printf("sizeof FusedGate: %lld Bytes\n", sizeof(FusedGate));
+  KernelGate* kgates = (KernelGate*) malloc(num_shm_gates*sizeof(KernelGate));
+  // KernelGate* kgates = nullptr;
   
   int fused_idx = 0;
   int shm_idx = 0;
@@ -250,17 +258,14 @@ bool DistributedSimulator::run() {
   int num_task_shm = 0;
   int batch_id = 0;
   int use_buffer = 0;
-  // FusedGate* fgates = (FusedGate*) malloc(4*sizeof(FusedGate));
-  // for (int j = 0; j < 4; j++) {
-  //   FusedGate gate(circuit.gates[j+1]);
-  //   printf("num target: %d\n", gate.num_target);
-  //   fgates[j] = gate;
-  // }
-  // // GateInfo info{circuit.fused_gates_.data(), circuit.num_fused.data(), circuit.shm_gates_.data(), circuit.num_shm.data(), circuit.active_physic_qs.data()};
-  // GateInfo info{fgates};
-  // apply_gates(info);
-  // printf("hhhhh\n");
   
+  {
+    runtime->issue_execution_fence(ctx);
+    TimingLauncher timer(MEASURE_MICRO_SECONDS);
+    Future future = runtime->issue_timing_measurement(ctx, timer);
+    future.get_void_result();
+  }
+  double ts_start = Realm::Clock::current_time_in_microseconds();
   while (current_task < circuit.task_map.size()) {
     printf("batch id %d\n", batch_id);
     GateInfo info;
@@ -321,6 +326,15 @@ bool DistributedSimulator::run() {
       }
     }
   }
+  {
+    runtime->issue_execution_fence(ctx);
+    TimingLauncher timer(MEASURE_MICRO_SECONDS);
+    Future future = runtime->issue_timing_measurement(ctx, timer);
+    future.get_void_result();
+  }
+  double ts_end = Realm::Clock::current_time_in_microseconds();
+  double run_time = 1e-6 * (ts_end - ts_start);
+  printf("ELAPSED TIME = %.4fs\n",run_time);
   
   return true;
 }
@@ -329,8 +343,8 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
   printf("Apply gates batch %d\n", info.batch_id);
   Context ctx = config.lg_ctx;
   Runtime* runtime = config.lg_hlr;
-  int use_buffer = info.use_buffer;
-  int num_sv_cpu = cpu_state_vectors.size() / 2;
+  size_t use_buffer = info.use_buffer;
+  size_t num_sv_cpu = cpu_state_vectors.size() / 2;
   for (size_t i = 0; i < num_sv_cpu; i++) {
     std::pair<LogicalRegion, LogicalPartition> cpu_sv = cpu_state_vectors[i];
     std::pair<LogicalRegion, LogicalPartition> gpu_sv =
@@ -437,7 +451,7 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
             }
 
             std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[cpu_lp_idx/total_gpu+num_sv_cpu*use_buffer].at(n_partition);
-            printf("cpu lp part: %d, %d\n", cpu_lp_idx, cur_batch*total_gpu);
+            // printf("cpu lp part: %d, %d\n", cpu_lp_idx, cur_batch*total_gpu);
             launcher.add_region_requirement(
                 RegionRequirement(s_lp[cur_batch*total_gpu], 0 /*projection ID*/, READ_ONLY,
                                   EXCLUSIVE, cpu_state_vectors[cpu_lp_idx/total_gpu+num_sv_cpu*use_buffer].first, MAP_TO_ZC_MEMORY));
@@ -524,10 +538,10 @@ bool DistributedSimulator::apply_gates(const GateInfo &info) {
           
           int my_chunk_id = chunk_id[gpu_sv_id];
           // add cpu sv as output
-          printf("my chunk id %d\n", my_chunk_id);
-          std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp[my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer)].at(1);
+          printf("my chunk id %d, num_sv_cpu %d, at %d[%d]\n", my_chunk_id, num_sv_cpu, my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer),my_chunk_id%total_gpu);
+          std::vector<LogicalPartition> s_lp = cpu_sv_shuffle_lp.at(my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer)).at(1);
           launcher.add_region_requirement(
-              RegionRequirement(s_lp[my_chunk_id%total_gpu], 0 /*projection ID*/, WRITE_ONLY,
+              RegionRequirement(s_lp.at(my_chunk_id%total_gpu), 0 /*projection ID*/, WRITE_ONLY,
                                 EXCLUSIVE, cpu_state_vectors[my_chunk_id/total_gpu+num_sv_cpu*(1-use_buffer)].first, MAP_TO_ZC_MEMORY));
           launcher.add_field(field_idx++, FID_DATA);
           

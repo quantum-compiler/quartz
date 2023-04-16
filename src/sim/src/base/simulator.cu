@@ -160,7 +160,7 @@ bool SimulatorCuQuantum<DT>::ApplyKernelGates(
   // 1. reset all the gates' target/control qubit to group qubit id
   // 2. generate per-device schedule
   KernelGate hostGates[n_devices * kernelgates.size()];
-  assert(kernelgates.size() < MAX_GATE);
+  assert(kernelgates.size() < MAX_SHM_GATE_BATCH);
   #pragma omp parallel for num_threads(n_devices)
   for (int k = 0; k < n_devices; k++) {
     int myncclrank = device_phy_to_logical.at(myRank * n_devices + k);

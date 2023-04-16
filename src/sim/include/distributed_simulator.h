@@ -13,6 +13,7 @@ public:
   Legion::coord_t num_local_qubits, num_all_qubits, num_state_vectors_on_gpu;
   Legion::Context lg_ctx;
   Legion::Runtime *lg_hlr;
+  std::string circuit;
 };
 
 struct GateInfo {

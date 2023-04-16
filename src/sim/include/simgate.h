@@ -38,8 +38,8 @@ struct FusedGate {
   // qindex target_physical = 0;
   // qindex control_physical = 0;
 
-  qComplex matrix[MAX_TOTAL_DEVICES*(1<<MAX_KERNEL_SIZE)*(1<<MAX_KERNEL_SIZE)];
-
+  // qComplex matrix[MAX_TOTAL_DEVICES*(1<<MAX_KERNEL_SIZE)*(1<<MAX_KERNEL_SIZE)];
+  qComplex* matrix;
   FusedGate(const Gate<qreal> &gate) {
     num_target = gate.num_target;
     // num_control = gate.num_control;
@@ -50,6 +50,7 @@ struct FusedGate {
     // for (int i = 0; i < gate.control.size(); i++) {
     //   control_physical |= qindex(1) << gate.control[i];
     // }
+    matrix = (qComplex*) malloc(sizeof(qComplex)*gate.matrix.size()*(1<<MAX_KERNEL_SIZE)*(1<<MAX_KERNEL_SIZE));
     for (int i = 0; i < gate.matrix.size(); i++) {
       for (int j = 0; j < gate.matrix[i].size(); j++) {
         matrix[i*gate.matrix[i].size()+j].x = gate.matrix[i][j].real();

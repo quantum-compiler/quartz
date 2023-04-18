@@ -7,6 +7,7 @@
 #include "fidelity_graphs/ibm_q27_falcon_fake_auckland.h"
 #include "fidelity_graphs/ibm_q65_hummingbird_fake_ithaca.h"
 #include "fidelity_graphs/ibm_q127_eagle_fake_washington.h"
+#include "fidelity_graphs/q5_test.h"
 
 namespace quartz {
 
@@ -17,7 +18,7 @@ namespace quartz {
         else if (backend_type == BackendType::IBM_Q20_TOKYO)
             Assert(false, "IBM_Q20_TOKYO has no fidelity graph");
         else if (backend_type == BackendType::Q5_TEST)
-            Assert(false, "Q5_TEST has no fidelity graph");
+            return Q5_Test_Ideal();
         else if (backend_type == BackendType::IBM_Q127_EAGLE)
             return IBM_Q127_Eagle_Washington();
         else if (backend_type == BackendType::IBM_Q27_FALCON)

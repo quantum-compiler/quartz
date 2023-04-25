@@ -93,6 +93,11 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
     } else if (node->type == CircuitWire::input_param) {
       input_params_op.push_back(Op(context->next_global_unique_id(),
                                    ctx->get_gate(GateType::input_param)));
+      if (node->index < (int)context->input_parameters.size()) {
+        // Retrieve the parameter value from context.
+        constant_param_values[input_params_op.back()] =
+            context->input_parameters[node->index];
+      }
     }
   }
 

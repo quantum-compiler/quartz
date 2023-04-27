@@ -168,7 +168,7 @@ bool QASMParser::load_qasm_stream(
             } else {
               std::cerr << "Unsupported parameter format: " << token
                         << std::endl;
-              assert(false);
+              return false;
             }
           }
         } else if (token.find("pi") != std::string::npos) {
@@ -223,7 +223,7 @@ bool QASMParser::load_qasm_stream(
       seq->add_gate(qubit_indices, param_indices, gate, nullptr);
     } else {
       std::cout << "Unknown gate: " << command << std::endl;
-      assert(false);
+      return false;
     }
   }
   return true;

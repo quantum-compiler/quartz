@@ -1561,26 +1561,26 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-std::shared_ptr<Graph>
-Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
-                       bool print_message,
-                       std::function<float(Graph *)> cost_function) {
+
+std::shared_ptr<Graph> Graph::greedy_optimize_with_eccs (
+  Context *ctx, std::vector<std::vector<CircuitSeq *>>& eccs,
+  bool print_message, std::function<float(Graph *)> cost_function) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
 
-  EquivalenceSet eqs;
-  // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name)) {
-    std::cout << "Failed to load equivalence file \"" << equiv_file_name
-              << "\"." << std::endl;
-    assert(false);
-  }
+  // EquivalenceSet eqs;
+  // // Load equivalent dags from file
+  // if (!eqs.load_json(ctx, equiv_file_name)) {
+  //   std::cout << "Failed to load equivalence file \"" << equiv_file_name
+  //             << "\"." << std::endl;
+  //   assert(false);
+  // }
 
   auto original_cost = cost_function(this);
 
-  // Get xfers that strictly reduce the cost from the ECC set
-  auto eccs = eqs.get_all_equivalence_sets();
+  // // Get xfers that strictly reduce the cost from the ECC set
+  // auto eccs = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
   for (const auto &ecc : eccs) {
     const int ecc_size = (int)ecc.size();
@@ -1647,6 +1647,21 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
 
   return optimized_graph;
 }
+
+
+std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
+  bool print_message, std::function<float(Graph *)> cost_function) {
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(ctx, equiv_file_name)) {
+    std::cout << "Failed to load equivalence file \"" << equiv_file_name
+              << "\"." << std::endl;
+    assert(false);
+  }
+  auto eccs = eqs.get_all_equivalence_sets();
+  return greedy_optimize_with_eccs(ctx, eccs, print_message, cost_function);
+}
+
 
 std::shared_ptr<Graph> Graph::optimize_legacy(
     float alpha, int budget, bool print_subst, Context *ctx,

@@ -210,7 +210,7 @@ public:
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
-  greedy_optimize_with_eccs(Context *ctx, std::vector<std::vector<CircuitSeq *>>& eccs,
+  greedy_optimize_with_xfers(Context *ctx, const std::vector<GraphXfer *> &xfers,
                   bool print_message,
                   std::function<float(Graph *)> cost_function = nullptr);
 

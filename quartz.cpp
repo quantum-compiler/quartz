@@ -37,7 +37,9 @@ extern "C" long unsigned int load_eqset_ (const char* eqset_fn_, unsigned char**
 extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned char** store) {
   std::string eqset_fn(eqset_fn_);
   EquivalenceSet* eqs = new EquivalenceSet();
-  if (!eqs->load_json(&gctxt, eqset_fn)) {
+  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
+                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  if (!eqs->load_json(ctxt, eqset_fn)) {
     std::cout << "Failed to load equivalence file \"" << eqset_fn
               << "\"." << std::endl;
     assert(false);
@@ -52,7 +54,7 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
     // graphs.reserve(ecc_size);
     graph_cost.reserve(ecc_size);
     for (auto &circuit : ecc) {
-      graphs->emplace_back(&gctxt, circuit);
+      graphs->emplace_back(ctxt, circuit);
       graph_cost.emplace_back(gcost_function(&(graphs->back())));
     }
     int representative_id =
@@ -60,7 +62,7 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
               graph_cost.begin());
     for (int i = 0; i < ecc_size; i++) {
       if (graph_cost[i] != graph_cost[representative_id]) {
-        auto xfer = GraphXfer::create_GraphXfer(&gctxt, ecc[i],
+        auto xfer = GraphXfer::create_GraphXfer(ctxt, ecc[i],
                                                 ecc[representative_id], true);
         if (xfer != nullptr) {
           xfers.push_back(xfer);
@@ -102,7 +104,7 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                   GateType::cx, GateType::input_qubit, GateType::input_param});
   auto uctx = union_contexts(&rem_ctx, &dst_ctx);
-  RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;"});
+  RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;"}); // TODO: check this.
   auto fgraph = new_graph->context_shift(&rem_ctx, &dst_ctx, &uctx, &rules, false);
 
   std::string new_qasm = fgraph->to_qasm(false, false);
@@ -114,23 +116,31 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
 
   std::string cqasm(cqasm_);
 
-  std::string eqset_fn = "../Nam_6_3_complete_ECC_set.json";
+  std::vector<GraphXfer*>* xfers_ptr = reinterpret_cast<std::vector<GraphXfer*>*> (xfers_);
+  std::vector<GraphXfer*> xfers = *xfers_ptr;
 
-  Context ctxt({GateType::h, GateType::x, GateType::rz, GateType::add,
+  // std::string eqset_fn = "Nam_4_3_complete_ECC_set.json";
+  Context* ctxt;
+  if (xfers.size () == 0) {
+    ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param});
-  QASMParser qasm_parser(&ctxt);
+  } else {
+    ctxt = xfers[0]->context;
+  }
+
+  QASMParser qasm_parser(ctxt);
   CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm_str(cqasm, dag)) {
     std::cout << "Parser failed" << std::endl;
     return -1;
   }
-  Graph graph(&ctxt, dag);
-
-  std::vector<GraphXfer*>* xfers_ptr = reinterpret_cast<std::vector<GraphXfer*>*> (xfers_);
-  std::vector<GraphXfer*> xfers = *xfers_ptr;
+  Graph graph(ctxt, dag);
 
   auto start = std::chrono::steady_clock::now();
-  auto graph_after_search = graph.greedy_optimize_with_xfers(&ctxt, xfers, /*print_message=*/ false, gcost_function);
+  // Assume that the context is same?
+  // std::cout << "calling greedy_opt" << std::endl;
+  // auto graph_after_search = graph.greedy_optimize_with_xfers(ctxt, eqset_fn, /*print_message=*/ false);
+  auto graph_after_search = graph.greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
   auto end = std::chrono::steady_clock::now();
 
   std::cout << " Gate count optimized from: "
@@ -146,6 +156,11 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
     return -1;
   }
   std::string cqasm2 = graph_after_search->to_qasm(false, false);
+
+  if (xfers.size() == 0) {
+    std::cout << "deleting wrongs" << std::endl;
+    delete ctxt;
+  }
   return write_qasm_to_buffer(cqasm2, buffer, buff_size);
   // std::cout << "circuit after opt = ";
   // std::cout << cqasm2.c_str() << std::endl;

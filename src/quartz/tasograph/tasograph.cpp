@@ -2376,9 +2376,9 @@ bool Graph::_pattern_matching(
       }
     }
   }
-  if (!fail) {
-    fail = !_loop_check_after_matching(xfer);
-  }
+  // if (!fail) {
+  //   fail = !_loop_check_after_matching(xfer);
+  // }
   if (fail) {
     while (!matched_opx_op_pairs_dq.empty()) {
       auto opx_op_pair = matched_opx_op_pairs_dq.back();
@@ -2398,6 +2398,8 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   if (!success)
     // If failed, the unmatch is already done in _pattern_matching.
     return false;
+
+  success = _loop_check_after_matching(xfer);
   // Pattern matching succeed, unmatch mapped nodes.
   while (!matched_opx_op_pairs_dq.empty()) {
     auto opx_op_pair = matched_opx_op_pairs_dq.back();

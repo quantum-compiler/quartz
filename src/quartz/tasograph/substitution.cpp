@@ -743,7 +743,9 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
     }
   }
   // Unmap op
-  mappedOps.erase(op);
+  if (mappedOps.find(op) != mappedOps.end()) {
+    mappedOps.erase(op);
+  }
   srcOp->mapOp.guid = 0;
   srcOp->mapOp.ptr = nullptr;
 }

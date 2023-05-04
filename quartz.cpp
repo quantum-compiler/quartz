@@ -100,14 +100,13 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&imt_ctx);
   auto new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
 
-
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                   GateType::cx, GateType::input_qubit, GateType::input_param});
   auto uctx = union_contexts(&rem_ctx, &dst_ctx);
   RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;"}); // TODO: check this.
-  auto fgraph = new_graph->context_shift(&rem_ctx, &dst_ctx, &uctx, &rules, false);
+  auto fin_graph = new_graph->context_shift(&rem_ctx, &dst_ctx, &uctx, &rules, false);
 
-  std::string new_qasm = fgraph->to_qasm(false, false);
+  std::string new_qasm = fin_graph->to_qasm(false, false);
   return write_qasm_to_buffer (new_qasm, buffer, buff_size);
 }
 
@@ -139,7 +138,7 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
   auto start = std::chrono::steady_clock::now();
   // Assume that the context is same?
   // std::cout << "calling greedy_opt" << std::endl;
-  // auto graph_after_search = graph.greedy_optimize_with_xfers(ctxt, eqset_fn, /*print_message=*/ false);
+  // auto graph_after_search = graph.greedy_optimize(ctxt, eqset_fn, /*print_message=*/ false);
   auto graph_after_search = graph.greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
   auto end = std::chrono::steady_clock::now();
 

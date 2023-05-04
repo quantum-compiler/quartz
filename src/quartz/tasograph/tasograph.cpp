@@ -2387,6 +2387,10 @@ bool Graph::_pattern_matching(
         // Only check inputs on a qubit
         // Excluding input_param gates and arithmetic gates
         Pos p = Pos(it->second.first, it->second.second);
+        if (pos_2_logical_qubit.find(p) == pos_2_logical_qubit.end()) {
+          fail = true;
+          break;
+        }
         auto q = pos_2_logical_qubit.find(p)->second;
         if (qubits.find(q) != qubits.end()) {
           fail = true;
@@ -2428,9 +2432,9 @@ bool Graph::_pattern_matching(
       }
     }
   }
-  // if (!fail) {
-  //   fail = !_loop_check_after_matching(xfer);
-  // }
+  if (!fail) {
+    fail = !_loop_check_after_matching(xfer);
+  }
   if (fail) {
     while (!matched_opx_op_pairs_dq.empty()) {
       auto opx_op_pair = matched_opx_op_pairs_dq.back();
@@ -2465,16 +2469,13 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
-  // std::cout << "pattern start"<<std::endl;
 
   auto success = _pattern_matching(xfer, op, matched_opx_op_pairs_dq);
-  // std::cout << "pattern end"<<std::endl;
   std::shared_ptr<Graph> new_graph(nullptr);
   if (!success)
     // If failed, the unmatch is already done in _pattern_matching.
     // Return nullptr.
     return new_graph;
-  // std::cout << "success"<<std::endl;
   if (success) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
@@ -2494,6 +2495,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
     matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
+
   return new_graph;
 }
 

@@ -738,12 +738,15 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
     if (in.op == nullptr) {
       // Update mappedInputsa
       auto it = mappedInputs.find(in.idx);
-      if (it != mappedInputs.end())
+      if (it != mappedInputs.end()){
         mappedInputs.erase(it);
+      }
     }
   }
   // Unmap op
-  mappedOps.erase(op);
+  if (mappedOps.find(op) != mappedOps.end()){
+    mappedOps.erase(op);
+  }
   srcOp->mapOp.guid = 0;
   srcOp->mapOp.ptr = nullptr;
 }

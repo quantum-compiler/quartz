@@ -481,9 +481,8 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
     if (dst_gate_set.find(gate_tp) == dst_gate_set.end()) {
       std::vector<Command> cmds;
       Command src_cmd;
-      assert(
-          rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
-
+      bool found_command = rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds);
+      assert(found_command);
       tp_2_xfer[gate_tp] =
           GraphXfer::create_single_gate_GraphXfer(union_ctx, src_cmd, cmds);
     }
@@ -1562,13 +1561,12 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 
-std::shared_ptr<Graph> Graph::greedy_optimize_with_eccs (
-  Context *ctx, std::vector<std::vector<CircuitSeq *>>& eccs,
+std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
+  Context *ctx, const std::vector<GraphXfer *> &xfers,
   bool print_message, std::function<float(Graph *)> cost_function) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
-
   // EquivalenceSet eqs;
   // // Load equivalent dags from file
   // if (!eqs.load_json(ctx, equiv_file_name)) {
@@ -1577,43 +1575,45 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_eccs (
   //   assert(false);
   // }
 
-  auto original_cost = cost_function(this);
-
   // // Get xfers that strictly reduce the cost from the ECC set
   // auto eccs = eqs.get_all_equivalence_sets();
-  std::vector<GraphXfer *> xfers;
-  for (const auto &ecc : eccs) {
-    const int ecc_size = (int)ecc.size();
-    std::vector<Graph> graphs;
-    std::vector<int> graph_cost;
-    graphs.reserve(ecc_size);
-    graph_cost.reserve(ecc_size);
-    for (auto &circuit : ecc) {
-      graphs.emplace_back(ctx, circuit);
-      graph_cost.emplace_back(cost_function(&graphs.back()));
-    }
-    int representative_id =
-        (int)(std::min_element(graph_cost.begin(), graph_cost.end()) -
-              graph_cost.begin());
-    for (int i = 0; i < ecc_size; i++) {
-      if (graph_cost[i] != graph_cost[representative_id]) {
-        auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
-                                                ecc[representative_id], true);
-        if (xfer != nullptr) {
-          xfers.push_back(xfer);
-        }
-      }
-    }
-  }
-  if (print_message) {
-    std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
-              << xfers.size() << std::endl;
-  }
-
+  // std::vector<GraphXfer *> xfers;
+  // for (const auto &ecc : eccs) {
+  //   const int ecc_size = (int)ecc.size();
+  //   std::vector<Graph> graphs;
+  //   std::vector<int> graph_cost;
+  //   graphs.reserve(ecc_size);
+  //   graph_cost.reserve(ecc_size);
+  //   for (auto &circuit : ecc) {
+  //     graphs.emplace_back(ctx, circuit);
+  //     graph_cost.emplace_back(cost_function(&graphs.back()));
+  //   }
+  //   int representative_id =
+  //       (int)(std::min_element(graph_cost.begin(), graph_cost.end()) -
+  //             graph_cost.begin());
+  //   for (int i = 0; i < ecc_size; i++) {
+  //     if (graph_cost[i] != graph_cost[representative_id]) {
+  //       auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
+  //                                               ecc[representative_id], true);
+  //       if (xfer != nullptr) {
+  //         xfers.push_back(xfer);
+  //       }
+  //     }
+  //   }
+  // }
+  // if (print_message) {
+  //   std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
+  //             << xfers.size() << std::endl;
+  // }
+  auto original_cost = cost_function(this);
   std::shared_ptr<Graph> optimized_graph = std::make_shared<Graph>(*this);
   bool optimized_in_this_iteration;
   std::vector<Op> all_nodes;
+  size_t num_visits = 0;
   optimized_graph->topology_order_ops(all_nodes);
+  auto start = std::chrono::steady_clock::now();
+  std::cout << "total xfers = " << xfers.size() << std::endl;
+  std::cout << "total nodes = " << all_nodes.size() << std::endl;
   do {
     optimized_in_this_iteration = false;
     for (auto xfer : xfers) {
@@ -1623,7 +1623,9 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_eccs (
         for (auto const &node : all_nodes) {
           auto new_graph = optimized_graph->apply_xfer(
               xfer, node, context->has_parameterized_gate());
+          num_visits++;
           if (new_graph) {
+
             optimized_graph.swap(new_graph);
             // Update the wires after applying a transformation.
             all_nodes.clear();
@@ -1637,7 +1639,14 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_eccs (
       } while (optimized_this_xfer);
     }
   } while (optimized_in_this_iteration);
+  auto end = std::chrono::steady_clock::now();
 
+  std::cout << "total nodes visited = " << num_visits << std::endl;
+  std::cout << "time in for loop " <<(double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - start)
+                       .count() /
+                   1000.0
+            << " seconds." <<std::endl;
   auto optimized_cost = cost_function(optimized_graph.get());
 
   if (print_message) {
@@ -1659,7 +1668,35 @@ std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &e
     assert(false);
   }
   auto eccs = eqs.get_all_equivalence_sets();
-  return greedy_optimize_with_eccs(ctx, eccs, print_message, cost_function);
+    std::vector<GraphXfer *> xfers;
+
+  if (cost_function == nullptr) {
+    cost_function = [](Graph *graph) { return graph->total_cost(); };
+  }
+  for (const auto &ecc : eccs) {
+    const int ecc_size = (int)ecc.size();
+    std::vector<Graph> graphs;
+    std::vector<int> graph_cost;
+    graphs.reserve(ecc_size);
+    graph_cost.reserve(ecc_size);
+    for (auto &circuit : ecc) {
+      graphs.emplace_back(ctx, circuit);
+      graph_cost.emplace_back(cost_function(&(graphs.back())));
+    }
+    int representative_id =
+        (int)(std::min_element(graph_cost.begin(), graph_cost.end()) -
+              graph_cost.begin());
+    for (int i = 0; i < ecc_size; i++) {
+      if (graph_cost[i] != graph_cost[representative_id]) {
+        auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
+                                                ecc[representative_id], true);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+      }
+    }
+  }
+  return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function);
 }
 
 
@@ -2350,6 +2387,10 @@ bool Graph::_pattern_matching(
         // Only check inputs on a qubit
         // Excluding input_param gates and arithmetic gates
         Pos p = Pos(it->second.first, it->second.second);
+        if (pos_2_logical_qubit.find(p) == pos_2_logical_qubit.end()) {
+          fail = true;
+          break;
+        }
         auto q = pos_2_logical_qubit.find(p)->second;
         if (qubits.find(q) != qubits.end()) {
           fail = true;
@@ -2413,13 +2454,14 @@ bool Graph::xfer_appliable(GraphXfer *xfer, Op op) const {
   if (!success)
     // If failed, the unmatch is already done in _pattern_matching.
     return false;
+  success = _loop_check_after_matching (xfer);
   // Pattern matching succeed, unmatch mapped nodes.
   while (!matched_opx_op_pairs_dq.empty()) {
     auto opx_op_pair = matched_opx_op_pairs_dq.back();
     matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
-  return true;
+  return success;
 }
 
 std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
@@ -2427,13 +2469,13 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
   // When eliminate_rotation is true, this function will eliminate all rotation
   // whose parameters are all 0
   std::deque<std::pair<OpX *, Op>> matched_opx_op_pairs_dq;
+
   auto success = _pattern_matching(xfer, op, matched_opx_op_pairs_dq);
   std::shared_ptr<Graph> new_graph(nullptr);
   if (!success)
     // If failed, the unmatch is already done in _pattern_matching.
     // Return nullptr.
     return new_graph;
-
   if (success) {
     new_graph = xfer->create_new_graph(this);
     if (new_graph->has_loop()) {
@@ -2453,6 +2495,7 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
     matched_opx_op_pairs_dq.pop_back();
     xfer->unmatch(opx_op_pair.first, opx_op_pair.second, this);
   }
+
   return new_graph;
 }
 

@@ -738,7 +738,8 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
     if (in.op == nullptr) {
       // Update mappedInputsa
       auto it = mappedInputs.find(in.idx);
-      mappedInputs.erase(it);
+      if (it != mappedInputs.end())
+        mappedInputs.erase(it);
     }
   }
   // Unmap op

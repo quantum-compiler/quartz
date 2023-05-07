@@ -81,8 +81,9 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
 extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
 
   std::string cqasm(cqasm_);
+  // std::cout << "here with qasm "<< cqasm << std::endl;
 
-  Context src_ctx({GateType::y, GateType::u1, GateType::h, GateType::ccz, GateType::rz, GateType::rx, GateType::x, GateType::cx,
+  Context src_ctx({GateType::u1, GateType::h, GateType::ccz, GateType::rz, GateType::rx, GateType::x, GateType::cx,
                    GateType::input_qubit, GateType::input_param});
 
   QASMParser qasm_parser(&src_ctx);
@@ -94,18 +95,21 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
   Graph graph(&src_ctx, dag);
 
   // decompose ccz as cx and rz
-  Context rem_ctx({GateType::y, GateType::u1, GateType::rx, GateType::h, GateType::x, GateType::rz, GateType::add,
+  Context rem_ctx({GateType::u1, GateType::rx, GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param});
   auto imt_ctx = union_contexts(&src_ctx, &rem_ctx);
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&imt_ctx);
   auto new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
+  // std::cout << "flipping done\n"<<  std::endl;
 
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                   GateType::cx, GateType::input_qubit, GateType::input_param});
   auto uctx = union_contexts(&rem_ctx, &dst_ctx);
-  auto y_rule = "y = rz(0.5pi) q0; rz(0.5pi) q0; h q0; rz(0.5pi) q0; rz(0.5pi) q0; h q0;";
-  RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;", "u1 q0 p0 = rz q0 p0;", y_rule}); // TODO: check this.
+  // auto y_rule = "y = rz(0.5pi) q0; rz(0.5pi) q0; h q0; rz(0.5pi) q0; rz(0.5pi) q0; h q0;";
+  RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;", "u1 q0 p0 = rz q0 p0;"}); // TODO: check this.
+  // std::cout << "contexy shifting " << new_graph->to_qasm (false, false) <<  std::endl;
   auto fin_graph = new_graph->context_shift(&rem_ctx, &dst_ctx, &uctx, &rules, false);
+  // std::cout << "ruling done\n"<<  std::endl;
 
   std::string new_qasm = fin_graph->to_qasm(false, false);
   return write_qasm_to_buffer (new_qasm, buffer, buff_size);

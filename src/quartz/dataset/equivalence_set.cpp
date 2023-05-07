@@ -192,14 +192,9 @@ bool EquivalenceClass::less_than(const EquivalenceClass &ecc1,
   return false;
 }
 
-bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
+bool EquivalenceSet::load_json(Context *ctx, std::istream &fin,
                                std::vector<CircuitSeq *> *new_representatives) {
-  std::ifstream fin;
-  fin.open(file_name, std::ifstream::in);
-  if (!fin.is_open()) {
-    std::cerr << "EquivalenceSet fails to open " << file_name << std::endl;
-    return false;
-  }
+
 
   // If the current equivalence set is not empty, keep the
   // representatives.
@@ -396,6 +391,18 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
 
   return true;
 }
+
+bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
+                               std::vector<CircuitSeq *> *new_representatives) {
+  std::ifstream file(file_name);
+  if (!file.is_open()) {
+    std::cerr << "EquivalenceSet fails to open " << file_name << std::endl;
+    return false;
+  }
+  std::istream& fin = file;
+  return load_json(ctx, fin, new_representatives);
+}
+
 
 bool EquivalenceSet::save_json(const std::string &save_file_name) const {
   std::ofstream fout;

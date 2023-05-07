@@ -87,11 +87,14 @@ public:
 // This class stores all equivalence classes.
 class EquivalenceSet {
 public:
+  bool load_json(Context *ctx, std::istream &fin,
+                 std::vector<CircuitSeq *> *new_representatives = nullptr);
   // |new_representatives| is for Generator::generate().
   // It will be pushed back all representatives previously not in
   // the equivalence set.
   bool load_json(Context *ctx, const std::string &file_name,
                  std::vector<CircuitSeq *> *new_representatives = nullptr);
+
 
   bool save_json(const std::string &file_name) const;
 

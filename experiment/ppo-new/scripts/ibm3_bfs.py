@@ -3,9 +3,8 @@ import os
 import sys
 import time
 
-import wandb
-
 import quartz
+import wandb
 from ibm_add_xfer import ibm_add_xfer
 
 

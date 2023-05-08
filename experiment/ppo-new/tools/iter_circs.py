@@ -18,7 +18,7 @@ def init_quartz_context(
         'rz',
         'add',
     ],
-    ecc_file_path: str = '../../ecc_set/ibm_3_2_5_ecc.json',
+    ecc_file_path: str = '../../ecc_set/ibm_325_ecc.json',
     no_increase: bool = False,
     include_nop: bool = True,
 ):
@@ -49,11 +49,13 @@ def is_nop(xfer_id: int) -> bool:
 
 init_quartz_context(
     gate_set=[
+        'h',
         'cx',
         'x',
         'sx',
         'rz',
         'add',
+        'neg',
     ],
     ecc_file_path='../../ecc_set/ibm_3_2_5_ecc.json',
     no_increase=False,

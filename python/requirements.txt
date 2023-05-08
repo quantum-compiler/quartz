@@ -1,4 +1,5 @@
 black>=22.1.0
+black[d]>=22.1.0
 certifi==2021.10.8
 cffi==1.15.0
 charset-normalizer==2.0.10

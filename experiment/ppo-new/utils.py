@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import datetime
 import itertools
+import os
 import random
 import sys
 import threading
@@ -12,7 +13,7 @@ from collections import deque, namedtuple
 from dataclasses import dataclass, fields
 from enum import Enum
 from functools import partial
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import dgl  # type: ignore
 import numpy as np
@@ -117,9 +118,10 @@ def get_quartz_context(
     return quartz_context, quartz_parser
 
 
-def masked_softmax(logits: torch.Tensor, mask: torch.BoolTensor) -> torch.Tensor:
-    logits[~mask] -= 1e10
-    return F.softmax(logits, dim=-1)
+def masked_softmax(logits: torch.Tensor, valid_mask: torch.BoolTensor) -> torch.Tensor:
+    masked_logits = logits.clone()
+    masked_logits[~valid_mask] -= 1e10
+    return F.softmax(masked_logits, dim=-1)
 
 
 def split_reduce_mean(x: torch.Tensor, sizes: torch.LongTensor) -> torch.Tensor:
@@ -167,3 +169,13 @@ def shuffle_lists(*ls):
 
 def vmem_used_perct() -> float:
     return psutil.virtual_memory().percent
+
+
+def cur_proc_vmem_perct() -> float:
+    process = psutil.Process(os.getpid())
+    return process.memory_percent()
+
+
+def pop_dict_first(d: Dict[Any, Any]) -> Any:
+    first_key = next(iter(d))
+    return d.pop(first_key)

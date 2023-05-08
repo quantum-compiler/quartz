@@ -86,20 +86,20 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
   Context src_ctx({GateType::u1, GateType::h, GateType::ccz, GateType::rz, GateType::rx, GateType::x, GateType::cx,
                    GateType::input_qubit, GateType::input_param});
 
-  QASMParser qasm_parser(&src_ctx);
-  CircuitSeq *dag = nullptr;
-  if (!qasm_parser.load_qasm_str(cqasm, dag)) {
-    std::cout << "Parser failed" << std::endl;
-    return -1;
-  }
-  Graph graph(&src_ctx, dag);
+  // QASMParser qasm_parser(&src_ctx);
+  // CircuitSeq *dag = nullptr;
+  // if (!qasm_parser.load_qasm_str(cqasm, dag)) {
+  //   std::cout << "Parser failed" << std::endl;
+  //   return -1;
+  // }
+  auto graph = Graph::from_qasm_str (&src_ctx, cqasm);
 
   // decompose ccz as cx and rz
   Context rem_ctx({GateType::u1, GateType::rx, GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param});
   auto imt_ctx = union_contexts(&src_ctx, &rem_ctx);
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&imt_ctx);
-  auto new_graph = graph.toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
+  auto new_graph = graph->toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
   // std::cout << "flipping done\n"<<  std::endl;
 
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
@@ -132,23 +132,17 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
     ctxt = xfers[0]->context;
   }
 
-  QASMParser qasm_parser(ctxt);
-  CircuitSeq *dag = nullptr;
-  if (!qasm_parser.load_qasm_str(cqasm, dag)) {
-    std::cout << "Parser failed" << std::endl;
-    return -1;
-  }
-  Graph graph(ctxt, dag);
+  auto graph = Graph::from_qasm_str (ctxt, cqasm);
 
   auto start = std::chrono::steady_clock::now();
   // Assume that the context is same?
   // std::cout << "calling greedy_opt" << std::endl;
   // auto graph_after_search = graph.greedy_optimize(ctxt, eqset_fn, /*print_message=*/ false);
-  auto graph_after_search = graph.greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
+  auto graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
   auto end = std::chrono::steady_clock::now();
 
   std::cout << " Gate count optimized from: "
-            << graph.gate_count() << " to "
+            << graph->gate_count() << " to "
             << graph_after_search->gate_count() << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
@@ -156,7 +150,7 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
                    1000.0
             << " seconds." << std::endl;
 
-  if (graph.total_cost() <= graph_after_search->total_cost()) {
+  if (graph->total_cost() <= graph_after_search->total_cost()) {
     return -1;
   }
   std::string cqasm2 = graph_after_search->to_qasm(false, false);

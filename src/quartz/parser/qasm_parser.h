@@ -68,14 +68,17 @@ bool QASMParser::load_qasm_stream(
   std::unordered_map<ParamType, int> parameters;
   int num_total_params = context->input_parameters.size();
 
-  while (std::getline(qasm_stream, line)) {
+  while (std::getline(qasm_stream, line, ';')) {
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space
     find_and_replace_first(line, "(", " ");
     find_and_replace_last(line, ")", " ");
-    // Ignore semicolon at the end
-    find_and_replace_all(line, ";", "");
+    // Ignore end of line
+    find_and_replace_all(line, "\n", "");
+    while (line.front() == ' ') {
+      line.erase(0, 1);
+    }
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
@@ -87,7 +90,7 @@ bool QASMParser::load_qasm_stream(
       continue; // comment, ignore this line
     } else if (command == "") {
       continue; // empty line, ignore this line
-    } else if (command == "OPENQASM") {
+    } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue; // header, ignore this line
     } else if (command == "include") {
       continue; // header, ignore this line

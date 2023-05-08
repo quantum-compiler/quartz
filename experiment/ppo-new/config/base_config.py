@@ -76,7 +76,7 @@ class BaseConfig:
     # network
     gnn_type: str = 'QGNN'  # 'QGNN' or 'QGIN'
     gate_type_embed_dim: int = 16
-    gnn_num_layers: int = 6
+    gnn_num_layers: int = 4
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
     gin_num_mlp_layers: int = 2
@@ -101,20 +101,21 @@ class BaseConfig:
     cost_type: str = 'gate_count'
     nop_stop: bool = True
     invalid_reward: float = -1.0
-    max_cost_ratio: float = 1.2
+    max_extra_cost: int = 6
     limit_total_gate_count: bool = False
     batch_inference: bool = True
     dyn_eps_len: bool = True
-    max_eps_len: int = 300
+    max_eps_len: int = 600
     min_eps_len: int = 20
     greedy_sample: bool = False
     agent_collect: bool = True
     agent_batch_size: int = 128
     subgraph_opt: bool = True
+    xfer_pred_layers: int = 1
 
     # training
     max_iterations: int = int(1e8)
-    num_eps_per_iter: int = 128  # 30
+    num_eps_per_iter: int = 64  # 30
     mini_batch_size: int = 3840  # per DDP process; < num_eps_per_iter * len_episode
     k_epochs: int = 25
     lr_gnn: float = 3e-4
@@ -128,9 +129,11 @@ class BaseConfig:
     time_budget: str = ''
 
     # logging
+    wandb_run_name_suffix: str = ''
     best_graph_output_dir: str = 'best_graphs'
     output_full_seq: bool = False
     full_seq_path: str = ''  # for read in
+    vmem_perct_limit: float = 70.0
 
 
 @dataclass
@@ -141,7 +144,10 @@ class TestConfig(BaseConfig):
     resume: bool = True
     budget: int = int(1e8)
     input_graphs: List[InputGraph] = field(default_factory=lambda: [])
-    input_graph_dir: str = '../nam_circs'
+    auto_tuning_dir: bool = True
+    tuning_dir: str = ''  # 'outputs/2023-02-06/12-02-12'
+    max_loss_tolerance: float = 0.10
+    max_search_sec: float = 60 * 20
 
 
 @dataclass

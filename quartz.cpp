@@ -34,19 +34,8 @@ extern "C" long unsigned int load_eqset_ (const char* eqset_fn_, unsigned char**
   return eccs.size();
 }
 
-extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned char** store) {
-  std::string eqset_fn(eqset_fn_);
-  EquivalenceSet* eqs = new EquivalenceSet();
-  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
-                  GateType::cx, GateType::input_qubit, GateType::input_param});
-  if (!eqs->load_json(ctxt, eqset_fn)) {
-    std::cout << "Failed to load equivalence file \"" << eqset_fn
-              << "\"." << std::endl;
-    assert(false);
-  }
-  std::vector<std::vector<CircuitSeq *>> eccs = eqs->get_all_equivalence_sets();
+std::vector<GraphXfer *> filter_greedy (Context * ctxt, std::vector<std::vector<CircuitSeq *>>  eccs) {
   std::vector<GraphXfer *> xfers;
-
   for (const auto &ecc : eccs) {
     const int ecc_size = (int)ecc.size();
     std::vector<Graph>* graphs = new std::vector<Graph>[ecc_size];
@@ -70,12 +59,78 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
       }
     }
   }
-  std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
-              << xfers.size() << std::endl;
+  return xfers;
+}
+
+extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned char** store) {
+  // std::string eqset_fn(eqset_fn_);
+  std::string eqset_fn(reinterpret_cast<const char*>(eqset_fn_));
+  std::istringstream iss(eqset_fn);
+
+  EquivalenceSet* eqs = new EquivalenceSet();
+  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
+                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  if (!eqs->load_json(ctxt, iss)) {
+    std::cout << "Failed to load equivalence file \"" << "whe"
+              << "\"." << std::endl;
+    assert(false);
+  }
+  std::vector<std::vector<CircuitSeq *>> eccs = eqs->get_all_equivalence_sets();
+  std::vector<GraphXfer *> xfers = filter_greedy(ctxt, eccs);
+
+  // std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
+              // << xfers.size() << std::endl;
 
   std::vector<GraphXfer *> *vptr = new std::vector<GraphXfer*>(xfers);
   *store = reinterpret_cast<unsigned char*> (vptr);
   return xfers.size();
+}
+
+extern "C" void load_xfers_ (const char* eqset_fn_,
+  unsigned char** gstore, long unsigned int* glen,
+  unsigned char** astore, long unsigned int* alen) {
+  // std::string eqset_fn(eqset_fn_);
+  std::string eqset_fn(reinterpret_cast<const char*>(eqset_fn_));
+  std::istringstream iss(eqset_fn);
+
+  EquivalenceSet* eqs = new EquivalenceSet();
+  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
+                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  if (!eqs->load_json(ctxt, iss)) {
+    std::cout << "Failed to load equivalence file \"" << "whe"
+              << "\"." << std::endl;
+    assert(false);
+  }
+  std::vector<std::vector<CircuitSeq *>> eccs = eqs->get_all_equivalence_sets();
+  std::vector<GraphXfer *> xfers;
+
+  for (const auto &ecc : eccs) {
+    CircuitSeq *representative = ecc.front();
+    for (auto &circuit : ecc) {
+      if (circuit != representative) {
+        auto xfer =
+            GraphXfer::create_GraphXfer(ctxt, circuit, representative, true);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+        xfer = GraphXfer::create_GraphXfer(ctxt, representative, circuit, true);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+      }
+    }
+  }
+  std::cout << "Number of xfers: " << xfers.size() << std::endl;
+  std::vector<GraphXfer *> *aptr = new std::vector<GraphXfer*>(xfers);
+  *astore = reinterpret_cast<unsigned char*> (aptr);
+  *alen =xfers.size();
+
+  auto greedy_xfers = filter_greedy (ctxt, eccs);
+  std::vector<GraphXfer *> *gptr = new std::vector<GraphXfer*>(greedy_xfers);
+  *gstore = reinterpret_cast<unsigned char*> (gptr);
+  *glen = greedy_xfers.size();
+
+  return;
 }
 
 extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
@@ -116,7 +171,7 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
 }
 
 
-extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, unsigned char* xfers_) {
+extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int buff_size, unsigned char* xfers_) {
 
   std::string cqasm(cqasm_);
 
@@ -138,7 +193,13 @@ extern "C" int opt_circuit_ (const char* cqasm_, char* buffer, int buff_size, un
   // Assume that the context is same?
   // std::cout << "calling greedy_opt" << std::endl;
   // auto graph_after_search = graph.greedy_optimize(ctxt, eqset_fn, /*print_message=*/ false);
-  auto graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
+  std::shared_ptr<Graph> graph_after_search;
+  if (timeout == 0) {
+    graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
+  } else {
+    graph_after_search = graph->optimize(xfers, 1.05 * graph->total_cost(), "", "", false, nullptr, timeout);
+  }
+
   auto end = std::chrono::steady_clock::now();
 
   std::cout << " Gate count optimized from: "

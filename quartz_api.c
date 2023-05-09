@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int opt_circuit(const char* cqasm, char* buffer, int buff_size, unsigned char* xfers_) {
-  int res = opt_circuit_ (cqasm, buffer, buff_size, xfers_);
+int opt_circuit(const char* cqasm, int timeout, char* buffer, int buff_size, unsigned char* xfers_) {
+  int res = opt_circuit_ (cqasm, timeout, buffer, buff_size, xfers_);
   return res;
 }
 
@@ -20,4 +20,11 @@ long unsigned int load_eqset (const char* eqset_fn_, unsigned char** store) {
 
 long unsigned int load_greedy_xfers (const char* eqset_fn_, unsigned char** store) {
    return load_greedy_xfers_(eqset_fn_, store);
+}
+
+void load_xfers (const char* eqset_fn_,
+  unsigned char** gstore, long unsigned int* glen,
+  unsigned char** allstore, long unsigned int* alen)
+{
+  load_xfers_(eqset_fn_, gstore, glen, allstore, alen);
 }

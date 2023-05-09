@@ -81,23 +81,13 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
   // Currently only 16383 vacant guid
   assert(num_input_qubits + num_input_params <= GUID_PRESERVED);
   std::vector<Op> input_qubits_op;
-  std::vector<Op> input_params_op;
   input_qubits_op.reserve(num_input_qubits);
-  input_params_op.reserve(num_input_params);
   for (auto &node : seq->wires) {
     if (node->type == CircuitWire::input_qubit) {
       auto input_qubit_op =
           Op(get_next_special_op_guid(), ctx->get_gate(GateType::input_qubit));
       input_qubits_op.push_back(input_qubit_op);
       input_qubit_op_2_qubit_idx[input_qubit_op] = node->index;
-    } else if (node->type == CircuitWire::input_param) {
-      input_params_op.push_back(Op(context->next_global_unique_id(),
-                                   ctx->get_gate(GateType::input_param)));
-      if (node->index < (int)context->input_parameters.size()) {
-        // Retrieve the parameter value from context.
-        constant_param_values[input_params_op.back()] =
-            context->input_parameters[node->index];
-      }
     }
   }
 
@@ -112,46 +102,70 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
   }
 
   for (auto &node : seq->wires) {
-    size_t srcIdx = -1; // Assumption: a node can have at most 1 input
-    Op srcOp;
-    if (node->type == CircuitWire::input_qubit) {
-      srcOp = input_qubits_op[node->index];
-      srcIdx = 0;
-    } else if (node->type == CircuitWire::input_param) {
-      srcOp = input_params_op[node->index];
-      srcIdx = 0;
+    if (node->type != CircuitWire::input_param) {
+      size_t srcIdx = -1; // Assumption: a node can have at most 1 input
+      Op srcOp;
+      if (node->type == CircuitWire::input_qubit) {
+        srcOp = input_qubits_op[node->index];
+        srcIdx = 0;
+      } else {
+        assert(node->input_gates.size() ==
+               1); // A node can have at most 1 input
+        auto input_edge = node->input_gates[0];
+        bool found = false;
+        for (srcIdx = 0; srcIdx < input_edge->output_wires.size(); ++srcIdx) {
+          if (node.get() == input_edge->output_wires[srcIdx]) {
+            found = true;
+            break;
+          }
+        }
+        assert(found);
+        assert(edge_2_op.find(input_edge) != edge_2_op.end());
+        srcOp = edge_2_op[input_edge];
+      }
+
+      assert(srcIdx >= 0);
+      assert(srcOp != Op::INVALID_OP);
+
+      for (auto output_edge : node->output_gates) {
+        size_t dstIdx;
+        bool found = false;
+        for (dstIdx = 0; dstIdx < output_edge->input_wires.size(); ++dstIdx) {
+          if (node.get() == output_edge->input_wires[dstIdx]) {
+            found = true;
+            break;
+          }
+        }
+        assert(found);
+        assert(edge_2_op.find(output_edge) != edge_2_op.end());
+        auto dstOp = edge_2_op[output_edge];
+
+        add_edge(srcOp, dstOp, srcIdx, dstIdx);
+      }
     } else {
-      assert(node->input_gates.size() == 1); // A node can have at most 1 input
-      auto input_edge = node->input_gates[0];
-      bool found = false;
-      for (srcIdx = 0; srcIdx < input_edge->output_wires.size(); ++srcIdx) {
-        if (node.get() == input_edge->output_wires[srcIdx]) {
-          found = true;
-          break;
+      // Deal with input_param. In CircuitSeq, a input_param node can have
+      // multiple outputs, but in Graph, a input_param op can have only 1
+      // output. So here we expand a single input_param node in CircuitSeq into
+      // multiple ops in Graph
+      for (auto output_edge : node->output_gates) {
+        size_t dstIdx;
+        bool found = false;
+        for (dstIdx = 0; dstIdx < output_edge->input_wires.size(); ++dstIdx) {
+          if (node.get() == output_edge->input_wires[dstIdx]) {
+            found = true;
+            break;
+          }
         }
+        assert(found);
+        assert(edge_2_op.find(output_edge) != edge_2_op.end());
+        auto dstOp = edge_2_op[output_edge];
+
+        Op srcOp = Op(context->next_global_unique_id(),
+                      context->get_gate(GateType::input_param));
+        assert(node->index < (int)context->input_parameters.size());
+        constant_param_values[srcOp] = context->input_parameters[node->index];
+        add_edge(srcOp, dstOp, 0, dstIdx);
       }
-      assert(found);
-      assert(edge_2_op.find(input_edge) != edge_2_op.end());
-      srcOp = edge_2_op[input_edge];
-    }
-
-    assert(srcIdx >= 0);
-    assert(srcOp != Op::INVALID_OP);
-
-    for (auto output_edge : node->output_gates) {
-      size_t dstIdx;
-      bool found = false;
-      for (dstIdx = 0; dstIdx < output_edge->input_wires.size(); ++dstIdx) {
-        if (node.get() == output_edge->input_wires[dstIdx]) {
-          found = true;
-          break;
-        }
-      }
-      assert(found);
-      assert(edge_2_op.find(output_edge) != edge_2_op.end());
-      auto dstOp = edge_2_op[output_edge];
-
-      add_edge(srcOp, dstOp, srcIdx, dstIdx);
     }
   }
 

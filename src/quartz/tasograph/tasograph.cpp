@@ -162,7 +162,6 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
         Op srcOp = Op(context->next_global_unique_id(),
                       context->get_gate(GateType::input_param));
-        assert(node->index < (int)context->input_parameters.size());
         add_edge(srcOp, dstOp, 0, dstIdx);
 
         // JATIN_NOTE: I replaced the assertion here, with an if statement.

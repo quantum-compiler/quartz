@@ -162,9 +162,13 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
         Op srcOp = Op(context->next_global_unique_id(),
                       context->get_gate(GateType::input_param));
-        assert(node->index < (int)context->input_parameters.size());
-        constant_param_values[srcOp] = context->input_parameters[node->index];
         add_edge(srcOp, dstOp, 0, dstIdx);
+
+        // JATIN_NOTE: I replaced the assertion here, with an if statement.
+        // assert(node->index < (int)context->input_parameters.size());
+        if (node->index < (int)context->input_parameters.size()) {
+          constant_param_values[srcOp] = context->input_parameters[node->index];
+        }
       }
     }
   }

@@ -194,7 +194,7 @@ cdef class PyXfer:
         elif is_nop:
             self.graphXfer = NULL
         elif dag_from is not None and dag_to is not None:
-            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, False)
+            self.graphXfer = GraphXfer.create_GraphXfer(context.context, dag_from.dag, dag_to.dag, True)
         else:
             self.graphXfer = NULL
 
@@ -246,8 +246,6 @@ cdef class QuartzContext:
     cdef bool include_nop
 
     def __cinit__(self, *,  gate_set, filename, no_increase=False, include_nop=True):
-        """The no_increase parameter is deprecated"""
-        # TODO: remove no_increase
         gate_type_list = []
         for s in gate_set:
             gate_type_list.append(get_gate_type_from_str(s))
@@ -292,8 +290,11 @@ cdef class QuartzContext:
                         dag_ptr_0 = eq_sets[i][j]
                         dag_ptr_1 = eq_sets[i][k]
                         xfer = GraphXfer.create_GraphXfer(self.context, dag_ptr_0, dag_ptr_1, True)
-                        if xfer != NULL:
-                            self.v_xfers.push_back(xfer)
+                        if xfer == NULL:
+                            continue
+                        if no_increase and xfer.num_dst_op() - xfer.num_src_op() > 0:
+                            continue
+                        self.v_xfers.push_back(xfer)
         self.include_nop = include_nop
 
     cdef load_json(self, filename):
@@ -481,10 +482,10 @@ cdef class PyGraph:
             return PyGraph().set_this(ret)
 
     # TODO: use node_id directly instead of using PyNode
-    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False):
+    def apply_xfer_with_local_state_tracking(self, *, PyXfer xfer, PyNode node, eliminate_rotation:bool = False, predecessor_layers: int = 1):
         if xfer.is_nop:
             return self, []
-        ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node, eliminate_rotation)
+        ret = deref(self.graph).apply_xfer_and_track_node(xfer.graphXfer, node.node, eliminate_rotation, predecessor_layers)
         if ret.first.get() == NULL:
             return None, []
         else:

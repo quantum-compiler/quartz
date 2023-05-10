@@ -738,8 +738,9 @@ void GraphXfer::unmatch(OpX *srcOp, Op op, const Graph *graph) {
     if (in.op == nullptr) {
       // Update mappedInputsa
       auto it = mappedInputs.find(in.idx);
-      if (it != mappedInputs.end())
+      if (it != mappedInputs.end()) {
         mappedInputs.erase(it);
+      }
     }
   }
   // Unmap op
@@ -1045,8 +1046,23 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
   return new_graph;
 }
 
-int GraphXfer::num_src_op() { return srcOps.size(); }
-int GraphXfer::num_dst_op() { return dstOps.size(); }
+int GraphXfer::num_src_op() {
+  int cnt = 0;
+  for (auto Op : srcOps) {
+    if (context->get_gate(Op->type)->is_quantum_gate())
+      cnt++;
+  }
+  return cnt;
+}
+
+int GraphXfer::num_dst_op() {
+  int cnt = 0;
+  for (auto Op : dstOps) {
+    if (context->get_gate(Op->type)->is_quantum_gate())
+      cnt++;
+  }
+  return cnt;
+}
 
 std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
   // TODO: Currenty only support non-parameter gates
@@ -1072,7 +1088,10 @@ std::string GraphXfer::to_str(std::vector<OpX *> const &v) const {
     for (auto const &idx : input_qubits) {
       oss << " " << idx;
     }
-    oss << std::endl;
+    oss << ";";
+
+    if (opx != v.back())
+      oss << " ";
 
     for (int i = 0; i < num_qubits; ++i) {
       mp[opx->outputs[i]] = input_qubits[i];

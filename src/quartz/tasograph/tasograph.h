@@ -13,6 +13,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <stack>
 #include <unordered_map>
 #include <vector>
 
@@ -210,6 +211,11 @@ public:
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
+  greedy_optimize_with_xfers(Context *ctx, const std::vector<GraphXfer *> &xfers,
+                  bool print_message,
+                  std::function<float(Graph *)> cost_function = nullptr);
+
+  std::shared_ptr<Graph>
   greedy_optimize(Context *ctx, const std::string &equiv_file_name,
                   bool print_message,
                   std::function<float(Graph *)> cost_function = nullptr);
@@ -291,10 +297,11 @@ public:
   appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
-                                    bool eliminate_rotation = false);
+                                    bool eliminate_rotation = false) const;
   std::pair<std::shared_ptr<Graph>, std::vector<int>>
   apply_xfer_and_track_node(GraphXfer *xfer, Op op,
-                            bool eliminate_rotation = false);
+                            bool eliminate_rotation = false,
+                            int predecessor_layers = 1) const;
   void all_ops(std::vector<Op> &ops);
   void all_edges(std::vector<Edge> &edges);
   void topology_order_ops(std::vector<Op> &ops) const;
@@ -304,6 +311,10 @@ public:
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
   bool _loop_check_after_matching(GraphXfer *xfer) const;
+  std::shared_ptr<Graph>
+  subgraph(const std::unordered_set<Op, OpHash> &ops) const;
+  std::vector<std::shared_ptr<Graph>>
+  topology_partition(const int partition_gate_count) const;
 
 private:
   void replace_node(Op oldOp, Op newOp);

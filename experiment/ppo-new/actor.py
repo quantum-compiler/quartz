@@ -50,7 +50,7 @@ class Observer:
         init_state_str: str,
         original_state_str: str,  # input graph, used to limit the cost
         max_eps_len: int,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
     ) -> List[SerializableExperience]:
         """Interact with env for many steps to collect data.
@@ -119,9 +119,9 @@ class Observer:
                 graph_cost = get_cost(graph, self.cost_type)
                 next_graph_cost = get_cost(next_graph, self.cost_type)
                 reward = graph_cost - next_graph_cost
-                game_over = (graph_cost > original_cost * max_cost_ratio) or (
-                    graph.gate_count > original_graph.gate_count * max_cost_ratio
-                )
+                game_over = graph_cost > original_cost + max_extra_cost  # or (
+                #     graph.gate_count > original_graph.gate_count + max_extra_cost
+                # )
                 next_graph_str = next_graph.to_qasm_str()
 
             exp = SerializableExperience(
@@ -174,8 +174,10 @@ class PPOAgent:
         max_eps_len: int,
         min_eps_len: int,
         subgraph_opt: bool,
+        xfer_pred_layers: int,
         output_full_seq: bool,
         output_dir: str,
+        vmem_perct_limit: float,
     ) -> None:
         self.id = agent_id
         self.num_agents = num_agents
@@ -190,6 +192,7 @@ class PPOAgent:
         self.invalid_reward = invalid_reward
         self.limit_total_gate_count = limit_total_gate_count
         self.subgraph_opt = subgraph_opt
+        self.xfer_pred_layers = xfer_pred_layers
 
         """networks related"""
         self.ac_net = ac_net  # NOTE: just a ref
@@ -220,6 +223,7 @@ class PPOAgent:
                 input_graph['qasm'],
                 self.cost_type,
                 self.device,
+                vmem_perct_limit=vmem_perct_limit,
             )
             for input_graph in input_graphs
         ]
@@ -412,7 +416,7 @@ class PPOAgent:
     @torch.no_grad()
     def collect_data(
         self,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
         greedy_sample: bool,
     ) -> ExperienceList:
@@ -460,7 +464,7 @@ class PPOAgent:
                     init_qasm,
                     orig_qasm,
                     max_eps_len_for_all,  # make sure all observers have the same max_eps_len
-                    max_cost_ratio,
+                    max_extra_cost,
                     nop_stop,
                 )
             )
@@ -578,8 +582,11 @@ class PPOAgent:
         for i in range(len(self.graph_buffers)):
             buffer = self.graph_buffers[i]
             info = best_info[i]
-            assert buffer.name == info['name']
-            if buffer.push_nonexist_best(info['qasm']):
+            assert buffer.name == info['name'], f'{buffer.name = }, {info["name"] = }'
+            if info['best_cost'] < get_cost(buffer.best_graph, self.cost_type):
+                graph = qtz.qasm_to_graph(info['qasm'])
+                buffer.push_back(graph)
+                buffer.best_graph = graph
                 printfl(
                     f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
                 )
@@ -601,7 +608,7 @@ class PPOAgent:
             best_g = buffer.best_graph
             best_cost = get_cost(best_g, self.cost_type)
             best_qasm = best_g.to_qasm_str()
-            best_path = os.path.join(output_dir, f'{buffer.name}_cost_{best_cost}.qasm')
+            best_path = os.path.join(output_dir, f'{buffer.name}.qasm')
             with open(best_path, 'w') as f:
                 f.write(best_qasm)
 
@@ -629,7 +636,9 @@ class PPOAgent:
         """sample node by softmax with temperature for each graph as a batch"""
         # (num_graphs, max_num_nodes)
         b_node_values_pad = nn.utils.rnn.pad_sequence(
-            node_values_list, batch_first=True, padding_value=-math.inf
+            node_values_list,
+            batch_first=True,
+            padding_value=-math.inf,
         )
         # (num_graphs, )
         temperature: torch.Tensor
@@ -654,9 +663,9 @@ class PPOAgent:
             self.device
         )
         node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-        sampled_node_ids = b_sampled_nodes + node_offsets
+        sampled_node_b_ids = b_sampled_nodes + node_offsets
         # (num_graphs, embed_dim)
-        sampled_node_embeds = b_node_embeds[sampled_node_ids]
+        sampled_node_embeds = b_node_embeds[sampled_node_b_ids]
         """use Actor to evaluate xfers for sampled nodes"""
         # (num_graphs, action_dim)
         xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
@@ -738,7 +747,7 @@ class PPOAgent:
         self,
         num_eps: int,
         agent_batch_size: int,
-        max_cost_ratio: float,
+        max_extra_cost: int,
         nop_stop: bool,
         greedy_sample: bool,
     ) -> ExperienceList:
@@ -832,6 +841,7 @@ class PPOAgent:
                     node=graph.get_node_from_id(id=action.node),
                     xfer=qtz.quartz_context.get_xfer_from_id(id=action.xfer),
                     eliminate_rotation=qtz.has_parameterized_gate,
+                    predecessor_layers=self.xfer_pred_layers,
                 )
                 """parse result, compute reward"""
                 reward: float = 0.0
@@ -848,12 +858,12 @@ class PPOAgent:
                     graph_cost = get_cost(graph, self.cost_type)
                     next_graph_cost = get_cost(next_graph, self.cost_type)
                     reward = graph_cost - next_graph_cost
-                    # game_over = graph_cost > original_costs[i_eps] * max_cost_ratio
-                    game_over = graph_cost > cur_best_cost * max_cost_ratio
+                    # game_over = graph_cost > original_costs[i_eps] * max_extra_cost
+                    game_over = graph_cost > cur_best_cost + max_extra_cost
                     if self.limit_total_gate_count:
                         game_over |= (
                             graph.gate_count
-                            > original_graph_list[i_eps].gate_count * max_cost_ratio
+                            > original_graph_list[i_eps].gate_count * max_extra_cost
                         )
                         # NOTE: limit the gate count according to the original graph
                         # (the one inputted by file) rather than the starting graph
@@ -924,7 +934,8 @@ class PPOAgent:
                     and not qtz.is_nop(action.xfer)
                     and next_graph_cost <= get_cost(graph_seq[0], self.cost_type)
                 ):
-                    graph_buffer.push_back(next_graph)
+                    if not greedy_sample or next_graph_cost < cur_best_cost + 6:
+                        graph_buffer.push_back(next_graph)
                     """best graph maintenance"""
                     if next_graph_cost < cur_best_cost:
                         # create a list of tuple: (graph, action taken on this graph, reward of action)

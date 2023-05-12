@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import copy
+import json
 import math
 import os
 import time
 import warnings
 from functools import partial
-from typing import Dict, List, OrderedDict, cast
+from typing import Dict, List, Optional, OrderedDict, cast
 
 import hydra
 import qtz
@@ -173,8 +174,10 @@ class PPOMod:
             max_eps_len=self.cfg.max_eps_len,
             min_eps_len=self.cfg.min_eps_len,
             subgraph_opt=self.cfg.subgraph_opt,
+            xfer_pred_layers=self.cfg.xfer_pred_layers,
             output_full_seq=self.cfg.output_full_seq,
             output_dir=self.output_dir,
+            vmem_perct_limit=self.cfg.vmem_perct_limit,
         )
         """use a holder class for convenience but split the model into 3 modules
         to avoid issue with BN + DDP
@@ -224,7 +227,9 @@ class PPOMod:
         if self.rank == 0:
             run_name: str | None = None
             if len(self.cfg.input_graphs) == 1:
-                run_name = self.cfg.input_graphs[0].name
+                run_name = (
+                    self.cfg.input_graphs[0].name + self.cfg.wandb_run_name_suffix
+                )
             wandb.init(
                 project=self.cfg.wandb.project,
                 entity=self.cfg.wandb.entity,
@@ -248,12 +253,16 @@ class PPOMod:
                 f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.'
             )
         self.start_time_sec = time.time()
+        # from pympler import muppy
+        # from pympler import summary
+        # sum0 = summary.summarize(muppy.get_objects())
         while self.i_iter < max_iterations:
-            self.train_iter()
+            # summary.print_(summary.get_diff(sum0, summary.summarize(muppy.get_objects())))
+            loss = self.train_iter()
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ac_net.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
-                self.save_ckpt(f'iter_{self.i_iter}.pt')
+                self.save_ckpt(f'iter_{self.i_iter}.pt', loss=loss)
             self.i_iter += 1
             used_sec = time.time() - self.start_time_sec
             if limited_time_budget and used_sec > sec_budget:
@@ -272,14 +281,14 @@ class PPOMod:
             exp_list = self.agent.collect_data_by_self(
                 self.cfg.num_eps_per_iter // self.ddp_processes,
                 self.cfg.agent_batch_size,
-                self.cfg.max_cost_ratio,
+                self.cfg.max_extra_cost,
                 self.cfg.nop_stop,
                 self.cfg.greedy_sample,
             )
         else:  # use observers to collect data
             collect_fn = partial(
                 self.agent.collect_data,
-                self.cfg.max_cost_ratio,
+                self.cfg.max_extra_cost,
                 self.cfg.nop_stop,
                 self.cfg.greedy_sample,
             )
@@ -296,8 +305,10 @@ class PPOMod:
         self.tot_exps_collected += len(exp_list)
         # printfl(f'Agent {self.rank} : finish collecting data for iter {self.i_iter} in {dur_s_collect} s. |exp_list| = {len(exp_list)}')
         """log info about data collection"""
+        self.agent.sync_best_graph()
         # Each agent has different data, so it is DDP training
         if self.rank == 0:
+            self.agent.output_best_graph(self.cfg.best_graph_output_dir)
             other_info_dict = self.agent.other_info_dict()
             lr_dict = {
                 f'lr_{i}': self.optimizer.param_groups[i]['lr']
@@ -310,6 +321,7 @@ class PPOMod:
                 'tot_exps_collected_all_rank': self.tot_exps_collected
                 * self.ddp_processes,
                 **lr_dict,
+                'vmem_perct': cur_proc_vmem_perct(),
             }
             printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
             logprintfl(
@@ -476,11 +488,22 @@ class PPOMod:
         # end for k_epochs
         self.lr_scheduler.step()
         self.ddp_ac_net.eval()
-        self.agent.sync_best_graph()
-        if self.rank == 0:
-            self.agent.output_best_graph(self.cfg.best_graph_output_dir)
+        """read in best circs from search"""
+        sync_dir = os.path.join(self.output_dir, 'sync_dir')
+        best_info_search_path = os.path.join(sync_dir, f'best_info_search.json')
+        if os.path.exists(best_info_search_path):
+            while True:
+                try:
+                    self.agent.load_best_info(best_info_search_path)
+                    break
+                except json.decoder.JSONDecodeError as e:
+                    time.sleep(1)
+                    continue
+        return loss.item()
 
-    def save_ckpt(self, ckpt_name: str, only_rank_zero: bool = True) -> None:
+    def save_ckpt(
+        self, ckpt_name: str, only_rank_zero: bool = True, loss: float = None
+    ) -> None:
         # TODO(not going to do) save top-k model
         ckpt_dir = os.path.join(self.output_dir, 'ckpts')
         os.makedirs(ckpt_dir, exist_ok=True)
@@ -495,6 +518,12 @@ class PPOMod:
                 },
                 ckpt_path,
             )
+            with open(os.path.join(ckpt_dir, 'latest.json'), 'w') as f:
+                info = {
+                    'path': ckpt_path,
+                    'loss': loss,
+                }
+                json.dump(info, fp=f, indent=2)
             printfl(f'saved "{ckpt_path}"!')
 
     def load_ckpt(self, ckpt_path: str) -> None:
@@ -555,6 +584,33 @@ class PPOMod:
 
     @torch.no_grad()
     def test(self, rank: int, world_size: int) -> None:
+        def auto_find_tuning_dir(input_graphs: List[str]) -> Optional[str]:
+            input_graphs = sorted(input_graphs)
+            for date in natsorted(os.listdir('outputs'), reverse=True):
+                date_dir = os.path.join('outputs', date)
+                for time in natsorted(os.listdir(date_dir), reverse=True)[1:]:
+                    tuning_dir = os.path.join(date_dir, time)
+                    sync_dir = os.path.join(tuning_dir, 'sync_dir')
+                    if os.path.exists(sync_dir):
+                        best_info_path = os.path.join(sync_dir, 'best_info_0.json')
+                        while True:
+                            if not os.path.exists(best_info_path):
+                                time.sleep(1)
+                                continue
+                            try:
+                                with open(best_info_path, 'r') as f:
+                                    best_info: list = json.load(f)
+                                break
+                            except json.decoder.JSONDecodeError as e:
+                                time.sleep(1)
+                                continue
+                        # end while
+                        graphs_in_info = sorted(info['name'] for info in best_info)
+                        if input_graphs == graphs_in_info:
+                            return tuning_dir
+            return None
+
+        seed_all(self.cfg.seed + rank)
         self.cfg = cast(TestConfig, self.cfg)
         self.init_ddp_processes(rank, world_size)
         """load ckpt"""
@@ -568,49 +624,41 @@ class PPOMod:
                 self.ddp_ac_net.load_state_dict(model_state_dict)
             printfl(f'rank {rank} resumed from "{ckpt_path}"!')
 
+        """get input graphs"""
+        input_graphs: Dict[str, quartz.PyGraph] = {}
+        for input_graph in self.cfg.input_graphs:
+            with open(input_graph.path) as f:
+                qasm_str = f.read()
+            graph = qtz.qasm_to_graph(qasm_str)
+            input_graphs[input_graph.name] = graph
+
+        if self.cfg.auto_tuning_dir:
+            tuning_dir = auto_find_tuning_dir(list(input_graphs.keys()))
+            if not tuning_dir:
+                raise Exception(f'Cannot find tuning_dir automatically!')
+        else:
+            tuning_dir = self.cfg.tuning_dir
+        use_tuning_dir = os.path.exists(tuning_dir)
+        if use_tuning_dir:
+            output_dir = tuning_dir
+            printfl(f'Test: use {tuning_dir = }')
+        else:
+            output_dir = self.output_dir
+
         tester = Tester(
             cost_type=CostType.from_str(self.cfg.cost_type),
             ac_net=self.ac_net,  # type: ignore
             device=self.device,
-            output_dir=self.output_dir,
-            rank=rank,
+            output_dir=output_dir,
+            sync_tuning_dir=use_tuning_dir,
+            # rank=rank,
+            hit_rate=self.cfg.hit_rate,
+            batch_size=self.cfg.num_eps_per_iter,
+            max_loss_tolerance=self.cfg.max_loss_tolerance,
+            max_search_sec=self.cfg.max_search_sec,
+            vmem_perct_limit=self.cfg.vmem_perct_limit,
         )
-        """get input graphs"""
-        input_graphs: List[InputGraph] = []
-        if len(self.cfg.input_graphs) > 0:
-            input_graphs = self.cfg.input_graphs
-        else:
-            files: List[str] = cast(
-                List[str], natsorted(os.listdir(self.cfg.input_graph_dir))
-            )
-            for file in files:
-                qasm_path = os.path.join(self.cfg.input_graph_dir, file)
-                name = file.split('.')[0]
-                input_graphs.append(InputGraph(name, qasm_path))
-        n_graph_each_rank = math.ceil(len(input_graphs) / world_size)
-        input_graphs = input_graphs[
-            n_graph_each_rank * rank : n_graph_each_rank * (rank + 1)
-        ]
-
-        info_list: List[str] = []
-        for input_graph in input_graphs:
-            with open(input_graph.path) as f:
-                qasm_str = f.read()
-            graph = qtz.qasm_to_graph(qasm_str)
-            printfl(f'rank {rank} Testing {input_graph.name}...')
-            best_cost, best_time = tester.beam_search(
-                graph,
-                self.cfg.topk,
-                self.cfg.max_eps_len,
-                input_graph.name,
-                self.cfg.budget,
-            )
-            info = f'{input_graph.name} : {best_cost}  {best_time} seconds ({sec_to_hms(best_time)})'
-            printfl(f'rank {rank} Test Result: {info}')
-            info_list.append(info)
-        printfl(f'\n\n rank {rank} All Test Results:\n')
-        for info in info_list:
-            printfl(info)
+        tester.search(input_graphs)
 
     def convert(self, rank: int) -> None:
         self.cfg = cast(ConvertConfig, self.cfg)

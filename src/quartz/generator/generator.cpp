@@ -45,6 +45,8 @@ void Generator::generate(
   dataset->insert(context, std::move(empty_dag));
   std::vector<std::vector<CircuitSeq *>> dags(1, dags_to_search);
 
+  initialize_supported_quantum_gates();
+
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().
   std::vector<std::unique_ptr<CircuitSeq>> dag_holder;
@@ -110,6 +112,19 @@ void Generator::generate(
       dags.push_back(simplified_dags_to_search);
       */
     }
+  }
+}
+
+void Generator::initialize_supported_quantum_gates() {
+  supported_quantum_gates_.clear();
+  auto gates = context->get_supported_quantum_gates();
+  for (auto &gate : gates) {
+    while ((int)supported_quantum_gates_.size() <=
+           context->get_gate(gate)->get_num_qubits()) {
+      supported_quantum_gates_.emplace_back();
+    }
+    supported_quantum_gates_[context->get_gate(gate)->get_num_qubits()]
+        .push_back(gate);
   }
 }
 
@@ -400,6 +415,54 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
       }
     }
     std::vector<int> qubit_indices, parameter_indices;
+    Gate *gate;
+
+    auto search_parameters =
+        [&dag, &gate, &qubit_indices, &parameter_indices, &try_to_add_to_result,
+         &unique_parameters, &input_param_masks](int num_remaining_parameters,
+                                                 const InputParamMaskType
+                                                     &current_usage_mask,
+                                                 auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+          if (num_remaining_parameters == 0) {
+            bool ret =
+                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
+            assert(ret);
+            try_to_add_to_result(dag);
+            ret = dag->remove_last_gate();
+            assert(ret);
+            if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
+              while (std::next_permutation(qubit_indices.begin(),
+                                           qubit_indices.end())) {
+                ret = dag->add_gate(qubit_indices, parameter_indices, gate,
+                                    nullptr);
+                assert(ret);
+                try_to_add_to_result(dag);
+                ret = dag->remove_last_gate();
+                assert(ret);
+              }
+            }
+            return;
+          }
+
+          for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+            if (unique_parameters) {
+              if (current_usage_mask & input_param_masks[p1]) {
+                // p1 contains an already used input parameter.
+                continue;
+              }
+              parameter_indices.push_back(p1);
+              search_parameters_ref(num_remaining_parameters - 1,
+                                    current_usage_mask | input_param_masks[p1],
+                                    search_parameters_ref);
+              parameter_indices.pop_back();
+            } else {
+              parameter_indices.push_back(p1);
+              search_parameters_ref(num_remaining_parameters - 1,
+                                    /*unused*/ 0, search_parameters_ref);
+              parameter_indices.pop_back();
+            }
+          }
+        };
     // Add 1 quantum gate according to the qubit index order.
 
     for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
@@ -408,112 +471,61 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
       // Case: 1-qubit operators. We need the new gate to operate on a qubit
       // with index at least |last_gate_min_qubit_index| to form a canonical
       // sequence.
-      if (q1 >= last_gate_min_qubit_index) {
-        for (const auto &idx : context->get_supported_quantum_gates()) {
-          Gate *gate = context->get_gate(idx);
-          if (gate->get_num_qubits() != 1) {
-            assert(gate->get_num_qubits() == 2);
-            continue;
-          }
-          auto search_parameters =
-              [&](int num_remaining_parameters,
-                  const InputParamMaskType &current_usage_mask, auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-                if (num_remaining_parameters == 0) {
-                  bool ret = dag->add_gate(qubit_indices, parameter_indices,
-                                           gate, nullptr);
-                  assert(ret);
-                  try_to_add_to_result(dag);
-                  ret = dag->remove_last_gate();
-                  assert(ret);
-                  return;
-                }
-
-                for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-                  if (unique_parameters) {
-                    if (current_usage_mask & input_param_masks[p1]) {
-                      // p1 contains an already used input parameter.
-                      continue;
-                    }
-                    parameter_indices.push_back(p1);
-                    search_parameters_ref(num_remaining_parameters - 1,
-                                          current_usage_mask |
-                                              input_param_masks[p1],
-                                          search_parameters_ref);
-                    parameter_indices.pop_back();
-                  } else {
-                    parameter_indices.push_back(p1);
-                    search_parameters_ref(num_remaining_parameters - 1,
-                                          /*unused*/ 0, search_parameters_ref);
-                    parameter_indices.pop_back();
-                  }
-                }
-              };
-          search_parameters(gate->get_num_parameters(), input_param_usage_mask,
-                            search_parameters);
-        }
-      }
-
-      // Case: 2-qubit operators without parameters. We need the new gate to
-      // operate on a qubit with index at least |last_gate_min_qubit_index|
-      // or a qubit that is used by the last gate to form a canonical sequence.
-      for (int q2 = q1 + 1; q2 < dag->get_num_qubits(); q2++) {
-        if (q1 < last_gate_min_qubit_index && !last_gate_used_qubit_index[q2]) {
-          continue;
-        }
-        qubit_indices.push_back(q2);
-        for (const auto &idx : context->get_supported_quantum_gates()) {
-          Gate *gate = context->get_gate(idx);
-          if (gate->get_num_qubits() == 2) {
-            auto search_parameters =
-                [&](int num_remaining_parameters,
-                    const InputParamMaskType &current_usage_mask, auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-                  if (num_remaining_parameters == 0) {
-                    bool ret = dag->add_gate(qubit_indices, parameter_indices,
-                                             gate, nullptr);
-                    assert(ret);
-                    try_to_add_to_result(dag);
-                    ret = dag->remove_last_gate();
-                    assert(ret);
-                    if (!gate->is_commutative()) {
-                      std::swap(qubit_indices[0], qubit_indices[1]);
-                      ret = dag->add_gate(qubit_indices, parameter_indices,
-                                          gate, nullptr);
-                      assert(ret);
-                      try_to_add_to_result(dag);
-                      ret = dag->remove_last_gate();
-                      assert(ret);
-                      std::swap(qubit_indices[0], qubit_indices[1]);
-                    }
-                    return;
-                  }
-
-                  for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-                    if (unique_parameters) {
-                      if (current_usage_mask & input_param_masks[p1]) {
-                        // p1 contains an already used input parameter.
-                        continue;
-                      }
-                      parameter_indices.push_back(p1);
-                      search_parameters_ref(num_remaining_parameters - 1,
-                                            current_usage_mask |
-                                                input_param_masks[p1],
-                                            search_parameters_ref);
-                      parameter_indices.pop_back();
-                    } else {
-                      parameter_indices.push_back(p1);
-                      search_parameters_ref(num_remaining_parameters - 1,
-                                            /*unused*/ 0,
-                                            search_parameters_ref);
-                      parameter_indices.pop_back();
-                    }
-                  }
-                };
+      if (supported_quantum_gates_.size() > 1) {
+        if (q1 >= last_gate_min_qubit_index) {
+          for (const auto &idx : supported_quantum_gates_[1]) {
+            gate = context->get_gate(idx);
             search_parameters(gate->get_num_parameters(),
                               input_param_usage_mask, search_parameters);
           }
         }
-        qubit_indices.pop_back();
       }
+
+      // Case: 2-qubit operators. We need the new gate to
+      // operate on a qubit with index at least |last_gate_min_qubit_index|
+      // or a qubit that is used by the last gate to form a canonical sequence.
+      if (supported_quantum_gates_.size() > 2) {
+        for (int q2 = q1 + 1; q2 < dag->get_num_qubits(); q2++) {
+          if (q1 < last_gate_min_qubit_index &&
+              !last_gate_used_qubit_index[q2]) {
+            continue;
+          }
+          qubit_indices.push_back(q2);
+          for (const auto &idx : supported_quantum_gates_[2]) {
+            gate = context->get_gate(idx);
+            search_parameters(gate->get_num_parameters(),
+                              input_param_usage_mask, search_parameters);
+          }
+          qubit_indices.pop_back();
+        }
+      }
+
+      // Case: 3-qubit operators. We need the new gate to
+      // operate on a qubit with index at least |last_gate_min_qubit_index|
+      // or a qubit that is used by the last gate to form a canonical sequence.
+      if (supported_quantum_gates_.size() > 3) {
+        for (int q2 = q1 + 1; q2 < dag->get_num_qubits(); q2++) {
+          qubit_indices.push_back(q2);
+          for (int q3 = q2 + 1; q3 < dag->get_num_qubits(); q3++) {
+            if (q1 < last_gate_min_qubit_index &&
+                !last_gate_used_qubit_index[q2] &&
+                !last_gate_used_qubit_index[q3]) {
+              continue;
+            }
+            qubit_indices.push_back(q3);
+            for (const auto &idx : supported_quantum_gates_[3]) {
+              gate = context->get_gate(idx);
+              search_parameters(gate->get_num_parameters(),
+                                input_param_usage_mask, search_parameters);
+            }
+            qubit_indices.pop_back();
+          }
+          qubit_indices.pop_back();
+        }
+      }
+
+      assert(supported_quantum_gates_.size() <= 4);
+
       qubit_indices.pop_back();
     }
   }

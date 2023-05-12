@@ -66,7 +66,7 @@ bool QASMParser::load_qasm_stream(
   // ordered alphabetically.
   std::map<std::string, int> index_offset;
   std::unordered_map<ParamType, int> parameters;
-  int num_total_params = context->input_parameters.size();
+  int num_total_params = context->get_num_parameters();
 
   while (std::getline(qasm_stream, line, ';')) {
     // Replace comma with space
@@ -200,8 +200,11 @@ bool QASMParser::load_qasm_stream(
           p = -p;
         if (parameters.count(p) == 0) {
           seq->add_input_parameter();
-          parameters[p] = num_total_params++;
-          context->input_parameters.push_back(p);
+          int param_id = context->get_new_param_id(/*is_symbolic=*/false);
+          num_total_params++;
+          assert(param_id == num_total_params);
+          parameters[p] = param_id;
+          context->set_param_value(param_id, p);
         }
         param_indices[i] = parameters[p];
       }

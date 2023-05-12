@@ -47,6 +47,15 @@ public:
   bool get_possible_representative(const CircuitSeqHashType &hash_value,
                                    CircuitSeq *&representative) const;
 
+  ParamType get_param_value(int id) const;
+  void set_param_value(int id, const ParamType &param);
+  // TODO: Use this function when generating symbolic parameters
+  int get_new_param_id(bool is_symbolic);
+  // TODO: This function should not be needed
+  int get_num_parameters() const;
+  bool param_is_symbolic(int id) const;
+  bool param_has_value(int id) const;
+
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].
   double random_number();
@@ -54,12 +63,6 @@ public:
 private:
   bool insert_gate(GateType tp);
 
-public:
-  // The parameters from the input QASM file.
-  // Written by QASMParser.
-  std::vector<ParamType> input_parameters;
-
-private:
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::vector<GateType> supported_gates_;
@@ -74,8 +77,15 @@ private:
   std::unordered_map<CircuitSeqHashType, CircuitSeq *> representatives_;
   // Standard mersenne_twister_engine seeded with 0
   std::mt19937 gen{0};
+
+  // The concrete parameters are from the input QASM file,
+  // written by QASMParser.
+  std::vector<ParamType> parameters_;
+  std::vector<bool> is_parameter_symbolic_;
+  int num_parameters_{0};
 };
 
+// TODO: This function does not consider the parameters
 Context union_contexts(Context *ctx_0, Context *ctx_1);
 
 } // namespace quartz

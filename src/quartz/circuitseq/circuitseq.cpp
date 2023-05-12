@@ -600,10 +600,8 @@ int CircuitSeq::get_circuit_depth() const {
   return *std::max_element(depth.begin(), depth.end());
 }
 
-ParamType CircuitSeq::get_parameter_value(Context *ctx, int para_idx) const {
-  assert(para_idx >= 0 && para_idx < get_num_total_parameters());
-  assert(para_idx < ctx->input_parameters.size());
-  return ctx->input_parameters[para_idx];
+ParamType CircuitSeq::get_parameter_value(Context *ctx, int para_idx) {
+  return ctx->get_param_value(para_idx);
 }
 
 bool CircuitSeq::qubit_used(int qubit_index) const {

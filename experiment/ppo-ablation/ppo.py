@@ -203,7 +203,7 @@ class PPOMod:
 
             def lr_lambda(epoch: int):
                 if epoch < self.cfg.lr_warmup_epochs:
-                    return base**epoch * self.cfg.lr_start_factor
+                    return base ** epoch * self.cfg.lr_start_factor
                 else:
                     return 1.0
 

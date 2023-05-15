@@ -206,6 +206,36 @@ bool Context::get_possible_representative(const CircuitSeqHashType &hash_value,
   return true;
 }
 
+ParamType Context::get_param_value(int id) const {
+  assert(id >= 0 && id < (int)parameters_.size());
+  return parameters_[id];
+}
+
+void Context::set_param_value(int id, const ParamType &param) {
+  while (id >= (int)parameters_.size()) {
+    parameters_.emplace_back();
+  }
+  parameters_[id] = param;
+}
+
+int Context::get_new_param_id(bool is_symbolic) {
+  assert(is_parameter_symbolic_.size() == num_parameters_);
+  is_parameter_symbolic_.push_back(is_symbolic);
+  return num_parameters_++;
+}
+
+int Context::get_num_parameters() const { return num_parameters_; }
+
+bool Context::param_is_symbolic(int id) const {
+  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
+         is_parameter_symbolic_[id];
+}
+
+bool Context::param_has_value(int id) const {
+  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
+         !is_parameter_symbolic_[id];
+}
+
 double Context::random_number() {
   static std::uniform_real_distribution<double> dis_real(0, 1);
   return dis_real(gen);

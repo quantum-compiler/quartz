@@ -1,0 +1,2 @@
+[tool.isort]
+src_paths = ["python", "experiment"]

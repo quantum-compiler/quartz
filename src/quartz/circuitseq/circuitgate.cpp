@@ -186,10 +186,10 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     result += "(";
     for (int j = 0; j < (int)input_wires.size(); j++) {
       if (input_wires[j]->is_parameter()) {
-        assert(ctx->input_parameters.size() > input_wires[j]->index);
+        assert(ctx->param_has_value(input_wires[j]->index));
         std::ostringstream out;
         out.precision(param_precision);
-        out << std::fixed << ctx->input_parameters[input_wires[j]->index];
+        out << std::fixed << ctx->get_param_value(input_wires[j]->index);
         result += std::move(out).str();
         num_remaining_parameters--;
         if (num_remaining_parameters != 0) {

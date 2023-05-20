@@ -20,6 +20,8 @@ public:
   Context(const std::vector<GateType> &supported_gates, const int num_qubits,
           const int num_params);
   Gate *get_gate(GateType tp);
+  Gate *get_general_controlled_gate(GateType tp,
+                                    const std::vector<bool> &state);
   [[nodiscard]] const std::vector<GateType> &get_supported_gates() const;
   [[nodiscard]] const std::vector<GateType> &
   get_supported_parameter_gates() const;
@@ -65,6 +67,9 @@ private:
 
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
+  std::unordered_map<
+      GateType, std::unordered_map<std::vector<bool>, std::unique_ptr<Gate>>>
+      general_controlled_gates_;
   std::vector<GateType> supported_gates_;
   std::vector<GateType> supported_parameter_gates_;
   std::vector<GateType> supported_quantum_gates_;

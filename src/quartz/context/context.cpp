@@ -49,6 +49,31 @@ Gate *Context::get_gate(GateType tp) {
     return nullptr;
 }
 
+Gate *Context::get_general_controlled_gate(GateType tp,
+                                           const std::vector<bool> &state) {
+  auto it1 = general_controlled_gates_.find(tp);
+  if (it1 == general_controlled_gates_.end()) {
+    it1 = general_controlled_gates_.insert(
+        general_controlled_gates_.end(),
+        std::make_pair(
+            tp,
+            std::unordered_map<std::vector<bool>, std::unique_ptr<Gate>>()));
+  }
+  auto it2 = it1->second.find(state);
+  if (it2 == it1->second.end()) {
+    // Create a new general controlled gate if not found.
+    Gate *controlled_gate = get_gate(tp);
+    if (!controlled_gate) {
+      return nullptr;
+    }
+    it2 = it1->second.insert(
+        it1->second.end(),
+        std::make_pair(state, std::make_unique<GeneralControlledGate>(
+                                  controlled_gate, state)));
+  }
+  return it2->second.get();
+}
+
 bool Context::insert_gate(GateType tp) {
   if (gates_.count(tp) > 0) {
     return false;

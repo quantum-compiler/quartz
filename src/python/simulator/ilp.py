@@ -100,8 +100,10 @@ def solve_ilp(
 
     print("Available solvers:", pulp.listSolvers(onlyAvailable=True))
     solver = pulp.HiGHS_CMD()
-    prob.solve(solver)
-    # prob.solve()
+    try:
+        prob.solve(solver)
+    except:
+        prob.solve()
     if print_solution:
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():
@@ -130,9 +132,12 @@ def solve_ilp(
         result = [[] for _ in range(num_iterations)]
         for j in range(num_iterations):
             for v in prob.variables():
-                if v.name.startswith("a") and v.varValue == 1.0:
+                if v.name.startswith("a") and abs(v.varValue - 1.0) < 1e-6:
                     if v.name.endswith(str(j) + ")"):
                         result[j].append(int(v.name.split("(")[1].split(",")[0]))
+            assert len(result[j]) == num_local_qubits
+            result[j] = sorted(result[j])
+            assert len(result[j]) == num_local_qubits
         return result
 
 

@@ -47,23 +47,39 @@ public:
 
   /**
    * Compute the schedule using dynamic programming.
-   * A kernel with a single controlled gate (e.g., CX) is assumed to have
-   * half of the cost of a kernel with a single corresponding non-controlled
-   * gate (e.g., X). A kernel with one CCX is assumed to have 1/4 of the
-   * cost of a kernel with X.
+   * Note that it is possible for this DP to give wrong results only when
+   * there are both X gate and controlled gates: it assumes we can swap
+   * single-qubit sparse gates with adjacent controlled gates if the
+   * single-qubit gate operates on the same qubit as the control qubit of
+   * the controlled gate. For example, it may reorder
+   * X(Q0) CZ(Q0, Q1)
+   * to
+   * CZ(Q0, Q1) X(Q0)
+   * where the correct schedule should be
+   * CZ[0](Q0, Q1) X(Q0).
    * @param kernel_cost The cost function of kernels.
    * @param non_insular_qubit_indices The set of non-insular qubit indices
    * for each gate, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
+   * @param shared_memory_gate_costs The cost for each gate if put into a
+   * shared-memory kernel, if any of them should be considered differently from
    * what we would have computed from the gate itself.
    * @return True iff the computation succeeds. The results are stored in
    * the member variables |kernels|, |kernel_qubits|, and |cost_|.
    */
   bool compute_kernel_schedule(
       const KernelCost &kernel_cost,
-      const std::vector<std::vector<int>> &non_insular_qubit_indices = {});
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_schedule() const;
+
+  /**
+   * Remove kernels with no gates and update the cost.
+   * @return The number of empty kernels removed.
+   */
+  int remove_empty_kernels(const KernelCost &kernel_cost);
 
   // The result simulation schedule. We will execute the kernels one by one,
   // and each kernel contains a sequence of gates.
@@ -111,5 +127,6 @@ get_schedules(const CircuitSeq &sequence,
 class PythonInterpreter;
 std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
-                              Context *ctx, PythonInterpreter *interpreter);
+                              Context *ctx, PythonInterpreter *interpreter,
+                              int answer_start_with = 1);
 } // namespace quartz

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <charconv>
+#include <fstream>
 #include <queue>
 #include <unordered_set>
 #include <utility>
@@ -1139,6 +1140,23 @@ CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
   std::unique_ptr<CircuitSeq> ret;
   ret.reset(seq); // transfer ownership of |seq|
   return ret;
+}
+
+bool CircuitSeq::to_qasm_file(Context *ctx, const std::string &filename,
+                              int param_precision) const {
+  std::ofstream fout(filename);
+  if (!fout.is_open()) {
+    return false;
+  }
+  fout << "OPENQASM 2.0;\n"
+          "include \"qelib1.inc\";\n"
+          "qreg q["
+       << get_num_qubits() << "];\n";
+  for (auto &gate : gates) {
+    fout << gate->to_qasm_style_string(ctx, param_precision);
+  }
+  fout.close();
+  return true;
 }
 
 bool CircuitSeq::canonical_representation(

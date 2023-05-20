@@ -40,6 +40,12 @@ public:
    * Default value is 0.
    */
   [[nodiscard]] virtual int get_num_control_qubits() const;
+  /**
+   * @return The control state for controlled gates. Only overridden by
+   * GeneralControlledGate.
+   * Default value is a vector of |get_num_control_qubits()| true's.
+   */
+  [[nodiscard]] virtual std::vector<bool> get_control_state() const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] bool is_parameter_gate() const;

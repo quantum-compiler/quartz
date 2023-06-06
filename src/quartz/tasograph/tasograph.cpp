@@ -2035,7 +2035,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   constexpr int kMaxNumCandidates = 2000;
   constexpr int kShrinkToNumCandidates = 1000;
 
-  auto shrink_candidates = [&] () {
+  auto shrink_candidates = [&]() {
     if (print_message) {
       fprintf(fout, "%s: shrink the priority queue with %d candidates.\n",
               circuit_name.c_str(), (int)candidates.size());

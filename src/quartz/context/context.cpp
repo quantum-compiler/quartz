@@ -49,6 +49,31 @@ Gate *Context::get_gate(GateType tp) {
     return nullptr;
 }
 
+Gate *Context::get_general_controlled_gate(GateType tp,
+                                           const std::vector<bool> &state) {
+  auto it1 = general_controlled_gates_.find(tp);
+  if (it1 == general_controlled_gates_.end()) {
+    it1 = general_controlled_gates_.insert(
+        general_controlled_gates_.end(),
+        std::make_pair(
+            tp,
+            std::unordered_map<std::vector<bool>, std::unique_ptr<Gate>>()));
+  }
+  auto it2 = it1->second.find(state);
+  if (it2 == it1->second.end()) {
+    // Create a new general controlled gate if not found.
+    Gate *controlled_gate = get_gate(tp);
+    if (!controlled_gate) {
+      return nullptr;
+    }
+    it2 = it1->second.insert(
+        it1->second.end(),
+        std::make_pair(state, std::make_unique<GeneralControlledGate>(
+                                  controlled_gate, state)));
+  }
+  return it2->second.get();
+}
+
 bool Context::insert_gate(GateType tp) {
   if (gates_.count(tp) > 0) {
     return false;
@@ -179,6 +204,36 @@ bool Context::get_possible_representative(const CircuitSeqHashType &hash_value,
   }
   representative = it->second;
   return true;
+}
+
+ParamType Context::get_param_value(int id) const {
+  assert(id >= 0 && id < (int)parameters_.size());
+  return parameters_[id];
+}
+
+void Context::set_param_value(int id, const ParamType &param) {
+  while (id >= (int)parameters_.size()) {
+    parameters_.emplace_back();
+  }
+  parameters_[id] = param;
+}
+
+int Context::get_new_param_id(bool is_symbolic) {
+  assert(is_parameter_symbolic_.size() == num_parameters_);
+  is_parameter_symbolic_.push_back(is_symbolic);
+  return num_parameters_++;
+}
+
+int Context::get_num_parameters() const { return num_parameters_; }
+
+bool Context::param_is_symbolic(int id) const {
+  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
+         is_parameter_symbolic_[id];
+}
+
+bool Context::param_has_value(int id) const {
+  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
+         !is_parameter_symbolic_[id];
 }
 
 double Context::random_number() {

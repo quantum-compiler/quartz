@@ -8,6 +8,7 @@
 namespace quartz {
 
 class CircuitWire;
+class Context;
 
 /**
  * A gate in the circuit.
@@ -26,6 +27,8 @@ public:
   // Get the "non-insular" qubit indices of the gate.
   [[nodiscard]] std::vector<int> get_non_insular_qubit_indices() const;
   [[nodiscard]] std::string to_string() const;
+  [[nodiscard]] std::string to_qasm_style_string(Context *ctx,
+                                                 int param_precision) const;
   std::vector<CircuitWire *> input_wires; // Include parameters!
   std::vector<CircuitWire *> output_wires;
 

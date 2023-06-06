@@ -3,6 +3,9 @@ from dataclasses import dataclass, field
 from typing import Any, List
 
 import hydra
+from hydra.core.config_store import ConfigStore
+from omegaconf import MISSING, OmegaConf  # Do not confuse with dataclass.MISSING
+
 from config.base_config import BaseConfig
 from config.ibm2_config import *
 from config.ibm_config import *
@@ -11,8 +14,6 @@ from config.nam2_config import *
 from config.nam_config import *
 from config.rig_config import *
 from config.tdg_config import *
-from hydra.core.config_store import ConfigStore
-from omegaconf import MISSING, OmegaConf  # Do not confuse with dataclass.MISSING
 
 defaults = [
     # config group name c will load config named base

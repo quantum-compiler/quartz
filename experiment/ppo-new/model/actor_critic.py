@@ -82,9 +82,9 @@ class ActorCritic(nn.Module):
         """make ddp verison instances for each sub-model"""
         _ddp_model = ActorCritic(
             device=self.device,
-            gnn=DDP(self.gnn, device_ids=[self.device]),
-            actor=DDP(self.actor, device_ids=[self.device]),
-            critic=DDP(self.critic, device_ids=[self.device]),
+            gnn=DDP(self.gnn, device_ids=[self.device] if self.device.type == 'cuda' else None),
+            actor=DDP(self.actor, device_ids=[self.device] if self.device.type == 'cuda' else None),
+            critic=DDP(self.critic, device_ids=[self.device] if self.device.type == 'cuda' else None),
         )
         return _ddp_model
 

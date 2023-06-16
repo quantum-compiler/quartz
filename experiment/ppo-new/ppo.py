@@ -151,7 +151,7 @@ class PPOMod:
             self.device = torch.device('cpu')
         else:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
-        torch.cuda.set_device(self.device)
+            torch.cuda.set_device(self.device)
         self.ac_net: ActorCritic = self._make_actor_critic()
         self.ac_net = cast(
             ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)

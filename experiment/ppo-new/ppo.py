@@ -569,7 +569,7 @@ class PPOMod:
             self.device = torch.device('cpu')
         else:
             self.device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
-        torch.cuda.set_device(self.device)
+            torch.cuda.set_device(self.device)
         printfl(f'rank {rank} / {world_size} use {self.device}')
         dist.init_process_group(
             backend='nccl',

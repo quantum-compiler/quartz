@@ -342,60 +342,30 @@ class PPOMod:
         all_target_values: List[float] = []
         all_advs: List[float] = []
         with torch.no_grad():
-            for i_step, exps in enumerate(
-                ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
-            ):
-                # (num_next_graphs, )
-                next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
-                """get embeds"""
-                # (batch_next_graphs_nodes, embed_dim)
-                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(
-                    exps.next_state, ActorCritic.gnn_name()
-                )
-                next_graph_embeds_list: List[torch.Tensor] = torch.split(
-                    b_next_graph_embeds, next_num_nodes.tolist()
-                )
-                """select embeds"""
-                # ( sum(num_next_nodes), embed_dim )
-                next_node_embeds: torch.Tensor = torch.cat(
-                    [
-                        graph_embed[next_node_ids]
-                        for (next_node_ids, graph_embed) in zip(
-                            exps.next_nodes, next_graph_embeds_list
-                        )
-                    ]
-                )
-                """evaluate"""
-                # ( sum(num_next_nodes), )
-                next_node_values: torch.Tensor = self.ddp_ac_net(
-                    next_node_embeds, ActorCritic.critic_name()
-                ).squeeze()
-                num_next_nodes = list(map(len, exps.next_nodes))
-                next_node_values_list: List[torch.Tensor] = torch.split(
-                    next_node_values, num_next_nodes
-                )
-                """get max next value for each graph"""
-                max_next_values_list: List[torch.Tensor] = []
-                for i in range(len(exps)):
-                    max_next_value: torch.Tensor
-                    # invalid xfer, gate count exceeds limit, NOP
-                    if (
-                        next_node_values_list[i].shape[0] == 0
-                        or exps.game_over[i]
-                        or qtz.is_nop(int(exps.action[i, 1]))
-                        and self.cfg.nop_stop
-                    ):
-                        max_next_value = torch.zeros(1).to(self.device)
-                    else:
-                        max_next_value, _ = torch.max(
-                            next_node_values_list[i], dim=0, keepdim=True
-                        )
-                    max_next_values_list.append(max_next_value)
-                max_next_values = torch.cat(max_next_values_list)
-                target_values = exps.reward + self.cfg.gamma * max_next_values
-                advs = target_values - exps.node_value
-                all_target_values += target_values.tolist()
-                all_advs += advs.tolist()
+            reward: list[float] = exp_list.reward
+            value: list[float] = exp_list.node_value
+            done: list[bool] = exp_list.game_over
+            advs: list[float] = [0.0] * len(exp_list)
+            target_values: list[float] = [0.0] * len(exp_list)
+
+            # Compute GAE
+            gae = 0
+            gae_lambda = 0.95
+            for step in reversed(range(len(exp_list))):
+                if step != len(exp_list) - 1:
+                    delta = (
+                        reward[step]
+                        + self.cfg.gamma * value[step + 1] * (1 - done[step])
+                        - value[step]
+                    )
+                else:
+                    delta = reward[step] - value[step]
+                gae = delta + self.cfg.gamma * gae_lambda * (1 - done[step]) * gae
+                advs[step] = gae
+                target_values[step] = value[step] + gae
+                
+            all_target_values += target_values
+            all_advs += advs
             # end for
             train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)  # type: ignore
         # end with

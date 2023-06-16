@@ -153,9 +153,10 @@ class PPOMod:
             self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
             torch.cuda.set_device(self.device)
         self.ac_net: ActorCritic = self._make_actor_critic()
-        self.ac_net = cast(
-            ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
-        )
+        if self.device.type == 'cuda':
+            self.ac_net = cast(
+                ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
+            )
         self.ac_net_old = copy.deepcopy(self.ac_net)
         self.agent = PPOAgent(
             agent_id=self.rank,

@@ -783,7 +783,8 @@ class PPOAgent:
             max_eps_len_for_all = max(max_eps_len_for_all, max_eps_len)
         # end for
         """communicate with other ranks to get max of max_eps_len_for_all"""
-        max_eps_len_all_ranks = torch.zeros(self.num_agents).to(self.device)
+        # max_eps_len_all_ranks = torch.zeros(self.num_agents).to(self.device)
+        max_eps_len_all_ranks = torch.zeros(self.num_agents).to('cuda:0')
         max_eps_len_all_ranks[self.id] = max_eps_len_for_all
         for r in range(self.num_agents):
             dist.broadcast(max_eps_len_all_ranks[r], r)

@@ -80,12 +80,15 @@ class ActorCritic(nn.Module):
 
     def ddp_model(self) -> ActorCritic:
         """make ddp verison instances for each sub-model"""
-        _ddp_model = ActorCritic(
-            device=self.device,
-            gnn=DDP(self.gnn, device_ids=[self.device] if self.device.type == 'cuda' else None),
-            actor=DDP(self.actor, device_ids=[self.device] if self.device.type == 'cuda' else None),
-            critic=DDP(self.critic, device_ids=[self.device] if self.device.type == 'cuda' else None),
-        )
+        if self.device.type == 'cuda':
+            _ddp_model = ActorCritic(
+                device=self.device,
+                gnn=DDP(self.gnn, device_ids=[self.device]),
+                actor=DDP(self.actor, device_ids=[self.device]),
+                critic=DDP(self.critic, device_ids=[self.device]),
+            )
+        else:
+            _ddp_model = ActorCritic(device=self.device, gnn=self.gnn, actor=self.actor, critic=self.critic)
         return _ddp_model
 
     def forward(self, x: torch.Tensor | dgl.DGLGraph, callee: str) -> torch.Tensor:

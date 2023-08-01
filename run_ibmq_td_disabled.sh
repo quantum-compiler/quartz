@@ -1,5 +1,7 @@
+#!/usr/bin/sh
 cd build
 make test_ibmq_td_disabled
+mkdir -p ../circuit/nam-benchmarks/output_files/ibmq/log
 ./test_ibmq_td_disabled ../circuit/nam-benchmarks/qcla_mod_7.qasm --output ../circuit/nam-benchmarks/output_files/ibmq/qcla_mod_7.qasm.output.ibmq.disable_td > ../circuit/nam-benchmarks/output_files/ibmq/log/qcla_mod_7.log &
 ./test_ibmq_td_disabled ../circuit/nam-benchmarks/tof_4.qasm --output ../circuit/nam-benchmarks/output_files/ibmq/tof_4.qasm.output.ibmq.disable_td > ../circuit/nam-benchmarks/output_files/ibmq/log/tof_4.log &
 ./test_ibmq_td_disabled ../circuit/nam-benchmarks/mod_red_21.qasm --output ../circuit/nam-benchmarks/output_files/ibmq/mod_red_21.qasm.output.ibmq.disable_td > ../circuit/nam-benchmarks/output_files/ibmq/log/mod_red_21.log &

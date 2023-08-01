@@ -1,5 +1,7 @@
+#!/usr/bin/sh
 cd build
 make test_rigetti_td_disabled
+mkdir -p ../circuit/nam-benchmarks/output_files/rigetti
 ./test_rigetti_td_disabled ../circuit/nam-benchmarks/adder_8.qasm --output ../circuit/nam-benchmarks/output_files/rigetti/adder_8.qasm.output.rigetti &
 ./test_rigetti_td_disabled ../circuit/nam-benchmarks/barenco_tof_3.qasm --output ../circuit/nam-benchmarks/output_files/rigetti/barenco_tof_3.qasm.output.rigetti &
 ./test_rigetti_td_disabled ../circuit/nam-benchmarks/barenco_tof_4.qasm --output ../circuit/nam-benchmarks/output_files/rigetti/barenco_tof_4.qasm.output.rigetti &

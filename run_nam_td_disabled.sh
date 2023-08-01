@@ -1,5 +1,7 @@
+#!/usr/bin/sh
 cd build
 make test_nam_td_disabled
+mkdir -p ../circuit/nam-benchmarks/output_files/nam/log
 ./test_nam_td_disabled ../circuit/nam-benchmarks/qcla_mod_7.qasm --output ../circuit/nam-benchmarks/output_files/nam/qcla_mod_7.qasm.output.nam.disable_td > ../circuit/nam-benchmarks/output_files/nam/log/qcla_mod_7.log &
 ./test_nam_td_disabled ../circuit/nam-benchmarks/tof_4.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_4.qasm.output.nam.disable_td > ../circuit/nam-benchmarks/output_files/nam/log/tof_4.log &
 ./test_nam_td_disabled ../circuit/nam-benchmarks/mod_red_21.qasm --output ../circuit/nam-benchmarks/output_files/nam/mod_red_21.qasm.output.nam.disable_td > ../circuit/nam-benchmarks/output_files/nam/log/mod_red_21.log &

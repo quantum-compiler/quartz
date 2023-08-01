@@ -1,5 +1,7 @@
+#!/usr/bin/sh
 cd build
 make test_nam
+mkdir -p ../circuit/nam-benchmarks/output_files/nam
 if [ $# -eq 0 ]
 then
   eqset_arg=""

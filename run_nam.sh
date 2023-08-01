@@ -1,5 +1,7 @@
+#!/usr/bin/sh
 cd build
 make test_nam
+mkdir -p ../circuit/nam-benchmarks/output_files/nam
 if [ $# -eq 0 ]
 then
   eqset_arg=""
@@ -24,7 +26,7 @@ fi
 ./test_nam ../circuit/nam-benchmarks/gf2^8_mult.qasm --output ../circuit/nam-benchmarks/output_files/nam/gf2^8_mult.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/gf2^9_mult.qasm --output ../circuit/nam-benchmarks/output_files/nam/gf2^9_mult.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/gf2^10_mult.qasm --output ../circuit/nam-benchmarks/output_files/nam/gf2^10_mult.qasm.output.nam $eqset_arg &
-./test_nam ../circuit/nam-benchmarks/mod5_4.qasm --output ../circuit/nam-benchmarks/output_files/nam/mod5_4.qasm.output.nnam $eqset_arg &
+./test_nam ../circuit/nam-benchmarks/mod5_4.qasm --output ../circuit/nam-benchmarks/output_files/nam/mod5_4.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/mod_mult_55.qasm --output ../circuit/nam-benchmarks/output_files/nam/mod_mult_55.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/mod_red_21.qasm --output ../circuit/nam-benchmarks/output_files/nam/mod_red_21.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/qcla_adder_10.qasm --output ../circuit/nam-benchmarks/output_files/nam/qcla_adder_10.qasm.output.nam $eqset_arg &
@@ -34,5 +36,5 @@ fi
 ./test_nam ../circuit/nam-benchmarks/tof_3.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_3.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/tof_4.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_4.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/tof_5.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_5.qasm.output.nam $eqset_arg &
-./test_nam ../circuit/nam-benchmarks/tof_10.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_10.qasm.output.nnam $eqset_arg &
+./test_nam ../circuit/nam-benchmarks/tof_10.qasm --output ../circuit/nam-benchmarks/output_files/nam/tof_10.qasm.output.nam $eqset_arg &
 ./test_nam ../circuit/nam-benchmarks/vbe_adder_3.qasm --output ../circuit/nam-benchmarks/output_files/nam/vbe_adder_3.qasm.output.nam $eqset_arg &

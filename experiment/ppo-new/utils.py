@@ -35,6 +35,7 @@ import quartz  # type: ignore
 
 def seed_all(seed: int) -> None:
     if seed is not None:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -42,6 +43,7 @@ def seed_all(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
 
 
 @dataclass
@@ -64,20 +66,20 @@ class CostType(Enum):
 
     @staticmethod
     def from_str(s: str) -> CostType:
-        if s == 'gate_count':
+        if s == "gate_count":
             return CostType.gate_count
-        elif s == 'cx_count':
+        elif s == "cx_count":
             return CostType.cx_count
-        elif s == 'cx_gate':
+        elif s == "cx_gate":
             return CostType.cx_gate
-        elif s == 'depth':
+        elif s == "depth":
             return CostType.depth
-        elif s == 'depth_gc':
+        elif s == "depth_gc":
             return CostType.depth_gc
-        elif s == 'depth_2_gc':
+        elif s == "depth_2_gc":
             return CostType.depth_2_gc
         else:
-            raise NotImplementedError(f'Unexpected input to CostType {s}')
+            raise NotImplementedError(f"Unexpected input to CostType {s}")
 
 
 def get_cost(graph: quartz.PyGraph, tp: CostType) -> int:
@@ -94,15 +96,15 @@ def get_cost(graph: quartz.PyGraph, tp: CostType) -> int:
     elif tp is CostType.depth_2_gc:
         return 2 * graph.depth + graph.gate_count
     else:
-        raise NotImplementedError(f'Unexpected CostType {tp} ({tp.__class__()})')
+        raise NotImplementedError(f"Unexpected CostType {tp} ({tp.__class__()})")
 
 
 def get_agent_name(agent_id: int) -> str:
-    return f'agent_{agent_id}'
+    return f"agent_{agent_id}"
 
 
 def get_obs_name(agent_id: int, obs_id: int) -> str:
-    return f'obs_{agent_id}_{obs_id}'
+    return f"obs_{agent_id}_{obs_id}"
 
 
 def get_quartz_context(
@@ -132,16 +134,16 @@ def split_reduce_mean(x: torch.Tensor, sizes: torch.LongTensor) -> torch.Tensor:
     return reduced / sizes.unsqueeze(-1)
 
 
-def errprint(s: str, file=sys.stderr, end='\n') -> None:
+def errprint(s: str, file=sys.stderr, end="\n") -> None:
     print(s, file=file, end=end)
 
 
-def printfl(s: str, end='\n') -> None:
+def printfl(s: str, end="\n") -> None:
     print(s, flush=True, end=end)
 
 
-def logprintfl(s: str, end='\n') -> None:
-    print(f'[{datetime.datetime.now()}] {s}', flush=True, end=end)
+def logprintfl(s: str, end="\n") -> None:
+    print(f"[{datetime.datetime.now()}] {s}", flush=True, end=end)
 
 
 def get_time_ns() -> int:
@@ -157,7 +159,7 @@ def sec_to_hms(sec: float) -> str:
 
 
 def hms_to_sec(hms: str) -> float:
-    return sum(x * float(t) for x, t in zip([3600, 60, 1], hms.split(':')))
+    return sum(x * float(t) for x, t in zip([3600, 60, 1], hms.split(":")))
 
 
 def shuffle_lists(*ls):

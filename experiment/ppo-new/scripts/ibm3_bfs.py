@@ -4,9 +4,9 @@ import sys
 import time
 
 import wandb
+from ibm_add_xfer import ibm_add_xfer
 
 import quartz
-from ibm_add_xfer import ibm_add_xfer
 
 
 def optimize(

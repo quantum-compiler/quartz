@@ -28,6 +28,73 @@ std::string Kernel::to_string() const {
   return result;
 }
 
+KernelCostType Kernel::cost(const KernelCost &cost_function,
+                            const std::vector<int> &local_qubit_layout) const {
+  if (type == KernelType::fusion) {
+    auto &vec = cost_function.get_fusion_kernel_costs();
+    if (qubits.size() < vec.size()) {
+      return vec[qubits.size()];
+    } else {
+      return (KernelCostType)(INFINITY);
+    }
+  } else if (type == KernelType::shared_memory) {
+    if (qubits.size() > cost_function.get_shared_memory_num_free_qubits()) {
+      // possible to be infeasible
+      if (qubits.size() >
+          cost_function.get_shared_memory_num_free_qubits() +
+              cost_function.get_shared_memory_num_cacheline_qubits()) {
+        // infeasible
+        return (KernelCostType)(INFINITY);
+      }
+      // we need the local qubit layout to determine the cacheline qubits.
+      assert(local_qubit_layout.size() >=
+             cost_function.get_shared_memory_num_cacheline_qubits());
+      int extra_qubits = (int)qubits.size() -
+                         cost_function.get_shared_memory_num_free_qubits();
+      for (auto &qubit : qubits) {
+        if (std::find(
+                local_qubit_layout.begin(),
+                local_qubit_layout.begin() +
+                    cost_function.get_shared_memory_num_cacheline_qubits(),
+                qubit) !=
+            local_qubit_layout.begin() +
+                cost_function.get_shared_memory_num_cacheline_qubits()) {
+          extra_qubits--;
+          if (extra_qubits <= 0) {
+            break;
+          }
+        }
+      }
+      if (extra_qubits > 0) {
+        // infeasible
+        return (KernelCostType)(INFINITY);
+      }
+    }
+    auto result = cost_function.get_shared_memory_init_cost();
+    for (auto &gate : gates.gates) {
+      result += cost_function.get_shared_memory_gate_cost(gate->gate->tp);
+    }
+    return result;
+  } else {
+    assert(false);
+    return (KernelCostType)(INFINITY);
+  }
+}
+
+bool Kernel::add_gate(CircuitGate *gate) {
+  if (gates.add_gate(gate)) {
+    for (auto output : gate->output_wires) {
+      assert(output->is_qubit());
+      if (std::find(qubits.begin(), qubits.end(), output->index) ==
+          qubits.end()) {
+        qubits.push_back(output->index);
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
 size_t KernelInDP::get_hash() const {
   size_t result = 5381 + (int)tp;
   for (const auto &i : active_qubits) {

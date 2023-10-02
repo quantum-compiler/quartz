@@ -1,6 +1,7 @@
 #pragma once
 
 #include "quartz/circuitseq/circuitseq.h"
+#include "quartz/simulator/kernel_cost.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,11 @@ public:
       : gates(gates), qubits(qubits), type(type) {}
 
   [[nodiscard]] std::string to_string() const;
+  [[nodiscard]] KernelCostType
+  cost(const KernelCost &cost_function,
+       const std::vector<int> &local_qubit_layout = {}) const;
+  bool add_gate(CircuitGate *gate);
+
   CircuitSeq gates;
   std::vector<int> qubits;
   KernelType type;

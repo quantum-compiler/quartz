@@ -1352,7 +1352,92 @@ bool Schedule::compute_kernel_schedule(
   return true;
 }
 
+bool Schedule::compute_kernel_schedule_simple(const KernelCost &kernel_cost) {
+  const int num_gates = sequence_.get_num_gates();
+  // dp[i]: min cost for the first i gates (1-indexed)
+  std::vector<KernelCostType> dp(num_gates + 1);
+  std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
+  dp[0] = 0;
+  CircuitSeq empty_circuit(sequence_.get_num_qubits(),
+                           sequence_.get_num_input_parameters());
+  std::map<KernelType, std::deque<Kernel>> possible_kernels;
+  possible_kernels.emplace(
+      std::make_pair(KernelType::fusion, std::deque<Kernel>()));
+  possible_kernels.emplace(
+      std::make_pair(KernelType::shared_memory, std::deque<Kernel>()));
+  for (int i = 1; i <= num_gates; i++) {
+    dp[i] = (KernelCostType)INFINITY;
+    // dp[i] <- cost(i-j .. i) + dp[i - j - 1]
+    for (auto &p : possible_kernels) {
+      auto tp = p.first;
+      auto &k = p.second;
+      k.emplace_front(empty_circuit, /*qubits=*/std::vector<int>(), tp);
+      int j;
+      for (j = 0; j < (int)k.size(); j++) {
+        k[j].add_gate(sequence_.gates[i - 1].get());
+        auto current_cost = k[j].cost(kernel_cost, local_qubit_);
+        if (current_cost >= (KernelCostType)INFINITY) {
+          // optimization: larger kernels are infeasible
+          break;
+        }
+        if (dp[i - j - 1] + current_cost < dp[i]) {
+          dp[i] = dp[i - j - 1] + current_cost;
+          dp_from[i] = std::make_pair(i - j - 1, tp); // record the transition
+        }
+      }
+      while (j < (int)k.size()) {
+        // optimization: larger kernels are infeasible
+        k.pop_back();
+      }
+    }
+  }
+  cost_ = dp[num_gates];
+  // Retrieve the splitting locations.
+  std::vector<int> kernel_split_locations;
+  kernel_split_locations.push_back(num_gates);
+  while (kernel_split_locations.back() > 0) {
+    kernel_split_locations.push_back(
+        dp_from[kernel_split_locations.back()].first);
+  }
+  // Record the kernels.
+  kernels.clear();
+  kernels.reserve(kernel_split_locations.size() - 1);
+  for (int i = (int)kernel_split_locations.size() - 1; i > 0; i--) {
+    int location = kernel_split_locations[i];
+    auto kernel = Kernel(empty_circuit, /*qubits=*/std::vector<int>(),
+                         dp_from[location].second);
+    for (int j = location; j < kernel_split_locations[i - 1]; j++) {
+      kernel.add_gate(sequence_.gates[j].get());
+    }
+    kernels.push_back(kernel);
+  }
+  return true;
+}
+
 int Schedule::get_num_kernels() const { return (int)kernels.size(); }
+
+void Schedule::print_kernel_info() const {
+  const int num_kernels = get_num_kernels();
+  int num_fusion = 0;
+  int num_shared_memory = 0;
+  for (int i = 0; i < num_kernels; i++) {
+    if (kernels[i].type == KernelType::fusion) {
+      num_fusion++;
+    } else if (kernels[i].type == KernelType::shared_memory) {
+      num_shared_memory++;
+    } else {
+      std::cout << "Unknown kernel type " << kernels[i].type << std::endl;
+      assert(false);
+    }
+  }
+  std::cout << "Kernel info: " << num_kernels << " kernels (" << num_fusion
+            << " fusion, " << num_shared_memory
+            << " shared-memory), cost = " << cost_ << ", local qubits";
+  for (auto &qubit : local_qubit_) {
+    std::cout << " " << qubit;
+  }
+  std::cout << std::endl;
+}
 
 void Schedule::print_kernel_schedule() const {
   const int num_kernels = get_num_kernels();
@@ -1399,7 +1484,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates) {
+              bool attach_single_qubit_gates, bool use_simple_dp) {
   constexpr bool debug = false;
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
@@ -1879,9 +1964,13 @@ get_schedules(const CircuitSeq &sequence,
   num_stage = -1;
   for (auto &schedule : result) {
     num_stage++;
-    schedule.compute_kernel_schedule(kernel_cost,
-                                     non_insular_qubit_indices[num_stage],
-                                     shared_memory_gate_costs[num_stage]);
+    if (use_simple_dp) {
+      schedule.compute_kernel_schedule_simple(kernel_cost);
+    } else {
+      schedule.compute_kernel_schedule(kernel_cost,
+                                       non_insular_qubit_indices[num_stage],
+                                       shared_memory_gate_costs[num_stage]);
+    }
   }
   if (attach_single_qubit_gates) {
     // Restore the single-qubit gates.

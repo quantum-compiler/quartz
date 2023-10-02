@@ -72,7 +72,17 @@ public:
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
+  /**
+   * Compute the schedule using a simple quadratic dynamic programming
+   * algorithm.
+   * TODO: use active qubits for shared-memory kernels
+   * @param kernel_cost
+   * @return
+   */
+  bool compute_kernel_schedule_simple(const KernelCost &kernel_cost);
+
   [[nodiscard]] int get_num_kernels() const;
+  void print_kernel_info() const;
   void print_kernel_schedule() const;
 
   /**
@@ -122,7 +132,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates);
+              bool attach_single_qubit_gates, bool use_simple_dp);
 
 class PythonInterpreter;
 std::vector<std::vector<int>>

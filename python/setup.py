@@ -56,6 +56,8 @@ def config_cython():
 
 setup_args = {}
 
+print("find_packages:", find_packages())
+
 setup(
     name='quartz',
     version="0.1.0",

@@ -30,6 +30,7 @@ def config_cython():
                     "quartz.%s" % fn[:-4],
                     ["%s/%s" % (path, fn)],
                     include_dirs=[
+                        "../src/",
                         "../src/quartz/",
                         "/usr/local/include/",
                         os.path.join(user_home_path, "usr_local/include"),
@@ -62,7 +63,7 @@ setup(
     description="Quartz: Superoptimization of Quantum Circuits",
     zip_safe=False,
     install_requires=[],
-    packages=find_packages(),
+    packages=['quartz'],
     url='https://github.com/quantum-compiler/quartz',
     ext_modules=config_cython(),
 )

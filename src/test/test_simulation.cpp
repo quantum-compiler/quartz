@@ -195,6 +195,7 @@ int main() {
                                        /*use_simple_dp=*/true);
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
+          // schedule.print_kernel_schedule();
         }
       }
       // fprintf(fout, "\n");

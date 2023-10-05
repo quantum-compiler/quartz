@@ -65,7 +65,7 @@ public:
    * shared-memory kernel, if any of them should be considered differently from
    * what we would have computed from the gate itself.
    * @return True iff the computation succeeds. The results are stored in
-   * the member variables |kernels|, |kernel_qubits|, and |cost_|.
+   * the member variables |kernels| and |cost_|.
    */
   bool compute_kernel_schedule(
       const KernelCost &kernel_cost,
@@ -75,11 +75,20 @@ public:
   /**
    * Compute the schedule using a simple quadratic dynamic programming
    * algorithm.
-   * TODO: use active qubits for shared-memory kernels
-   * @param kernel_cost
-   * @return
+   * @param kernel_cost The cost function of kernels.
+   * @param non_insular_qubit_indices The set of non-insular qubit indices
+   * for each gate, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
+   * @param shared_memory_gate_costs The cost for each gate if put into a
+   * shared-memory kernel, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
+   * @return True iff the computation succeeds. The results are stored in
+   * the member variables |kernels| and |cost_|.
    */
-  bool compute_kernel_schedule_simple(const KernelCost &kernel_cost);
+  bool compute_kernel_schedule_simple(
+      const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_info() const;

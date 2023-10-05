@@ -28,8 +28,10 @@ std::string Kernel::to_string() const {
   return result;
 }
 
-KernelCostType Kernel::cost(const KernelCost &cost_function,
-                            const std::vector<int> &local_qubit_layout) const {
+KernelCostType
+Kernel::cost(const KernelCost &cost_function,
+             const std::vector<int> &local_qubit_layout,
+             const KernelCostType *customized_shared_memory_gate_cost) const {
   if (type == KernelType::fusion) {
     auto &vec = cost_function.get_fusion_kernel_costs();
     if (qubits.size() < vec.size()) {
@@ -71,8 +73,12 @@ KernelCostType Kernel::cost(const KernelCost &cost_function,
       }
     }
     auto result = cost_function.get_shared_memory_init_cost();
-    for (auto &gate : gates.gates) {
-      result += cost_function.get_shared_memory_gate_cost(gate->gate->tp);
+    if (customized_shared_memory_gate_cost == nullptr) {
+      for (auto &gate : gates.gates) {
+        result += cost_function.get_shared_memory_gate_cost(gate->gate->tp);
+      }
+    } else {
+      result += *customized_shared_memory_gate_cost;
     }
     return result;
   } else {
@@ -81,13 +87,17 @@ KernelCostType Kernel::cost(const KernelCost &cost_function,
   }
 }
 
-bool Kernel::add_gate(CircuitGate *gate) {
+bool Kernel::add_gate(CircuitGate *gate,
+                      const std::vector<int> &customized_non_insular_qubits) {
   if (gates.add_gate(gate)) {
-    for (auto output : gate->output_wires) {
-      assert(output->is_qubit());
-      if (std::find(qubits.begin(), qubits.end(), output->index) ==
-          qubits.end()) {
-        qubits.push_back(output->index);
+    auto gate_qubits = (type == KernelType::shared_memory
+                            ? (customized_non_insular_qubits.empty()
+                                   ? gate->get_non_insular_qubit_indices()
+                                   : customized_non_insular_qubits)
+                            : gate->get_qubit_indices());
+    for (auto qubit : gate_qubits) {
+      if (std::find(qubits.begin(), qubits.end(), qubit) == qubits.end()) {
+        qubits.push_back(qubit);
       }
     }
     return true;

@@ -62,7 +62,7 @@ setup(
     description="Quartz: Superoptimization of Quantum Circuits",
     zip_safe=False,
     install_requires=[],
-    packages=find_packages(),
+    packages=['quartz'],  # find_packages()
     url='https://github.com/quantum-compiler/quartz',
     ext_modules=config_cython(),
 )

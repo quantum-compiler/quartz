@@ -29,7 +29,6 @@ requests-ntlm==1.1.0
 scipy>=1.7.3
 six==1.16.0
 stevedore==3.5.0
-symengine==0.10.0
 sympy==1.9
 urllib3==1.26.8
 websocket-client==1.5.1

@@ -82,6 +82,8 @@ bool QASMParser::load_qasm_stream(
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
+    // Strip the command to avoid potential '\r'
+    command = strip(command);
     // XXX: "u" is an alias of "u3".
     if (command == std::string("u")) {
       command = std::string("u3");
@@ -201,8 +203,8 @@ bool QASMParser::load_qasm_stream(
         if (parameters.count(p) == 0) {
           seq->add_input_parameter();
           int param_id = context->get_new_param_id(/*is_symbolic=*/false);
-          num_total_params++;
           assert(param_id == num_total_params);
+          num_total_params++;
           parameters[p] = param_id;
           context->set_param_value(param_id, p);
         }

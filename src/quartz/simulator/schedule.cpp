@@ -1362,8 +1362,6 @@ bool Schedule::compute_kernel_schedule_simple(
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
   const int num_gates = sequence_.get_num_gates();
-  // We have not computed the schedule before.
-  assert(kernels.empty());
   // Either to not customize |non_insular_qubit_indices|, or to customize the
   // non-insular qubit indices for each gate.
   assert(non_insular_qubit_indices.empty() ||
@@ -1463,6 +1461,36 @@ bool Schedule::compute_kernel_schedule_simple(
   return true;
 }
 
+bool Schedule::compute_kernel_schedule_simple_repeat(
+    int repeat, const KernelCost &kernel_cost,
+    const std::vector<std::vector<int>> &non_insular_qubit_indices,
+    const std::vector<KernelCostType> &shared_memory_gate_costs) {
+  assert(repeat >= 1);
+  if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
+                                      shared_memory_gate_costs)) {
+    return false;
+  }
+  auto best_cost = cost_;
+  auto best_kernels = std::move(kernels);
+  auto sequence_clone = sequence_.clone();
+  // Repeat for |repeat| - 1 times.
+  for (int i = 1; i < repeat; i++) {
+    auto seq = sequence_clone->random_gate_permutation(/*seed=*/i);
+    sequence_.clone_from(*seq, {}, {});
+    if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
+                                        shared_memory_gate_costs)) {
+      return false;
+    }
+    if (cost_ < best_cost) {
+      best_cost = cost_;
+      best_kernels = std::move(kernels);
+    }
+  }
+  cost_ = best_cost;
+  kernels = std::move(best_kernels);
+  return true;
+}
+
 int Schedule::get_num_kernels() const { return (int)kernels.size(); }
 
 void Schedule::print_kernel_info() const {
@@ -1533,7 +1561,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, bool use_simple_dp) {
+              bool attach_single_qubit_gates, int use_simple_dp_times) {
   constexpr bool debug = false;
   std::vector<Schedule> result;
   result.reserve(local_qubits.size());
@@ -2013,9 +2041,10 @@ get_schedules(const CircuitSeq &sequence,
   num_stage = -1;
   for (auto &schedule : result) {
     num_stage++;
-    if (use_simple_dp) {
-      schedule.compute_kernel_schedule_simple(
-          kernel_cost, non_insular_qubit_indices[num_stage],
+    if (use_simple_dp_times > 0) {
+      schedule.compute_kernel_schedule_simple_repeat(
+          use_simple_dp_times, kernel_cost,
+          non_insular_qubit_indices[num_stage],
           shared_memory_gate_costs[num_stage]);
     } else {
       schedule.compute_kernel_schedule(kernel_cost,

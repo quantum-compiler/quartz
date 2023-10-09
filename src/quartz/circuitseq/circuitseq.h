@@ -120,13 +120,13 @@ public:
    *    for the topological order of one circuit, but we still define it
    *    for the completeness of comparing different circuits.
    * 2. If the qubit indices are all the same, compare the gate type.
-   * 
+   *
    * The parameter "gates" are placed at the beginning.
    *
    * This functions guarantees that if and only if two sequence
    * representations share the same canonical representation, they have
    * the same circuit representation.
-   * 
+   *
    * @param output_seq If |output| is true, store the canonical representation
    * into |output_seq|.
    * The parameter |output_seq| should be a pointer containing nullptr
@@ -181,11 +181,11 @@ public:
 
   static bool same_gate(CircuitGate *gate1, CircuitGate *gate2);
 
+private:
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
 
-  private:
   // A helper function used by |CircuitSeqHashType hash(Context *ctx)|.
   static void generate_hash_values(
       Context *ctx, const ComplexType &hash_value,

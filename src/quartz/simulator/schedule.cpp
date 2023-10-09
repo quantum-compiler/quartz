@@ -8,17 +8,18 @@
 
 namespace quartz {
 
-Schedule::Schedule(const CircuitSeq &sequence,
+Schedule::Schedule(std::unique_ptr<CircuitSeq> &&sequence,
                    const std::vector<int> &local_qubit,
                    const std::vector<int> &global_qubit,
                    int num_shared_memory_cacheline_qubits, Context *ctx)
-    : cost_(), sequence_(sequence), local_qubit_(local_qubit),
+    : cost_(), sequence_(std::move(sequence)), local_qubit_(local_qubit),
       global_qubit_(global_qubit), ctx_(ctx) {
   assert((int)local_qubit.size() + (int)global_qubit.size() ==
-         sequence.get_num_qubits());
+         sequence_->get_num_qubits());
   assert((int)local_qubit.size() >= num_shared_memory_cacheline_qubits);
-  local_qubit_mask_.assign(sequence.get_num_qubits(), false);
-  shared_memory_cacheline_qubit_mask_.assign(sequence.get_num_qubits(), false);
+  local_qubit_mask_.assign(sequence_->get_num_qubits(), false);
+  shared_memory_cacheline_qubit_mask_.assign(sequence_->get_num_qubits(),
+                                             false);
   for (int i = 0; i < (int)local_qubit.size(); i++) {
     local_qubit_mask_[local_qubit[i]] = true;
     if (i < num_shared_memory_cacheline_qubits) {
@@ -28,8 +29,8 @@ Schedule::Schedule(const CircuitSeq &sequence,
 }
 
 size_t Schedule::num_down_sets() {
-  const int num_qubits = sequence_.get_num_qubits();
-  const int num_gates = sequence_.get_num_gates();
+  const int num_qubits = sequence_->get_num_qubits();
+  const int num_gates = sequence_->get_num_gates();
   // Each std::vector<bool> object stores a mask of which gates are in the
   // down set.
   std::unordered_set<std::vector<bool>> down_sets;
@@ -55,7 +56,7 @@ size_t Schedule::num_down_sets() {
     for (int i = 0; i < num_gates; i++) {
       if (!current_set[i]) {
         bool can_add = true;
-        for (auto wire : sequence_.gates[i]->input_wires) {
+        for (auto wire : sequence_->gates[i]->input_wires) {
           if (wire->is_qubit() && qubit_used[wire->index]) {
             can_add = false;
             break;
@@ -69,7 +70,7 @@ size_t Schedule::num_down_sets() {
             to_search.push(new_set);
           }
         }
-        for (auto wire : sequence_.gates[i]->input_wires) {
+        for (auto wire : sequence_->gates[i]->input_wires) {
           if (wire->is_qubit()) {
             // If we decide to not add this gate, we cannot add any gates using
             // the qubits it operates on later.
@@ -275,8 +276,8 @@ bool Schedule::compute_kernel_schedule(
     const KernelCost &kernel_cost,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
-  const int num_qubits = sequence_.get_num_qubits();
-  const int num_gates = sequence_.get_num_gates();
+  const int num_qubits = sequence_->get_num_qubits();
+  const int num_gates = sequence_->get_num_gates();
   auto kernel_costs = kernel_cost.get_fusion_kernel_costs();
   const int max_fusion_kernel_size = (int)kernel_costs.size() - 1;
   const int shared_memory_kernel_size =
@@ -517,7 +518,7 @@ bool Schedule::compute_kernel_schedule(
       std::cout << i << ", ";
     }
     std::cout << std::endl;
-    std::cout << sequence_.to_string(true) << std::endl;
+    std::cout << sequence_->to_string(true) << std::endl;
   }
   // The main DP loop.
   for (int i = 0; i < num_gates; i++) {
@@ -529,7 +530,7 @@ bool Schedule::compute_kernel_schedule(
     }
     f_next.clear();
     // Get the qubit indices of the current gate.
-    auto &current_gate = *sequence_.gates[i];
+    auto &current_gate = *sequence_->gates[i];
     KernelCostType current_gate_cost;
     if (shared_memory_gate_costs.empty()) {
       current_gate_cost =
@@ -1270,7 +1271,7 @@ bool Schedule::compute_kernel_schedule(
   int start_gate_index = 0; // an optimization
   for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
-    CircuitSeq current_seq(num_qubits, sequence_.get_num_input_parameters());
+    CircuitSeq current_seq(num_qubits, sequence_->get_num_input_parameters());
     std::vector<bool> active_in_kernel(num_qubits, false);
     for (auto &index : s.active_qubits) {
       active_in_kernel[index] = true;
@@ -1288,7 +1289,7 @@ bool Schedule::compute_kernel_schedule(
         continue;
       }
       bool executable = true;
-      for (auto &wire : sequence_.gates[i]->input_wires) {
+      for (auto &wire : sequence_->gates[i]->input_wires) {
         if (wire->is_qubit() && qubit_blocked[wire->index]) {
           executable = false;
           break;
@@ -1299,7 +1300,7 @@ bool Schedule::compute_kernel_schedule(
         current_non_insular_indices = non_insular_qubit_indices[i];
       } else {
         current_non_insular_indices =
-            sequence_.gates[i]->get_non_insular_qubit_indices();
+            sequence_->gates[i]->get_non_insular_qubit_indices();
       }
       for (auto &qubit : current_non_insular_indices) {
         if (qubit_insularly_blocked[qubit]) {
@@ -1309,7 +1310,7 @@ bool Schedule::compute_kernel_schedule(
       }
       if (s.tp == KernelType::fusion) {
         // For fusion kernels, we require all local qubits to be active.
-        for (auto &qubit : sequence_.gates[i]->get_qubit_indices()) {
+        for (auto &qubit : sequence_->gates[i]->get_qubit_indices()) {
           if (is_local_qubit(qubit) && !active_in_kernel[qubit]) {
             executable = false;
             break;
@@ -1328,7 +1329,7 @@ bool Schedule::compute_kernel_schedule(
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        current_seq.add_gate(sequence_.gates[i].get());
+        current_seq.add_gate(sequence_->gates[i].get());
       } else {
         // Block the non-insular qubits.
         for (auto &qubit : current_non_insular_indices) {
@@ -1339,7 +1340,7 @@ bool Schedule::compute_kernel_schedule(
         // TODO: if we execute any gate with the same insular qubit later
         //  in this kernel, we need to adjust the states for X gates
         //  accordingly.
-        for (auto &qubit : sequence_.gates[i]->get_insular_qubit_indices()) {
+        for (auto &qubit : sequence_->gates[i]->get_insular_qubit_indices()) {
           qubit_insularly_blocked[qubit] = true;
         }
       }
@@ -1361,7 +1362,7 @@ bool Schedule::compute_kernel_schedule_simple(
     const KernelCost &kernel_cost,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
-  const int num_gates = sequence_.get_num_gates();
+  const int num_gates = sequence_->get_num_gates();
   // Either to not customize |non_insular_qubit_indices|, or to customize the
   // non-insular qubit indices for each gate.
   assert(non_insular_qubit_indices.empty() ||
@@ -1374,8 +1375,8 @@ bool Schedule::compute_kernel_schedule_simple(
   std::vector<KernelCostType> dp(num_gates + 1);
   std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
   dp[0] = 0;
-  CircuitSeq empty_circuit(sequence_.get_num_qubits(),
-                           sequence_.get_num_input_parameters());
+  CircuitSeq empty_circuit(sequence_->get_num_qubits(),
+                           sequence_->get_num_input_parameters());
   std::map<KernelType, std::deque<Kernel>> possible_kernels;
   possible_kernels.emplace(
       std::make_pair(KernelType::fusion, std::deque<Kernel>()));
@@ -1396,7 +1397,7 @@ bool Schedule::compute_kernel_schedule_simple(
       }
       int j;
       for (j = 0; j < (int)k.size(); j++) {
-        k[j].add_gate(sequence_.gates[i - 1].get(),
+        k[j].add_gate(sequence_->gates[i - 1].get(),
                       non_insular_qubit_indices.empty()
                           ? std::vector<int>()
                           : non_insular_qubit_indices[i - 1]);
@@ -1406,7 +1407,7 @@ bool Schedule::compute_kernel_schedule_simple(
           if (shared_memory_gate_costs.empty()) {
             shared_memory_possible_kernels_gate_cost[j] +=
                 kernel_cost.get_shared_memory_gate_cost(
-                    sequence_.gates[i - 1]->gate->tp);
+                    sequence_->gates[i - 1]->gate->tp);
           } else {
             shared_memory_possible_kernels_gate_cost[j] +=
                 shared_memory_gate_costs[i - 1];
@@ -1454,7 +1455,7 @@ bool Schedule::compute_kernel_schedule_simple(
     auto kernel = Kernel(empty_circuit, /*qubits=*/std::vector<int>(),
                          dp_from[kernel_split_locations[i - 1]].second);
     for (int j = location; j < kernel_split_locations[i - 1]; j++) {
-      kernel.add_gate(sequence_.gates[j].get());
+      kernel.add_gate(sequence_->gates[j].get());
     }
     kernels.push_back(kernel);
   }
@@ -1472,11 +1473,9 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
   }
   auto best_cost = cost_;
   auto best_kernels = std::move(kernels);
-  auto sequence_clone = sequence_.clone();
   // Repeat for |repeat| - 1 times.
   for (int i = 1; i < repeat; i++) {
-    auto seq = sequence_clone->random_gate_permutation(/*seed=*/i);
-    sequence_.clone_from(*seq, {}, {});
+    sequence_ = sequence_->random_gate_permutation(/*seed=*/i);
     if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
                                         shared_memory_gate_costs)) {
       return false;
@@ -1742,7 +1741,8 @@ get_schedules(const CircuitSeq &sequence,
           return res;
         };
 
-    CircuitSeq current_seq(num_qubits, sequence.get_num_input_parameters());
+    auto current_seq = std::make_unique<CircuitSeq>(
+        num_qubits, sequence.get_num_input_parameters());
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
       if (executed[i]) {
@@ -1800,7 +1800,7 @@ get_schedules(const CircuitSeq &sequence,
             }
           } else {
             // Either a global gate or a multi-qubit gate.
-            current_seq.add_gate(sequence.gates[i].get());
+            current_seq->add_gate(sequence.gates[i].get());
             // Attach single-qubit gates to this gate.
             auto gate_cost = kernel_cost.get_shared_memory_gate_cost(
                 sequence.gates[i]->gate->tp);
@@ -1860,7 +1860,7 @@ get_schedules(const CircuitSeq &sequence,
             gate_indices[sequence.gates[i]->to_string()].push(i);
           }
         } else {
-          current_seq.add_gate(sequence.gates[i].get());
+          current_seq->add_gate(sequence.gates[i].get());
         }
       } else {
         // Block the qubits.
@@ -2000,7 +2000,7 @@ get_schedules(const CircuitSeq &sequence,
                       << " is kept." << std::endl;
           }
           int gate_id = single_qubit_gate_indices[qubit][0];
-          current_seq.add_gate(sequence.gates[gate_id].get());
+          current_seq->add_gate(sequence.gates[gate_id].get());
           // Only update them for gates that are passed into the DP.
           // Update |dp_sequence_position| and |non_insular_qubit_indices|.
           dp_sequence_position[gate_id] = std::make_pair(
@@ -2026,9 +2026,10 @@ get_schedules(const CircuitSeq &sequence,
       }
     }
 
-    result.emplace_back(
-        current_seq, current_local_qubit_layout, current_global_qubit_layout,
-        kernel_cost.get_shared_memory_num_cacheline_qubits(), ctx);
+    result.emplace_back(std::move(current_seq), current_local_qubit_layout,
+                        current_global_qubit_layout,
+                        kernel_cost.get_shared_memory_num_cacheline_qubits(),
+                        ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }

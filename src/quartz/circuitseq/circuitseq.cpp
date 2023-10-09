@@ -1321,6 +1321,94 @@ bool CircuitSeq::to_canonical_representation() {
   return false;
 }
 
+[[nodiscard]] std::unique_ptr<CircuitSeq>
+CircuitSeq::random_gate_permutation(size_t seed,
+                                    int *result_permutation) const {
+  auto output_seq = std::make_unique<CircuitSeq>(get_num_qubits(),
+                                                 get_num_input_parameters());
+  std::mt19937 rng(seed);
+  // Add all parameter "gates" first.
+  for (auto &circuit_gate : gates) {
+    if (circuit_gate->gate->is_parameter_gate()) {
+      output_seq->add_gate(circuit_gate.get());
+    }
+  }
+
+  int num_mapped_circuit_gates = output_seq->get_num_gates();
+
+  std::unordered_map<CircuitWire *, int> wire_id;
+  std::unordered_map<CircuitGate *, int> gate_id;
+  for (int i = 0; i < (int)wires.size(); i++) {
+    wire_id[wires[i].get()] = i;
+  }
+  for (int i = 0; i < (int)gates.size(); i++) {
+    gate_id[gates[i].get()] = i;
+  }
+
+  std::vector<CircuitGate *> free_gates;
+  std::vector<CircuitWire *> free_wires;
+  free_wires.reserve(get_num_qubits() + get_num_input_parameters());
+
+  // Construct the |free_wires| vector with the input qubit wires.
+  std::vector<int> wire_in_degree(wires.size(), 0);
+  std::vector<int> gate_in_degree(gates.size(), 0);
+  for (auto &wire : wires) {
+    if (wire->is_parameter()) {
+      wire_in_degree[wire_id[wire.get()]] = -1;
+      continue;
+    }
+    wire_in_degree[wire_id[wire.get()]] = (int)wire->input_gates.size();
+    if (!wire_in_degree[wire_id[wire.get()]]) {
+      free_wires.push_back(wire.get());
+    }
+  }
+  for (auto &circuit_gate : gates) {
+    gate_in_degree[gate_id[circuit_gate.get()]] = 0;
+    for (auto &input_wire : circuit_gate->input_wires) {
+      if (input_wire->is_qubit()) {
+        gate_in_degree[gate_id[circuit_gate.get()]]++;
+      }
+    }
+  }
+
+  while (!free_wires.empty() || !free_gates.empty()) {
+    // Remove the wires in |free_wires|.
+    for (auto &wire : free_wires) {
+      for (auto &output_gate : wire->output_gates) {
+        if (!--gate_in_degree[gate_id[output_gate]]) {
+          free_gates.push_back(output_gate);
+        }
+      }
+    }
+    free_wires.clear();
+
+    if (!free_gates.empty()) {
+      // Find a random free circuit_gate (gate)
+      // in [0, (int)free_gates.size() - 1].
+      int random_loc = std::uniform_int_distribution<int>(
+          0, (int)free_gates.size() - 1)(rng);
+      CircuitGate *free_gate = free_gates[random_loc];
+      if (result_permutation != nullptr) {
+        // Record the permutation.
+        result_permutation[gate_id[free_gate]] = num_mapped_circuit_gates;
+      }
+      num_mapped_circuit_gates++;
+      free_gates.erase(free_gates.begin() + random_loc);
+
+      output_seq->add_gate(free_gate);
+
+      // Update the free wires.
+      for (auto &output_wire : free_gate->output_wires) {
+        if (!--wire_in_degree[wire_id[output_wire]]) {
+          free_wires.push_back(output_wire);
+        }
+      }
+    }
+  }
+  assert(num_mapped_circuit_gates == get_num_gates());
+  return output_seq;
+}
+
 std::unique_ptr<CircuitSeq>
 CircuitSeq::get_permuted_seq(const std::vector<int> &qubit_permutation,
                              const std::vector<int> &param_permutation) const {

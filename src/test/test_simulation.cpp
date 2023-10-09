@@ -192,7 +192,7 @@ int main() {
         std::cout << local_qubits.size() << " stages." << std::endl;
         auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                        /*attach_single_qubit_gates=*/true,
-                                       /*use_simple_dp=*/true);
+                                       /*use_simple_dp_times=*/10);
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();

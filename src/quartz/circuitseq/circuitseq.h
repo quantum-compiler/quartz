@@ -104,49 +104,82 @@ public:
   bool to_qasm_file(Context *ctx, const std::string &filename,
                     int param_precision = 15) const;
 
-  // Returns true iff the CircuitSeq is already under the canonical
-  // representation.
-  // Canonical representation is a sequence representation of a
-  // circuit such that the sequence is the lexicographically smallest
-  // topological order of the circuit, where the gates are compared by:
-  // 1. The qubit indices in lexicographical order.
-  //    If the smallest qubit indices two gates operate on
-  //    are different, the gate with the smaller one is considered
-  //    smaller. For example,
-  //      (q1, q4) < (q2, q3);
-  //      (q1, q3) < (q1, q4);
-  //      (q1, q3) < (q2);
-  //      (q1) < (q1, q3).
-  //    Note that two gates operating on the same qubit is impossible
-  //    for the topological order of one circuit, but we still define it
-  //    for the completeness of comparing different circuits.
-  // 2. If the qubit indices are all the same, compare the gate type.
-  //
-  // The parameter "gates" are placed at the beginning.
-  //
-  // If |output| is true, store the canonical representation into
-  // |output_seq|.
-  // The parameter |output_seq| should be a pointer containing nullptr
-  // (otherwise its content will be deleted).
-  // This functions guarantees that if and only if two sequence
-  // representations share the same canonical representation, they have
-  // the same circuit representation.
+  /**
+   * Canonical representation is a sequence representation of a
+   * circuit such that the sequence is the lexicographically smallest
+   * topological order of the circuit, where the gates are compared by:
+   * 1. The qubit indices in lexicographical order.
+   *    If the smallest qubit indices two gates operate on
+   *    are different, the gate with the smaller one is considered
+   *    smaller. For example,
+   *      (q1, q4) < (q2, q3);
+   *      (q1, q3) < (q1, q4);
+   *      (q1, q3) < (q2);
+   *      (q1) < (q1, q3).
+   *    Note that two gates operating on the same qubit is impossible
+   *    for the topological order of one circuit, but we still define it
+   *    for the completeness of comparing different circuits.
+   * 2. If the qubit indices are all the same, compare the gate type.
+   *
+   * The parameter "gates" are placed at the beginning.
+   *
+   * This functions guarantees that if and only if two sequence
+   * representations share the same canonical representation, they have
+   * the same circuit representation.
+   *
+   * @param output_seq If |output| is true, store the canonical representation
+   * into |output_seq|.
+   * The parameter |output_seq| should be a pointer containing nullptr
+   * (otherwise its content will be deleted).
+   * @param output Whether to output the canonical representation. Default is
+   * true.
+   * @return True iff the CircuitSeq is already under the canonical
+   * representation.
+   */
   bool canonical_representation(std::unique_ptr<CircuitSeq> *output_seq,
                                 bool output = true) const;
   [[nodiscard]] bool is_canonical_representation() const;
-  // Returns true iff this is NOT canonical representation
-  // (so the function changes this CircuitSeq to canonical representation).
+  /**
+   * Convert this CircuitSeq to canonical representation.
+   * @return True iff this is NOT canonical representation
+   * (so the function modifies this CircuitSeq).
+   */
   bool to_canonical_representation();
+
+  /**
+   * Permute the quantum gates randomly. This function topologically sorts
+   * the sequence and uniformly randomly pick one quantum gate among all choices
+   * each time.
+   * @param seed The random seed used for randomness in this function.
+   * Default is 0.
+   * @param result_permutation Store the result permutation in this array
+   * if it is not nullptr. Requires the size to be at least the number of
+   * quantum gates if not nullptr. The behavior is undefined if there is
+   * a non-quantum gate and this parameter is not nullptr. Default is nullptr.
+   * @return The permuted circuit sequence.
+   */
+  [[nodiscard]] std::unique_ptr<CircuitSeq>
+  random_gate_permutation(size_t seed = 0,
+                          int *result_permutation = nullptr) const;
+  /**
+   * Permute the qubits and input parameters.
+   * @param qubit_permutation The qubit permutation. The size must be the
+   * same as the number of qubits.
+   * @param param_permutation The input parameter permutation. If the size is
+   * smaller than the total number of input parameters, this function only
+   * permutes a prefix of input parameters corresponding to |param_permutation|.
+   * @return The permuted circuit sequence.
+   */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
   get_permuted_seq(const std::vector<int> &qubit_permutation,
                    const std::vector<int> &param_permutation) const;
 
   // Returns quantum gates which do not topologically depend on any other
   // quantum gates.
-  std::vector<CircuitGate *> first_quantum_gates() const;
+  [[nodiscard]] std::vector<CircuitGate *> first_quantum_gates() const;
   // Returns quantum gates which can appear at last in some topological
   // order of the CircuitSeq.
-  std::vector<CircuitGate *> last_quantum_gates() const;
+  [[nodiscard]] std::vector<CircuitGate *> last_quantum_gates() const;
 
   static bool same_gate(const CircuitSeq &seq1, int index1,
                         const CircuitSeq &seq2, int index2);

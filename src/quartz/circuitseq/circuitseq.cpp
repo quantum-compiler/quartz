@@ -1321,12 +1321,11 @@ bool CircuitSeq::to_canonical_representation() {
   return false;
 }
 
-[[nodiscard]] std::unique_ptr<CircuitSeq>
-CircuitSeq::random_gate_permutation(size_t seed,
-                                    int *result_permutation) const {
+[[nodiscard]] std::unique_ptr<CircuitSeq> CircuitSeq::get_gate_permutation(
+    const std::function<int(const std::vector<CircuitGate *> &)> &gate_chooser,
+    int *result_permutation) const {
   auto output_seq = std::make_unique<CircuitSeq>(get_num_qubits(),
                                                  get_num_input_parameters());
-  std::mt19937 rng(seed);
   // Add all parameter "gates" first.
   for (auto &circuit_gate : gates) {
     if (circuit_gate->gate->is_parameter_gate()) {
@@ -1383,17 +1382,24 @@ CircuitSeq::random_gate_permutation(size_t seed,
     free_wires.clear();
 
     if (!free_gates.empty()) {
-      // Find a random free circuit_gate (gate)
-      // in [0, (int)free_gates.size() - 1].
-      int random_loc = std::uniform_int_distribution<int>(
-          0, (int)free_gates.size() - 1)(rng);
-      CircuitGate *free_gate = free_gates[random_loc];
+      int location;
+      if (gate_chooser == nullptr) {
+        // Find a random free circuit_gate (gate)
+        // in [0, (int)free_gates.size() - 1].
+        static std::mt19937 rng(0);
+        location = std::uniform_int_distribution<int>(
+            0, (int)free_gates.size() - 1)(rng);
+      } else {
+        location = gate_chooser(free_gates);
+      }
+      assert(location >= 0 && location < (int)free_gates.size());
+      CircuitGate *free_gate = free_gates[location];
       if (result_permutation != nullptr) {
         // Record the permutation.
         result_permutation[gate_id[free_gate]] = num_mapped_circuit_gates;
       }
       num_mapped_circuit_gates++;
-      free_gates.erase(free_gates.begin() + random_loc);
+      free_gates.erase(free_gates.begin() + location);
 
       output_seq->add_gate(free_gate);
 

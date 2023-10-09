@@ -6,6 +6,7 @@
 #include "circuitgate.h"
 #include "circuitwire.h"
 
+#include <functional>
 #include <istream>
 #include <string>
 
@@ -147,20 +148,25 @@ public:
   bool to_canonical_representation();
 
   /**
-   * Permute the quantum gates randomly. This function topologically sorts
-   * the sequence and uniformly randomly pick one quantum gate among all choices
+   * Permute the quantum gates. This function topologically sorts
+   * the sequence and picks one quantum gate among all choices
    * each time.
-   * @param seed The random seed used for randomness in this function.
-   * Default is 0.
+   * @param gate_chooser The function used to pick the quantum gate to be
+   * placed the first each time, invoked the same number of times as the number
+   * of quantum gates. This function takes as input an std::vector of
+   * potential quantum gates, and returns the index of the quantum gate to be
+   * placed first.
+   * Default (nullptr) is uniformly random.
    * @param result_permutation Store the result permutation in this array
    * if it is not nullptr. Requires the size to be at least the number of
    * quantum gates if not nullptr. The behavior is undefined if there is
    * a non-quantum gate and this parameter is not nullptr. Default is nullptr.
    * @return The permuted circuit sequence.
    */
-  [[nodiscard]] std::unique_ptr<CircuitSeq>
-  random_gate_permutation(size_t seed = 0,
-                          int *result_permutation = nullptr) const;
+  [[nodiscard]] std::unique_ptr<CircuitSeq> get_gate_permutation(
+      const std::function<int(const std::vector<CircuitGate *> &)>
+          &gate_chooser = nullptr,
+      int *result_permutation = nullptr) const;
   /**
    * Permute the qubits and input parameters.
    * @param qubit_permutation The qubit permutation. The size must be the

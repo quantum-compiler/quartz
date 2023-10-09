@@ -1471,6 +1471,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
                                       shared_memory_gate_costs)) {
     return false;
   }
+  const int num_qubits = sequence_->get_num_qubits();
   const int num_gates = sequence_->get_num_gates();
   auto best_cost = cost_;
   auto best_kernels = std::move(kernels);
@@ -1485,8 +1486,47 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       shared_memory_gate_costs;
   // Repeat for |repeat| - 1 times.
   for (int i = 1; i < repeat; i++) {
+    // Permute the gates that is "closer" in qubits to recent gates.
+    std::vector<double> recent_qubit_weight(num_qubits, 0);
+    auto gate_chooser = [&recent_qubit_weight, &num_qubits](
+                            const std::vector<CircuitGate *> &gates) -> int {
+      int gate_location = 0;
+      double max_weight = 0;
+      static std::mt19937 rng(0);
+      std::vector<double> weights(gates.size(), 0);
+      for (int i = 0; i < (int)gates.size(); i++) {
+        weights[i] = 0;
+        for (auto qubit : gates[i]->get_qubit_indices()) {
+          weights[i] += recent_qubit_weight[qubit];
+        }
+        weights[i] /= gates[i]->gate->get_num_qubits();
+        if (weights[i] > max_weight) {
+          max_weight = weights[i];
+          gate_location = i;
+        }
+      }
+      for (int i = 0; i < (int)gates.size(); i++) {
+        // We still have some chance to choose each gate.
+        if (std::uniform_real_distribution<double>(0, 1)(rng) <
+            exp(weights[i] - max_weight) / (int)gates.size()) {
+          gate_location = i;
+        }
+      }
+      // choose |gate_location|, update weights
+      constexpr double kDiscountFactor = 0.9; // discount older weights
+      for (auto &weight : recent_qubit_weight) {
+        weight *= kDiscountFactor;
+      }
+      for (auto qubit : gates[gate_location]->get_qubit_indices()) {
+        // |qubit| gets 1, |qubit - 1| gets 0.5, |qubit +- 2| gets 0.25, ...
+        for (int j = 0; j < num_qubits; j++) {
+          recent_qubit_weight[j] += pow(0.5, abs(qubit - j));
+        }
+      }
+      return gate_location;
+    };
     sequence_ =
-        sequence_->random_gate_permutation(/*seed=*/i, gate_permutation_ptr);
+        sequence_->get_gate_permutation(gate_chooser, gate_permutation_ptr);
     // Permute the corresponding non-insular qubit indices and
     // shared-memory gate costs.
     if (!current_non_insular_qubit_indices.empty()) {
@@ -1513,6 +1553,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
                                         current_shared_memory_gate_costs)) {
       return false;
     }
+    // print_kernel_info();
     if (cost_ < best_cost) {
       best_cost = cost_;
       best_kernels = std::move(kernels);

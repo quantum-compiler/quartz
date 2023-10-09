@@ -1380,9 +1380,10 @@ CircuitSeq::random_gate_permutation(size_t seed) const {
     free_wires.clear();
 
     if (!free_gates.empty()) {
-      // Find a random free circuit_gate (gate).
-      int random_loc =
-          std::uniform_int_distribution<int>(0, (int)free_gates.size())(rng);
+      // Find a random free circuit_gate (gate)
+      // in [0, (int)free_gates.size() - 1].
+      int random_loc = std::uniform_int_distribution<int>(
+          0, (int)free_gates.size() - 1)(rng);
       CircuitGate *free_gate = free_gates[random_loc];
       free_gates.erase(free_gates.begin() + random_loc);
 

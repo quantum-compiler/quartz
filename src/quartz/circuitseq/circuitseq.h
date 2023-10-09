@@ -152,10 +152,15 @@ public:
    * each time.
    * @param seed The random seed used for randomness in this function.
    * Default is 0.
+   * @param result_permutation Store the result permutation in this array
+   * if it is not nullptr. Requires the size to be at least the number of
+   * quantum gates if not nullptr. The behavior is undefined if there is
+   * a non-quantum gate and this parameter is not nullptr. Default is nullptr.
    * @return The permuted circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
-  random_gate_permutation(size_t seed = 0) const;
+  random_gate_permutation(size_t seed = 0,
+                          int *result_permutation = nullptr) const;
   /**
    * Permute the qubits and input parameters.
    * @param qubit_permutation The qubit permutation. The size must be the

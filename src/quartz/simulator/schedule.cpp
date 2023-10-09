@@ -1471,13 +1471,46 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
                                       shared_memory_gate_costs)) {
     return false;
   }
+  const int num_gates = sequence_->get_num_gates();
   auto best_cost = cost_;
   auto best_kernels = std::move(kernels);
+  std::vector<int> gate_permutation(num_gates, 0);
+  int *gate_permutation_ptr =
+      (!non_insular_qubit_indices.empty() || !shared_memory_gate_costs.empty())
+          ? gate_permutation.data()
+          : nullptr;
+  std::vector<std::vector<int>> current_non_insular_qubit_indices =
+      non_insular_qubit_indices;
+  std::vector<KernelCostType> current_shared_memory_gate_costs =
+      shared_memory_gate_costs;
   // Repeat for |repeat| - 1 times.
   for (int i = 1; i < repeat; i++) {
-    sequence_ = sequence_->random_gate_permutation(/*seed=*/i);
-    if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
-                                        shared_memory_gate_costs)) {
+    sequence_ =
+        sequence_->random_gate_permutation(/*seed=*/i, gate_permutation_ptr);
+    // Permute the corresponding non-insular qubit indices and
+    // shared-memory gate costs.
+    if (!current_non_insular_qubit_indices.empty()) {
+      assert(current_non_insular_qubit_indices.size() == num_gates);
+      std::vector<std::vector<int>> permuted_indices(num_gates,
+                                                     std::vector<int>());
+      for (int j = 0; j < num_gates; j++) {
+        permuted_indices[gate_permutation[j]] =
+            current_non_insular_qubit_indices[j];
+      }
+      current_non_insular_qubit_indices = std::move(permuted_indices);
+    }
+    if (!current_shared_memory_gate_costs.empty()) {
+      assert(current_shared_memory_gate_costs.size() == num_gates);
+      std::vector<KernelCostType> permuted_costs(num_gates, KernelCostType());
+      for (int j = 0; j < num_gates; j++) {
+        permuted_costs[gate_permutation[j]] =
+            current_shared_memory_gate_costs[j];
+      }
+      current_shared_memory_gate_costs = std::move(permuted_costs);
+    }
+    if (!compute_kernel_schedule_simple(kernel_cost,
+                                        current_non_insular_qubit_indices,
+                                        current_shared_memory_gate_costs)) {
       return false;
     }
     if (cost_ < best_cost) {

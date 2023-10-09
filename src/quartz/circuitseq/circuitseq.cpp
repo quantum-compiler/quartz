@@ -1322,7 +1322,8 @@ bool CircuitSeq::to_canonical_representation() {
 }
 
 [[nodiscard]] std::unique_ptr<CircuitSeq>
-CircuitSeq::random_gate_permutation(size_t seed) const {
+CircuitSeq::random_gate_permutation(size_t seed,
+                                    int *result_permutation) const {
   auto output_seq = std::make_unique<CircuitSeq>(get_num_qubits(),
                                                  get_num_input_parameters());
   std::mt19937 rng(seed);
@@ -1332,6 +1333,8 @@ CircuitSeq::random_gate_permutation(size_t seed) const {
       output_seq->add_gate(circuit_gate.get());
     }
   }
+
+  int num_mapped_circuit_gates = output_seq->get_num_gates();
 
   std::unordered_map<CircuitWire *, int> wire_id;
   std::unordered_map<CircuitGate *, int> gate_id;
@@ -1385,6 +1388,11 @@ CircuitSeq::random_gate_permutation(size_t seed) const {
       int random_loc = std::uniform_int_distribution<int>(
           0, (int)free_gates.size() - 1)(rng);
       CircuitGate *free_gate = free_gates[random_loc];
+      if (result_permutation != nullptr) {
+        // Record the permutation.
+        result_permutation[gate_id[free_gate]] = num_mapped_circuit_gates;
+      }
+      num_mapped_circuit_gates++;
       free_gates.erase(free_gates.begin() + random_loc);
 
       output_seq->add_gate(free_gate);
@@ -1397,6 +1405,7 @@ CircuitSeq::random_gate_permutation(size_t seed) const {
       }
     }
   }
+  assert(num_mapped_circuit_gates == get_num_gates());
   return output_seq;
 }
 

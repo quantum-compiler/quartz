@@ -1492,6 +1492,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
                             const std::vector<CircuitGate *> &gates) -> int {
       int gate_location = 0;
       double max_weight = 0;
+      double total_exp_weight = 0;
       static std::mt19937 rng(0);
       std::vector<double> weights(gates.size(), 0);
       for (int i = 0; i < (int)gates.size(); i++) {
@@ -1500,17 +1501,21 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
           weights[i] += recent_qubit_weight[qubit];
         }
         weights[i] /= gates[i]->gate->get_num_qubits();
+        total_exp_weight += exp(weights[i]);
         if (weights[i] > max_weight) {
           max_weight = weights[i];
           gate_location = i;
         }
       }
+      // Choose gates[i] w.p. proportional to exp(weights[i]).
       for (int i = 0; i < (int)gates.size(); i++) {
         // We still have some chance to choose each gate.
-        if (std::uniform_real_distribution<double>(0, 1)(rng) <
-            exp(weights[i] - max_weight) / (int)gates.size()) {
+        if (std::uniform_real_distribution<double>(0, total_exp_weight)(rng) <=
+            exp(weights[i])) {
           gate_location = i;
+          break;
         }
+        total_exp_weight -= weights[i];
       }
       // choose |gate_location|, update weights
       constexpr double kDiscountFactor = 0.9; // discount older weights

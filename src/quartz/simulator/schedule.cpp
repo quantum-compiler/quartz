@@ -1466,10 +1466,18 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
     int repeat, const KernelCost &kernel_cost,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
-  assert(repeat >= 1);
-  if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
-                                      shared_memory_gate_costs)) {
-    return false;
+  assert(repeat >= 1 || repeat == -1);
+  // -1: temporary special case, use max weight instead of randomized
+  bool special = false;
+  if (repeat == -1) {
+    repeat = 2;
+    special = true;
+    cost_ = INFINITY;
+  } else {
+    if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
+                                        shared_memory_gate_costs)) {
+      return false;
+    }
   }
   const int num_qubits = sequence_->get_num_qubits();
   const int num_gates = sequence_->get_num_gates();
@@ -1492,8 +1500,9 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
     constexpr double kDiscountFactor = 0.9;
     // Permute the gates that is "closer" in qubits to recent gates.
     std::vector<double> recent_qubit_weight(num_qubits, 0);
-    auto gate_chooser = [&recent_qubit_weight, &num_qubits, &kDiscountFactor](
-                            const std::vector<CircuitGate *> &gates) -> int {
+    auto gate_chooser =
+        [&recent_qubit_weight, &num_qubits, &kDiscountFactor,
+         &special](const std::vector<CircuitGate *> &gates) -> int {
       int gate_location = 0;
       double max_weight = 0; // not used
       double total_exp_weight = 0;
@@ -1511,14 +1520,16 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
           gate_location = i;
         }
       }
-      // Choose gates[i] w.p. proportional to exp(weights[i]).
-      for (int i = 0; i < (int)gates.size(); i++) {
-        if (std::uniform_real_distribution<double>(0, total_exp_weight)(rng) <=
-            exp(weights[i])) {
-          gate_location = i;
-          break;
+      if (!special) {
+        // Choose gates[i] w.p. proportional to exp(weights[i]).
+        for (int i = 0; i < (int)gates.size(); i++) {
+          if (std::uniform_real_distribution<double>(0, total_exp_weight)(
+                  rng) <= exp(weights[i])) {
+            gate_location = i;
+            break;
+          }
+          total_exp_weight -= weights[i];
         }
-        total_exp_weight -= weights[i];
       }
       // choose |gate_location|, update weights
       for (auto &weight : recent_qubit_weight) {
@@ -2002,10 +2013,13 @@ get_schedules(const CircuitSeq &sequence,
         // The last stage. We need to execute all the remaining single-qubit
         // gates.
         if (last_gate_index[qubit] == -1) {
-          std::cerr << "Qubit " << qubit << " is not entangled." << std::endl;
-          assert(false);
+          std::cerr << "Warning: qubit " << qubit
+                    << " is not entangled. Consider not including it in the "
+                       "simulation?"
+                    << std::endl;
+        } else {
+          need_to_attach = true;
         }
-        need_to_attach = true;
       }
       if (!need_to_attach && !local_in_next_stage[qubit]) {
         // We need to execute any single-qubit gate
@@ -2123,12 +2137,13 @@ get_schedules(const CircuitSeq &sequence,
   num_stage = -1;
   for (auto &schedule : result) {
     num_stage++;
-    if (use_simple_dp_times > 0) {
+    if (use_simple_dp_times > 0 || use_simple_dp_times == -1) {
       schedule.compute_kernel_schedule_simple_repeat(
           use_simple_dp_times, kernel_cost,
           non_insular_qubit_indices[num_stage],
           shared_memory_gate_costs[num_stage]);
     } else {
+      assert(use_simple_dp_times == 0);
       schedule.compute_kernel_schedule(kernel_cost,
                                        non_insular_qubit_indices[num_stage],
                                        shared_memory_gate_costs[num_stage]);

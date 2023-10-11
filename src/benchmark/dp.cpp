@@ -39,7 +39,13 @@ int main() {
   KernelCost kernel_cost(
       /*fusion_kernel_costs=*/{0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
       /*shared_memory_init_cost=*/6,
-      /*shared_memory_gate_cost=*/[](quartz::GateType type) { if (type == quartz::GateType::swap) return 1000.0; else return 0.5; },
+      /*shared_memory_gate_cost=*/
+      [](quartz::GateType type) {
+        if (type == quartz::GateType::swap)
+          return 1000.0;
+        else
+          return 0.5;
+      },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   FILE *fout = fopen("dp_result.csv", "w");
   for (auto circuit : circuit_names) {
@@ -58,11 +64,13 @@ int main() {
         if (local_q > num_q) {
           continue;
         }
+        auto t0 = std::chrono::steady_clock::now();
         std::vector<std::vector<int>> local_qubits;
         local_qubits = compute_local_qubits_with_ilp(
             *seq, local_q, &ctx, &interpreter, answer_start_with);
         int ilp_result = (int)local_qubits.size();
         std::cout << local_qubits.size() << " stages." << std::endl;
+        auto t1 = std::chrono::steady_clock::now();
         auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                        /*attach_single_qubit_gates=*/true,
                                        /*use_simple_dp_times=*/1);
@@ -73,6 +81,18 @@ int main() {
         }
         fprintf(fout, "%.1f, ", total_cost);
         fflush(fout);
+        auto t2 = std::chrono::steady_clock::now();
+        schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
+                                  /*attach_single_qubit_gates=*/true,
+                                  /*use_simple_dp_times=*/-1);
+        total_cost = 0;
+        for (auto &schedule : schedules) {
+          // schedule.print_kernel_info();
+          total_cost += schedule.cost_;
+        }
+        fprintf(fout, "%.1f, ", total_cost);
+        fflush(fout);
+        auto t3 = std::chrono::steady_clock::now();
         schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                   /*attach_single_qubit_gates=*/true,
                                   /*use_simple_dp_times=*/10);
@@ -83,6 +103,7 @@ int main() {
         }
         fprintf(fout, "%.1f, ", total_cost);
         fflush(fout);
+        auto t4 = std::chrono::steady_clock::now();
         schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                   /*attach_single_qubit_gates=*/true,
                                   /*use_simple_dp_times=*/100);
@@ -93,6 +114,7 @@ int main() {
         }
         fprintf(fout, "%.1f, ", total_cost);
         fflush(fout);
+        auto t5 = std::chrono::steady_clock::now();
         schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                   /*attach_single_qubit_gates=*/true,
                                   /*use_simple_dp_times=*/0);
@@ -103,6 +125,28 @@ int main() {
         }
         fprintf(fout, "%.1f, ", total_cost);
         fflush(fout);
+        auto t6 = std::chrono::steady_clock::now();
+        fprintf(fout, "%.3f, %.3f, %.3f, %.3f, %.3f",
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t2 - t1)
+                        .count() /
+                    1000.0,
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t3 - t2)
+                        .count() /
+                    1000.0,
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t4 - t3)
+                        .count() /
+                    1000.0,
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t5 - t4)
+                        .count() /
+                    1000.0,
+                (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    t6 - t5)
+                        .count() /
+                    1000.0);
         answer_start_with = ilp_result;
       }
       fprintf(fout, "\n");

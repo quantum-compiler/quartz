@@ -15,7 +15,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 class ActorCritic(nn.Module):
     def __init__(
         self,
-        gnn_type: str = 'QGIN',
+        gnn_type: str = "QGIN",
         num_gate_types: int = 20,
         gate_type_embed_dim: int = 16,
         gnn_num_layers: int = 6,
@@ -23,12 +23,12 @@ class ActorCritic(nn.Module):
         gnn_output_dim: int = 32,
         gin_num_mlp_layers: int = 2,
         gin_learn_eps: bool = False,
-        gin_neighbor_pooling_type: str = 'sum',  # sum', 'mean', 'max'
+        gin_neighbor_pooling_type: str = "sum",  # sum', 'mean', 'max'
         gin_graph_pooling_type: str = None,  # 'sum', 'mean', 'max'
         actor_hidden_size: int = 32,
         critic_hidden_size: int = 32,
         action_dim: int = 32,
-        device: torch.device = 'cpu',
+        device: torch.device = "cpu",
         gnn: nn.Module = None,
         actor: nn.Module = None,
         critic: nn.Module = None,
@@ -51,7 +51,7 @@ class ActorCritic(nn.Module):
 
         self.gnn_num_layers = gnn_num_layers
         self.device = device
-        if gnn_type.lower() == 'QGNN'.lower():
+        if gnn_type.lower() == "QGNN".lower():
             self.gnn = QGNN(
                 gnn_num_layers,
                 num_gate_types,
@@ -60,7 +60,7 @@ class ActorCritic(nn.Module):
                 gnn_hidden_dim,
             )
             gnn_output_dim = gnn_hidden_dim
-        elif gnn_type.lower() == 'QGIN'.lower():
+        elif gnn_type.lower() == "QGIN".lower():
             self.gnn = QGIN(
                 num_layers=gnn_num_layers,
                 num_mlp_layers=gin_num_mlp_layers,
@@ -73,14 +73,18 @@ class ActorCritic(nn.Module):
                 graph_pooling_type=gin_graph_pooling_type,
             )
         else:
-            raise NotImplementedError(f'Unknown GNN type {gnn_type}.')
+            raise NotImplementedError(f"Unknown GNN type {gnn_type}.")
 
-        self.actor = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
+        ################################################################################
+        # self.actor = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
+        self.actor_xfer = MLP(2, gnn_output_dim, actor_hidden_size, action_dim)
+        self.actor_gate = MLP(2, gnn_output_dim, actor_hidden_size, 1)
+        ################################################################################
         self.critic = MLP(2, gnn_output_dim, critic_hidden_size, 1)
 
     def ddp_model(self) -> ActorCritic:
         """make ddp verison instances for each sub-model"""
-        if self.device.type == 'cuda':
+        if self.device.type == "cuda":
             _ddp_model = ActorCritic(
                 device=self.device,
                 gnn=DDP(self.gnn, device_ids=[self.device]),
@@ -88,7 +92,9 @@ class ActorCritic(nn.Module):
                 critic=DDP(self.critic, device_ids=[self.device]),
             )
         else:
-            _ddp_model = ActorCritic(device=self.device, gnn=self.gnn, actor=self.actor, critic=self.critic)
+            _ddp_model = ActorCritic(
+                device=self.device, gnn=self.gnn, actor=self.actor, critic=self.critic
+            )
         return _ddp_model
 
     def forward(self, x: torch.Tensor | dgl.DGLGraph, callee: str) -> torch.Tensor:
@@ -98,14 +104,20 @@ class ActorCritic(nn.Module):
             Return: torch.Tensor (num_nodes, gnn_output_dim)
             """
             return self.gnn(x)
-        elif callee == self.actor_name():
-            """
-            Evaluate actions for a node
-            Args:
-                x: (B, gnn_output_dim)
-            Return: torch.Tensor (B, action_dim)
-            """
-            return self.actor(x)
+        ################################################################################
+        # elif callee == self.actor_name():
+        #     """
+        #     Evaluate actions for a node
+        #     Args:
+        #         x: (B, gnn_output_dim)
+        #     Return: torch.Tensor (B, action_dim)
+        #     """
+        #     return self.actor(x)
+        elif callee == self.actor_xfer_name():
+            return self.actor_xfer(x)
+        elif callee == self.actor_gate_name():
+            return self.actor_gate(x)
+        ################################################################################
         elif callee == self.critic_name():
             """
             Evaluate nodes in graphs
@@ -115,16 +127,27 @@ class ActorCritic(nn.Module):
             """
             return self.critic(x)
         else:
-            raise NotImplementedError(f'Unexpected callee name: {callee}')
+            raise NotImplementedError(f"Unexpected callee name: {callee}")
 
     @staticmethod
     def gnn_name() -> str:
-        return 'gnn'
+        return "gnn"
+
+    ################################################################################
+    # @staticmethod
+    # def actor_name() -> str:
+    #     return "actor"
 
     @staticmethod
-    def actor_name() -> str:
-        return 'actor'
+    def actor_xfer_name() -> str:
+        return "actor_xfer"
+
+    @staticmethod
+    def actor_gate_name() -> str:
+        return "actor_gate"
+
+    ################################################################################
 
     @staticmethod
     def critic_name() -> str:
-        return 'critic'
+        return "critic"

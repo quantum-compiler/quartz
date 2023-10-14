@@ -70,7 +70,7 @@ class Observer:
 
         graph = init_graph
         graph_str = init_state_str
-        info: Dict[str, Any] = {'start': True}
+        info: Dict[str, Any] = {"start": True}
         last_eps_end: int = -1
         for i_step in range(max_eps_len):
             """get action (action_node, xfer_dist) from agent"""
@@ -137,12 +137,12 @@ class Observer:
                 copy.deepcopy(info),
             )
             exp_list.append(exp)
-            info['start'] = False
+            info["start"] = False
             if game_over:
                 if self.batch_inference:
                     graph = init_graph
                     graph_str = init_state_str
-                    info['start'] = True
+                    info["start"] = True
                     last_eps_end = i_step
                 else:
                     break
@@ -219,8 +219,8 @@ class PPOAgent:
 
         self.graph_buffers: List[GraphBuffer] = [
             GraphBuffer(
-                input_graph['name'],
-                input_graph['qasm'],
+                input_graph["name"],
+                input_graph["qasm"],
                 self.cost_type,
                 self.device,
                 vmem_perct_limit=vmem_perct_limit,
@@ -274,7 +274,7 @@ class PPOAgent:
             self.states_buf[obs_id] = dgl_graph
         else:
             raise Exception(
-                f'Unexpected: self.states_buf[{obs_id}] is not None! Duplicate assignment occurs!'
+                f"Unexpected: self.states_buf[{obs_id}] is not None! Duplicate assignment occurs!"
             )
 
         with self.lock:  # avoid data race on self.pending_states
@@ -358,29 +358,29 @@ class PPOAgent:
         info_dict: Dict[str, float | int] = {}
         for buffer in self.graph_buffers:
             best_graph_info: Dict[str, int] = {
-                'cost': get_cost(buffer.best_graph, self.cost_type),
-                'gate_count': buffer.best_graph.gate_count,
-                'cx_count': buffer.best_graph.cx_count,
-                'depth': buffer.best_graph.depth,
+                "cost": get_cost(buffer.best_graph, self.cost_type),
+                "gate_count": buffer.best_graph.gate_count,
+                "cx_count": buffer.best_graph.cx_count,
+                "depth": buffer.best_graph.depth,
             }
             for metric_name, value in best_graph_info.items():
-                info_dict[f'{buffer.name}_best_graph_{metric_name}'] = value
+                info_dict[f"{buffer.name}_best_graph_{metric_name}"] = value
 
             eps_len_info = buffer.eps_len_info()
             for k, v in eps_len_info.items():
-                info_dict[f'{buffer.name}_{k}'] = v
+                info_dict[f"{buffer.name}_{k}"] = v
 
             rewards_info = buffer.rewards_info()
             for k, v in rewards_info.items():
-                info_dict[f'{buffer.name}_{k}'] = v
+                info_dict[f"{buffer.name}_{k}"] = v
 
             cost_info = buffer.cost_info()
             for k, v in cost_info.items():
-                info_dict[f'{buffer.name}_{k}'] = v
+                info_dict[f"{buffer.name}_{k}"] = v
 
             basic_info = buffer.basic_info()
             for k, v in basic_info.items():
-                info_dict[f'{buffer.name}_{k}'] = v
+                info_dict[f"{buffer.name}_{k}"] = v
 
         # end for
 
@@ -392,7 +392,7 @@ class PPOAgent:
         best_gc: int,
         exp_seq: List[Tuple[SerializableExperience, quartz.PyGraph, quartz.PyGraph]],
     ) -> str:
-        output_dir = os.path.join(self.output_dir, name, f'{best_gc}_{self.id}')
+        output_dir = os.path.join(self.output_dir, name, f"{best_gc}_{self.id}")
         os.makedirs(output_dir)
         """make a s_exp to output the starting graph"""
         first_s_exp = SerializableExperience.new_empty()
@@ -403,10 +403,10 @@ class PPOAgent:
         """output the seq"""
         for i_step, (s_exp, graph, next_graph) in enumerate(exp_seq):
             fname = (
-                f'{i_step}_{get_cost(next_graph, self.cost_type)}_{int(s_exp.reward)}_'
-                f'{s_exp.action.node}_{s_exp.action.xfer}.qasm'
+                f"{i_step}_{get_cost(next_graph, self.cost_type)}_{int(s_exp.reward)}_"
+                f"{s_exp.action.node}_{s_exp.action.xfer}.qasm"
             )
-            with open(os.path.join(output_dir, fname), 'w') as f:
+            with open(os.path.join(output_dir, fname), "w") as f:
                 if not isinstance(s_exp.next_state, str):
                     s_exp.next_state = s_exp.next_state.to_qasm_str()
 
@@ -494,7 +494,7 @@ class PPOAgent:
                 graph_cost = get_cost(graph, self.cost_type)
                 next_graph_cost = get_cost(next_graph, self.cost_type)
                 """collect info"""
-                if s_exp.info['start']:
+                if s_exp.info["start"]:
                     init_graph = graph
                     init_graph_cost = graph_cost
                     exp_seq = []
@@ -520,13 +520,13 @@ class PPOAgent:
                     seq_path = self.output_opt_path(
                         graph_buffer.name, next_graph_cost, exp_seq
                     )
-                    msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
-                    printfl(f'\n{msg}\n')
+                    msg = f"Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} ."
+                    printfl(f"\n{msg}\n")
                     if (
-                        self.id == 0 and os.getenv('ALERT_BETTER') == '1'
+                        self.id == 0 and os.getenv("ALERT_BETTER") == "1"
                     ):  # TODO(not going to do) Colin multi-processing logging
                         wandb.alert(
-                            title='Better graph is found!',
+                            title="Better graph is found!",
                             text=msg,
                             level=wandb.AlertLevel.INFO,
                             wait_duration=0,
@@ -553,17 +553,17 @@ class PPOAgent:
 
     def sync_best_graph(self) -> None:
         """broadcast the best graph of each buffer to other agents"""
-        sync_dir = os.path.join(self.output_dir, 'sync_dir')
+        sync_dir = os.path.join(self.output_dir, "sync_dir")
         os.makedirs(sync_dir, exist_ok=True)
         best_info = [
             {
-                'name': buffer.name,
-                'best_cost': get_cost(buffer.best_graph, self.cost_type),
-                'qasm': buffer.best_graph.to_qasm_str(),
+                "name": buffer.name,
+                "best_cost": get_cost(buffer.best_graph, self.cost_type),
+                "qasm": buffer.best_graph.to_qasm_str(),
             }
             for buffer in self.graph_buffers
         ]
-        with open(os.path.join(sync_dir, f'best_info_{self.id}.json'), 'w') as f:
+        with open(os.path.join(sync_dir, f"best_info_{self.id}.json"), "w") as f:
             json.dump(best_info, fp=f, indent=2)
         # printfl(f'Agent {self.id} : waiting for others to sync')
         dist.barrier()
@@ -571,7 +571,7 @@ class PPOAgent:
         """read in other agents' results"""
         for r in range(self.num_agents):
             if r != self.id:
-                self.load_best_info(os.path.join(sync_dir, f'best_info_{r}.json'))
+                self.load_best_info(os.path.join(sync_dir, f"best_info_{r}.json"))
             # end if r
         # end for r
 
@@ -582,13 +582,13 @@ class PPOAgent:
         for i in range(len(self.graph_buffers)):
             buffer = self.graph_buffers[i]
             info = best_info[i]
-            assert buffer.name == info['name'], f'{buffer.name = }, {info["name"] = }'
-            if info['best_cost'] < get_cost(buffer.best_graph, self.cost_type):
-                graph = qtz.qasm_to_graph(info['qasm'])
+            assert buffer.name == info["name"], f'{buffer.name = }, {info["name"] = }'
+            if info["best_cost"] < get_cost(buffer.best_graph, self.cost_type):
+                graph = qtz.qasm_to_graph(info["qasm"])
                 buffer.push_back(graph)
                 buffer.best_graph = graph
                 printfl(
-                    f'  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}'
+                    f"  Agent {self.id} : read in new best graph ({get_cost(buffer.best_graph, self.cost_type)}) from {best_info_path}"
                 )
                 if self.output_full_seq:
                     buffer.all_graphs = {
@@ -608,8 +608,8 @@ class PPOAgent:
             best_g = buffer.best_graph
             best_cost = get_cost(best_g, self.cost_type)
             best_qasm = best_g.to_qasm_str()
-            best_path = os.path.join(output_dir, f'{buffer.name}.qasm')
-            with open(best_path, 'w') as f:
+            best_path = os.path.join(output_dir, f"{buffer.name}.qasm")
+            with open(best_path, "w") as f:
                 f.write(best_qasm)
 
     @torch.no_grad()
@@ -628,7 +628,29 @@ class PPOAgent:
         # (batch_num_nodes, embed_dim)
         b_node_embeds: torch.Tensor = self.ac_net.gnn(b_state)
         # (batch_num_nodes, )
-        b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
+        ################################################################################
+        # b_node_values: torch.Tensor = self.ac_net.critic(b_node_embeds).squeeze()
+        b_node_values: torch.Tensor = self.ac_net.actor_gate(b_node_embeds).squeeze()
+        b_graph_embeds: torch.Tensor = torch.zeros(
+            size=(len(dgl_graphs), b_node_embeds.shape[-1])
+        )
+        num_nodes_prefix_sum: torch.LongTensor = torch.cumsum(num_nodes)
+        for i in range(len(dgl_graphs)):
+            if i == 0:
+                b_graph_embeds[i], _ = torch.max(
+                    b_node_embeds[num_nodes_prefix_sum[0, num_nodes_prefix_sum[0]]]
+                )
+            else:
+                b_graph_embeds[i], _ = torch.max(
+                    b_node_embeds[
+                        num_nodes_prefix_sum[
+                            num_nodes_prefix_sum[i - 1], num_nodes_prefix_sum[i]
+                        ]
+                    ],
+                    dim=0,
+                )
+        b_graph_values: torch.Tensor = self.ac_net.critic(b_graph_embeds).squeeze()
+        ################################################################################
         # list with length num_graphs; each member is a tensor of node values in a graph
         node_values_list: List[torch.Tensor] = torch.split(
             b_node_values, num_nodes.tolist()
@@ -641,13 +663,16 @@ class PPOAgent:
             padding_value=-math.inf,
         )
         # (num_graphs, )
-        temperature: torch.Tensor
-        if not self.softmax_temp_en:
-            temperature = torch.ones(1).to(self.device)
-        else:
-            temperature = 1 / (
-                torch.log(self.hit_rate * (num_nodes - 1) / (1 - self.hit_rate))
-            )
+        ################################################################################
+        # temperature: torch.Tensor
+        # if not self.softmax_temp_en:
+        #     temperature = torch.ones(1).to(self.device)
+        # else:
+        #     temperature = 1 / (
+        #         torch.log(self.hit_rate * (num_nodes - 1) / (1 - self.hit_rate))
+        #     )
+        temperature = torch.ones(1).to(self.device)
+        ################################################################################
         b_softmax_node_values_pad = F.softmax(
             b_node_values_pad / temperature.unsqueeze(1), dim=-1
         )
@@ -705,16 +730,16 @@ class PPOAgent:
     def output_seq(
         self, name: str, best_cost: int, seq: List[Tuple[quartz.PyGraph, Action, float]]
     ) -> str:
-        output_dir = os.path.join(self.output_dir, name, f'{best_cost}_{self.id}')
+        output_dir = os.path.join(self.output_dir, name, f"{best_cost}_{self.id}")
         os.makedirs(output_dir)
         for i_step, (graph, action, reward) in enumerate(seq):
             # NOTE: action here is what action to apply on this graph to get the next graph
             fname = (
-                f'{i_step}_{get_cost(graph, self.cost_type)}_{int(reward)}_'
-                f'{action.node}_{action.xfer}.qasm'
+                f"{i_step}_{get_cost(graph, self.cost_type)}_{int(reward)}_"
+                f"{action.node}_{action.xfer}.qasm"
             )
             qasm = graph.to_qasm_str()
-            with open(os.path.join(output_dir, fname), 'w') as f:
+            with open(os.path.join(output_dir, fname), "w") as f:
                 f.write(qasm)
         return output_dir
 
@@ -726,7 +751,7 @@ class PPOAgent:
         best_cost: int,
     ) -> str:
         output_dir = os.path.join(
-            self.output_dir, name, f'fullseq_{best_cost}_{self.id}'
+            self.output_dir, name, f"fullseq_{best_cost}_{self.id}"
         )
         os.makedirs(output_dir)
         graph = best_graph
@@ -734,10 +759,10 @@ class PPOAgent:
             info: AllGraphDictValue = all_graphs[graph]
             # NOTE: action here is how this graph is got from its predecessors
             fname = (
-                f'{info.dist}_{info.cost}_{info.action.node}_{info.action.xfer}.qasm'
+                f"{info.dist}_{info.cost}_{info.action.node}_{info.action.xfer}.qasm"
             )
             qasm = graph.to_qasm_str()
-            with open(os.path.join(output_dir, fname), 'w') as f:
+            with open(os.path.join(output_dir, fname), "w") as f:
                 f.write(qasm)
             graph = info.pre_graph
         return output_dir
@@ -784,7 +809,7 @@ class PPOAgent:
         # end for
         """communicate with other ranks to get max of max_eps_len_for_all"""
         # max_eps_len_all_ranks = torch.zeros(self.num_agents).to(self.device)
-        max_eps_len_all_ranks = torch.zeros(self.num_agents).to('cuda:0')
+        max_eps_len_all_ranks = torch.zeros(self.num_agents).to("cuda:0")
         max_eps_len_all_ranks[self.id] = max_eps_len_for_all
         for r in range(self.num_agents):
             dist.broadcast(max_eps_len_all_ranks[r], r)
@@ -955,20 +980,20 @@ class PPOAgent:
                         seq_path = self.output_seq(
                             graph_buffer.name, next_graph_cost, seq
                         )
-                        msg = f'Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} .'
-                        printfl(f'\n{msg}\n')
+                        msg = f"Agent {self.id} : {graph_buffer.name}: {cur_best_cost} -> {next_graph_cost} ! Seq saved to {seq_path} ."
+                        printfl(f"\n{msg}\n")
                         if (
                             self.id == 0
                         ):  # TODO(not going to do) multi-processing logging
                             wandb.alert(
-                                title='Better graph is found!',
+                                title="Better graph is found!",
                                 text=msg,
                                 level=wandb.AlertLevel.INFO,
                                 wait_duration=0,
                             )  # send alert to slack
                         graph_buffer.best_graph = next_graph
                         if self.output_full_seq:
-                            printfl(f'Agent {self.id}: saving full seq...')
+                            printfl(f"Agent {self.id}: saving full seq...")
                             full_seq_path = self.output_full_opt_seq(
                                 graph_buffer.all_graphs,
                                 graph_buffer.name,
@@ -976,7 +1001,7 @@ class PPOAgent:
                                 next_graph_cost,
                             )
                             printfl(
-                                f'Agent {self.id}: full seq saved to {full_seq_path}'
+                                f"Agent {self.id}: full seq saved to {full_seq_path}"
                             )
                     # end if better
                 # end if

@@ -680,20 +680,29 @@ class PPOAgent:
         #     b_node_values_pad,
         #     torch.max(b_node_values_pad, dim=-1, keepdim=True).values
         # ).float()
-        b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
+        # b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
+        node_dists: Categorical = Categorical(b_softmax_node_values_pad)
+        b_sampled_nodes = node_dists.sample()
         action_nodes: List[int] = b_sampled_nodes.tolist()
+        action_node_logps: torch.Tensor = node_dists.log_prob(action_nodes)
+        # action_node_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
         """collect embeddings of sampled nodes"""
         # (num_graphs, )
-        node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(
-            self.device
-        )
-        node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-        sampled_node_b_ids = b_sampled_nodes + node_offsets
-        # (num_graphs, embed_dim)
-        sampled_node_embeds = b_node_embeds[sampled_node_b_ids]
+        ################################################################################
+        # node_offsets = torch.zeros(b_sampled_nodes.shape[0], dtype=torch.long).to(
+        #     self.device
+        # )
+        # node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
+        # sampled_node_b_ids = b_sampled_nodes + node_offsets
+        # # (num_graphs, embed_dim)
+        # sampled_node_embeds = b_node_embeds[sampled_node_b_ids]
+        ################################################################################
         """use Actor to evaluate xfers for sampled nodes"""
         # (num_graphs, action_dim)
-        xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
+        ################################################################################
+        # xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
+        xfer_logits: torch.Tensor = self.ac_net.actor(b_graph_embeds)
+        ################################################################################
         """sample action_xfer with mask"""
         av_xfer_masks = torch.zeros_like(
             xfer_logits, dtype=torch.bool
@@ -723,7 +732,9 @@ class PPOAgent:
             action_nodes,
             action_xfers.tolist(),
             action_node_values,
+            b_graph_values,
             action_xfer_logps.tolist(),
+            action_node_logps.tolist(),
             av_xfer_masks.cpu(),
         )
 

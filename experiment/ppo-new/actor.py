@@ -731,8 +731,8 @@ class PPOAgent:
             dgl_graphs,
             action_nodes,
             action_xfers.tolist(),
-            action_node_values,
-            b_graph_values,
+            # action_node_values,
+            b_graph_values.tolist(),
             action_xfer_logps.tolist(),
             action_node_logps.tolist(),
             av_xfer_masks.cpu(),
@@ -834,22 +834,36 @@ class PPOAgent:
         graph_seqs: List[List[quartz.PyGraph]] = [[] for _ in range(num_eps)]
         last_eps_ends: List[int] = [-1 for _ in range(num_eps)]
         for i_step in range(max_eps_len_for_all):
+            ################################################################################
             """inference by mini-batches"""
             dgl_graphs: List[dgl.DGLGraph] = []
             action_nodes: List[int] = []
             action_xfers: List[int] = []
-            action_node_values: List[float] = []
+            graph_values: List[float] = []
             action_xfer_logps: List[float] = []
+            action_node_logps: List[float] = []
             av_xfer_masks: torch.BoolTensor = cast(
                 torch.BoolTensor, torch.zeros(0, dtype=torch.bool)
             )
             for inf_batch_start in range(0, num_eps, agent_batch_size):
+                # (
+                #     mb_dgl_graphs,
+                #     mb_action_nodes,
+                #     mb_action_xfers,
+                #     mb_node_values,
+                #     mb_logps,
+                #     mb_av_xfer_masks,
+                # ) = self.select_action_for_self(
+                #     cur_graphs[inf_batch_start : inf_batch_start + agent_batch_size]
+                # )
+
                 (
                     mb_dgl_graphs,
                     mb_action_nodes,
                     mb_action_xfers,
-                    mb_node_values,
-                    mb_logps,
+                    mb_graph_values,
+                    mb_xfer_logps,
+                    mb_node_logps,
                     mb_av_xfer_masks,
                 ) = self.select_action_for_self(
                     cur_graphs[inf_batch_start : inf_batch_start + agent_batch_size]
@@ -857,12 +871,14 @@ class PPOAgent:
                 dgl_graphs += mb_dgl_graphs
                 action_nodes += mb_action_nodes
                 action_xfers += mb_action_xfers
-                action_node_values += mb_node_values
-                action_xfer_logps += mb_logps
+                graph_values += mb_graph_values
+                action_xfer_logps += mb_xfer_logps
+                action_node_logps += mb_node_logps
                 av_xfer_masks = cast(
                     torch.BoolTensor, torch.cat([av_xfer_masks, mb_av_xfer_masks])
                 )
             # end for infer_batch
+            ################################################################################
             """apply actions"""
             for i_eps in range(num_eps):
                 eps_list = eps_lists[i_eps]
@@ -934,22 +950,25 @@ class PPOAgent:
                 eps_list.next_nodes.append(next_nodes)
 
                 # collect cur_graph info
-                if self.subgraph_opt:
-                    dgl_graphs[i_eps], new_indices = dgl.khop_out_subgraph(
-                        dgl_graphs[i_eps],
-                        action.node,
-                        k=self.ac_net.gnn_num_layers,
-                    )
-                    action.node = new_indices[0]
+                ################################################################################
+                # if self.subgraph_opt:
+                #     dgl_graphs[i_eps], new_indices = dgl.khop_out_subgraph(
+                #         dgl_graphs[i_eps],
+                #         action.node,
+                #         k=self.ac_net.gnn_num_layers,
+                #     )
+                #     action.node = new_indices[0]
+                ################################################################################
                 eps_list.state.append(dgl_graphs[i_eps])
                 eps_list.action.append(action)
 
                 # collect other info
                 eps_list.reward.append(reward)
                 eps_list.game_over.append(game_over)
-                eps_list.node_value.append(action_node_values[i_eps])
+                eps_list.state_value.append(graph_values[i_eps])
                 eps_list.xfer_mask.append(cast(torch.BoolTensor, av_xfer_masks[i_eps]))
                 eps_list.xfer_logprob.append(action_xfer_logps[i_eps])
+                eps_list.node_logprob.append(action_node_logps[i_eps])
                 eps_list.info.append({})
 
                 """collect info for graph buffer"""

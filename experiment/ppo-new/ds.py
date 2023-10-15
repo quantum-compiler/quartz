@@ -98,10 +98,11 @@ class ExperienceList:
     reward: List[float]
     next_state: List[str | dgl.DGLGraph]
     game_over: List[bool]
-    node_value: List[float]
+    state_value: List[float]
     next_nodes: List[List[int]]
     xfer_mask: List[torch.BoolTensor]
     xfer_logprob: List[float]
+    node_logprob: List[float]
     info: List[Any]
 
     def __len__(self) -> int:
@@ -147,10 +148,11 @@ class ExperienceList:
             self.reward,
             self.next_state,
             self.game_over,
-            self.node_value,
+            self.state_value,
             self.next_nodes,
             self.xfer_mask,
             self.xfer_logprob,
+            self.node_logprob,
             self.info,
         ) = shuffle_lists(
             self.state,
@@ -158,10 +160,11 @@ class ExperienceList:
             self.reward,
             self.next_state,
             self.game_over,
-            self.node_value,
+            self.state_value,
             self.next_nodes,
             self.xfer_mask,
             self.xfer_logprob,
+            self.node_logprob,
             self.info,
         )
 
@@ -203,10 +206,11 @@ class TrainExpList(ExperienceList):
             self.reward,
             self.next_state,
             self.game_over,
-            self.node_value,
+            self.state_value,
             self.next_nodes,
             self.xfer_mask,
             self.xfer_logprob,
+            self.node_logprob,
             self.info,
             self.target_values,
             self.advantages,
@@ -216,10 +220,11 @@ class TrainExpList(ExperienceList):
             self.reward,
             self.next_state,
             self.game_over,
-            self.node_value,
+            self.state_value,
             self.next_nodes,
             self.xfer_mask,
             self.xfer_logprob,
+            self.node_logprob,
             self.info,
             self.target_values,
             self.advantages,

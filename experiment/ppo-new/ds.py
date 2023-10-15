@@ -44,10 +44,11 @@ class Experience:
     reward: float
     next_state: quartz.PyGraph
     game_over: bool
-    node_value: float
+    state_value: float
     next_nodes: List[int]
     xfer_mask: torch.BoolTensor
     xfer_logprob: float
+    node_logprob: float
     info: Any
 
     def __iter__(self) -> Iterator:
@@ -59,11 +60,11 @@ class Experience:
 
     def __str__(self) -> str:
         s = (
-            f'{self.state} (gate_count = {self.state.gate_count}) '
-            f'{self.next_state} (gate_count = {self.next_state.gate_count}) \n'
-            f'{self.action}  reward = {self.reward}  game_over = {self.game_over}  '
-            f'next_nodes = {self.next_nodes}  \n'
-            f'xfer_mask = {self.xfer_mask}  xfer_logprob = {self.xfer_logprob}  info = {self.info}'
+            f"{self.state} (gate_count = {self.state.gate_count}) "
+            f"{self.next_state} (gate_count = {self.next_state.gate_count}) \n"
+            f"{self.action}  reward = {self.reward}  game_over = {self.game_over}  "
+            f"next_nodes = {self.next_nodes}  \n"
+            f"xfer_mask = {self.xfer_mask}  xfer_logprob = {self.xfer_logprob}  info = {self.info}"
         )
         return s
 
@@ -111,6 +112,21 @@ class ExperienceList:
     def __iter__(self) -> Iterator:
         return iter([getattr(self, field.name) for field in fields(self)])
 
+    def __getitem__(self, idx: int) -> Experience:
+        return Experience(
+            self.state[idx],
+            self.action[idx],
+            self.reward[idx],
+            self.next_state[idx],
+            self.game_over[idx],
+            self.state_value[idx],
+            self.next_nodes[idx],
+            self.xfer_mask[idx],
+            self.xfer_logprob[idx],
+            self.node_logprob[idx],
+            self.info[idx],
+        )
+
     def items(self):
         return {field.name: getattr(self, field.name) for field in fields(self)}.items()
 
@@ -139,7 +155,7 @@ class ExperienceList:
         for name, field in self.items():
             assert len(field) == len(
                 self
-            ), f'{len(name)} = len({name}) != len(self) = {len(self)})'
+            ), f"{len(name)} = len({name}) != len(self) = {len(self)})"
 
     def shuffle(self) -> None:
         (
@@ -172,7 +188,7 @@ class ExperienceList:
         self,
         start_pos: int = 0,
         batch_size: int = 1,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
     ) -> BatchedExperience:
         exps = BatchedExperience.new_empty()
         if start_pos < len(self):
@@ -182,10 +198,11 @@ class ExperienceList:
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device)  # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
             exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device)  # type: ignore
-            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
+            exps.state_value = torch.Tensor(self.state_value[sc]).to(device)
             exps.next_nodes = [torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc]]  # type: ignore
             exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device)  # type: ignore
             exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
+            exps.node_logprob = torch.Tensor(self.node_logprob[sc]).to(device)
 
         return exps
 
@@ -234,7 +251,7 @@ class TrainExpList(ExperienceList):
         self,
         start_pos: int = 0,
         batch_size: int = 1,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
     ) -> TrainBatchExp:
         exps = TrainBatchExp.new_empty()
         if start_pos < len(self):
@@ -244,10 +261,11 @@ class TrainExpList(ExperienceList):
             exps.action = torch.stack([a.to_tensor() for a in self.action[sc]]).to(device)  # type: ignore
             exps.reward = torch.Tensor(self.reward[sc]).to(device)
             exps.game_over = torch.BoolTensor(self.game_over[sc]).to(device)  # type: ignore
-            exps.node_value = torch.Tensor(self.node_value[sc]).to(device)
+            exps.state_value = torch.Tensor(self.state_value[sc]).to(device)
             exps.next_nodes = [torch.LongTensor(ns).to(device) for ns in self.next_nodes[sc]]  # type: ignore
             exps.xfer_mask = torch.stack(self.xfer_mask[sc]).to(device)  # type: ignore
             exps.xfer_logprob = torch.Tensor(self.xfer_logprob[sc]).to(device)
+            exps.node_logprob = torch.Tensor(self.node_logprob[sc]).to(device)
             exps.target_values = torch.Tensor(self.target_values[sc]).to(device)
             exps.advantages = torch.Tensor(self.advantages[sc]).to(device)
         return exps
@@ -260,10 +278,11 @@ class BatchedExperience:
     reward: torch.Tensor  # (B,)
     next_state: dgl.DGLGraph
     game_over: torch.BoolTensor  # (B,)
-    node_value: torch.Tensor  # (B,)
+    state_value: torch.Tensor  # (B,)
     next_nodes: List[torch.LongTensor]
     xfer_mask: torch.BoolTensor  # (B,)
     xfer_logprob: torch.Tensor  # (B,)
+    node_logprob: torch.Tensor  # (B,)
 
     @staticmethod
     def new_empty() -> BatchedExperience:
@@ -276,10 +295,11 @@ class BatchedExperience:
         res.action = torch.cat([self.action, other.action])  # type: ignore
         res.reward = torch.cat([self.reward, other.reward])
         res.game_over = torch.cat([self.game_over, other.game_over])  # type: ignore
-        res.node_value = torch.cat([self.node_value, other.node_value])
+        res.state_value = torch.cat([self.state_value, other.state_value])
         res.next_nodes = self.next_nodes + other.next_nodes
         res.xfer_mask = torch.cat([self.xfer_mask, other.xfer_mask])  # type: ignore
         res.xfer_logprob = torch.cat([self.xfer_logprob, other.xfer_logprob])
+        res.node_logprob = torch.cat([self.node_logprob, other.node_logprob])
         return res
 
     def __len__(self) -> int:
@@ -295,8 +315,8 @@ class TrainBatchExp(BatchedExperience):
         return TrainBatchExp(*[None for _ in range(len(fields(TrainBatchExp)))])  # type: ignore
 
 
-ExpListType = TypeVar('ExpListType', bound=ExperienceList)
-BatchExpType = TypeVar('BatchExpType', bound=BatchedExperience)
+ExpListType = TypeVar("ExpListType", bound=ExperienceList)
+BatchExpType = TypeVar("BatchExpType", bound=BatchedExperience)
 
 
 class ExperienceListIterator:
@@ -304,7 +324,7 @@ class ExperienceListIterator:
         self,
         src: ExpListType,
         batch_size: int = 1,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         self.src = src
         self.batch_size = batch_size
@@ -340,7 +360,7 @@ class GraphBuffer:
         name: str,
         original_graph_qasm: str,
         cost_type: CostType,
-        device: torch.device = torch.device('cpu'),
+        device: torch.device = torch.device("cpu"),
         max_len: int | float = math.inf,
         vmem_perct_limit: float = 80.0,
     ) -> None:
@@ -409,20 +429,20 @@ class GraphBuffer:
                 )  # don't use more memory
 
         if old_len > self.max_len:
-            printfl(f'Buffer {self.name} starts to shrink.')
+            printfl(f"Buffer {self.name} starts to shrink.")
             while len(self) > self.max_len:
                 self.pop_some(min(len(self) - self.max_len // 2, len(self) - 2))
             printfl(
-                f'Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {cur_proc_vmem_perct()} %).'
+                f"Buffer {self.name} shrinked from {old_len} to {len(self)}. (Mem: {vmem_perct} % -> {cur_proc_vmem_perct()} %)."
             )
 
         if vmem_used_perct() > 96.0:
             printfl(
-                f'{vmem_used_perct()} % memory are used. Pause to avoid system crash.'
+                f"{vmem_used_perct()} % memory are used. Pause to avoid system crash."
             )
             # from IPython import embed; embed()
             raise MemoryError(
-                f'Used {vmem_used_perct()} % memory. Exit to avoid system crash.'
+                f"Used {vmem_used_perct()} % memory. Exit to avoid system crash."
             )
 
     def push_back(self, graph: quartz.PyGraph, hash_value: int = None) -> bool:
@@ -541,12 +561,12 @@ class GraphBuffer:
     def eps_len_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {}
         max_eps_len = max(self.eps_lengths)
-        info[f'min_epslen'] = min(self.eps_lengths)
-        info[f'max_epslen'] = max_eps_len
-        info[f'mean_epslen'] = sum(self.eps_lengths) / len(self.eps_lengths)
+        info[f"min_epslen"] = min(self.eps_lengths)
+        info[f"max_epslen"] = max_eps_len
+        info[f"mean_epslen"] = sum(self.eps_lengths) / len(self.eps_lengths)
 
         self.max_eps_length = max(self.max_eps_length, max_eps_len)
-        info[f'max_epslen_global'] = self.max_eps_length
+        info[f"max_epslen_global"] = self.max_eps_length
 
         return info
 
@@ -562,9 +582,9 @@ class GraphBuffer:
 
         all_rewards = list(itertools.chain(*self.rewards))
 
-        info['max_eps_reward'] = max_eps_reward
-        info['mean_eps_reward'] = mean_eps_reward
-        info['mean_exp_reward'] = sum(all_rewards) / len(all_rewards)
+        info["max_eps_reward"] = max_eps_reward
+        info["mean_eps_reward"] = mean_eps_reward
+        info["mean_exp_reward"] = sum(all_rewards) / len(all_rewards)
 
         return info
 
@@ -572,27 +592,27 @@ class GraphBuffer:
         info: Dict[str, float] = {}
 
         for name, values, init_values in [
-            ('gate_count', self.graph_gcs, self.init_graph_gcs),
-            ('cx_count', self.graph_ccs, self.init_graph_ccs),
-            ('depth', self.graph_depths, self.init_graph_depths),
-            ('cost', self.graph_costs, self.init_graph_costs),
+            ("gate_count", self.graph_gcs, self.init_graph_gcs),
+            ("cx_count", self.graph_ccs, self.init_graph_ccs),
+            ("depth", self.graph_depths, self.init_graph_depths),
+            ("cost", self.graph_costs, self.init_graph_costs),
         ]:
-            info[f'min_init_{name}'] = min(init_values)
-            info[f'max_init_{name}'] = max(init_values)
-            info[f'mean_init_{name}'] = sum(init_values) / len(init_values)
+            info[f"min_init_{name}"] = min(init_values)
+            info[f"max_init_{name}"] = max(init_values)
+            info[f"mean_init_{name}"] = sum(init_values) / len(init_values)
 
-            info[f'min_{name}_iter'] = min(values)
-            info[f'max_{name}_iter'] = max(values)
-            info[f'mean_{name}_iter'] = sum(values) / len(values)
+            info[f"min_{name}_iter"] = min(values)
+            info[f"max_{name}_iter"] = max(values)
+            info[f"mean_{name}_iter"] = sum(values) / len(values)
 
         return info
 
     def basic_info(self) -> Dict[str, float]:
         info: Dict[str, float] = {
-            'buffer_size': len(self),
-            'diff_costs': len(self.cost_to_graph),
-            'min_cost': self.cost_to_graph.peekitem(0)[0],
-            'max_cost': self.cost_to_graph.peekitem(-1)[0],
+            "buffer_size": len(self),
+            "diff_costs": len(self.cost_to_graph),
+            "min_cost": self.cost_to_graph.peekitem(0)[0],
+            "max_cost": self.cost_to_graph.peekitem(-1)[0],
         }
         return info
 

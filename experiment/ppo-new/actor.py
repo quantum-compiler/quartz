@@ -633,22 +633,22 @@ class PPOAgent:
         b_node_values: torch.Tensor = self.ac_net.actor_gate(b_node_embeds).squeeze()
         b_graph_embeds: torch.Tensor = torch.zeros(
             size=(len(dgl_graphs), b_node_embeds.shape[-1])
-        )
-        num_nodes_prefix_sum: torch.LongTensor = torch.cumsum(num_nodes)
+        ).to(self.device)
+        node_offsets = torch.zeros(num_eps, dtype=torch.long).to(self.device)
+        node_offsets[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
+        """Compute graph embeds by max pooling"""
         for i in range(len(dgl_graphs)):
-            if i == 0:
+            if i != num_eps - 1:
                 b_graph_embeds[i], _ = torch.max(
-                    b_node_embeds[num_nodes_prefix_sum[0, num_nodes_prefix_sum[0]]]
+                    b_node_embeds[node_offsets[i] : node_offsets[i + 1]],
+                    dim=0,
                 )
             else:
                 b_graph_embeds[i], _ = torch.max(
-                    b_node_embeds[
-                        num_nodes_prefix_sum[
-                            num_nodes_prefix_sum[i - 1], num_nodes_prefix_sum[i]
-                        ]
-                    ],
+                    b_node_embeds[node_offsets[i] :],
                     dim=0,
                 )
+        """Compute graph values"""
         b_graph_values: torch.Tensor = self.ac_net.critic(b_graph_embeds).squeeze()
         ################################################################################
         # list with length num_graphs; each member is a tensor of node values in a graph
@@ -683,7 +683,7 @@ class PPOAgent:
         # b_sampled_nodes = torch.multinomial(b_softmax_node_values_pad, 1).flatten()
         node_dists: Categorical = Categorical(b_softmax_node_values_pad)
         b_sampled_nodes = node_dists.sample()
-        action_nodes: List[int] = b_sampled_nodes.tolist()
+        action_nodes: torch.Tensor = b_sampled_nodes
         action_node_logps: torch.Tensor = node_dists.log_prob(action_nodes)
         # action_node_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
         """collect embeddings of sampled nodes"""
@@ -701,7 +701,7 @@ class PPOAgent:
         # (num_graphs, action_dim)
         ################################################################################
         # xfer_logits: torch.Tensor = self.ac_net.actor(sampled_node_embeds)
-        xfer_logits: torch.Tensor = self.ac_net.actor(b_graph_embeds)
+        xfer_logits: torch.Tensor = self.ac_net.actor_xfer(b_graph_embeds)
         ################################################################################
         """sample action_xfer with mask"""
         av_xfer_masks = torch.zeros_like(
@@ -712,7 +712,7 @@ class PPOAgent:
             graph = cur_graphs[i_eps]
             av_xfers = graph.available_xfers_parallel(
                 context=qtz.quartz_context,
-                node=graph.get_node_from_id(id=action_nodes[i_eps]),
+                node=graph.get_node_from_id(id=action_nodes.tolist()[i_eps]),
             )
             av_xfer_masks[i_eps][av_xfers] = True
         # end for
@@ -725,11 +725,11 @@ class PPOAgent:
         action_xfers = xfer_dists.sample()
         action_xfer_logps: torch.Tensor = xfer_dists.log_prob(action_xfers)
         action_node_values: List[float] = b_node_values_pad[
-            list(range(num_eps)), action_nodes
+            list(range(num_eps)), action_nodes.tolist()
         ].tolist()
         return (
             dgl_graphs,
-            action_nodes,
+            action_nodes.tolist(),
             action_xfers.tolist(),
             # action_node_values,
             b_graph_values.tolist(),

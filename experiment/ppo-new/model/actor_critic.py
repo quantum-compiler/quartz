@@ -30,7 +30,8 @@ class ActorCritic(nn.Module):
         action_dim: int = 32,
         device: torch.device = "cpu",
         gnn: nn.Module = None,
-        actor: nn.Module = None,
+        actor_gate: nn.Module = None,
+        actor_xfer: nn.Module = None,
         critic: nn.Module = None,
     ) -> None:
         """
@@ -41,10 +42,12 @@ class ActorCritic(nn.Module):
         super().__init__()
         """init the network with existed modules"""
         if gnn is not None:
-            assert actor is not None
+            assert actor_gate is not None
+            assert actor_xfer is not None
             assert critic is not None
             self.gnn = gnn
-            self.actor = actor
+            self.actor_gate = actor_gate
+            self.actor_xfer = actor_xfer
             self.critic = critic
             self.device = device
             return
@@ -88,7 +91,9 @@ class ActorCritic(nn.Module):
             _ddp_model = ActorCritic(
                 device=self.device,
                 gnn=DDP(self.gnn, device_ids=[self.device]),
-                actor=DDP(self.actor, device_ids=[self.device]),
+                # actor=DDP(self.actor, device_ids=[self.device]),
+                actor_gate=DDP(self.actor_gate, device_ids=[self.device]),
+                actor_xfer=DDP(self.actor_xfer, device_ids=[self.device]),
                 critic=DDP(self.critic, device_ids=[self.device]),
             )
         else:

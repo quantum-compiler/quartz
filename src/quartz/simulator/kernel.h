@@ -1,6 +1,7 @@
 #pragma once
 
 #include "quartz/circuitseq/circuitseq.h"
+#include "quartz/simulator/kernel_cost.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,39 @@ public:
       : gates(gates), qubits(qubits), type(type) {}
 
   [[nodiscard]] std::string to_string() const;
+  /**
+   * Compute the cost of this kernel, return infinity if the kernel is not
+   * feasible.
+   * If the kernel type is fusion, the complexity is O(1).
+   * If the kernel type is shared-memory, the complexity is
+   * O(||qubits|| * cost_function.get_shared_memory_num_cacheline_qubits()
+   *   + ||gates|| * 1(customized_shared_memory_gate_cost == nullptr)).
+   * @param cost_function The cost function of kernels.
+   * @param local_qubit_layout The qubit layout to determine if a shared-memory
+   * kernel is feasible. |local_qubit_layout[0]| stores the least significant
+   * qubit.
+   * @param customized_shared_memory_gate_cost Sometimes we may want to
+   * customize the sum of the cost of gates in a shared-memory kernel.
+   * If this variable is not |nullptr|, we take the value directly instead of
+   * adding up the gates in |gates|.
+   * @return The cost of this kernel, or infinity if it's not feasible.
+   */
+  [[nodiscard]] KernelCostType cost(
+      const KernelCost &cost_function,
+      const std::vector<int> &local_qubit_layout = {},
+      const KernelCostType *customized_shared_memory_gate_cost = nullptr) const;
+  /**
+   * Add a gate and update the |qubits| set.
+   * @param gate The gate to be added, calling |CircuitGate::add_gate(gate)|.
+   * @param customized_non_insular_qubits Sometimes we may want to customize
+   * the set of non-insular qubits in a shared-memory kernel.
+   * If this variable is not empty and if the kernel type is shared-memory,
+   * we use this qubit set to update |qubits|.
+   * @return True iff the gate is successfully added.
+   */
+  bool add_gate(CircuitGate *gate,
+                const std::vector<int> &customized_non_insular_qubits = {});
+
   CircuitSeq gates;
   std::vector<int> qubits;
   KernelType type;

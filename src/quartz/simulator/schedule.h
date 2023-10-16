@@ -17,7 +17,8 @@ namespace quartz {
  */
 class Schedule {
 public:
-  Schedule(const CircuitSeq &sequence, const std::vector<int> &local_qubit,
+  Schedule(std::unique_ptr<CircuitSeq> &&sequence,
+           const std::vector<int> &local_qubit,
            const std::vector<int> &global_qubit,
            int num_shared_memory_cacheline_qubits, Context *ctx);
 
@@ -65,14 +66,38 @@ public:
    * shared-memory kernel, if any of them should be considered differently from
    * what we would have computed from the gate itself.
    * @return True iff the computation succeeds. The results are stored in
-   * the member variables |kernels|, |kernel_qubits|, and |cost_|.
+   * the member variables |kernels| and |cost_|.
    */
   bool compute_kernel_schedule(
       const KernelCost &kernel_cost,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
+  /**
+   * Compute the schedule using a simple quadratic dynamic programming
+   * algorithm.
+   * @param kernel_cost The cost function of kernels.
+   * @param non_insular_qubit_indices The set of non-insular qubit indices
+   * for each gate, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
+   * @param shared_memory_gate_costs The cost for each gate if put into a
+   * shared-memory kernel, if any of them should be considered differently from
+   * what we would have computed from the gate itself.
+   * @return True iff the computation succeeds. The results are stored in
+   * the member variables |kernels| and |cost_|.
+   */
+  bool compute_kernel_schedule_simple(
+      const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
+
+  bool compute_kernel_schedule_simple_repeat(
+      int repeat, const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
+
   [[nodiscard]] int get_num_kernels() const;
+  void print_kernel_info() const;
   void print_kernel_schedule() const;
 
   /**
@@ -88,7 +113,7 @@ public:
 
 private:
   // The original circuit sequence.
-  CircuitSeq sequence_;
+  std::unique_ptr<CircuitSeq> sequence_;
 
   // The set of local qubits.
   // |local_qubit_[0]| is the least significant bit.
@@ -122,7 +147,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates);
+              bool attach_single_qubit_gates, int use_simple_dp_times);
 
 class PythonInterpreter;
 std::vector<std::vector<int>>

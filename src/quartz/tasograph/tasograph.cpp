@@ -1400,7 +1400,6 @@ template <class _CharT, class _Traits>
 std::shared_ptr<Graph>
 Graph::_from_qasm_stream(Context *ctx,
                          std::basic_istream<_CharT, _Traits> &qasm_stream) {
-
   std::shared_ptr<Graph> graph(new Graph(ctx));
   std::string line;
   GateType gate_type;
@@ -1414,7 +1413,7 @@ Graph::_from_qasm_stream(Context *ctx,
     find_and_replace_all(line, ")", " ");
     // ignore end of line
     find_and_replace_all(line, "\n", "");
-    while (line.front() == ' ') {
+    while (!line.empty() && line.front() == ' ') {
       line.erase(0, 1);
     }
     std::stringstream ss(line);

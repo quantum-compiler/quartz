@@ -64,8 +64,8 @@ cd ..  # should be at the root directory of quartz/ now
 
 #### Windows:
 ```batch
-:: should be at the root directory of quartz/ now
 cd ..
+:: should be at the root directory of quartz/ now
 "build/Debug/test_optimize.exe"
 ```
 

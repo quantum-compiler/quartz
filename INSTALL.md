@@ -30,7 +30,7 @@ conda env create --name quartz --file env.yml
 conda activate quartz
 ```
 
-3. Build the Quartz runtime library (optional with CLion, see [below](INSTALL.md#CLion Integration (Optional))). This step differs a little bit between Windows and other OS.
+3. Build the Quartz runtime library (optional with CLion, see [below](INSTALL.md#clion-integration-optional)). This step differs a little bit between Windows and other OS.
 
 #### Unix/Linux/MacOS:
 ```shell
@@ -100,7 +100,7 @@ to `~/.bashrc`.
 ## CLion Integration (Optional)
 ### Additional Prerequisites
 * CLion: https://www.jetbrains.com/clion/download/
-* First 2 steps in [Build Quartz Runtime](INSTALL.md#Build Quartz Runtime)
+* First 2 steps in [Build Quartz Runtime](INSTALL.md#build-quartz-runtime)
 
 ### CLion Settings
 - Settings -> Build, Execution, Deployment -> Toolchains -> add "Visual Studio"
@@ -119,7 +119,7 @@ to `~/.bashrc`.
 ## Visual Studio Integration (Optional) (only for Windows)
 ### Additional Prerequisites
 * Visual Studio: Workloads -> Python Development. You can use Visual Studio Installer to modify an existing Visual Studio installation if the Python Development component was not installed before.
-* First 3 steps in [Build Quartz Runtime](INSTALL.md#Build Quartz Runtime)
+* First 3 steps in [Build Quartz Runtime](INSTALL.md#build-quartz-runtime)
 
 ### Configuration to Run
 - View -> Solution Explorer

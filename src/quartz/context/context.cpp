@@ -45,8 +45,12 @@ Gate *Context::get_gate(GateType tp) {
   const auto it = gates_.find(tp);
   if (it != gates_.end())
     return it->second.get();
-  else
+  else {
+    std::cerr << "Gate " << gate_type_name(tp)
+              << " not in current context (gate set)." << std::endl;
+    assert(false);
     return nullptr;
+  }
 }
 
 Gate *Context::get_general_controlled_gate(GateType tp,

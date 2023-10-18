@@ -1,28 +1,27 @@
-from qiskit import IBMQ, transpile
-from qiskit import QuantumCircuit
-from qiskit_aer import AerSimulator
+import csv
+import os
+import sys
+from os.path import isfile, join
+
+import numpy as np
+from qiskit import IBMQ, QuantumCircuit, transpile
 from qiskit.providers.fake_provider import (
+    FakeManhattan,
+    FakeManhattanV2,
     FakeMelbourne,
     FakeMelbourneV2,
     FakeMontreal,
     FakeMontrealV2,
+    FakeSherbrooke,
     FakeWashington,
     FakeWashingtonV2,
-    FakeSherbrooke,
-    FakeManhattan,
-    FakeManhattanV2,
 )
 from qiskit.providers.models import BackendProperties
-import numpy as np
-import os
-from os.path import join, isfile
-import sys
-import csv
-from qiskit.transpiler.passes import SabreLayout, VF2PostLayout, BasisTranslator
 from qiskit.transpiler import PassManager
 from qiskit.transpiler.coupling import CouplingMap
+from qiskit.transpiler.passes import BasisTranslator, SabreLayout, VF2PostLayout
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-
+from qiskit_aer import AerSimulator
 
 # class Simulator:
 #     def __init__(self, file_path):
@@ -136,6 +135,7 @@ from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 #         acc_circ_log_succ_rate += circ_log_succ_rate
 
 #     return acc_circ_log_succ_rate / times
+
 
 def get_log_logical_fidelity(fn: str) -> float:
     gate_error_rate = {

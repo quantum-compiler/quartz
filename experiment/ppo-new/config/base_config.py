@@ -48,7 +48,7 @@ class BaseConfig:
     ddp_port: int = 23333
     omp_num_threads: int = 4
 
-    seed: int = 98765
+    seed: int = 23333
     wandb: WandbConfig = WandbConfig()
 
     # quartz

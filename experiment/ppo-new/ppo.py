@@ -6,6 +6,7 @@ import json
 import math
 import os
 import time
+import datetime
 import warnings
 from functools import partial
 from typing import Dict, List, Optional, OrderedDict, cast
@@ -108,6 +109,7 @@ class PPOMod:
                 init_method=f'tcp://localhost:{self.cfg.ddp_port}',
                 rank=rank,
                 world_size=ddp_processes,
+                timeout=datetime.timedelta(seconds=1800),
             )
             self.train()
         else:

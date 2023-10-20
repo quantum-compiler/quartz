@@ -98,12 +98,12 @@ class PPOMod:
         if rank < ddp_processes:
             """init agent processes"""
             agent_name = get_agent_name(rank)
-            rpc.init_rpc(
-                name=agent_name,
-                rank=rank,
-                world_size=tot_processes,
-                rpc_backend_options=rpc_backend_options,
-            )
+            #rpc.init_rpc(
+            #    name=agent_name,
+            #    rank=rank,
+            #    world_size=tot_processes,
+            #    rpc_backend_options=rpc_backend_options,
+            #)
             dist.init_process_group(
                 backend='nccl',
                 init_method=f'tcp://localhost:{self.cfg.ddp_port}',
@@ -118,14 +118,14 @@ class PPOMod:
             agent_rref_id = obs_rank // self.cfg.obs_per_agent
             obs_in_agent_rank = obs_rank % self.cfg.obs_per_agent
             obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
-            rpc.init_rpc(
-                name=obs_name,
-                rank=rank,
-                world_size=tot_processes,
-                rpc_backend_options=rpc_backend_options,
-            )
+            #rpc.init_rpc(
+            #    name=obs_name,
+            #    rank=rank,
+            #    world_size=tot_processes,
+            #    rpc_backend_options=rpc_backend_options,
+            #)
         # block until all rpcs finish
-        rpc.shutdown()
+        #rpc.shutdown()
 
     def _make_actor_critic(
         self,

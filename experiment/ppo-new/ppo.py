@@ -6,7 +6,6 @@ import json
 import math
 import os
 import time
-import datetime
 import warnings
 from functools import partial
 from typing import Dict, List, Optional, OrderedDict, cast
@@ -40,11 +39,11 @@ class PPOMod:
     def __init__(self, cfg: BaseConfig, output_dir: str) -> None:
         self.cfg: BaseConfig = cfg
         self.output_dir = output_dir
-        self.wandb_mode = 'online'
+        self.wandb_mode = "online"
         if cfg.wandb.offline:
-            self.wandb_mode = 'offline'
+            self.wandb_mode = "offline"
         elif cfg.wandb.en is False:
-            self.wandb_mode = 'disabled'
+            self.wandb_mode = "disabled"
         wandb.require("service")
         wandb.setup()
         self.print_cfg()
@@ -62,18 +61,18 @@ class PPOMod:
             with open(input_graph.path) as f:
                 self.input_graphs.append(
                     {
-                        'name': input_graph.name,
-                        'qasm': f.read(),
+                        "name": input_graph.name,
+                        "qasm": f.read(),
                     }
                 )
 
     def print_cfg(self) -> None:
-        print('================ Configs ================')
+        print("================ Configs ================")
         print(OmegaConf.to_yaml(self.cfg))
         # for k, v in self.cfg.items():
         #     print(f'{k} : {v}')
-        print(f'output_dir : {self.output_dir}')
-        print('=========================================')
+        print(f"output_dir : {self.output_dir}")
+        print("=========================================")
 
     def init_process(self, rank: int, ddp_processes: int, obs_processes: int) -> None:
         seed_all(self.cfg.seed + rank)
@@ -82,7 +81,7 @@ class PPOMod:
 
         """set num of OMP threads to avoid blasting the machine"""
         if self.cfg.omp_num_threads != 0:
-            os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
+            os.environ["OMP_NUM_THREADS"] = str(self.cfg.omp_num_threads)
         # otherwise we don't limit it
 
         """RPC and DDP initialization"""
@@ -91,25 +90,24 @@ class PPOMod:
         self.ddp_processes = ddp_processes
         tot_processes = ddp_processes + obs_processes
         rpc_backend_options = rpc.TensorPipeRpcBackendOptions(
-            init_method=f'tcp://localhost:{self.cfg.ddp_port + 1}',
+            init_method=f"tcp://localhost:{self.cfg.ddp_port + 1}",
             rpc_timeout=0,
         )
 
         if rank < ddp_processes:
             """init agent processes"""
             agent_name = get_agent_name(rank)
-            #rpc.init_rpc(
-            #    name=agent_name,
-            #    rank=rank,
-            #    world_size=tot_processes,
-            #    rpc_backend_options=rpc_backend_options,
-            #)
+            # rpc.init_rpc(
+            #     name=agent_name,
+            #     rank=rank,
+            #     world_size=tot_processes,
+            #     rpc_backend_options=rpc_backend_options,
+            # )
             dist.init_process_group(
-                backend='nccl',
-                init_method=f'tcp://localhost:{self.cfg.ddp_port}',
+                backend="nccl",
+                init_method=f"tcp://localhost:{self.cfg.ddp_port}",
                 rank=rank,
                 world_size=ddp_processes,
-                timeout=datetime.timedelta(seconds=1800),
             )
             self.train()
         else:
@@ -118,14 +116,14 @@ class PPOMod:
             agent_rref_id = obs_rank // self.cfg.obs_per_agent
             obs_in_agent_rank = obs_rank % self.cfg.obs_per_agent
             obs_name = get_obs_name(agent_rref_id, obs_in_agent_rank)
-            #rpc.init_rpc(
-            #    name=obs_name,
-            #    rank=rank,
-            #    world_size=tot_processes,
-            #    rpc_backend_options=rpc_backend_options,
-            #)
+            # rpc.init_rpc(
+            #     name=obs_name,
+            #     rank=rank,
+            #     world_size=tot_processes,
+            #     rpc_backend_options=rpc_backend_options,
+            # )
         # block until all rpcs finish
-        #rpc.shutdown()
+        # rpc.shutdown()
 
     def _make_actor_critic(
         self,
@@ -150,12 +148,12 @@ class PPOMod:
     def train(self) -> None:
         """init agent and network"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-            self.device = torch.device('cpu')
+            self.device = torch.device("cpu")
         else:
-            self.device = torch.device(f'cuda:{self.cfg.gpus[self.rank]}')
+            self.device = torch.device(f"cuda:{self.cfg.gpus[self.rank]}")
             torch.cuda.set_device(self.device)
         self.ac_net: ActorCritic = self._make_actor_critic()
-        if self.device.type == 'cuda':
+        if self.device.type == "cuda":
             self.ac_net = cast(
                 ActorCritic, nn.SyncBatchNorm.convert_sync_batchnorm(self.ac_net)
             )
@@ -191,20 +189,28 @@ class PPOMod:
         self.optimizer = torch.optim.Adam(
             [
                 {
-                    'params': self.ddp_ac_net.gnn.parameters(),
-                    'lr': self.cfg.lr_gnn,
+                    "params": self.ddp_ac_net.gnn.parameters(),
+                    "lr": self.cfg.lr_gnn,
+                },
+                # {
+                #     'params': self.ddp_ac_net.actor.parameters(),
+                #     'lr': self.cfg.lr_actor,
+                # },
+                {
+                    "params": self.ddp_ac_net.actor_gate.parameters(),
+                    "lr": self.cfg.lr_actor,
                 },
                 {
-                    'params': self.ddp_ac_net.actor.parameters(),
-                    'lr': self.cfg.lr_actor,
+                    "params": self.ddp_ac_net.actor_xfer.parameters(),
+                    "lr": self.cfg.lr_actor,
                 },
                 {
-                    'params': self.ddp_ac_net.critic.parameters(),
-                    'lr': self.cfg.lr_critic,
+                    "params": self.ddp_ac_net.critic.parameters(),
+                    "lr": self.cfg.lr_critic,
                 },
             ]
         )
-        if self.cfg.lr_scheduler == 'linear':
+        if self.cfg.lr_scheduler == "linear":
             base = (1 / self.cfg.lr_start_factor) ** (1 / self.cfg.lr_warmup_epochs)
 
             def lr_lambda(epoch: int):
@@ -219,14 +225,14 @@ class PPOMod:
                 last_epoch=-1,
             )
 
-        elif self.cfg.lr_scheduler == 'none':
+        elif self.cfg.lr_scheduler == "none":
             self.lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
                 self.optimizer,
                 lr_lambda=lambda _: 1.0,
                 last_epoch=-1,
             )
         else:
-            raise ValueError(f'Unknown lr_scheduler: {self.cfg.lr_scheduler}')
+            raise ValueError(f"Unknown lr_scheduler: {self.cfg.lr_scheduler}")
         if self.rank == 0:
             run_name: str | None = None
             if len(self.cfg.input_graphs) == 1:
@@ -240,7 +246,7 @@ class PPOMod:
                 config=self.cfg,  # type: ignore
                 name=run_name,
             )
-        printfl(f'rank {self.rank} / {self.ddp_processes} on {self.device} initialized')
+        printfl(f"rank {self.rank} / {self.ddp_processes} on {self.device} initialized")
 
         max_iterations = int(self.cfg.max_iterations)
         self.i_iter: int = 0
@@ -253,7 +259,7 @@ class PPOMod:
         if limited_time_budget:
             sec_budget: float = hms_to_sec(self.cfg.time_budget)
             printfl(
-                f'rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set.'
+                f"rank {self.rank}: Time budget {self.cfg.time_budget} ( {sec_budget} sec ) is set."
             )
         self.start_time_sec = time.time()
         # from pympler import muppy
@@ -265,12 +271,12 @@ class PPOMod:
             if self.i_iter % self.cfg.update_policy_interval == 0:
                 self.ac_net_old.load_state_dict(self.ac_net.state_dict())
             if self.i_iter % self.cfg.save_ckpt_interval == 0:
-                self.save_ckpt(f'iter_{self.i_iter}.pt', loss=loss)
+                self.save_ckpt(f"iter_{self.i_iter}.pt", loss=loss)
             self.i_iter += 1
             used_sec = time.time() - self.start_time_sec
             if limited_time_budget and used_sec > sec_budget:
                 printfl(
-                    f'rank {self.rank}: Run out of time budget {used_sec} sec / {self.cfg.time_budget} ({used_sec} sec). Breaking training loop...'
+                    f"rank {self.rank}: Run out of time budget {used_sec} sec / {self.cfg.time_budget} ({used_sec} sec). Breaking training loop..."
                 )
                 break
 
@@ -314,94 +320,120 @@ class PPOMod:
             self.agent.output_best_graph(self.cfg.best_graph_output_dir)
             other_info_dict = self.agent.other_info_dict()
             lr_dict = {
-                f'lr_{i}': self.optimizer.param_groups[i]['lr']
+                f"lr_{i}": self.optimizer.param_groups[i]["lr"]
                 for i in range(len(self.optimizer.param_groups))
             }
             collect_info = {
                 **other_info_dict,  # type: ignore
-                'iter': self.i_iter,
-                'num_exps': len(exp_list),
-                'tot_exps_collected_all_rank': self.tot_exps_collected
+                "iter": self.i_iter,
+                "num_exps": len(exp_list),
+                "tot_exps_collected_all_rank": self.tot_exps_collected
                 * self.ddp_processes,
                 **lr_dict,
-                'vmem_perct': cur_proc_vmem_perct(),
+                "vmem_perct": cur_proc_vmem_perct(),
             }
-            printfl(f'\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .')
+            printfl(f"\n  Data for iter {self.i_iter} collected in {dur_s_collect} s .")
             logprintfl(
-                f'\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} .'
+                f"\n  Training lasted {sec_to_hms(time.time() - self.start_time_sec)} ."
             )
             for k, v in collect_info.items():
-                printfl(f'    {k} : {v}')
+                printfl(f"    {k} : {v}")
             wandb.log(collect_info)
             pbar = tqdm(
                 total=self.cfg.k_epochs
                 * math.ceil(len(exp_list) / self.cfg.mini_batch_size),
-                desc=f'Iter {self.i_iter}',
-                bar_format='{desc} : {n}/{total} |{bar}| {elapsed} {postfix}',
+                desc=f"Iter {self.i_iter}",
+                bar_format="{desc} : {n}/{total} |{bar}| {elapsed} {postfix}",
             )
 
         """evaluate, compute loss, and update (DDP)"""
         """compute values of next nodes using un-updated network to get advantages"""
-        all_target_values: List[float] = []
-        all_advs: List[float] = []
+        ################################################################################
+        # all_target_values: List[float] = []
+        # all_advs: List[float] = []
+        # with torch.no_grad():
+        #     for i_step, exps in enumerate(
+        #         ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
+        #     ):
+        #         # (num_next_graphs, )
+        #         next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
+        #         """get embeds"""
+        #         # (batch_next_graphs_nodes, embed_dim)
+        #         b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(
+        #             exps.next_state, ActorCritic.gnn_name()
+        #         )
+        #         next_graph_embeds_list: List[torch.Tensor] = torch.split(
+        #             b_next_graph_embeds, next_num_nodes.tolist()
+        #         )
+        #         """select embeds"""
+        #         # ( sum(num_next_nodes), embed_dim )
+        #         next_node_embeds: torch.Tensor = torch.cat(
+        #             [
+        #                 graph_embed[next_node_ids]
+        #                 for (next_node_ids, graph_embed) in zip(
+        #                     exps.next_nodes, next_graph_embeds_list
+        #                 )
+        #             ]
+        #         )
+        #         """evaluate"""
+        #         # ( sum(num_next_nodes), )
+        #         next_node_values: torch.Tensor = self.ddp_ac_net(
+        #             next_node_embeds, ActorCritic.critic_name()
+        #         ).squeeze()
+        #         num_next_nodes = list(map(len, exps.next_nodes))
+        #         next_node_values_list: List[torch.Tensor] = torch.split(
+        #             next_node_values, num_next_nodes
+        #         )
+        #         """get max next value for each graph"""
+        #         max_next_values_list: List[torch.Tensor] = []
+        #         for i in range(len(exps)):
+        #             max_next_value: torch.Tensor
+        #             # invalid xfer, gate count exceeds limit, NOP
+        #             if (
+        #                 next_node_values_list[i].shape[0] == 0
+        #                 or exps.game_over[i]
+        #                 or qtz.is_nop(int(exps.action[i, 1]))
+        #                 and self.cfg.nop_stop
+        #             ):
+        #                 max_next_value = torch.zeros(1).to(self.device)
+        #             else:
+        #                 max_next_value, _ = torch.max(
+        #                     next_node_values_list[i], dim=0, keepdim=True
+        #                 )
+        #             max_next_values_list.append(max_next_value)
+        #         max_next_values = torch.cat(max_next_values_list)
+        #         target_values = exps.reward + self.cfg.gamma * max_next_values
+        #         advs = target_values - exps.node_value
+        #         all_target_values += target_values.tolist()
+        #         all_advs += advs.tolist()
+        #     # end for
+        #     train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)  # type: ignore
+        # # end with
+        ################################################################################
         with torch.no_grad():
-            for i_step, exps in enumerate(
-                ExperienceListIterator(exp_list, self.cfg.mini_batch_size, self.device)
-            ):
-                # (num_next_graphs, )
-                next_num_nodes: torch.LongTensor = exps.next_state.batch_num_nodes()
-                """get embeds"""
-                # (batch_next_graphs_nodes, embed_dim)
-                b_next_graph_embeds: torch.Tensor = self.ddp_ac_net(
-                    exps.next_state, ActorCritic.gnn_name()
+            all_target_values: torch.Tensor = torch.zeros(len(exp_list))
+            all_advs: torch.Tensor = torch.zeros(len(exp_list))
+            last_gae_lam = 0.0
+            # for t, dp in enumerate(exp_list[::-1]):
+            for t in range(len(exp_list) - 1, -1, -1):
+                dp = exp_list[t]
+                if t == len(exp_list) - 1 or dp.game_over:
+                    next_value = 0
+                    next_non_terminal = False
+                else:
+                    next_value = exp_list[t + 1].state_value
+                    next_non_terminal = dp.game_over
+                delta = (
+                    dp.reward
+                    + self.cfg.gamma * next_value * next_non_terminal
+                    - dp.state_value
                 )
-                next_graph_embeds_list: List[torch.Tensor] = torch.split(
-                    b_next_graph_embeds, next_num_nodes.tolist()
+                all_advs[t] = last_gae_lam = (
+                    delta + self.cfg.gamma * 0.99 * last_gae_lam * next_non_terminal
                 )
-                """select embeds"""
-                # ( sum(num_next_nodes), embed_dim )
-                next_node_embeds: torch.Tensor = torch.cat(
-                    [
-                        graph_embed[next_node_ids]
-                        for (next_node_ids, graph_embed) in zip(
-                            exps.next_nodes, next_graph_embeds_list
-                        )
-                    ]
-                )
-                """evaluate"""
-                # ( sum(num_next_nodes), )
-                next_node_values: torch.Tensor = self.ddp_ac_net(
-                    next_node_embeds, ActorCritic.critic_name()
-                ).squeeze()
-                num_next_nodes = list(map(len, exps.next_nodes))
-                next_node_values_list: List[torch.Tensor] = torch.split(
-                    next_node_values, num_next_nodes
-                )
-                """get max next value for each graph"""
-                max_next_values_list: List[torch.Tensor] = []
-                for i in range(len(exps)):
-                    max_next_value: torch.Tensor
-                    # invalid xfer, gate count exceeds limit, NOP
-                    if (
-                        next_node_values_list[i].shape[0] == 0
-                        or exps.game_over[i]
-                        or qtz.is_nop(int(exps.action[i, 1]))
-                        and self.cfg.nop_stop
-                    ):
-                        max_next_value = torch.zeros(1).to(self.device)
-                    else:
-                        max_next_value, _ = torch.max(
-                            next_node_values_list[i], dim=0, keepdim=True
-                        )
-                    max_next_values_list.append(max_next_value)
-                max_next_values = torch.cat(max_next_values_list)
-                target_values = exps.reward + self.cfg.gamma * max_next_values
-                advs = target_values - exps.node_value
-                all_target_values += target_values.tolist()
-                all_advs += advs.tolist()
-            # end for
+                all_target_values[t] = all_advs[t] + dp.state_value
             train_exp_list = TrainExpList(*exp_list, all_target_values, all_advs)  # type: ignore
-        # end with
+
         """update the network for K epochs"""
         self.ddp_ac_net.train()
         for k_epoch in range(self.cfg.k_epochs):
@@ -421,16 +453,55 @@ class PPOMod:
                 )
                 nodes_offset: torch.LongTensor = torch.LongTensor([0] * num_nodes.shape[0]).to(self.device)  # type: ignore
                 nodes_offset[1:] = torch.cumsum(num_nodes, dim=0)[:-1]
-                selected_nodes = exps.action[:, 0] + nodes_offset
-                selected_node_embeds = b_node_embeds[selected_nodes]
-                # NOTE: this is the "new value" updated with the network's updates
-                selected_node_values: torch.Tensor = self.ddp_ac_net(
-                    selected_node_embeds, ActorCritic.critic_name()
+                ################################################################################
+                # Get the graph embeddings
+                graph_embeds: torch.Tensor = torch.zeros(
+                    (len(num_nodes), b_node_embeds.shape[1])
+                ).to(self.device)
+                for i in range(len(num_nodes)):
+                    if i != len(num_nodes) - 1:
+                        graph_embeds[i] = torch.max(
+                            b_node_embeds[nodes_offset[i] : nodes_offset[i + 1]], dim=0
+                        )[0]
+                    else:
+                        graph_embeds[i] = torch.max(
+                            b_node_embeds[nodes_offset[i] :], dim=0
+                        )[0]
+                graph_values: torch.Tensor = self.ddp_ac_net(
+                    graph_embeds, ActorCritic.critic_name()
                 ).squeeze()
+                # selected_nodes = exps.action[:, 0] + nodes_offset
+                selected_nodes = exps.action[:, 0]
+                all_node_values: torch.Tensor = self.ddp_ac_net(
+                    b_node_embeds, ActorCritic.actor_gate_name()
+                ).squeeze()
+                ################################################################################
+                """ get gate dist by Actor """
+                node_logprobs: list[torch.Tensor] = []
+                for i in range(len(num_nodes)):
+                    if i != len(num_nodes) - 1:
+                        node_dist = Categorical(
+                            torch.softmax(
+                                all_node_values[nodes_offset[i] : nodes_offset[i + 1]],
+                                dim=0,
+                            )
+                        )
+                    else:
+                        node_dist = Categorical(
+                            torch.softmax(all_node_values[nodes_offset[i] :], dim=0)
+                        )
+                    node_logprobs.append(node_dist.log_prob(selected_nodes[i]))
+                node_logprobs = torch.stack(node_logprobs)
+                ################################################################################
+                # selected_node_embeds = b_node_embeds[selected_nodes]
+                # NOTE: this is the "new value" updated with the network's updates
+                # selected_node_values: torch.Tensor = self.ddp_ac_net(
+                #     selected_node_embeds, ActorCritic.actor_gate_name()
+                # ).squeeze()
                 """get xfer dist by Actor"""
                 # (batch_num_graphs, action_dim)
                 xfer_logits: torch.Tensor = self.ddp_ac_net(
-                    selected_node_embeds, ActorCritic.actor_name()
+                    graph_embeds, ActorCritic.actor_xfer_name()
                 )
                 softmax_xfer = masked_softmax(xfer_logits, exps.xfer_mask)
                 xfer_dists = Categorical(softmax_xfer)
@@ -439,7 +510,9 @@ class PPOMod:
                 xfer_entropys = xfer_dists.entropy()
                 """compute loss for Actor (policy_net, theta)"""
                 # prob ratio = (pi_theta / pi_theta__old)
-                ratios = torch.exp(xfer_logprobs - exps.xfer_logprob)
+                ratios = torch.exp(
+                    xfer_logprobs + node_logprobs - exps.xfer_logprob - node_logprobs
+                )
                 surr1 = ratios * exps.advantages
                 surr2 = (
                     torch.clamp(ratios, 1 - self.cfg.eps_clip, 1 + self.cfg.eps_clip)
@@ -447,9 +520,7 @@ class PPOMod:
                 )  # NOTE: use fixed advantages
                 actor_loss = -torch.mean(torch.min(surr1, surr2))
                 """compute loss for Critic (value_net, phi)"""
-                critic_loss = torch.mean(
-                    (exps.target_values - selected_node_values) ** 2
-                )
+                critic_loss = torch.mean((exps.target_values - graph_values) ** 2)
                 xfer_entropy = torch.mean(xfer_entropys)
                 """compute overall loss"""
                 loss = (
@@ -466,10 +537,10 @@ class PPOMod:
                 if self.rank == 0:
                     pbar.update(1)
                     log_dict = {
-                        'actor_loss': float(actor_loss),
-                        'critic_loss': float(critic_loss),
-                        'xfer_entropy': float(xfer_entropy),
-                        'loss': float(loss),
+                        "actor_loss": float(actor_loss),
+                        "critic_loss": float(critic_loss),
+                        "xfer_entropy": float(xfer_entropy),
+                        "loss": float(loss),
                     }
                     pbar.set_postfix(
                         {
@@ -479,10 +550,10 @@ class PPOMod:
                     pbar.refresh()
                     wandb.log(
                         {
-                            'actor_loss': actor_loss,
-                            'critic_loss': critic_loss,
-                            'xfer_entropy': xfer_entropy,
-                            'loss': loss,
+                            "actor_loss": actor_loss,
+                            "critic_loss": critic_loss,
+                            "xfer_entropy": xfer_entropy,
+                            "loss": loss,
                         }
                     )
             # end for i_step
@@ -492,8 +563,8 @@ class PPOMod:
         self.lr_scheduler.step()
         self.ddp_ac_net.eval()
         """read in best circs from search"""
-        sync_dir = os.path.join(self.output_dir, 'sync_dir')
-        best_info_search_path = os.path.join(sync_dir, f'best_info_search.json')
+        sync_dir = os.path.join(self.output_dir, "sync_dir")
+        best_info_search_path = os.path.join(sync_dir, f"best_info_search.json")
         if os.path.exists(best_info_search_path):
             while True:
                 try:
@@ -508,23 +579,23 @@ class PPOMod:
         self, ckpt_name: str, only_rank_zero: bool = True, loss: float = None
     ) -> None:
         # TODO(not going to do) save top-k model
-        ckpt_dir = os.path.join(self.output_dir, 'ckpts')
+        ckpt_dir = os.path.join(self.output_dir, "ckpts")
         os.makedirs(ckpt_dir, exist_ok=True)
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
         if not only_rank_zero or self.rank == 0:
             torch.save(
                 {
-                    'i_iter': self.i_iter,
-                    'model_state_dict': self.ac_net.state_dict(),
-                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    "i_iter": self.i_iter,
+                    "model_state_dict": self.ac_net.state_dict(),
+                    "optimizer_state_dict": self.optimizer.state_dict(),
                     # 'loss': LOSS,
                 },
                 ckpt_path,
             )
-            with open(os.path.join(ckpt_dir, 'latest.json'), 'w') as f:
+            with open(os.path.join(ckpt_dir, "latest.json"), "w") as f:
                 info = {
-                    'path': ckpt_path,
-                    'loss': loss,
+                    "path": ckpt_path,
+                    "loss": loss,
                 }
                 json.dump(info, fp=f, indent=2)
             printfl(f'saved "{ckpt_path}"!')
@@ -532,9 +603,9 @@ class PPOMod:
     def load_ckpt(self, ckpt_path: str) -> None:
         """load model and optimizer"""
         ckpt = torch.load(ckpt_path, map_location=self.agent.device)
-        self.i_iter = int(ckpt['i_iter']) + 1
+        self.i_iter = int(ckpt["i_iter"]) + 1
         model_state_dict = cast(
-            OrderedDict[str, torch.Tensor], ckpt['model_state_dict']
+            OrderedDict[str, torch.Tensor], ckpt["model_state_dict"]
         )
         if self.cfg.load_non_ddp_ckpt:
             self.ac_net.load_state_dict(model_state_dict)
@@ -554,7 +625,7 @@ class PPOMod:
             self.ddp_ac_net.load_state_dict(model_state_dict)
             self.ac_net_old.load_state_dict(self.ac_net.state_dict())
         if self.cfg.resume_optimizer:
-            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         printfl(f'resumed from "{ckpt_path}"!')
         """load best graph info"""
         if self.cfg.load_best_info:
@@ -568,20 +639,20 @@ class PPOMod:
         seed_all(self.cfg.seed)
         """init Quartz and other things"""
         if self.cfg.gpus is None or len(self.cfg.gpus) == 0:
-            self.device = torch.device('cpu')
+            self.device = torch.device("cpu")
         else:
-            self.device = torch.device(f'cuda:{self.cfg.gpus[rank]}')
+            self.device = torch.device(f"cuda:{self.cfg.gpus[rank]}")
             torch.cuda.set_device(self.device)
-        printfl(f'rank {rank} / {world_size} use {self.device}')
+        printfl(f"rank {rank} / {world_size} use {self.device}")
         dist.init_process_group(
-            backend='nccl',
-            init_method=f'tcp://localhost:{self.cfg.ddp_port}',
+            backend="nccl",
+            init_method=f"tcp://localhost:{self.cfg.ddp_port}",
             rank=rank,
             world_size=world_size,
         )
         self.init_quartz_context_func()
         if self.cfg.omp_num_threads != 0:
-            os.environ['OMP_NUM_THREADS'] = str(self.cfg.omp_num_threads)
+            os.environ["OMP_NUM_THREADS"] = str(self.cfg.omp_num_threads)
         self.ac_net: ActorCritic = self._make_actor_critic()
         self.ddp_ac_net = self.ac_net.ddp_model()
 
@@ -589,26 +660,26 @@ class PPOMod:
     def test(self, rank: int, world_size: int) -> None:
         def auto_find_tuning_dir(input_graphs: List[str]) -> Optional[str]:
             input_graphs = sorted(input_graphs)
-            for date in natsorted(os.listdir('outputs'), reverse=True):
-                date_dir = os.path.join('outputs', date)
+            for date in natsorted(os.listdir("outputs"), reverse=True):
+                date_dir = os.path.join("outputs", date)
                 for time in natsorted(os.listdir(date_dir), reverse=True)[1:]:
                     tuning_dir = os.path.join(date_dir, time)
-                    sync_dir = os.path.join(tuning_dir, 'sync_dir')
+                    sync_dir = os.path.join(tuning_dir, "sync_dir")
                     if os.path.exists(sync_dir):
-                        best_info_path = os.path.join(sync_dir, 'best_info_0.json')
+                        best_info_path = os.path.join(sync_dir, "best_info_0.json")
                         while True:
                             if not os.path.exists(best_info_path):
                                 time.sleep(1)
                                 continue
                             try:
-                                with open(best_info_path, 'r') as f:
+                                with open(best_info_path, "r") as f:
                                     best_info: list = json.load(f)
                                 break
                             except json.decoder.JSONDecodeError as e:
                                 time.sleep(1)
                                 continue
                         # end while
-                        graphs_in_info = sorted(info['name'] for info in best_info)
+                        graphs_in_info = sorted(info["name"] for info in best_info)
                         if input_graphs == graphs_in_info:
                             return tuning_dir
             return None
@@ -620,7 +691,7 @@ class PPOMod:
         if self.cfg.resume:
             ckpt_path = self.cfg.ckpt_path
             ckpt = torch.load(ckpt_path, map_location=self.device)
-            model_state_dict = ckpt['model_state_dict']
+            model_state_dict = ckpt["model_state_dict"]
             if self.cfg.load_non_ddp_ckpt:
                 self.ac_net.load_state_dict(model_state_dict)
             else:
@@ -638,13 +709,13 @@ class PPOMod:
         if self.cfg.auto_tuning_dir:
             tuning_dir = auto_find_tuning_dir(list(input_graphs.keys()))
             if not tuning_dir:
-                raise Exception(f'Cannot find tuning_dir automatically!')
+                raise Exception(f"Cannot find tuning_dir automatically!")
         else:
             tuning_dir = self.cfg.tuning_dir
         use_tuning_dir = os.path.exists(tuning_dir)
         if use_tuning_dir:
             output_dir = tuning_dir
-            printfl(f'Test: use {tuning_dir = }')
+            printfl(f"Test: use {tuning_dir = }")
         else:
             output_dir = self.output_dir
 
@@ -670,22 +741,22 @@ class PPOMod:
             """load ckpt"""
             ckpt_path = self.cfg.ckpt_path
             ckpt = torch.load(ckpt_path, map_location=self.device)
-            model_state_dict = ckpt['model_state_dict']
+            model_state_dict = ckpt["model_state_dict"]
             self.ddp_ac_net.load_state_dict(model_state_dict)
             printfl(f'"{ckpt_path}" is loaded!')
 
             out_path: str
-            if self.cfg.ckpt_output_path == '':
+            if self.cfg.ckpt_output_path == "":
                 ckpt_fname = os.path.basename(ckpt_path)
                 os.makedirs(self.cfg.ckpt_output_dir, exist_ok=True)
                 out_path = os.path.join(
-                    self.cfg.ckpt_output_dir, f'converted_{ckpt_fname}'
+                    self.cfg.ckpt_output_dir, f"converted_{ckpt_fname}"
                 )
             else:
                 out_path = self.cfg.ckpt_output_path
             if os.path.exists(out_path):
                 for i in range(int(1e8)):
-                    posb_path = f'{out_path}.{i}'
+                    posb_path = f"{out_path}.{i}"
                     if not os.path.exists(posb_path):
                         out_path = posb_path
                         break
@@ -693,13 +764,13 @@ class PPOMod:
             printfl(f'saved "{out_path}"!')
 
 
-@hydra.main(config_path='config', config_name='config')
+@hydra.main(config_path="config", config_name="config")
 def main(config: Config) -> None:
     output_dir = os.path.abspath(os.curdir)  # get hydra output dir
     os.chdir(hydra.utils.get_original_cwd())  # set working dir to the original one
 
     cfg: BaseConfig = config.c
-    warnings.simplefilter('ignore')
+    warnings.simplefilter("ignore")
 
     ppo_mod = PPOMod(cfg, output_dir)
 
@@ -707,10 +778,10 @@ def main(config: Config) -> None:
     if len(cfg.gpus) > 1:
         ddp_processes = len(cfg.gpus)
     mp.set_start_method(cfg.mp_start_method)
-    if cfg.mode == 'train':
+    if cfg.mode == "train":
         obs_processes = ddp_processes * cfg.obs_per_agent
         tot_processes = ddp_processes + obs_processes
-        print(f'spawning {tot_processes} processes...')
+        print(f"spawning {tot_processes} processes...")
         mp.spawn(
             fn=ppo_mod.init_process,
             args=(
@@ -720,14 +791,14 @@ def main(config: Config) -> None:
             nprocs=tot_processes,
             join=True,
         )
-    elif cfg.mode == 'test':
+    elif cfg.mode == "test":
         mp.spawn(
             fn=ppo_mod.test,
             args=(ddp_processes,),
             nprocs=ddp_processes,
             join=True,
         )
-    elif cfg.mode == 'convert':
+    elif cfg.mode == "convert":
         mp.spawn(
             fn=ppo_mod.convert,
             args=(),
@@ -735,8 +806,8 @@ def main(config: Config) -> None:
             join=True,
         )
     else:
-        raise NotImplementedError(f'Unexpected mode {cfg.mode}')
+        raise NotImplementedError(f"Unexpected mode {cfg.mode}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

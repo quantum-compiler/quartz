@@ -125,7 +125,7 @@ class BaseConfig:
     lr_start_factor: float = 0.1
     lr_warmup_epochs: int = 50
     update_policy_interval: int = 1
-    save_ckpt_interval: int = 1
+    save_ckpt_interval: int = 10
     time_budget: str = ''
 
     # logging

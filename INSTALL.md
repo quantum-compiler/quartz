@@ -130,6 +130,7 @@ to `~/.bashrc`.
 
 ### Troubleshooting
 - If there is a pop-up window saying missing "python311.dll" (name varies with Python version) or "zlib.dll", go to `(path\to\conda)\envs\quartz`, copy the required .dll files to `(path\to\quartz)\build\Debug`.
+  - For any program (test/benchmark) requiring pybind11, please make sure that the working directory of that program does **not** contain "python311.dll" (name varies with Python version). If you encounter "Debug Error! ... abort() has been called" with Exception 0xe06d7363, this might be the cause.
 
 ## Dependencies for the Simulator (Optional)
 

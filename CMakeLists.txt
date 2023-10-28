@@ -136,5 +136,24 @@ install (DIRECTORY ${PROJECT_SOURCE_DIR}/src/quartz/
         DESTINATION include/quartz
         FILES_MATCHING PATTERN "*.h")
 
+if(USE_ARBLIB)
+    macro (add_executable _name)
+        # invoke built-in add_executable
+        _add_executable(${ARGV})
+        if (TARGET ${_name})
+            target_link_libraries(${_name} flint flint-arb gmp quartz_runtime ${QUARTZ_LINK_LIBS})
+        endif()
+    endmacro()
+    add_compile_definitions(USE_ARBLIB)
+else()
+    macro (add_executable _name)
+        # invoke built-in add_executable
+        _add_executable(${ARGV})
+        if (TARGET ${_name})
+            target_link_libraries(${_name} quartz_runtime ${QUARTZ_LINK_LIBS})
+        endif()
+    endmacro()
+endif()
+
 add_subdirectory(src/test)
 add_subdirectory(src/benchmark)

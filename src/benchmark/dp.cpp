@@ -12,12 +12,14 @@
 using namespace quartz;
 
 int main() {
+  // assume the work directory is in build/
   auto start = std::chrono::steady_clock::now();
   init_python_interpreter();
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
-               GateType::cx, GateType::cz, GateType::cp, GateType::swap});
+               GateType::cx, GateType::cz, GateType::cp, GateType::swap,
+               GateType::rz});
   std::vector<std::string> circuit_names = {"ae",
                                             "dj",
                                             "ghz",
@@ -30,6 +32,8 @@ int main() {
                                             "su2random",
                                             "twolocalrandom",
                                             "wstate"};
+
+  std::vector<std::string> circuit_names_nwq = {"bv", "ising"};
   // 28-34 total qubits, 28 local qubits
   std::vector<int> num_qubits;
   for (int i = 28; i <= 34; i++) {
@@ -47,15 +51,23 @@ int main() {
           return 0.5;
       },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
-  FILE *fout = fopen("dp_result.csv", "w");
+  FILE *fout = fopen("../dp_result.csv", "w");
   for (auto circuit : circuit_names) {
+    // nwq:
+    //  for (auto circuit : circuit_names_nwq) {
     fprintf(fout, "%s\n", circuit.c_str());
     std::cout << circuit << std::endl;
     for (int num_q : num_qubits) {
       auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
+          &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                     ".qasm");
+      // nwq:
+      //      auto seq = CircuitSeq::from_qasm_file(
+      //          &ctx,
+      //          std::string("../../../PycharmProjects/nwqbench/NWQ_Bench/") +
+      //                    circuit + "/qasm/" + circuit + "_n" +
+      //                    std::to_string(num_q) + ".qasm");
       // TODO: remove swap gates
 
       fprintf(fout, "%d, ", num_q);

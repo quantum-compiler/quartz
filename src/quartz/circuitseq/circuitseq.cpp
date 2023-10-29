@@ -414,18 +414,18 @@ int CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
   }
 
   auto *gate = circuit_gate->gate;
-  // Remove gates from input wires.
-  for (auto *input_wire : circuit_gate->input_wires) {
-    assert(!input_wire->output_gates.empty());
-    auto it = std::find(input_wire->output_gates.begin(),
-                        input_wire->output_gates.end(), circuit_gate);
-    assert(it != input_wire->output_gates.end());
-    input_wire->output_gates.erase(it);
-  }
 
   int ret = 1;
 
   if (gate->is_parameter_gate()) {
+    // Remove gates from input wires.
+    for (auto *input_wire : circuit_gate->input_wires) {
+      assert(!input_wire->output_gates.empty());
+      auto it = std::find(input_wire->output_gates.begin(),
+                          input_wire->output_gates.end(), circuit_gate);
+      assert(it != input_wire->output_gates.end());
+      input_wire->output_gates.erase(it);
+    }
     // Remove the parameter.
     assert(circuit_gate->output_wires.size() == 1);
     auto wire = circuit_gate->output_wires[0];
@@ -452,49 +452,7 @@ int CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
     }
   } else {
     assert(gate->is_quantum_gate());
-    int num_outputs = (int)circuit_gate->output_wires.size();
-    int j = 0;
-    for (int i = 0; i < num_outputs; i++, j++) {
-      // Match the input qubits and the output qubits.
-      while (j < (int)circuit_gate->input_wires.size() &&
-             !circuit_gate->input_wires[j]->is_qubit()) {
-        j++;
-      }
-      assert(j < (int)circuit_gate->input_wires.size());
-      assert(circuit_gate->input_wires[j]->index ==
-             circuit_gate->output_wires[i]->index);
-      if (outputs[circuit_gate->output_wires[i]->index] ==
-          circuit_gate->output_wires[i]) {
-        // Restore the outputs.
-        outputs[circuit_gate->output_wires[i]->index] =
-            circuit_gate->input_wires[j];
-      }
-      if (circuit_gate->output_wires[i]->output_gates.empty()) {
-        // Remove the qubit wires.
-        auto it = std::find_if(
-            wires.begin(), wires.end(), [&](std::unique_ptr<CircuitWire> &p) {
-              return p.get() == circuit_gate->output_wires[i];
-            });
-        assert(it != wires.end());
-        wires.erase(it);
-      } else {
-        // Merge the adjacent qubit wires.
-        for (auto &e : circuit_gate->output_wires[i]->output_gates) {
-          auto it = std::find(e->input_wires.begin(), e->input_wires.end(),
-                              circuit_gate->output_wires[i]);
-          assert(it != e->input_wires.end());
-          *it = circuit_gate->input_wires[j];
-          circuit_gate->input_wires[j]->output_gates.push_back(e);
-        }
-        // And then remove the disconnected qubit wire.
-        auto it = std::find_if(
-            wires.begin(), wires.end(), [&](std::unique_ptr<CircuitWire> &p) {
-              return p.get() == circuit_gate->output_wires[i];
-            });
-        assert(it != wires.end());
-        wires.erase(it);
-      }
-    }
+    remove_quantum_gate_from_graph(circuit_gate);
   }
 
   // Remove the gate.
@@ -515,6 +473,63 @@ int CircuitSeq::remove_first_quantum_gate() {
     }
   }
   return 0; // nothing removed
+}
+
+int CircuitSeq::remove_swap_gates() {
+  std::vector<int> qubit_permutation(num_qubits);
+  for (int i = 0; i < num_qubits; i++) {
+    qubit_permutation[i] = i;
+  }
+  std::vector<CircuitGate *> to_remove;
+  auto output_wires_to_be_removed =
+      std::make_unique<std::unordered_set<CircuitWire *>>();
+  for (auto &circuit_gate : gates) {
+    if (circuit_gate->gate->tp == GateType::swap) {
+      to_remove.push_back(circuit_gate.get());
+      assert((int)circuit_gate->output_wires.size() == 2);
+      // apply the logical swap gate
+      std::swap(qubit_permutation[circuit_gate->output_wires[0]->index],
+                qubit_permutation[circuit_gate->output_wires[1]->index]);
+      // maintain the graph topology
+      std::swap(circuit_gate->output_wires[0], circuit_gate->output_wires[1]);
+
+      remove_quantum_gate_from_graph(
+          circuit_gate.get(),
+          /*assert_no_logical_qubit_permutation=*/false,
+          output_wires_to_be_removed.get());
+      // the output wires are going to be removed,
+      // so we do not need to adjust their indices
+    } else {
+      for (auto &output_wire : circuit_gate->output_wires) {
+        if (output_wire->is_qubit()) {
+          output_wire->index = qubit_permutation[output_wire->index];
+        }
+      }
+    }
+  }
+  if (to_remove.empty()) {
+    return 0;
+  }
+  int to_remove_ptr = 0;
+  auto original_gates = std::move(gates);
+  for (auto &circuit_gate : original_gates) {
+    if (to_remove_ptr < (int)to_remove.size() &&
+        to_remove[to_remove_ptr] == circuit_gate.get()) {
+      // remove this gate
+      to_remove_ptr++;
+    } else {
+      gates.push_back(std::move(circuit_gate));
+    }
+  }
+  auto original_wires = std::move(wires);
+  for (auto &wire : original_wires) {
+    if (output_wires_to_be_removed->find(wire.get()) ==
+        output_wires_to_be_removed->end()) {
+      // keep this wire
+      wires.push_back(std::move(wire));
+    }
+  }
+  return (int)to_remove.size();
 }
 
 bool CircuitSeq::evaluate(const Vector &input_dis,
@@ -707,11 +722,11 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
     for (int i = 0; i < num_total_params; i++) {
       const auto &param = all_parameters[i];
       ComplexType shifted =
-          dot_product * ComplexType{std::cos(param), std::sin(param)};
+          dot_product *ComplexType{std::cos(param), std::sin(param)};
       generate_hash_values(ctx, shifted, i, all_parameters, &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i);
-      shifted = dot_product * ComplexType{std::cos(param), -std::sin(param)};
+      shifted = dot_product *ComplexType{std::cos(param), -std::sin(param)};
       generate_hash_values(ctx, shifted, i + num_total_params, all_parameters,
                            &tmp, &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
@@ -720,8 +735,8 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
       // Check phase shift of pi/4, 2pi/4, ..., 7pi/4.
       for (int i = 1; i < 8; i++) {
         const double pi = std::acos(-1.0);
-        ComplexType shifted = dot_product * ComplexType{std::cos(pi / 4 * i),
-                                                        std::sin(pi / 4 * i)};
+        ComplexType shifted = dot_product *ComplexType{std::cos(pi / 4 * i),
+                                                       std::sin(pi / 4 * i)};
         generate_hash_values(ctx, shifted, i, all_parameters, &tmp,
                              &other_hash_values_);
         other_hash_values_.emplace_back(tmp,
@@ -1514,6 +1529,72 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   }
   for (auto &wire : other.parameters) {
     parameters.emplace_back(wires_mapping[wire]);
+  }
+}
+
+void CircuitSeq::remove_quantum_gate_from_graph(
+    CircuitGate *circuit_gate, bool assert_no_logical_qubit_permutation,
+    std::unordered_set<CircuitWire *> *output_wires_to_be_removed) {
+  // Remove gates from input wires.
+  for (auto *input_wire : circuit_gate->input_wires) {
+    assert(!input_wire->output_gates.empty());
+    auto it = std::find(input_wire->output_gates.begin(),
+                        input_wire->output_gates.end(), circuit_gate);
+    assert(it != input_wire->output_gates.end());
+    input_wire->output_gates.erase(it);
+  }
+  int num_outputs = (int)circuit_gate->output_wires.size();
+  int j = 0;
+  for (int i = 0; i < num_outputs; i++, j++) {
+    // Match the input qubits and the output qubits.
+    while (j < (int)circuit_gate->input_wires.size() &&
+           !circuit_gate->input_wires[j]->is_qubit()) {
+      j++;
+    }
+    assert(j < (int)circuit_gate->input_wires.size());
+    if (assert_no_logical_qubit_permutation) {
+      assert(circuit_gate->input_wires[j]->index ==
+             circuit_gate->output_wires[i]->index);
+    }
+    if (outputs[circuit_gate->output_wires[i]->index] ==
+        circuit_gate->output_wires[i]) {
+      // Restore the outputs.
+      outputs[circuit_gate->output_wires[i]->index] =
+          circuit_gate->input_wires[j];
+    }
+    if (circuit_gate->output_wires[i]->output_gates.empty()) {
+      // Remove the qubit wires.
+      if (output_wires_to_be_removed) {
+        output_wires_to_be_removed->insert(circuit_gate->output_wires[i]);
+      } else {
+        auto it = std::find_if(
+            wires.begin(), wires.end(), [&](std::unique_ptr<CircuitWire> &p) {
+              return p.get() == circuit_gate->output_wires[i];
+            });
+        assert(it != wires.end());
+        wires.erase(it);
+      }
+    } else {
+      // Merge the adjacent qubit wires.
+      for (auto &e : circuit_gate->output_wires[i]->output_gates) {
+        auto it = std::find(e->input_wires.begin(), e->input_wires.end(),
+                            circuit_gate->output_wires[i]);
+        assert(it != e->input_wires.end());
+        *it = circuit_gate->input_wires[j];
+        circuit_gate->input_wires[j]->output_gates.push_back(e);
+      }
+      // And then remove the disconnected qubit wire.
+      if (output_wires_to_be_removed) {
+        output_wires_to_be_removed->insert(circuit_gate->output_wires[i]);
+      } else {
+        auto it = std::find_if(
+            wires.begin(), wires.end(), [&](std::unique_ptr<CircuitWire> &p) {
+              return p.get() == circuit_gate->output_wires[i];
+            });
+        assert(it != wires.end());
+        wires.erase(it);
+      }
+    }
   }
 }
 

@@ -58,17 +58,17 @@ int main() {
     fprintf(fout, "%s\n", circuit.c_str());
     std::cout << circuit << std::endl;
     for (int num_q : num_qubits) {
+      // requires running test_remove_swap first
       auto seq = CircuitSeq::from_qasm_file(
           &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
-                    ".qasm");
+                    "_no_swap.qasm");
       // nwq:
       //      auto seq = CircuitSeq::from_qasm_file(
       //          &ctx,
       //          std::string("../../../PycharmProjects/nwqbench/NWQ_Bench/") +
       //                    circuit + "/qasm/" + circuit + "_n" +
       //                    std::to_string(num_q) + ".qasm");
-      // TODO: remove swap gates
 
       fprintf(fout, "%d, ", num_q);
       int answer_start_with = 1;

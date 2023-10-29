@@ -62,6 +62,8 @@ public:
   int remove_first_quantum_gate();
   /**
    * Remove all swap gates, adjusting logical qubit indices correspondingly.
+   * The time complexity is
+   * O((total number of gates) + (total number of wires)) (linear).
    * @return The number of gates removed.
    */
   int remove_swap_gates();

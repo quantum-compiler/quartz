@@ -13,8 +13,10 @@
 
 namespace quartz {
 CircuitSeq::CircuitSeq(int num_qubits, int num_input_parameters)
-    : num_qubits(num_qubits), num_input_parameters(num_input_parameters),
-      hash_value_(0), hash_value_valid_(false) {
+    : num_qubits(num_qubits),
+      num_input_parameters(num_input_parameters),
+      hash_value_(0),
+      hash_value_valid_(false) {
   wires.reserve(num_qubits + num_input_parameters);
   outputs.reserve(num_qubits);
   parameters.reserve(num_input_parameters);

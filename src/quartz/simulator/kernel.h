@@ -84,4 +84,4 @@ struct KernelInDP {
   KernelType tp;
 };
 
-} // namespace quartz
+}  // namespace quartz

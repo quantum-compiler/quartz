@@ -162,7 +162,7 @@ CircuitSeqHashType EquivalenceClass::hash(Context *ctx) {
       return dag->hash(ctx);
     }
   }
-  return 0; // empty class
+  return 0;  // empty class
 }
 
 void EquivalenceClass::sort() {
@@ -239,14 +239,14 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
     // the tags
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
     fin >> std::hex >> hash_value;
-    fin.ignore(); // '_'
+    fin.ignore();  // '_'
     fin >> std::dec >> id;
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
     EquivClassTag class1 = std::make_pair(hash_value, id);
 
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
     fin >> std::hex >> hash_value;
-    fin.ignore(); // '_'
+    fin.ignore();  // '_'
     fin >> std::dec >> id;
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
     EquivClassTag class2 = std::make_pair(hash_value, id);
@@ -304,7 +304,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
     // the tag
     CircuitSeqHashType hash_value;
     fin >> std::hex >> hash_value;
-    fin.ignore(); // '_'
+    fin.ignore();  // '_'
     int id;
     fin >> std::dec >> id;
     EquivClassTag class_tag = std::make_pair(hash_value, id);
@@ -335,7 +335,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
       }
 
       // New CircuitSeq
-      fin.unget(); // '['
+      fin.unget();  // '['
       auto dag = CircuitSeq::read_json(ctx, fin);
       auto dag_hash_value = dag->hash(ctx);
       // Due to floating point errors and for compatibility of
@@ -579,7 +579,7 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
         for (const auto &other_hash : dag->other_hash_values()) {
           hash_values_to_remove.insert(other_hash);
         }
-        dag = nullptr; // delete the CircuitSeq
+        dag = nullptr;  // delete the CircuitSeq
       }
     }
     if (!class_modified) {
@@ -594,7 +594,7 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
     std::unordered_set<CircuitSeqHashType> existing_hash_values;
     std::unordered_set<CircuitSeqHashType> hash_values_to_insert;
     num_class_modified++;
-    item->set_dags({}); // insert the DAGs one by one
+    item->set_dags({});  // insert the DAGs one by one
     for (auto &dag : dags) {
       if (dag) {
         existing_hash_values.insert(dag->hash(ctx));
@@ -777,7 +777,7 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
       if (already_exist) {
         // Remove the new class.
         classes_to_insert.pop_back();
-        keep_dag_class = false; // unused
+        keep_dag_class = false;  // unused
       } else {
         // Add pointers to the new class.
         for (auto &dag : new_dag_class->get_all_dags()) {
@@ -1136,7 +1136,7 @@ int EquivalenceSet::first_class_with_common_first_or_last_gates() const {
     }
     class_id++;
   }
-  return -1; // no common first or last gates found
+  return -1;  // no common first or last gates found
 }
 
 std::string EquivalenceSet::get_class_id(int num_class) const {
@@ -1225,4 +1225,4 @@ void EquivalenceSet::remove_possible_class(const CircuitSeqHashType &hash_value,
   possible_classes.erase(equiv_class);
 }
 
-} // namespace quartz
+}  // namespace quartz

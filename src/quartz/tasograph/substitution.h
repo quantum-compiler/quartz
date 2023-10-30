@@ -21,8 +21,8 @@ struct TensorX {
   TensorX(void) : op(NULL), idx(0) {}
   TensorX(OpX *_op, int _idx) : op(_op), idx(_idx) {}
   Tensor to_edge(const GraphXfer *xfer) const;
-  OpX *op; // The op that outputs this tensor
-  int idx; // The output index of the op
+  OpX *op;  // The op that outputs this tensor
+  int idx;  // The output index of the op
   inline bool operator==(const TensorX &b) const {
     if (op != b.op)
       return false;
@@ -133,4 +133,4 @@ class GraphXfer {
   std::unordered_map<int, ParamType> paramValues;
 };
 
-} // namespace quartz
+}  // namespace quartz

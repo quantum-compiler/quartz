@@ -59,11 +59,11 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                .c_str());
     auto end2 = std::chrono::steady_clock::now();
     verification_time += end2 - start2;
-    equiv_set.clear(); // this is necessary
+    equiv_set.clear();  // this is necessary
     equiv_set.load_json(&ctx, file_prefix + "pruning.json");
   } else {
     // Create the ECC set by ourselves.
-    equiv_set.clear(); // this is necessary
+    equiv_set.clear();  // this is necessary
     for (auto &it : dataset1.dataset) {
       auto ecc = std::make_unique<EquivalenceClass>();
       ecc->set_dags(std::move(it.second));
@@ -127,4 +127,4 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                    2
             << std::endl;
 }
-} // namespace quartz
+}  // namespace quartz

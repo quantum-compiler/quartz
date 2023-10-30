@@ -202,4 +202,4 @@ class RuleParser {
       rules;
 };
 
-} // namespace quartz
+}  // namespace quartz

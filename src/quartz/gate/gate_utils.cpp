@@ -46,4 +46,4 @@ std::vector<GateType> voqc_gate_set() {
   return {GateType::h, GateType::x, GateType::rz, GateType::cx};
 }
 
-} // namespace quartz
+}  // namespace quartz

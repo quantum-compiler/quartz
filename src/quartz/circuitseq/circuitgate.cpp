@@ -230,4 +230,4 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   return result;
 }
 
-} // namespace quartz
+}  // namespace quartz

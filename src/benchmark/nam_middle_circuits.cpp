@@ -98,10 +98,10 @@ int main() {
     std::cout << "ECC set generated." << std::endl;
   }
   // Logs are printed to Nam_6_3_barenco_tof_10.log, Nam_6_3_gf2^8_mult.log, ...
-  benchmark_nam("barenco_tof_10"); // 450 gates
-  benchmark_nam("gf2^8_mult");     // 883 gates
-  benchmark_nam("qcla_mod_7");     // 884 gates
-  benchmark_nam("adder_8");        // 900 gates
+  benchmark_nam("barenco_tof_10");  // 450 gates
+  benchmark_nam("gf2^8_mult");      // 883 gates
+  benchmark_nam("qcla_mod_7");      // 884 gates
+  benchmark_nam("adder_8");         // 900 gates
   if (num_benchmark > 0) {
     std::cout << "Summary:" << std::endl;
     std::cout << summary_result.str();

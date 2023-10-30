@@ -99,4 +99,4 @@ template <int kSize> class Matrix : public MatrixBase {
   ComplexType data_[kSize][kSize];
 };
 
-} // namespace quartz
+}  // namespace quartz

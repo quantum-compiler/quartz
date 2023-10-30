@@ -15,7 +15,7 @@ class Gate {
   virtual MatrixBase *get_matrix();
   virtual MatrixBase *get_matrix(const std::vector<ParamType> &params);
   virtual ParamType compute(const std::vector<ParamType> &input_params);
-  [[nodiscard]] virtual bool is_commutative() const; // for traditional gates
+  [[nodiscard]] virtual bool is_commutative() const;  // for traditional gates
   /**
    * @return True if the gate is a multi-qubit gate and the gate remains
    * the same under any qubit permutation (e.g., CZ, CP, CCZ, SWAP).
@@ -65,4 +65,4 @@ class Gate {
 
 #undef PER_GATE
 
-} // namespace quartz
+}  // namespace quartz

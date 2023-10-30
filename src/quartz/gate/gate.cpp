@@ -54,4 +54,4 @@ bool Gate::is_toffoli_gate() const {
   return tp == GateType::ccz;
 }
 
-} // namespace quartz
+}  // namespace quartz

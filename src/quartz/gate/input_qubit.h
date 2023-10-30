@@ -17,4 +17,4 @@ class InputQubitGate : public Gate {
   MatrixBase *get_matrix() override { return &mat; }
   Matrix<1> mat;
 };
-} // namespace quartz
+}  // namespace quartz

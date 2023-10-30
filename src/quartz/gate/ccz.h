@@ -26,4 +26,4 @@ class CCZGate : public Gate {
   Matrix<8> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

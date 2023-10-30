@@ -33,7 +33,7 @@ void Generator::generate(
   // Generate all possible parameter gates at the beginning.
   assert(max_num_param_gates == 1);
   empty_dag->generate_parameter_gates(context);
-  empty_dag->hash(context); // generate other hash values
+  empty_dag->hash(context);  // generate other hash values
   std::vector<CircuitSeq *> dags_to_search(1, empty_dag.get());
   if (invoke_python_verifier) {
     assert(equiv_set);
@@ -198,7 +198,7 @@ void Generator::dfs(int gate_idx, int max_num_gates,
   for (const auto &idx : context->get_supported_quantum_gates()) {
     Gate *gate = context->get_gate(idx);
     if (gate->get_num_qubits() == 0) {
-      assert(false); // We only search for quantum gates here.
+      assert(false);  // We only search for quantum gates here.
       if (!max_remaining_param_gates) {
         // We can't add more parameter gates.
         continue;
@@ -653,4 +653,4 @@ void Generator::dfs_parameter_gates(
   }
 }
 
-} // namespace quartz
+}  // namespace quartz

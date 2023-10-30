@@ -140,7 +140,7 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
       }
     }
   }
-  return false; // fully equivalent
+  return false;  // fully equivalent
 }
 
 bool CircuitSeq::add_gate(const std::vector<int> &qubit_indices,
@@ -186,7 +186,7 @@ bool CircuitSeq::add_gate(const std::vector<int> &qubit_indices,
       wire->index = qubit_idx;
       wire->input_gates.push_back(circuit_gate.get());
       circuit_gate->output_wires.push_back(wire.get());
-      outputs[qubit_idx] = wire.get(); // Update outputs
+      outputs[qubit_idx] = wire.get();  // Update outputs
       wires.push_back(std::move(wire));
     }
   }
@@ -253,7 +253,7 @@ bool CircuitSeq::insert_gate(int insert_position,
       wire->input_gates.push_back(circuit_gate.get());
       circuit_gate->output_wires.push_back(wire.get());
       if (outputs[qubit_idx] == previous_wires[qubit_idx]) {
-        outputs[qubit_idx] = wire.get(); // Update outputs
+        outputs[qubit_idx] = wire.get();  // Update outputs
       } else {
         for (auto &output_gate : previous_wires[qubit_idx]->output_gates) {
           // Should have exactly one |output_gate|
@@ -473,7 +473,7 @@ int CircuitSeq::remove_first_quantum_gate() {
       return remove_gate(circuit_gate.get());
     }
   }
-  return 0; // nothing removed
+  return 0;  // nothing removed
 }
 
 int CircuitSeq::remove_swap_gates() {
@@ -943,7 +943,7 @@ std::string CircuitSeq::to_string(bool line_number) const {
   const int num_gates = (int)gates.size();
   for (int i = 0; i < num_gates; i++) {
     if (line_number) {
-      char buffer[20]; // enough to store any int
+      char buffer[20];  // enough to store any int
       int max_line_number_width =
           std::max(1, (int)std::ceil(std::log10(num_gates - 0.01)));
       sprintf(buffer, "%*d", max_line_number_width, i);
@@ -1124,7 +1124,7 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
         assert(ch == 'P' || ch == 'Q');
         int index;
         fin >> index;
-        fin.ignore(); // '\"'
+        fin.ignore();  // '\"'
         if (ch == 'Q') {
           qubit_indices.push_back(index);
         } else {
@@ -1154,7 +1154,7 @@ CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
   CircuitSeq *seq = nullptr;
   parser.load_qasm(filename, seq);
   std::unique_ptr<CircuitSeq> ret;
-  ret.reset(seq); // transfer ownership of |seq|
+  ret.reset(seq);  // transfer ownership of |seq|
   return ret;
 }
 
@@ -1463,7 +1463,7 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
     for (int i = 0; i < (int)other.wires.size(); i++) {
       wires.emplace_back(std::make_unique<CircuitWire>(*(other.wires[i])));
       assert(wires[i].get() !=
-             other.wires[i].get()); // make sure we make a copy
+             other.wires[i].get());  // make sure we make a copy
       wires_mapping[other.wires[i].get()] = wires[i].get();
     }
   } else {
@@ -1475,7 +1475,8 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       assert(qubit_permutation[i] >= 0 && qubit_permutation[i] < num_qubits);
       wires[qubit_permutation[i]] =
           std::make_unique<CircuitWire>(*(other.wires[i]));
-      wires[qubit_permutation[i]]->index = qubit_permutation[i]; // update index
+      wires[qubit_permutation[i]]->index =
+          qubit_permutation[i];  // update index
       assert(wires[qubit_permutation[i]].get() != other.wires[i].get());
       wires_mapping[other.wires[i].get()] = wires[qubit_permutation[i]].get();
     }
@@ -1488,7 +1489,7 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       wires[num_qubits + param_permutation[i_inc]] =
           std::make_unique<CircuitWire>(*(other.wires[i]));
       wires[num_qubits + param_permutation[i_inc]]->index =
-          param_permutation[i_inc]; // update index
+          param_permutation[i_inc];  // update index
       assert(wires[num_qubits + param_permutation[i_inc]].get() !=
              other.wires[i].get());
       wires_mapping[other.wires[i].get()] =
@@ -1498,7 +1499,7 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
          i < (int)other.wires.size(); i++) {
       wires[i] = std::make_unique<CircuitWire>(*(other.wires[i]));
       if (wires[i]->is_qubit()) {
-        wires[i]->index = qubit_permutation[wires[i]->index]; // update index
+        wires[i]->index = qubit_permutation[wires[i]->index];  // update index
       }
       assert(wires[i].get() != other.wires[i].get());
       wires_mapping[other.wires[i].get()] = wires[i].get();
@@ -1687,4 +1688,4 @@ bool CircuitSeq::same_gate(CircuitGate *gate1, CircuitGate *gate2) {
   return true;
 }
 
-} // namespace quartz
+}  // namespace quartz

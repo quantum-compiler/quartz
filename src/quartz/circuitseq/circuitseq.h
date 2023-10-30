@@ -19,7 +19,7 @@ class CircuitSeq {
  public:
   // TODO: Input parameters should be handled in Context instead of here
   CircuitSeq(int num_qubits, int num_input_parameters);
-  CircuitSeq(const CircuitSeq &other); // clone a CircuitSeq
+  CircuitSeq(const CircuitSeq &other);  // clone a CircuitSeq
   [[nodiscard]] std::unique_ptr<CircuitSeq> clone() const;
   [[nodiscard]] bool fully_equivalent(const CircuitSeq &other) const;
   [[nodiscard]] bool fully_equivalent(Context *ctx, CircuitSeq &other);
@@ -281,4 +281,4 @@ class UniquePtrCircuitSeqComparator {
     return seq1->less_than(*seq2);
   }
 };
-} // namespace quartz
+}  // namespace quartz

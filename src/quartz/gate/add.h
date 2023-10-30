@@ -16,4 +16,4 @@ class AddGate : public Gate {
   bool is_commutative() const override { return true; }
 };
 
-} // namespace quartz
+}  // namespace quartz

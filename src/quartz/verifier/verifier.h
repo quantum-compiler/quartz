@@ -23,4 +23,4 @@ class Verifier {
   bool redundant(Context *ctx, const EquivalenceSet *eqs, CircuitSeq *dag);
 };
 
-} // namespace quartz
+}  // namespace quartz

@@ -24,4 +24,4 @@ class PythonInterpreter {
   pybind11::function solve_ilp_;
 };
 
-} // namespace quartz
+}  // namespace quartz

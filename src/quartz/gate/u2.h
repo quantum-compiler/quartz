@@ -30,4 +30,4 @@ class U2Gate : public Gate {
       cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

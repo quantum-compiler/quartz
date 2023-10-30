@@ -34,4 +34,4 @@ class CircuitWire {
   std::vector<CircuitGate *> output_gates;
 };
 
-} // namespace quartz
+}  // namespace quartz

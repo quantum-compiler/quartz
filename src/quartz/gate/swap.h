@@ -16,4 +16,4 @@ class SWAPGate : public Gate {
   bool is_sparse() const override { return true; }
   Matrix<4> mat;
 };
-} // namespace quartz
+}  // namespace quartz

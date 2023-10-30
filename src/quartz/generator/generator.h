@@ -96,4 +96,4 @@ class Generator {
   Verifier verifier_;
 };
 
-} // namespace quartz
+}  // namespace quartz

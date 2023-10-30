@@ -154,4 +154,4 @@ std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter,
                               int answer_start_with = 1);
-} // namespace quartz
+}  // namespace quartz

@@ -29,4 +29,4 @@ class CPGate : public Gate {
   std::unordered_map<float, std::unique_ptr<Matrix<4>>> cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

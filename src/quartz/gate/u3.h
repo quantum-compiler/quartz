@@ -32,4 +32,4 @@ class U3Gate : public Gate {
       cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

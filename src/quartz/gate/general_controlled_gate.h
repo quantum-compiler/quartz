@@ -79,4 +79,4 @@ class GeneralControlledGate : public Gate {
   Gate *controlled_gate_;
   std::vector<bool> state_;
 };
-} // namespace quartz
+}  // namespace quartz

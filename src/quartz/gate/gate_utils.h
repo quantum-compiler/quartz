@@ -27,4 +27,4 @@ const int kMaxParamInputPerQuantumGate = 3;
 std::vector<GateType> ibmq_gate_set();
 std::vector<GateType> voqc_gate_set();
 
-} // namespace quartz
+}  // namespace quartz

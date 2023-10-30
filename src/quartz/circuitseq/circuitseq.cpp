@@ -1,4 +1,5 @@
 #include "circuitseq.h"
+
 #include "../context/context.h"
 #include "../gate/gate.h"
 #include "../parser/qasm_parser.h"

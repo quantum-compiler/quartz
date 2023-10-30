@@ -2,6 +2,7 @@
 
 #include "../gate/gate_utils.h"
 #include "context.h"
+
 #include <assert.h>
 #include <cmath>
 #include <istream>

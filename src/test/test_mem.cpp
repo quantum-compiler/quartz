@@ -1,11 +1,11 @@
+#include "quartz/context/context.h"
+#include "quartz/tasograph/substitution.h"
+#include "quartz/tasograph/tasograph.h"
+
 #include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
-
-#include "quartz/context/context.h"
-#include "quartz/tasograph/substitution.h"
-#include "quartz/tasograph/tasograph.h"
 
 using namespace quartz;
 

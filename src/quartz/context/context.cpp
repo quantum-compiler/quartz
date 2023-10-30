@@ -1,4 +1,5 @@
 #include "context.h"
+
 #include "../gate/all_gates.h"
 #include "quartz/circuitseq/circuitseq.h"
 

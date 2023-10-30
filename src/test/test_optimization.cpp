@@ -1,4 +1,5 @@
 #include "test_optimization.h"
+
 #include "quartz/gate/gate_utils.h"
 
 #include <iostream>

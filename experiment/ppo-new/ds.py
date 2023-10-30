@@ -493,7 +493,7 @@ class GraphBuffer:
             weights = 1 / (gcost - gcost.min() + 0.2)
             # weights = (gcost == gcost.min()).float()
         else:
-            weights = 1 / gcost**4
+            weights = 1 / gcost ** 4
         sampled_gcost_idx = int(torch.multinomial(weights, num_samples=1))
         sampled_gcost = gcost_list[sampled_gcost_idx]
         graphs = self.cost_to_graph[sampled_gcost]

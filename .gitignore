@@ -48,9 +48,6 @@ Makefile
 # Dataset
 *.json
 
-# Clang format
-.clang-format
-
 # Cython
 python/quartz/_cython/*.cpp
 python/build/*

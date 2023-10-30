@@ -1,6 +1,7 @@
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "test/gen_ecc_set.h"
+
 #include <cmath>
 #include <filesystem>
 #include <sstream>

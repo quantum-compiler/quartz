@@ -6,7 +6,7 @@
 
 namespace quartz {
 class GeneralControlledGate : public Gate {
-public:
+ public:
   GeneralControlledGate(Gate *controlled_gate, const std::vector<bool> &state)
       : controlled_gate_(controlled_gate), state_(state),
         Gate(controlled_gate->tp, controlled_gate->num_qubits,

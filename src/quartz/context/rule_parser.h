@@ -13,7 +13,7 @@
 namespace quartz {
 
 class Command {
-public:
+ public:
   Command() {}
   Command(const Command &cmd) {
     tp = cmd.tp;
@@ -77,7 +77,7 @@ public:
 };
 
 class RuleParser {
-public:
+ public:
   RuleParser(std::vector<std::string> rules_) {
     for (auto rule : rules_) {
       std::string gate_name;
@@ -151,7 +151,7 @@ public:
     return false;
   }
 
-public:
+ public:
   static std::pair<RuleParser *, RuleParser *> ccz_cx_rz_rules() {
     RuleParser *rule_0 =
         new RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
@@ -194,7 +194,7 @@ public:
     return std::make_pair(rule_0, rule_1);
   }
 
-private:
+ private:
   std::map<GateType,
            std::vector<std::pair<
                Command, std::pair<std::vector<Command>, std::set<GateType>>>>>

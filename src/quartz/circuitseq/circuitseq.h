@@ -16,7 +16,7 @@ namespace quartz {
 class Context;
 
 class CircuitSeq {
-public:
+ public:
   // TODO: Input parameters should be handled in Context instead of here
   CircuitSeq(int num_qubits, int num_input_parameters);
   CircuitSeq(const CircuitSeq &other); // clone a CircuitSeq
@@ -212,7 +212,7 @@ public:
 
   static bool same_gate(CircuitGate *gate1, CircuitGate *gate2);
 
-private:
+ private:
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
@@ -243,13 +243,13 @@ private:
       const std::vector<ParamType> &param_values, CircuitSeqHashType *main_hash,
       std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>> *other_hash);
 
-public:
+ public:
   std::vector<std::unique_ptr<CircuitWire>> wires;
   std::vector<std::unique_ptr<CircuitGate>> gates;
   std::vector<CircuitWire *> outputs;
   std::vector<CircuitWire *> parameters;
 
-private:
+ private:
   int num_qubits, num_input_parameters;
   CircuitSeqHashType hash_value_;
   // For both floating-point error tolerance
@@ -271,7 +271,7 @@ private:
 };
 
 class UniquePtrCircuitSeqComparator {
-public:
+ public:
   bool operator()(const std::unique_ptr<CircuitSeq> &seq1,
                   const std::unique_ptr<CircuitSeq> &seq2) const {
     if (!seq1 || !seq2) {

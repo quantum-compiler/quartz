@@ -5,7 +5,7 @@
 
 namespace quartz {
 class RYGate : public Gate {
-public:
+ public:
   RYGate() : Gate(GateType::ry, 1 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);

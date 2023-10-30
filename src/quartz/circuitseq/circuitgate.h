@@ -15,7 +15,7 @@ class Context;
  * Stores the gate type, input and output information.
  */
 class CircuitGate {
-public:
+ public:
   // Get the minimum qubit index of the gate.
   [[nodiscard]] int get_min_qubit_index() const;
   // Get the qubit indices of the gate.

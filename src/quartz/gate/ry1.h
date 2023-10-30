@@ -4,7 +4,7 @@
 
 namespace quartz {
 class RY1Gate : public Gate {
-public:
+ public:
   RY1Gate()
       : Gate(GateType::ry1, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(1 / std::sqrt(2)), ComplexType(-1 / std::sqrt(2))},

@@ -6,7 +6,7 @@
 
 namespace quartz {
 class SWAPGate : public Gate {
-public:
+ public:
   SWAPGate()
       : Gate(GateType::swap, 2 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0, 0, 0}, {0, 0, 1, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}}) {}

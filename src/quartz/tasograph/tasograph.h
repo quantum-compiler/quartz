@@ -24,7 +24,7 @@ namespace quartz {
 bool equal_to_2k_pi(double d);
 
 class Op {
-public:
+ public:
   Op(void);
   Op(size_t _guid, Gate *_ptr) : guid(_guid), ptr(_ptr) {}
   inline bool operator==(const Op &b) const {
@@ -62,13 +62,13 @@ public:
   }
   static const Op INVALID_OP;
 
-public:
+ public:
   size_t guid;
   Gate *ptr;
 };
 
 class OpCompare {
-public:
+ public:
   bool operator()(const Op &a, const Op &b) const {
     if (a.guid != b.guid)
       return a.guid < b.guid;
@@ -77,7 +77,7 @@ public:
 };
 
 class OpHash {
-public:
+ public:
   size_t operator()(const Op &a) const {
     std::hash<size_t> hash_fn;
     return hash_fn(a.guid) * 17 + hash_fn((size_t)(a.ptr));
@@ -85,7 +85,7 @@ public:
 };
 
 class Pos {
-public:
+ public:
   Pos() {
     op = Op();
     idx = 0;
@@ -127,7 +127,7 @@ inline bool operator!=(const Pos &a, const Pos &b) {
 }
 
 class PosHash {
-public:
+ public:
   size_t operator()(const Pos &a) const {
     std::hash<size_t> hash_fn;
     OpHash op_hash;
@@ -136,7 +136,7 @@ public:
 };
 
 class PosCompare {
-public:
+ public:
   bool operator()(const Pos &a, const Pos &b) const {
     if (a.op != b.op)
       return a.op < b.op;
@@ -145,7 +145,7 @@ public:
 };
 
 class Tensor {
-public:
+ public:
   Tensor(void);
   int idx;
   Op op;
@@ -176,7 +176,7 @@ class GraphXfer;
 class OpX;
 
 class Graph {
-public:
+ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const CircuitSeq *seq);
   Graph(const Graph &graph);
@@ -311,7 +311,7 @@ public:
   std::vector<std::shared_ptr<Graph>>
   topology_partition(const int partition_gate_count) const;
 
-private:
+ private:
   void replace_node(Op oldOp, Op newOp);
   void remove_edge(Op srcOp, Op dstOp);
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
@@ -335,7 +335,7 @@ private:
       GraphXfer *xfer, Op op,
       std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const;
 
-public:
+ public:
   size_t special_op_guid;
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;

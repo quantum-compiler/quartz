@@ -6,7 +6,7 @@
 
 namespace quartz {
 class CU1Gate : public Gate {
-public:
+ public:
   CU1Gate() : Gate(GateType::cu1, 2 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);

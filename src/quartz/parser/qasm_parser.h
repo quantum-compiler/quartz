@@ -25,7 +25,7 @@ bool is_gate_string(const std::string &token, GateType &type);
 std::string strip(const std::string &input);
 
 class QASMParser {
-public:
+ public:
   QASMParser(Context *ctx) : context(ctx) {}
 
   template <class _CharT, class _Traits>
@@ -49,7 +49,7 @@ public:
     return res;
   }
 
-private:
+ private:
   Context *context;
 };
 

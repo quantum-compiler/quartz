@@ -7,7 +7,7 @@
 namespace quartz {
 // Verify if two circuits are equivalent and other things about DAGs.
 class Verifier {
-public:
+ public:
   bool equivalent(Context *ctx, CircuitSeq *circuit1, CircuitSeq *circuit2);
   // On-the-fly equivalence checking while generating circuits
   bool equivalent_on_the_fly(Context *ctx, CircuitSeq *circuit1,

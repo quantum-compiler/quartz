@@ -6,7 +6,7 @@
 
 namespace quartz {
 class PGate : public Gate {
-public:
+ public:
   PGate() : Gate(GateType::p, 1 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);

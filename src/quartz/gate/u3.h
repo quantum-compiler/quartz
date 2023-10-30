@@ -6,7 +6,7 @@
 
 namespace quartz {
 class U3Gate : public Gate {
-public:
+ public:
   U3Gate() : Gate(GateType::u3, 1 /*num_qubits*/, 3 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 3);

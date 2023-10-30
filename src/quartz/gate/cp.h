@@ -6,7 +6,7 @@
 
 namespace quartz {
 class CPGate : public Gate {
-public:
+ public:
   CPGate() : Gate(GateType::cp, 2 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);

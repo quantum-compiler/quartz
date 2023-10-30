@@ -10,7 +10,7 @@
 
 namespace quartz {
 class Gate {
-public:
+ public:
   Gate(GateType tp, int num_qubits, int num_parameters);
   virtual MatrixBase *get_matrix();
   virtual MatrixBase *get_matrix(const std::vector<ParamType> &params);

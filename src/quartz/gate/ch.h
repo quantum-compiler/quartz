@@ -6,7 +6,7 @@
 
 namespace quartz {
 class CHGate : public Gate {
-public:
+ public:
   CHGate()
       : Gate(GateType::ch, 2 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0, 0, 0},

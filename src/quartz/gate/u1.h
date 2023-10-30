@@ -2,6 +2,7 @@
 
 #include "../math/matrix.h"
 #include "gate.h"
+
 #include <cassert>
 
 namespace quartz {

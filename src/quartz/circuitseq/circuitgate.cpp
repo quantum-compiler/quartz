@@ -1,4 +1,5 @@
 #include "circuitgate.h"
+
 #include "circuitwire.h"
 #include "context/context.h"
 

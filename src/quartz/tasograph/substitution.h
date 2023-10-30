@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "quartz/circuitseq/circuitseq.h"
 #include "tasograph.h"
+
 #include <ostream>
 #include <queue>
 

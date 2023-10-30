@@ -1,4 +1,5 @@
 #include "generator.h"
+
 #include "../dataset/equivalence_set.h"
 
 #include <cassert>

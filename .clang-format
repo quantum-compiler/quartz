@@ -79,7 +79,7 @@ ForEachMacros:
   - BOOST_FOREACH
 IfMacros:
   - KJ_IF_MAYBE
-IncludeBlocks:   Preserve  # Regroup
+IncludeBlocks:   Regroup
 IncludeCategories:
   - Regex:           '^<ext/.*\.h>'
     Priority:        2
@@ -88,7 +88,7 @@ IncludeCategories:
     Priority:        2
     SortPriority:    0
   - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
-    Priority:        3
+    Priority:        4
     SortPriority:    0
   - Regex:           '^<.*\.h>'
     Priority:        1

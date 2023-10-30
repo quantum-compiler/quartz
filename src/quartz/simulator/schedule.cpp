@@ -301,7 +301,7 @@ bool Schedule::compute_kernel_schedule(
 
   // A state for dynamic programming.
   struct Status {
-  public:
+   public:
     static size_t get_hash(const std::vector<int> &s) {
       size_t result = 5381;
       for (const auto &i : s) {
@@ -463,11 +463,11 @@ bool Schedule::compute_kernel_schedule(
     size_t hash;
   };
   class StatusHash {
-  public:
+   public:
     size_t operator()(const Status &s) const { return s.hash; }
   };
   struct LocalSchedule {
-  public:
+   public:
     [[nodiscard]] std::string to_string() const {
       std::string result;
       result += "{";

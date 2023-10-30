@@ -4,7 +4,7 @@
 
 namespace quartz {
 class HGate : public Gate {
-public:
+ public:
   HGate()
       : Gate(GateType::h, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(1 / std::sqrt(2)), ComplexType(1 / std::sqrt(2))},

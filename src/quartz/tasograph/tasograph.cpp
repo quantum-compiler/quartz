@@ -1589,7 +1589,6 @@ std::shared_ptr<Graph> Graph::from_qasm_str(Context *ctx,
 
 void Graph::draw_circuit(const std::string &src_file_name,
                          const std::string &save_filename) {
-
   system(("python python/draw_graph.py " + src_file_name + " " + save_filename)
              .c_str());
 }

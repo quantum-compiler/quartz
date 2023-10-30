@@ -8,7 +8,7 @@
 namespace quartz {
 // An std::vector<ComplexType> to store the distributions.
 class Vector {
-public:
+ public:
   Vector() = default;
   explicit Vector(int sz) : data_(sz) {}
   explicit Vector(const std::vector<ComplexType> &data) : data_(data) {}
@@ -24,7 +24,7 @@ public:
   // Otherwise, use a static mt19937 generator for this function.
   static Vector random_generate(int num_qubits, std::mt19937 *gen = nullptr);
 
-private:
+ private:
   std::vector<ComplexType> data_;
 };
 

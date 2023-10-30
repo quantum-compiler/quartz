@@ -16,7 +16,7 @@ namespace quartz {
  * A simulation schedule of a circuit sequence on one device.
  */
 class Schedule {
-public:
+ public:
   Schedule(std::unique_ptr<CircuitSeq> &&sequence,
            const std::vector<int> &local_qubit,
            const std::vector<int> &global_qubit,
@@ -111,7 +111,7 @@ public:
   std::vector<Kernel> kernels;
   KernelCostType cost_;
 
-private:
+ private:
   // The original circuit sequence.
   std::unique_ptr<CircuitSeq> sequence_;
 

@@ -11,7 +11,7 @@ void init_python_interpreter();
 
 // There can only be one alive PythonInterpreter object at any time.
 class PythonInterpreter {
-public:
+ public:
   std::vector<std::vector<int>>
   solve_ilp(const std::vector<std::vector<int>> &circuit_gate_qubits,
             const std::vector<int> &circuit_gate_executable_type,
@@ -19,7 +19,7 @@ public:
             int num_local_qubits, int num_iterations,
             bool print_solution = false);
 
-private:
+ private:
   pybind11::scoped_interpreter guard_;
   pybind11::function solve_ilp_;
 };

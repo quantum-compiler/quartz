@@ -84,7 +84,7 @@ Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
 #ifdef USE_ARBLIB
   constexpr slong kRandPrec = 64;
   class FlintRandWrapper {
-  public:
+   public:
     FlintRandWrapper() { flint_randinit(state); }
     ~FlintRandWrapper() { flint_randclear(state); }
     flint_rand_t state{};

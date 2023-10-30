@@ -4,7 +4,7 @@
 
 namespace quartz {
 class SXGate : public Gate {
-public:
+ public:
   SXGate()
       : Gate(GateType::sx, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(0.5 + 0.5i), ComplexType(0.5 - 0.5i)},

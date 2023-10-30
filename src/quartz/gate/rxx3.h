@@ -6,7 +6,7 @@
 
 namespace quartz {
 class RXX3Gate : public Gate {
-public:
+ public:
   RXX3Gate()
       : Gate(GateType::rxx3, 2 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(-1 / std::sqrt(2)), ComplexType(0), ComplexType(0),

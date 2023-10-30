@@ -40,7 +40,7 @@ struct TensorXCompare {
 };
 
 class TensorXHash {
-public:
+ public:
   size_t operator()(const TensorX &a) const {
     std::hash<size_t> hash_fn;
     return hash_fn(a.idx) * 17 + hash_fn((size_t)(a.op));
@@ -48,20 +48,20 @@ public:
 };
 
 class OpX {
-public:
+ public:
   OpX(const OpX &_op);
   OpX(GateType _type);
   void add_input(const TensorX &input);
   void add_output(const TensorX &output);
 
-public:
+ public:
   GateType type;
   Op mapOp;
   std::vector<TensorX> inputs, outputs;
 };
 
 class GraphCompare {
-public:
+ public:
   GraphCompare() {
     cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -72,12 +72,12 @@ public:
     return cost_function_(lhs.get()) > cost_function_(rhs.get());
   }
 
-private:
+ private:
   std::function<float(Graph *)> cost_function_;
 };
 
 class GraphXfer {
-public:
+ public:
   GraphXfer(Context *_context);
   GraphXfer(Context *_context, const CircuitSeq *src_graph,
             const CircuitSeq *dst_graph);
@@ -106,7 +106,7 @@ public:
   // TODO: not implemented
   //   std::string to_qasm(std::vector<OpX *> const &v) const;
 
-public:
+ public:
   static GraphXfer *create_GraphXfer(Context *_context,
                                      const CircuitSeq *src_graph,
                                      const CircuitSeq *dst_graph,
@@ -121,7 +121,7 @@ public:
   static std::pair<GraphXfer *, GraphXfer *> ccz_cx_u1_xfer(Context *ctx);
   static std::pair<GraphXfer *, GraphXfer *> ccz_cx_t_xfer(Context *ctx);
 
-public:
+ public:
   Context *context;
   int tensorId;
   std::unordered_map<Op, OpX *, OpHash> mappedOps;

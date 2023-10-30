@@ -31,7 +31,7 @@ constexpr bool kCheckPhaseShiftOfPiOver4 = true;
 constexpr int kCheckPhaseShiftOfPiOver4Index = 10000; // not used now
 
 struct PairHash {
-public:
+ public:
   template <typename T, typename U>
   std::size_t operator()(const std::pair<T, U> &x) const {
     return std::hash<T>()(x.first) ^ std::hash<U>()(x.second);

@@ -9,7 +9,7 @@ namespace quartz {
 // Only used as a wrapper of input qubit in TASO graph
 // TODO
 class InputQubitGate : public Gate {
-public:
+ public:
   InputQubitGate()
       : Gate(GateType::input_qubit, 0 /*num_qubits*/, 0 /*num_parameters*/),
         mat() {}

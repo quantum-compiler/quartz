@@ -11,7 +11,7 @@
 
 namespace quartz {
 class Generator {
-public:
+ public:
   explicit Generator(Context *ctx) : context(ctx) {}
 
   // Use DFS to generate all equivalent DAGs with |num_qubits| qubits,
@@ -70,7 +70,7 @@ public:
                std::chrono::steady_clock::now()) *record_verification_time =
           nullptr);
 
-private:
+ private:
   void initialize_supported_quantum_gates();
 
   void dfs(int gate_idx, int max_num_gates, int max_remaining_param_gates,

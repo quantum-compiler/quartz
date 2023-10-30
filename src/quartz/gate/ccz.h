@@ -6,7 +6,7 @@
 
 namespace quartz {
 class CCZGate : public Gate {
-public:
+ public:
   CCZGate()
       : Gate(GateType::ccz, 3 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0, 0, 0, 0, 0, 0, 0},

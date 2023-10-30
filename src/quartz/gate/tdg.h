@@ -4,7 +4,7 @@
 
 namespace quartz {
 class TDGGate : public Gate {
-public:
+ public:
   TDGGate()
       : Gate(GateType::tdg, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0}, {0, std::sqrt(2) / 2 * (1.0 - 1.0i)}}) {}

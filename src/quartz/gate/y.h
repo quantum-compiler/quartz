@@ -4,7 +4,7 @@
 
 namespace quartz {
 class YGate : public Gate {
-public:
+ public:
   YGate()
       : Gate(GateType::y, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(0), ComplexType(-1.0i)},

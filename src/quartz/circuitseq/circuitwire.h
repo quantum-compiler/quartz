@@ -11,7 +11,7 @@ class CircuitGate;
  * Can be a qubit or a parameter (see comment below).
  */
 class CircuitWire {
-public:
+ public:
   enum Type {
     internal_qubit,
     input_qubit,

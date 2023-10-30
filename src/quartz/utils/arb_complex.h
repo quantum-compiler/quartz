@@ -12,7 +12,7 @@ namespace quartz {
 constexpr slong kArbPrec = 64;
 
 class ArbComplex {
-public:
+ public:
   using value_type = arb_t;
   ArbComplex() {
     arb_init(re);
@@ -100,7 +100,7 @@ public:
     std::cout << ")";
   }
 
-private:
+ private:
   arb_t re, im;
 };
 

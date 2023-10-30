@@ -15,7 +15,7 @@ namespace quartz {
 class CircuitSeq;
 
 class Context {
-public:
+ public:
   explicit Context(const std::vector<GateType> &supported_gates);
   Context(const std::vector<GateType> &supported_gates, const int num_qubits,
           const int num_params);
@@ -62,7 +62,7 @@ public:
   // ranging [0, 1].
   double random_number();
 
-private:
+ private:
   bool insert_gate(GateType tp);
 
   size_t global_unique_id;

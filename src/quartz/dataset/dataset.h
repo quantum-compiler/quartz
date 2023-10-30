@@ -8,7 +8,7 @@
 namespace quartz {
 
 class Dataset {
-public:
+ public:
   bool save_json(Context *ctx, const std::string &file_name) const;
 
   // Return the number of DAGs removed.

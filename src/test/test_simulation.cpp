@@ -141,7 +141,8 @@ int main() {
     num_local_qubits.push_back(i);
   }
   quartz::KernelCost kernel_cost(
-      /*fusion_kernel_costs=*/{0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
+      /*fusion_kernel_costs=*/
+      {0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
       /*shared_memory_init_cost=*/6,
       /*shared_memory_gate_cost=*/
       [](quartz::GateType type) {

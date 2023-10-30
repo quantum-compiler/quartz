@@ -16,7 +16,7 @@ std::string kernel_type_name(KernelType tp);
  * A kernel used in the output of schedule.
  */
 class Kernel {
-public:
+ public:
   Kernel(const CircuitSeq &gates, const std::vector<int> &qubits,
          KernelType type)
       : gates(gates), qubits(qubits), type(type) {}
@@ -65,7 +65,7 @@ public:
  * schedule.
  */
 struct KernelInDP {
-public:
+ public:
   // It is unspecified what the kernel type is if the default constructor
   // is called.
   KernelInDP() {}

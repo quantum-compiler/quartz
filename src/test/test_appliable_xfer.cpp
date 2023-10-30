@@ -70,7 +70,6 @@ int main() {
   const int idx = 7;
 
   for (int _t = 0; _t < 1e5; _t++) {
-
     const auto t1_start = std::chrono::high_resolution_clock::now();
     const auto ans_ref = graph.appliable_xfers(all_ops[idx], xfers);
     const auto t1_end = std::chrono::high_resolution_clock::now();

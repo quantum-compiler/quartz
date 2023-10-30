@@ -9,6 +9,7 @@
 #include <functional>
 #include <istream>
 #include <string>
+#include <unordered_set>
 
 namespace quartz {
 
@@ -42,11 +43,30 @@ public:
   // TODO: Currently we only support |max_recursion_depth == 1|.
   void generate_parameter_gates(Context *ctx, int max_recursion_depth = 1);
 
-  // Return the total number of gates removed.
-  // The time complexity is O((number of gates removed) *
-  // ((total number of wires) + (total number of gates))).
+  /**
+   * Remove a quantum gate or a classical "gate".
+   * The time complexity is
+   * O((number of gates removed) * (total number of gates)
+   * + (number of wires removed) * (total number of wires)).
+   * @param circuit_gate the gate to be removed.
+   * @return The number of gates removed.
+   */
   int remove_gate(CircuitGate *circuit_gate);
+  /**
+   * Remove the first quantum gate (if there is one).
+   * The time complexity is
+   * O((total number of gates)
+   * + (number of wires removed) * (total number of wires)).
+   * @return The number of gates removed.
+   */
   int remove_first_quantum_gate();
+  /**
+   * Remove all swap gates, adjusting logical qubit indices correspondingly.
+   * The time complexity is
+   * O((total number of gates) + (total number of wires)) (linear).
+   * @return The number of gates removed.
+   */
+  int remove_swap_gates();
   // Evaluate the output distribution given input distribution and
   // input parameters. Also output all parameter values (including input
   // and internal parameters) when |parameter_values| is not nullptr.
@@ -196,6 +216,25 @@ private:
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation);
+
+  /**
+   * Remove a quantum gate from the graph, remove its output wires by default,
+   * adjust the pointers, but do not remove the gate from |gates|.
+   * The time complexity is
+   * O((number of wires removed) * (total number of wires)) by default,
+   * or O(number of wires of the gate) if the wires are not removed.
+   * @param circuit_gate The gate to be removed.
+   * @param assert_no_logical_qubit_permutation If this variable is true (by
+   * default), assert that removing this gate will not cause future qubit
+   * indices being swapped.
+   * @param output_wires_to_be_removed If this variable is nullptr, remove
+   * the output wires; otherwise, store the output wires to be removed into
+   * this set.
+   */
+  void remove_quantum_gate_from_graph(
+      CircuitGate *circuit_gate,
+      bool assert_no_logical_qubit_permutation = true,
+      std::unordered_set<CircuitWire *> *output_wires_to_be_removed = nullptr);
 
   // A helper function used by |CircuitSeqHashType hash(Context *ctx)|.
   static void generate_hash_values(

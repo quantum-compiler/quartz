@@ -618,7 +618,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
   std::unordered_map<int, std::pair<Op, int>> newMapInputs;
   for (size_t i = 0; i < srcOp->inputs.size(); i++) {
     TensorX in = srcOp->inputs[i];
-    if (in.op == NULL) { // Input tensor
+    if (in.op == NULL) {  // Input tensor
       auto it = mappedInputs.find(in.idx);
       if (it != mappedInputs.end()) {
         // Input is already mapped
@@ -1103,4 +1103,4 @@ std::string GraphXfer::src_str() const { return to_str(srcOps); }
 
 std::string GraphXfer::dst_str() const { return to_str(dstOps); }
 
-}; // namespace quartz
+};  // namespace quartz

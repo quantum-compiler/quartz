@@ -19,4 +19,4 @@ class CZGate : public Gate {
   Matrix<4> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

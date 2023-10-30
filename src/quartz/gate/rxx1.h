@@ -22,4 +22,4 @@ class RXX1Gate : public Gate {
   Matrix<4> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

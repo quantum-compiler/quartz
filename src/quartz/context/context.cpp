@@ -270,4 +270,4 @@ Context union_contexts(Context *ctx_0, Context *ctx_1) {
   return Context(union_vector);
 }
 
-} // namespace quartz
+}  // namespace quartz

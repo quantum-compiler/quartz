@@ -40,7 +40,7 @@ size_t Schedule::num_down_sets() {
   down_sets.insert(empty_set);
   to_search.push(empty_set);
 
-  long long tmp = 1; // debug
+  long long tmp = 1;  // debug
   while (!to_search.empty()) {
     auto current_set = to_search.front();
     to_search.pop();
@@ -616,7 +616,7 @@ bool Schedule::compute_kernel_schedule(
                   << std::endl;
       }
       costs.reserve(f_prev.size());
-      KernelCostType lowest_cost, highest_cost; // for debugging
+      KernelCostType lowest_cost, highest_cost;  // for debugging
       for (auto it = f_prev.begin(); it != f_prev.end(); it++) {
         // Use the current "end" cost as a heuristic.
         // TODO: profile the running time of |compute_end_schedule| and see
@@ -1240,7 +1240,7 @@ bool Schedule::compute_kernel_schedule(
           /*current_merging_kernel=*/KernelInDP(), /*cost=*/current_cost,
           /*touching_set_index=*/-1, /*kernel_index=*/num_kernels);
     }
-  } // end of for (int i = 0; i < num_gates; i++)
+  }  // end of for (int i = 0; i < num_gates; i++)
   if (f[num_gates & 1].empty()) {
     return false;
   }
@@ -1269,7 +1269,7 @@ bool Schedule::compute_kernel_schedule(
   kernels.reserve(result_schedule.kernels.size());
   std::vector<bool> executed(num_gates, false);
   cost_ = min_cost;
-  int start_gate_index = 0; // an optimization
+  int start_gate_index = 0;  // an optimization
   for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
     CircuitSeq current_seq(num_qubits, sequence_->get_num_input_parameters());
@@ -1425,7 +1425,7 @@ bool Schedule::compute_kernel_schedule_simple(
         }
         if (dp[i - j - 1] + current_cost < dp[i]) {
           dp[i] = dp[i - j - 1] + current_cost;
-          dp_from[i] = std::make_pair(i - j - 1, tp); // record the transition
+          dp_from[i] = std::make_pair(i - j - 1, tp);  // record the transition
         }
       }
       while (j < (int)k.size()) {
@@ -1505,7 +1505,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
         [&recent_qubit_weight, &num_qubits, &kDiscountFactor,
          &special](const std::vector<CircuitGate *> &gates) -> int {
       int gate_location = 0;
-      double max_weight = 0; // not used
+      double max_weight = 0;  // not used
       double total_exp_weight = 0;
       static std::mt19937 rng(0);
       std::vector<double> weights(gates.size(), 0);
@@ -1534,7 +1534,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       }
       // choose |gate_location|, update weights
       for (auto &weight : recent_qubit_weight) {
-        weight *= kDiscountFactor; // discount older weights
+        weight *= kDiscountFactor;  // discount older weights
       }
       for (auto qubit : gates[gate_location]->get_qubit_indices()) {
         // |qubit| gets 1, |qubit - 1| gets 0.5, |qubit +- 2| gets 0.25, ...
@@ -1663,7 +1663,7 @@ get_schedules(const CircuitSeq &sequence,
   std::vector<int> current_global_qubit_layout;
   std::vector<bool> local_qubit_mask(num_qubits, false);
   std::vector<bool> executed(num_gates, false);
-  int start_gate_index = 0; // an optimization
+  int start_gate_index = 0;  // an optimization
 
   // Variables for |attach_single_qubit_gates|=true.
   // |single_qubit_gate_indices[i]|: the indices of single-qubit gates at the
@@ -2326,4 +2326,4 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
     }
   }
 }
-} // namespace quartz
+}  // namespace quartz

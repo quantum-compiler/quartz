@@ -7,10 +7,10 @@ int main() {
   const int num_input_parameters = 0;
   const int max_num_quantum_gates = 2;
   const int max_num_param_gates = 1;
-  const bool run_dfs = false; // original (without pruning) and
+  const bool run_dfs = false;  // original (without pruning) and
   // restricting search space (which may miss some transformations)
   const bool run_bfs_unverified = false;
-  const bool run_bfs_verified = true; // with representative pruning
+  const bool run_bfs_verified = true;  // with representative pruning
 
   Context ctx({GateType::h}, num_qubits, num_input_parameters);
   Generator gen(&ctx);

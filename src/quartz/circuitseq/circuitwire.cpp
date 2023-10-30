@@ -17,4 +17,4 @@ std::string CircuitWire::to_string() const {
   }
 }
 
-} // namespace quartz
+}  // namespace quartz

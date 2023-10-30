@@ -104,6 +104,6 @@ class ArbComplex {
   arb_t re, im;
 };
 
-} // namespace quartz
+}  // namespace quartz
 
 #endif

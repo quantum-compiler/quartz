@@ -13,7 +13,7 @@ using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair<unsigned long long, int>;
 using InputParamMaskType = unsigned long long;
 
-using namespace std::complex_literals; // so that we can write stuff like 1.0i
+using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 namespace quartz {
 const ParamType PI = std::acos((ParamType)-1);
@@ -28,7 +28,7 @@ static_assert(!(kFingerprintInvariantUnderPhaseShift &&
                 kCheckPhaseShiftInGenerator));
 constexpr PhaseShiftIdType kNoPhaseShift = -1;
 constexpr bool kCheckPhaseShiftOfPiOver4 = true;
-constexpr int kCheckPhaseShiftOfPiOver4Index = 10000; // not used now
+constexpr int kCheckPhaseShiftOfPiOver4Index = 10000;  // not used now
 
 struct PairHash {
  public:
@@ -46,4 +46,4 @@ std::string to_string_with_precision(const T &val, int precision = 6) {
   return out.str();
 }
 
-} // namespace quartz
+}  // namespace quartz

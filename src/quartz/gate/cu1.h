@@ -28,4 +28,4 @@ class CU1Gate : public Gate {
   std::unordered_map<ParamType, std::unique_ptr<Matrix<4>>> cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

@@ -24,4 +24,4 @@ class RZGate : public Gate {
   std::unordered_map<float, std::unique_ptr<Matrix<2>>> cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

@@ -68,4 +68,4 @@ class KernelCost {
   int optimal_fusion_kernel_size_;
 };
 
-} // namespace quartz
+}  // namespace quartz

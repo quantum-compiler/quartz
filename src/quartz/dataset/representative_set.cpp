@@ -27,7 +27,7 @@ bool RepresentativeSet::load_json(Context *ctx, const std::string &file_name) {
     }
 
     // New CircuitSeq
-    fin.unget(); // '['
+    fin.unget();  // '['
     auto dag = CircuitSeq::read_json(ctx, fin);
     dags_.emplace_back(std::move(dag));
   }
@@ -90,4 +90,4 @@ void RepresentativeSet::sort() {
   std::sort(dags_.begin(), dags_.end(), UniquePtrCircuitSeqComparator());
 }
 
-} // namespace quartz
+}  // namespace quartz

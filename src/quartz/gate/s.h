@@ -14,4 +14,4 @@ class SGate : public Gate {
   bool is_diagonal() const override { return true; }
   Matrix<2> mat;
 };
-} // namespace quartz
+}  // namespace quartz

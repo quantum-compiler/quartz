@@ -66,4 +66,4 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-} // namespace quartz
+}  // namespace quartz

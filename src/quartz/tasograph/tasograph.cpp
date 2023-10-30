@@ -104,14 +104,14 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
   for (auto &node : seq->wires) {
     if (node->type != CircuitWire::input_param) {
-      size_t srcIdx = -1; // Assumption: a node can have at most 1 input
+      size_t srcIdx = -1;  // Assumption: a node can have at most 1 input
       Op srcOp;
       if (node->type == CircuitWire::input_qubit) {
         srcOp = input_qubits_op[node->index];
         srcIdx = 0;
       } else {
         assert(node->input_gates.size() ==
-               1); // A node can have at most 1 input
+               1);  // A node can have at most 1 input
         auto input_edge = node->input_gates[0];
         bool found = false;
         for (srcIdx = 0; srcIdx < input_edge->output_wires.size(); ++srcIdx) {
@@ -854,8 +854,8 @@ void Graph::constant_and_rotation_elimination() {
 
 uint64_t Graph::xor_bitmap(uint64_t src_bitmap, int src_idx,
                            uint64_t dst_bitmap, int dst_idx) {
-  uint64_t dst_bit = 1 << dst_idx; // Get mask, only dst_idx is 1
-  dst_bit &= dst_bitmap;           // Get dst_idx bit
+  uint64_t dst_bit = 1 << dst_idx;  // Get mask, only dst_idx is 1
+  dst_bit &= dst_bitmap;            // Get dst_idx bit
   dst_bit >>= dst_idx;
   dst_bit <<= src_idx;
   return src_bitmap ^= dst_bit;
@@ -914,10 +914,10 @@ bool Graph::move_forward(Pos &pos, bool left) {
           return true;
         }
       }
-      return false; // Output qubit
+      return false;  // Output qubit
     }
   }
-  assert(false); // Should not reach here
+  assert(false);  // Should not reach here
 }
 
 bool Graph::moveable(GateType tp) {
@@ -1043,7 +1043,7 @@ void Graph::rotation_merging(GateType target_rotation) {
     // Explore the outEdges of op
     if (op.ptr->tp == GateType::cx) {
       auto in_edge_list = inEdges[op];
-      std::vector<Pos> pos_list(2); // Two inputs for cx gate
+      std::vector<Pos> pos_list(2);  // Two inputs for cx gate
       for (const auto &edge : in_edge_list) {
         pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
       }
@@ -1107,10 +1107,10 @@ void Graph::rotation_merging(GateType target_rotation) {
       int qid = todo_qubits.front();
       todo_qubits.pop();
       expand(anchor_point[qid], true, target_rotation, covered, anchor_point,
-             pos_to_qubits, todo_qubits); // expand left
+             pos_to_qubits, todo_qubits);  // expand left
       expand(anchor_point[qid], false, target_rotation, covered, anchor_point,
              pos_to_qubits,
-             todo_qubits); // expand right
+             todo_qubits);  // expand right
     }
 
     // Step 3: deal with partial cnot
@@ -1310,8 +1310,8 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
 
     if (op.ptr->tp != GateType::input_qubit &&
         op.ptr->tp != GateType::input_param) {
-      assert(op.ptr->is_quantum_gate()); // Should not have any
-                                         // arithmetic gates
+      assert(op.ptr->is_quantum_gate());  // Should not have any
+                                          // arithmetic gates
       std::ostringstream iss;
       iss << std::setprecision(10) << std::fixed;
       iss << gate_type_name(op.ptr->tp);
@@ -1328,8 +1328,8 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
           if (edge.dstIdx >= num_qubits) {
             // Parameter inputs
             assert(constant_param_values.find(edge.srcOp) !=
-                   constant_param_values.end()); // All parameters should be
-                                                 // constant
+                   constant_param_values.end());  // All parameters should be
+                                                  // constant
             param_values[edge.dstIdx - num_qubits] =
                 constant_param_values.find(edge.srcOp)->second;
           }
@@ -1421,19 +1421,19 @@ Graph::_from_qasm_stream(Context *ctx,
     std::string command;
     std::getline(ss, command, ' ');
     if (command == "//") {
-      continue; // comment, ignore this line
+      continue;  // comment, ignore this line
     } else if (command == "") {
-      continue; // empty line, ignore this line
+      continue;  // empty line, ignore this line
     } else if (command == "OPENQASM" || command == "OpenQASM") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "include") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "barrier") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "measure") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "creg") {
-      continue; // ignore this line
+      continue;  // ignore this line
     } else if (command == "qreg") {
       std::string token;
       getline(ss, token, ' ');
@@ -1935,7 +1935,7 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
   //   }
   bestGraph->constant_and_rotation_elimination();
   return bestGraph;
-} // namespace quartz
+}  // namespace quartz
 
 std::shared_ptr<Graph>
 Graph::optimize(Context *ctx, const std::string &equiv_file_name,
@@ -2149,7 +2149,7 @@ std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
       delete graph;
     graph = new_graph.get();
   }
-  assert(false); // Should never reach here
+  assert(false);  // Should never reach here
 }
 
 std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
@@ -2171,7 +2171,7 @@ std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
       temp_graph = new_graph_1;
     }
   }
-  assert(false); // Should never reach here
+  assert(false);  // Should never reach here
 }
 
 void Graph::toffoli_flip_greedy_with_trace(GateType target_rotation,
@@ -2857,4 +2857,4 @@ Graph::topology_partition(const int partition_gate_count) const {
   }
   return subgraphs;
 }
-}; // namespace quartz
+};  // namespace quartz

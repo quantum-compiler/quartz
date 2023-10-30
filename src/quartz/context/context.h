@@ -93,4 +93,4 @@ class Context {
 // TODO: This function does not consider the parameters
 Context union_contexts(Context *ctx_0, Context *ctx_1);
 
-} // namespace quartz
+}  // namespace quartz

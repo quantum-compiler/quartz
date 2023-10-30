@@ -29,9 +29,9 @@ class CircuitGate {
   [[nodiscard]] std::string to_string() const;
   [[nodiscard]] std::string to_qasm_style_string(Context *ctx,
                                                  int param_precision) const;
-  std::vector<CircuitWire *> input_wires; // Include parameters!
+  std::vector<CircuitWire *> input_wires;  // Include parameters!
   std::vector<CircuitWire *> output_wires;
 
   Gate *gate;
 };
-} // namespace quartz
+}  // namespace quartz

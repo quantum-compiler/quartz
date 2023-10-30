@@ -15,4 +15,4 @@ class HGate : public Gate {
   Matrix<2> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

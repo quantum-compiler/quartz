@@ -181,4 +181,4 @@ std::string KernelInDP::to_string() const {
   return result;
 }
 
-} // namespace quartz
+}  // namespace quartz

@@ -35,4 +35,4 @@ class RepresentativeSet {
   std::vector<std::unique_ptr<CircuitSeq>> dags_;
 };
 
-} // namespace quartz
+}  // namespace quartz

@@ -27,4 +27,4 @@ int KernelCost::get_optimal_fusion_kernel_size() const {
   return optimal_fusion_kernel_size_;
 }
 
-} // namespace quartz
+}  // namespace quartz

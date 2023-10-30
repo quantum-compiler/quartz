@@ -82,4 +82,4 @@ bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs,
   return true;
 }
 
-} // namespace quartz
+}  // namespace quartz

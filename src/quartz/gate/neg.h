@@ -12,4 +12,4 @@ class NegGate : public Gate {
     return -input_params[0];
   }
 };
-} // namespace quartz
+}  // namespace quartz

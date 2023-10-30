@@ -194,4 +194,4 @@ class EquivalenceSet {
       possible_classes_;
 };
 
-} // namespace quartz
+}  // namespace quartz

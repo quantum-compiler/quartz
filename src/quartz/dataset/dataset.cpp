@@ -84,7 +84,7 @@ int Dataset::remove_singletons(Context *ctx) {
         found_possible_equivalence = true;
         break;
       }
-      assert(hash_value == it_hash_value + 1); // Only deal with this case...
+      assert(hash_value == it_hash_value + 1);  // Only deal with this case...
     }
     // ...so that we know for sure that only DAGs with hash value equal
     // to |it_hash_value - 1| can have other_hash_values() containing
@@ -133,7 +133,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));
         }
-        dag = nullptr; // delete the original CircuitSeq
+        dag = nullptr;  // delete the original CircuitSeq
       }
     }
     if (!new_dags.empty()) {
@@ -166,7 +166,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
   for (auto &dag : dags_to_insert_afterwards) {
     const auto hash_value = dag->hash(ctx);
     if (!dag_already_exists(*dag, dataset[hash_value])) {
-      num_removed--; // Insert |circuitseq| back.
+      num_removed--;  // Insert |circuitseq| back.
       dataset[hash_value].push_back(std::move(dag));
     }
   }
@@ -203,4 +203,4 @@ void Dataset::clear() {
                                std::vector<std::unique_ptr<CircuitSeq>>>();
 }
 
-} // namespace quartz
+}  // namespace quartz

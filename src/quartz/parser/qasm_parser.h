@@ -89,19 +89,19 @@ bool QASMParser::load_qasm_stream(
       command = std::string("u3");
     }
     if (command == "//") {
-      continue; // comment, ignore this line
+      continue;  // comment, ignore this line
     } else if (command == "") {
-      continue; // empty line, ignore this line
+      continue;  // empty line, ignore this line
     } else if (command == "OPENQASM" || command == "OpenQASM") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "include") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "barrier") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "measure") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "creg") {
-      continue; // ignore this line
+      continue;  // ignore this line
     } else if (command == "qreg") {
       std::string name;
       getline(ss, name, '[');
@@ -237,4 +237,4 @@ bool QASMParser::load_qasm_stream(
   return true;
 }
 
-} // namespace quartz
+}  // namespace quartz

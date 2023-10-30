@@ -28,7 +28,7 @@ int main() {
 
   Graph graph(&union_ctx, dag);
   RuleParser rule_parser(
-      {"t q0 = rz q0 0.25pi", // t -> rz
+      {"t q0 = rz q0 0.25pi",  // t -> rz
        "tdg q0 = rz q0 -0.25pi",
        "ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
        "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "

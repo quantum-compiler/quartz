@@ -57,4 +57,4 @@ std::vector<std::vector<int>> PythonInterpreter::solve_ilp(
                  num_qubits, num_local_qubits, num_iterations, print_solution);
   return result.cast<std::vector<std::vector<int>>>();
 }
-} // namespace quartz
+}  // namespace quartz

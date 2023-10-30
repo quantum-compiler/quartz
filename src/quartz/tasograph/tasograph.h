@@ -344,4 +344,4 @@ class Graph {
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
 };
 
-}; // namespace quartz
+};  // namespace quartz

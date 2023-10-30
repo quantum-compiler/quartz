@@ -147,8 +147,8 @@ int main() {
       /*shared_memory_gate_cost=*/
       [](quartz::GateType type) {
         if (type == quartz::GateType::swap)
-          return 1000.0; // we do not support swap gates in shared-memory
-                         // kernels
+          return 1000.0;  // we do not support swap gates in shared-memory
+                          // kernels
         else
           return 0.5;
       },

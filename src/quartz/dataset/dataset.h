@@ -41,4 +41,4 @@ class Dataset {
                      std::vector<std::unique_ptr<CircuitSeq>>>
       dataset;
 };
-} // namespace quartz
+}  // namespace quartz

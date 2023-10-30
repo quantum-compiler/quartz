@@ -722,11 +722,11 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
     for (int i = 0; i < num_total_params; i++) {
       const auto &param = all_parameters[i];
       ComplexType shifted =
-          dot_product *ComplexType{std::cos(param), std::sin(param)};
+          dot_product * ComplexType{std::cos(param), std::sin(param)};
       generate_hash_values(ctx, shifted, i, all_parameters, &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i);
-      shifted = dot_product *ComplexType{std::cos(param), -std::sin(param)};
+      shifted = dot_product * ComplexType{std::cos(param), -std::sin(param)};
       generate_hash_values(ctx, shifted, i + num_total_params, all_parameters,
                            &tmp, &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
@@ -735,8 +735,8 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
       // Check phase shift of pi/4, 2pi/4, ..., 7pi/4.
       for (int i = 1; i < 8; i++) {
         const double pi = std::acos(-1.0);
-        ComplexType shifted = dot_product *ComplexType{std::cos(pi / 4 * i),
-                                                       std::sin(pi / 4 * i)};
+        ComplexType shifted = dot_product * ComplexType{std::cos(pi / 4 * i),
+                                                        std::sin(pi / 4 * i)};
         generate_hash_values(ctx, shifted, i, all_parameters, &tmp,
                              &other_hash_values_);
         other_hash_values_.emplace_back(tmp,

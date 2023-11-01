@@ -3,6 +3,7 @@
 #include "quartz/context/context.h"
 #include "quartz/generator/generator.h"
 
+#include <cassert>
 #include <chrono>
 #include <fstream>
 
@@ -178,36 +179,9 @@ void test_pruning(
       }
       if (use_generated_file_if_possible) {
         std::cout << (file_prefix + "original_unverified.json")
-                  << " not found. Generating..." << std::endl;
+                  << " not found. generate_dfs() deprecated." << std::endl;
+        assert(false);
       }
-      start = std::chrono::steady_clock::now();
-      gen.generate_dfs(num_qubits, num_input_parameters, max_num_quantum_gates,
-                       max_num_param_gates, dataset1, /*restrict_search_space=*/
-                       false, unique_parameters);
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original: " << dataset1.num_total_dags()
-          << " circuits with " << dataset1.num_hash_values()
-          << " different hash values are found in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                 end - start)
-                     .count() /
-                 1000.0
-          << " seconds." << std::endl;
-
-      num_singletons = dataset1.remove_singletons(&ctx);
-      std::cout << num_singletons << " singletons removed." << std::endl;
-
-      start = std::chrono::steady_clock::now();
-      dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original: json saved in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                 end - start)
-                     .count() /
-                 1000.0
-          << " seconds." << std::endl;
     }
 
     ctx.clear_representatives();

@@ -7,8 +7,6 @@ int main() {
   const int num_input_parameters = 0;
   const int max_num_quantum_gates = 2;
   const int max_num_param_gates = 1;
-  const bool run_dfs = false;  // original (without pruning) and
-  // restricting search space (which may miss some transformations)
   const bool run_bfs_unverified = false;
   const bool run_bfs_verified = true;  // with representative pruning
 
@@ -20,81 +18,6 @@ int main() {
   Dataset dataset1;
   auto start = std::chrono::steady_clock::now();
   auto end = std::chrono::steady_clock::now();
-
-  if (run_dfs) {
-    start = std::chrono::steady_clock::now();
-    gen.generate_dfs(num_qubits, num_input_parameters, max_num_quantum_gates,
-                     max_num_param_gates, dataset1, /*restrict_search_space=*/
-                     true, /*unique_parameters=*/false);
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "DFS with search space restricted: "
-              << dataset1.num_total_dags() << " circuits with "
-              << dataset1.num_hash_values()
-              << " different hash values are found in "
-              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                     end - start)
-                         .count() /
-                     1000.0
-              << " seconds." << std::endl;
-    dataset1.save_json(&ctx, "dfs_restricted.json");
-
-    start = std::chrono::steady_clock::now();
-    equiv_set.clear();
-    system("python src/python/verifier/verify_equivalences.py "
-           "dfs_restricted.json "
-           "dfs_restricted_verified.json");
-    equiv_set.load_json(&ctx, "dfs_restricted_verified.json");
-    equiv_set.simplify(&ctx);
-    equiv_set.save_json("dfs_restricted_simplified.json");
-    end = std::chrono::steady_clock::now();
-    std::cout
-        << std::dec << "DFS with search space restricted: there are "
-        << equiv_set.num_total_dags() << " circuits in "
-        << equiv_set.num_equivalence_classes()
-        << " equivalence classes after verification and simplification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                         start)
-                   .count() /
-               1000.0
-        << " seconds." << std::endl;
-
-    ctx.clear_representatives();
-    dataset1.clear();
-
-    start = std::chrono::steady_clock::now();
-    gen.generate_dfs(num_qubits, num_input_parameters, max_num_quantum_gates,
-                     max_num_param_gates, dataset1, /*restrict_search_space=*/
-                     false, /*unique_parameters=*/false);
-    end = std::chrono::steady_clock::now();
-    std::cout << std::dec << "DFS for all DAGs: " << dataset1.num_total_dags()
-              << " circuits with " << dataset1.num_hash_values()
-              << " different hash values are found in "
-              << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                     end - start)
-                         .count() /
-                     1000.0
-              << " seconds." << std::endl;
-    dataset1.save_json(&ctx, "dfs_all.json");
-
-    start = std::chrono::steady_clock::now();
-    equiv_set.clear();
-    system("python src/python/verifier/verify_equivalences.py dfs_all.json "
-           "dfs_all_verified.json");
-    equiv_set.load_json(&ctx, "dfs_all_verified.json");
-    equiv_set.simplify(&ctx);
-    equiv_set.save_json("dfs_all_simplified.json");
-    end = std::chrono::steady_clock::now();
-    std::cout
-        << std::dec << "DFS for all DAGs: there are "
-        << equiv_set.num_total_dags() << " circuits in "
-        << equiv_set.num_equivalence_classes()
-        << " equivalence classes after verification and simplification in "
-        << (double)std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                         start)
-                   .count() /
-               1000.0
-        << " seconds." << std::endl;
-  }
 
   if (run_bfs_unverified) {
     ctx.clear_representatives();

@@ -93,7 +93,7 @@ class Schedule {
 
   /**
    * Similar to above, but compute in a reversed order.
-   * The memory complexity becomes linear.
+   * The space complexity becomes linear.
    */
   bool compute_kernel_schedule_simple_reversed(
       const KernelCost &kernel_cost,

@@ -75,7 +75,7 @@ class Schedule {
 
   /**
    * Compute the schedule using a simple quadratic dynamic programming
-   * algorithm.
+   * algorithm. The memory complexity is also quadratic.
    * @param kernel_cost The cost function of kernels.
    * @param non_insular_qubit_indices The set of non-insular qubit indices
    * for each gate, if any of them should be considered differently from
@@ -87,6 +87,15 @@ class Schedule {
    * the member variables |kernels| and |cost_|.
    */
   bool compute_kernel_schedule_simple(
+      const KernelCost &kernel_cost,
+      const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
+
+  /**
+   * Similar to above, but compute in a reversed order.
+   * The space complexity becomes linear.
+   */
+  bool compute_kernel_schedule_simple_reversed(
       const KernelCost &kernel_cost,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});

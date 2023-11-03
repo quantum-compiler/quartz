@@ -1463,6 +1463,85 @@ bool Schedule::compute_kernel_schedule_simple(
   return true;
 }
 
+bool Schedule::compute_kernel_schedule_simple_reversed(
+    const KernelCost &kernel_cost,
+    const std::vector<std::vector<int>> &non_insular_qubit_indices,
+    const std::vector<KernelCostType> &shared_memory_gate_costs) {
+  const int num_gates = sequence_->get_num_gates();
+  // Either to not customize |non_insular_qubit_indices|, or to customize the
+  // non-insular qubit indices for each gate.
+  assert(non_insular_qubit_indices.empty() ||
+         (int)non_insular_qubit_indices.size() == num_gates);
+  // Either to not customize |shared_memory_gate_costs|, or to customize the
+  // cost for each gate.
+  assert(shared_memory_gate_costs.empty() ||
+         (int)shared_memory_gate_costs.size() == num_gates);
+  // dp[i]: min cost for the gates with indices [i, infinity)
+  std::vector<KernelCostType> dp(num_gates + 1);
+  std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
+  dp[num_gates] = 0;
+  CircuitSeq empty_circuit(sequence_->get_num_qubits(),
+                           sequence_->get_num_input_parameters());
+  std::map<KernelType, int> max_j_position;
+  max_j_position.emplace(std::make_pair(KernelType::fusion, num_gates));
+  max_j_position.emplace(std::make_pair(KernelType::shared_memory, num_gates));
+  for (int i = num_gates - 1; i >= 0; i--) {
+    dp[i] = (KernelCostType)INFINITY;
+    // dp[i] <- cost(i .. j - 1) + dp[j]
+    for (auto &p : max_j_position) {
+      auto tp = p.first;
+      auto &max_j = p.second;
+      int j;
+      Kernel current_kernel(empty_circuit, /*qubits=*/std::vector<int>(), tp);
+      KernelCostType current_cost = 0;
+      if (tp == KernelType::shared_memory) {
+        current_cost = kernel_cost.get_shared_memory_init_cost();
+      }
+      for (j = i + 1; j <= max_j; j++) {
+        current_kernel.add_gate(sequence_->gates[j - 1].get(),
+                                non_insular_qubit_indices.empty()
+                                    ? std::vector<int>()
+                                    : non_insular_qubit_indices[j - 1]);
+        if (tp == KernelType::shared_memory) {
+          if (shared_memory_gate_costs.empty()) {
+            current_cost += kernel_cost.get_shared_memory_gate_cost(
+                sequence_->gates[j - 1]->gate->tp);
+          } else {
+            current_cost += shared_memory_gate_costs[j - 1];
+          }
+        } else {
+          current_cost =
+              current_kernel.cost(kernel_cost, local_qubit_, nullptr);
+        }
+        if (current_cost >= (KernelCostType)INFINITY) {
+          // optimization: larger kernels are infeasible
+          max_j = j - 1;
+          break;
+        }
+        if (dp[j] + current_cost < dp[i]) {
+          dp[i] = dp[j] + current_cost;
+          dp_from[i] = std::make_pair(j, tp);  // record the transition
+        }
+      }
+    }
+  }
+  cost_ = dp[0];
+  if (dp[0] >= (KernelCostType)INFINITY) {
+    return false;
+  }
+  // Record the kernels.
+  kernels.clear();
+  for (int i = 0; i < num_gates; i = dp_from[i].first) {
+    auto kernel =
+        Kernel(empty_circuit, /*qubits=*/std::vector<int>(), dp_from[i].second);
+    for (int j = i; j < dp_from[i].first; j++) {
+      kernel.add_gate(sequence_->gates[j].get());
+    }
+    kernels.push_back(kernel);
+  }
+  return true;
+}
+
 bool Schedule::compute_kernel_schedule_simple_repeat(
     int repeat, const KernelCost &kernel_cost,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
@@ -1475,8 +1554,8 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
     special = true;
     cost_ = INFINITY;
   } else {
-    if (!compute_kernel_schedule_simple(kernel_cost, non_insular_qubit_indices,
-                                        shared_memory_gate_costs)) {
+    if (!compute_kernel_schedule_simple_reversed(
+            kernel_cost, non_insular_qubit_indices, shared_memory_gate_costs)) {
       return false;
     }
   }
@@ -1567,9 +1646,9 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       }
       current_shared_memory_gate_costs = std::move(permuted_costs);
     }
-    if (!compute_kernel_schedule_simple(kernel_cost,
-                                        current_non_insular_qubit_indices,
-                                        current_shared_memory_gate_costs)) {
+    if (!compute_kernel_schedule_simple_reversed(
+            kernel_cost, current_non_insular_qubit_indices,
+            current_shared_memory_gate_costs)) {
       return false;
     }
     // print_kernel_info();

@@ -46,7 +46,7 @@ int main() {
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   FILE *fout = fopen("../dp_result.csv", "w");
   constexpr bool run_nwq = false;
-  for (auto circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
+  for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
     fprintf(fout, "%s\n", circuit.c_str());
     std::cout << circuit << std::endl;
     for (int num_q : num_qubits) {
@@ -100,7 +100,10 @@ int main() {
         auto t1 = std::chrono::steady_clock::now();
         auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                        /*attach_single_qubit_gates=*/true,
-                                       /*use_simple_dp_times=*/1);
+                                       /*use_simple_dp_times=*/1,
+                                       /*cache_file_name_prefix=*/circuit +
+                                           std::to_string(num_q) + "_" +
+                                           std::to_string(local_q) + "_simple");
         KernelCostType total_cost = 0;
         for (auto &schedule : schedules) {
           // schedule.print_kernel_info();
@@ -111,7 +114,10 @@ int main() {
         auto t2 = std::chrono::steady_clock::now();
         schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                   /*attach_single_qubit_gates=*/true,
-                                  /*use_simple_dp_times=*/-1);
+                                  /*use_simple_dp_times=*/-1,
+                                  /*cache_file_name_prefix=*/circuit +
+                                      std::to_string(num_q) + "_" +
+                                      std::to_string(local_q) + "_max_weight");
         total_cost = 0;
         for (auto &schedule : schedules) {
           // schedule.print_kernel_info();
@@ -122,7 +128,10 @@ int main() {
         auto t5 = std::chrono::steady_clock::now();
         schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
                                   /*attach_single_qubit_gates=*/true,
-                                  /*use_simple_dp_times=*/0);
+                                  /*use_simple_dp_times=*/0,
+                                  /*cache_file_name_prefix=*/circuit +
+                                      std::to_string(num_q) + "_" +
+                                      std::to_string(local_q) + "_complicated");
         total_cost = 0;
         for (auto &schedule : schedules) {
           // schedule.print_kernel_info();

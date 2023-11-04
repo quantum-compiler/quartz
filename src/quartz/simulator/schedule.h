@@ -114,6 +114,9 @@ class Schedule {
    * @return The number of empty kernels removed.
    */
   int remove_empty_kernels(const KernelCost &kernel_cost);
+  static Schedule from_file(Context *ctx, const std::string &filename);
+  bool save_to_file(Context *ctx, const std::string &filename,
+                    int param_precision = 15) const;
 
   // The result simulation schedule. We will execute the kernels one by one,
   // and each kernel contains a sequence of gates.
@@ -150,17 +153,33 @@ class Schedule {
  * @param ctx The Context object.
  * @param attach_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
+ * @param use_simple_dp_times Temporary. If this variable is 0,
+ * use the complicated DP algorithm. If this variable is positive, use
+ * the simple DP algorithm.
+ * @param cache_file_name_prefix If this variable is not empty,
+ * use the cached files if possible (in this case, no other variables are used),
+ * and compute the schedules and cache them into files otherwise.
  * @return The kernel schedule for each stage.
  */
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, int use_simple_dp_times);
+              bool attach_single_qubit_gates, int use_simple_dp_times = 0,
+              const std::string &cache_file_name_prefix = "");
 
 class PythonInterpreter;
 std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter,
                               int answer_start_with = 1);
+
+/**
+ * Call the above two functions sequentially, use the cached files if possible.
+ */
+std::vector<Schedule> get_schedules_with_ilp(
+    const CircuitSeq &sequence, int num_local_qubits,
+    const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
+    bool attach_single_qubit_gates, int use_simple_dp_times = 0,
+    const std::string &cache_file_name_prefix = "", int answer_start_with = 1);
 }  // namespace quartz

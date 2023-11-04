@@ -1,5 +1,7 @@
 #include "kernel.h"
 
+#include "quartz/utils/string_utils.h"
+
 #include <cassert>
 
 namespace quartz {
@@ -13,6 +15,18 @@ std::string kernel_type_name(KernelType tp) {
   return "undefined";
 }
 
+KernelType string_to_kernel_type(const std::string &s) {
+  if (s == "fusion") {
+    return KernelType::fusion;
+  } else if (s == "shared_memory") {
+    return KernelType::shared_memory;
+  } else {
+    std::cerr << "Unknown kernel type " << s << std::endl;
+    assert(false);
+    return KernelType::fusion;
+  }
+}
+
 std::string Kernel::to_string() const {
   std::string result;
   result += kernel_type_name(type);
@@ -24,7 +38,42 @@ std::string Kernel::to_string() const {
     }
   }
   result += "], gates ";
-  result += gates.to_string();
+  result += gates->to_string();
+  return result;
+}
+
+Kernel Kernel::from_qasm_style_string(Context *ctx, const std::string &str) {
+  std::stringstream ss(str);
+  std::string token;
+  KernelType tp;
+  std::vector<int> qubits;
+  while (ss >> token) {
+    if (token == "//") {
+      ss >> token;
+      tp = string_to_kernel_type(token);
+      break;
+    }
+  }
+  while (ss >> token) {
+    if (token == "//") {
+      bool ok = read_json_style_vector(ss, qubits);
+      assert(ok);
+      break;
+    }
+  }
+  std::getline(ss, token, '\0');  // extract the rest
+  auto gates = CircuitSeq::from_qasm_style_string(ctx, token);
+  return {std::move(gates), qubits, tp};
+}
+
+std::string Kernel::to_qasm_style_string(Context *ctx,
+                                         int param_precision) const {
+  std::string result = "// ";
+  result += kernel_type_name(type);
+  result += "\n// ";
+  result += to_json_style_string(qubits);
+  result += "\n";
+  result += gates->to_qasm_style_string(ctx, param_precision);
   return result;
 }
 
@@ -74,7 +123,7 @@ Kernel::cost(const KernelCost &cost_function,
     }
     auto result = cost_function.get_shared_memory_init_cost();
     if (customized_shared_memory_gate_cost == nullptr) {
-      for (auto &gate : gates.gates) {
+      for (auto &gate : gates->gates) {
         result += cost_function.get_shared_memory_gate_cost(gate->gate->tp);
       }
     } else {
@@ -89,7 +138,7 @@ Kernel::cost(const KernelCost &cost_function,
 
 bool Kernel::add_gate(CircuitGate *gate,
                       const std::vector<int> &customized_non_insular_qubits) {
-  if (gates.add_gate(gate)) {
+  if (gates->add_gate(gate)) {
     auto gate_qubits = (type == KernelType::shared_memory
                             ? (customized_non_insular_qubits.empty()
                                    ? gate->get_non_insular_qubit_indices()

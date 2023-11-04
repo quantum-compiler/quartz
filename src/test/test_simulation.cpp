@@ -184,16 +184,11 @@ int main() {
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        std::vector<std::vector<int>> local_qubits;
-        // int result =
-        // num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
-        // fprintf(fout, " %d", result);
-        local_qubits =
-            compute_local_qubits_with_ilp(*seq, local_q, &ctx, &interpreter);
-        std::cout << local_qubits.size() << " stages." << std::endl;
-        auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
-                                       /*attach_single_qubit_gates=*/true,
-                                       /*use_simple_dp_times=*/100);
+        auto schedules = get_schedules_with_ilp(
+            *seq, local_q, kernel_cost, &ctx, &interpreter,
+            /*attach_single_qubit_gates=*/true,
+            /*use_simple_dp_times=*/10,
+            circuit + std::to_string(num_q) + "_" + std::to_string(local_q));
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();

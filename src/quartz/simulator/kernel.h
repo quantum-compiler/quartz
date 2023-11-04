@@ -2,6 +2,7 @@
 
 #include "quartz/circuitseq/circuitseq.h"
 #include "quartz/simulator/kernel_cost.h"
+#include "quartz/utils/utils.h"
 
 #include <string>
 #include <vector>
@@ -11,17 +12,23 @@ namespace quartz {
 enum KernelType { fusion, shared_memory };
 
 std::string kernel_type_name(KernelType tp);
+KernelType string_to_kernel_type(const std::string &s);
 
 /**
  * A kernel used in the output of schedule.
  */
 class Kernel {
  public:
-  Kernel(const CircuitSeq &gates, const std::vector<int> &qubits,
+  Kernel(std::unique_ptr<CircuitSeq> &&gates, const std::vector<int> &qubits,
          KernelType type)
-      : gates(gates), qubits(qubits), type(type) {}
+      : gates(std::move(gates)), qubits(qubits), type(type) {}
 
   [[nodiscard]] std::string to_string() const;
+
+  static Kernel from_qasm_style_string(Context *ctx, const std::string &str);
+  [[nodiscard]] std::string
+  to_qasm_style_string(Context *ctx,
+                       int param_precision = kDefaultQASMParamPrecision) const;
   /**
    * Compute the cost of this kernel, return infinity if the kernel is not
    * feasible.
@@ -55,7 +62,7 @@ class Kernel {
   bool add_gate(CircuitGate *gate,
                 const std::vector<int> &customized_non_insular_qubits = {});
 
-  CircuitSeq gates;
+  std::unique_ptr<CircuitSeq> gates;
   std::vector<int> qubits;
   KernelType type;
 };

@@ -33,7 +33,8 @@ class Context {
   std::vector<ParamType> get_and_gen_parameters(int num_params);
   [[nodiscard]] const Vector &get_generated_input_dis(int num_qubits) const;
   [[nodiscard]] const Vector &get_generated_hashing_dis(int num_qubits) const;
-  [[nodiscard]] std::vector<ParamType> get_generated_parameters(int num_params) const;
+  [[nodiscard]] std::vector<ParamType>
+  get_generated_parameters(int num_params) const;
   [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 

@@ -223,6 +223,10 @@ void Context::set_param_value(int id, const ParamType &param) {
   parameters_[id] = param;
 }
 
+std::vector<ParamType> Context::get_all_param_values() const {
+  return parameters_;
+}
+
 int Context::get_new_param_id(bool is_symbolic) {
   assert(is_parameter_symbolic_.size() == num_parameters_);
   is_parameter_symbolic_.push_back(is_symbolic);

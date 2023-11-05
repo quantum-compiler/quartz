@@ -128,16 +128,17 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
-               GateType::rz});
+               GateType::rz, GateType::ccz});
   std::vector<std::string> circuit_names = {
-      "qft"
+      "nam-benchmarks/adder_8.qasm"
+      // "nam-benchmarks/csla_mux_3.qasm"
       // "realamprandom"
       // "QASMBench/ising_n34.qasm"
   };
-  // 33 total qubits, 28 local qubits
-  std::vector<int> num_qubits = {33};
+  // 24 total qubits, 20 local qubits
+  std::vector<int> num_qubits = {24};
   std::vector<int> num_local_qubits;
-  for (int i = 28; i <= 28; i++) {
+  for (int i = 20; i <= 20; i++) {
     num_local_qubits.push_back(i);
   }
   quartz::KernelCost kernel_cost(
@@ -157,12 +158,12 @@ int main() {
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
-      auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
-                    ".qasm");
-      /*auto seq = CircuitSeq::from_qasm_file(&ctx, std::string("../circuit/") +
-                                                      circuit);*/
+      /* auto seq = CircuitSeq::from_qasm_file(
+           &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
+                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
+                     ".qasm");*/
+      auto seq = CircuitSeq::from_qasm_file(&ctx, std::string("../circuit/") +
+                                                      circuit);
 
       // Repeat the entire circuit for kNumRepeat times.
       constexpr int kNumRepeat = 0;
@@ -187,11 +188,14 @@ int main() {
         auto schedules = get_schedules_with_ilp(
             *seq, local_q, kernel_cost, &ctx, &interpreter,
             /*attach_single_qubit_gates=*/true,
-            /*use_simple_dp_times=*/10,
-            circuit + std::to_string(num_q) + "_" + std::to_string(local_q));
+            /*use_simple_dp_times=*/0, "tmp");
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();
+        }
+        bool ok = verify_schedule(&ctx, *seq, schedules);  // may take 1h
+        if (ok) {
+          std::cout << "Schedule verified." << std::endl;
         }
       }
       // fprintf(fout, "\n");

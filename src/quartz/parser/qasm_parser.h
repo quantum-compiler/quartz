@@ -88,9 +88,9 @@ bool QASMParser::load_qasm_stream(
     if (command == std::string("u")) {
       command = std::string("u3");
     }
-    if (command == "//") {
+    if (command.length() >= 2 && command.substr(0, 2) == "//") {
       continue;  // comment, ignore this line
-    } else if (command == "") {
+    } else if (command.empty()) {
       continue;  // empty line, ignore this line
     } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue;  // header, ignore this line

@@ -1883,6 +1883,7 @@ get_schedules(const CircuitSeq &sequence,
     if (sequence.gates[i]->gate->get_num_qubits() == 1 &&
         sequence.gates[i]->gate->is_sparse() &&
         !sequence.gates[i]->gate->is_diagonal()) {
+      // X gate or any single-qubit anti-diagonal gate.
       flipping[sequence.gates[i]->get_min_qubit_index()].flip();
     } else if (sequence.gates[i]->gate->get_num_control_qubits() > 0) {
       for (auto &qubit : sequence.gates[i]->get_control_qubit_indices()) {
@@ -2063,40 +2064,38 @@ get_schedules(const CircuitSeq &sequence,
             auto gate_cost = kernel_cost.get_shared_memory_gate_cost(
                 sequence.gates[i]->gate->tp);
             for (auto &qubit : non_insular_qubits) {
+              // For non-insular qubits: attach to this gate.
               gate_cost += do_attach_single_qubit_gates(attach_front, i, qubit);
             }
             for (auto &qubit : sequence.gates[i]->get_insular_qubit_indices()) {
-              if (has_dense_single_qubit_gate[qubit]) {
-                // We need to attach single-qubit gates to an insular qubit
-                // if there is any dense single-qubit gate.
-                if (last_gate_index[qubit] != -1 &&
-                    std::find(
-                        non_insular_qubit_indices
-                            [dp_sequence_position[last_gate_index[qubit]].first]
-                            [dp_sequence_position[last_gate_index[qubit]]
-                                 .second]
-                                .begin(),
-                        non_insular_qubit_indices
-                            [dp_sequence_position[last_gate_index[qubit]].first]
-                            [dp_sequence_position[last_gate_index[qubit]]
-                                 .second]
-                                .end(),
-                        qubit) !=
-                        non_insular_qubit_indices
-                            [dp_sequence_position[last_gate_index[qubit]].first]
-                            [dp_sequence_position[last_gate_index[qubit]]
-                                 .second]
-                                .end()) {
-                  // It's better to attach them to the last gate because
-                  // it's already non-insular.
-                  gate_cost += do_attach_single_qubit_gates(
-                      attach_back, last_gate_index[qubit], qubit);
-                } else {
-                  gate_cost +=
-                      do_attach_single_qubit_gates(attach_front, i, qubit);
+              // For insular qubits: attach to the previous gate if it exists.
+              if (last_gate_index[qubit] != -1 &&
+                  std::find(
+                      non_insular_qubit_indices
+                          [dp_sequence_position[last_gate_index[qubit]].first]
+                          [dp_sequence_position[last_gate_index[qubit]].second]
+                              .begin(),
+                      non_insular_qubit_indices
+                          [dp_sequence_position[last_gate_index[qubit]].first]
+                          [dp_sequence_position[last_gate_index[qubit]].second]
+                              .end(),
+                      qubit) !=
+                      non_insular_qubit_indices
+                          [dp_sequence_position[last_gate_index[qubit]].first]
+                          [dp_sequence_position[last_gate_index[qubit]].second]
+                              .end()) {
+                // No need to update |non_insular_qubits| because it's already
+                // non-insular.
+                gate_cost += do_attach_single_qubit_gates(
+                    attach_back, last_gate_index[qubit], qubit);
+              } else {
+                if (has_dense_single_qubit_gate[qubit]) {
                   // This qubit is no longer insular.
                   non_insular_qubits.push_back(qubit);
                 }
+                // Attach to this gate.
+                gate_cost +=
+                    do_attach_single_qubit_gates(attach_front, i, qubit);
               }
             }
 
@@ -2329,6 +2328,7 @@ get_schedules(const CircuitSeq &sequence,
                 if (sequence.gates[gate_index]->gate->get_num_qubits() == 1 &&
                     sequence.gates[gate_index]->gate->is_sparse() &&
                     !sequence.gates[gate_index]->gate->is_diagonal()) {
+                  // X gate or any single-qubit anti-diagonal gate.
                   flipping[sequence.gates[gate_index]->get_min_qubit_index()]
                       .flip();
                 }
@@ -2347,6 +2347,9 @@ get_schedules(const CircuitSeq &sequence,
                           << std::endl;
                     }
                   }
+                }
+                if (debug) {
+                  std::cout << "insert back " << gate_index << std::endl;
                 }
                 schedule.kernels[i].gates->insert_gate(
                     insert_location, sequence.gates[gate_index].get());
@@ -2397,6 +2400,7 @@ get_schedules(const CircuitSeq &sequence,
                   1 &&
               schedule.kernels[i].gates->gates[j]->gate->is_sparse() &&
               !schedule.kernels[i].gates->gates[j]->gate->is_diagonal()) {
+            // X gate or any single-qubit anti-diagonal gate.
             flipping[schedule.kernels[i].gates->gates[j]->get_min_qubit_index()]
                 .flip();
           }
@@ -2523,5 +2527,50 @@ std::vector<Schedule> get_schedules_with_ilp(
   return get_schedules(sequence, local_qubits, kernel_cost, ctx,
                        attach_single_qubit_gates, use_simple_dp_times,
                        cache_file_name_prefix);
+}
+
+bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
+                     const std::vector<Schedule> &schedules,
+                     int random_test_times) {
+  if (sequence.get_num_qubits() > 30) {
+    std::cerr << "We only support verifying schedules for circuits with no more"
+                 " than 30 qubits (the input circuit has "
+              << sequence.get_num_qubits() << " qubits)." << std::endl;
+    return true;
+  }
+  auto seq = std::make_unique<CircuitSeq>(sequence.get_num_qubits(),
+                                          sequence.get_num_input_parameters());
+  for (auto &schedule : schedules) {
+    for (auto &kernel : schedule.kernels) {
+      for (auto &gate : kernel.gates->gates) {
+        seq->add_gate(gate.get());
+      }
+    }
+  }
+  for (int test = 0; test < random_test_times; test++) {
+    const auto sz = 1 << sequence.get_num_qubits();
+    Vector input_dis = Vector::random_generate(sequence.get_num_qubits());
+    auto input_parameters = ctx->get_all_param_values();
+    assert(input_parameters.size() >= sequence.get_num_input_parameters());
+    input_parameters.resize(sequence.get_num_input_parameters());
+    std::vector<ParamType> all_parameters;
+    Vector expected_output;
+    Vector found_output;
+    bool ok = sequence.evaluate(input_dis, input_parameters, expected_output,
+                                &all_parameters);
+    assert(ok);
+    ok = seq->evaluate(input_dis, input_parameters, found_output,
+                       &all_parameters);
+    assert(ok);
+    for (int i = 0; i < sz; i++) {
+      if (std::abs(found_output[i] - expected_output[i]) >
+          kCircuitSeqHashMaxError) {
+        std::cerr << "At " << i << ", expected " << expected_output[i]
+                  << ", found " << found_output[i] << std::endl;
+        return false;
+      }
+    }
+  }
+  return true;
 }
 }  // namespace quartz

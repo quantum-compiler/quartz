@@ -190,7 +190,13 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
         assert(ctx->param_has_value(input_wires[j]->index));
         std::ostringstream out;
         out.precision(param_precision);
-        out << std::fixed << ctx->get_param_value(input_wires[j]->index);
+        const auto &param_value = ctx->get_param_value(input_wires[j]->index);
+        if (param_value == 0) {
+          // optimization: if a parameter is 0, do not output that many digits
+          out << "0";
+        } else {
+          out << std::fixed << param_value;
+        }
         result += std::move(out).str();
         num_remaining_parameters--;
         if (num_remaining_parameters != 0) {

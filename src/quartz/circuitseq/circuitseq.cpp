@@ -1158,19 +1158,36 @@ CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
   return ret;
 }
 
+std::unique_ptr<CircuitSeq>
+CircuitSeq::from_qasm_style_string(Context *ctx, const std::string &str) {
+  QASMParser parser(ctx);
+  CircuitSeq *seq = nullptr;
+  parser.load_qasm_str(str, seq);
+  std::unique_ptr<CircuitSeq> ret;
+  ret.reset(seq);  // transfer ownership of |seq|
+  return ret;
+}
+
+std::string CircuitSeq::to_qasm_style_string(Context *ctx,
+                                             int param_precision) const {
+  std::string result = "OPENQASM 2.0;\n"
+                       "include \"qelib1.inc\";\n"
+                       "qreg q[";
+  result += std::to_string(get_num_qubits());
+  result += "];\n";
+  for (auto &gate : gates) {
+    result += gate->to_qasm_style_string(ctx, param_precision);
+  }
+  return result;
+}
+
 bool CircuitSeq::to_qasm_file(Context *ctx, const std::string &filename,
                               int param_precision) const {
   std::ofstream fout(filename);
   if (!fout.is_open()) {
     return false;
   }
-  fout << "OPENQASM 2.0;\n"
-          "include \"qelib1.inc\";\n"
-          "qreg q["
-       << get_num_qubits() << "];\n";
-  for (auto &gate : gates) {
-    fout << gate->to_qasm_style_string(ctx, param_precision);
-  }
+  fout << to_qasm_style_string(ctx, param_precision);
   fout.close();
   return true;
 }

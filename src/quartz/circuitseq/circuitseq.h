@@ -122,8 +122,13 @@ class CircuitSeq {
   static std::unique_ptr<CircuitSeq> read_json(Context *ctx, std::istream &fin);
   static std::unique_ptr<CircuitSeq>
   from_qasm_file(Context *ctx, const std::string &filename);
+  static std::unique_ptr<CircuitSeq>
+  from_qasm_style_string(Context *ctx, const std::string &str);
+  std::string
+  to_qasm_style_string(Context *ctx,
+                       int param_precision = kDefaultQASMParamPrecision) const;
   bool to_qasm_file(Context *ctx, const std::string &filename,
-                    int param_precision = 15) const;
+                    int param_precision = kDefaultQASMParamPrecision) const;
 
   /**
    * Canonical representation is a sequence representation of a

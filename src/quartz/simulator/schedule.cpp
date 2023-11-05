@@ -1,8 +1,10 @@
 #include "schedule.h"
 
 #include "quartz/pybind/pybind.h"
+#include "quartz/utils/string_utils.h"
 
 #include <deque>
+#include <filesystem>
 #include <queue>
 #include <stack>
 #include <unordered_set>
@@ -1272,7 +1274,8 @@ bool Schedule::compute_kernel_schedule(
   int start_gate_index = 0;  // an optimization
   for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
-    CircuitSeq current_seq(num_qubits, sequence_->get_num_input_parameters());
+    auto current_seq = std::make_unique<CircuitSeq>(
+        num_qubits, sequence_->get_num_input_parameters());
     std::vector<bool> active_in_kernel(num_qubits, false);
     for (auto &index : s.active_qubits) {
       active_in_kernel[index] = true;
@@ -1330,7 +1333,7 @@ bool Schedule::compute_kernel_schedule(
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        current_seq.add_gate(sequence_->gates[i].get());
+        current_seq->add_gate(sequence_->gates[i].get());
       } else {
         // Block the non-insular qubits.
         for (auto &qubit : current_non_insular_indices) {
@@ -1346,7 +1349,7 @@ bool Schedule::compute_kernel_schedule(
         }
       }
     }
-    kernels.emplace_back(current_seq, s.active_qubits, s.tp);
+    kernels.emplace_back(std::move(current_seq), s.active_qubits, s.tp);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
@@ -1376,8 +1379,8 @@ bool Schedule::compute_kernel_schedule_simple(
   std::vector<KernelCostType> dp(num_gates + 1);
   std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
   dp[0] = 0;
-  CircuitSeq empty_circuit(sequence_->get_num_qubits(),
-                           sequence_->get_num_input_parameters());
+  auto empty_circuit = std::make_unique<CircuitSeq>(
+      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
   std::map<KernelType, std::deque<Kernel>> possible_kernels;
   possible_kernels.emplace(
       std::make_pair(KernelType::fusion, std::deque<Kernel>()));
@@ -1392,7 +1395,8 @@ bool Schedule::compute_kernel_schedule_simple(
     for (auto &p : possible_kernels) {
       auto tp = p.first;
       auto &k = p.second;
-      k.emplace_front(empty_circuit, /*qubits=*/std::vector<int>(), tp);
+      k.emplace_front(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
+                      tp);
       if (tp == KernelType::shared_memory) {
         shared_memory_possible_kernels_gate_cost.emplace_front(0);
       }
@@ -1453,12 +1457,12 @@ bool Schedule::compute_kernel_schedule_simple(
   kernels.reserve(kernel_split_locations.size() - 1);
   for (int i = (int)kernel_split_locations.size() - 1; i > 0; i--) {
     int location = kernel_split_locations[i];
-    auto kernel = Kernel(empty_circuit, /*qubits=*/std::vector<int>(),
+    auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                          dp_from[kernel_split_locations[i - 1]].second);
     for (int j = location; j < kernel_split_locations[i - 1]; j++) {
       kernel.add_gate(sequence_->gates[j].get());
     }
-    kernels.push_back(kernel);
+    kernels.push_back(std::move(kernel));
   }
   return true;
 }
@@ -1480,8 +1484,8 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
   std::vector<KernelCostType> dp(num_gates + 1);
   std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
   dp[num_gates] = 0;
-  CircuitSeq empty_circuit(sequence_->get_num_qubits(),
-                           sequence_->get_num_input_parameters());
+  auto empty_circuit = std::make_unique<CircuitSeq>(
+      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
   std::map<KernelType, int> max_j_position;
   max_j_position.emplace(std::make_pair(KernelType::fusion, num_gates));
   max_j_position.emplace(std::make_pair(KernelType::shared_memory, num_gates));
@@ -1492,7 +1496,8 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
       auto tp = p.first;
       auto &max_j = p.second;
       int j;
-      Kernel current_kernel(empty_circuit, /*qubits=*/std::vector<int>(), tp);
+      Kernel current_kernel(empty_circuit->clone(),
+                            /*qubits=*/std::vector<int>(), tp);
       KernelCostType current_cost = 0;
       if (tp == KernelType::shared_memory) {
         current_cost = kernel_cost.get_shared_memory_init_cost();
@@ -1532,12 +1537,12 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
   // Record the kernels.
   kernels.clear();
   for (int i = 0; i < num_gates; i = dp_from[i].first) {
-    auto kernel =
-        Kernel(empty_circuit, /*qubits=*/std::vector<int>(), dp_from[i].second);
+    auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
+                         dp_from[i].second);
     for (int j = i; j < dp_from[i].first; j++) {
       kernel.add_gate(sequence_->gates[j].get());
     }
-    kernels.push_back(kernel);
+    kernels.push_back(std::move(kernel));
   }
   return true;
 }
@@ -1704,7 +1709,7 @@ void Schedule::print_kernel_schedule() const {
 int Schedule::remove_empty_kernels(const KernelCost &kernel_cost) {
   int num_empty_kernels = 0;
   for (auto &kernel : kernels) {
-    if (kernel.gates.get_num_gates() == 0) {
+    if (kernel.gates->get_num_gates() == 0) {
       num_empty_kernels++;
       if (kernel.type == KernelType::fusion) {
         cost_ -= kernel_cost.get_fusion_kernel_costs()[kernel.qubits.size()];
@@ -1721,20 +1726,101 @@ int Schedule::remove_empty_kernels(const KernelCost &kernel_cost) {
   auto prev_kernels = std::move(kernels);
   kernels.clear();
   for (auto &kernel : prev_kernels) {
-    if (kernel.gates.get_num_gates() != 0) {
+    if (kernel.gates->get_num_gates() != 0) {
       kernels.push_back(std::move(kernel));
     }
   }
   return num_empty_kernels;
 }
 
+Schedule Schedule::from_file(Context *ctx, const std::string &filename) {
+  std::ifstream fin(filename);
+  if (!fin.is_open()) {
+    std::cerr << "Failed to open schedule file " << filename << std::endl;
+    assert(false);
+    return {nullptr, {}, {}, 0, ctx};
+  }
+  std::stringstream ss;
+  ss << fin.rdbuf();  // read out the content
+  fin.close();
+
+  std::string s;
+  std::vector<int> local_qubit;
+  std::vector<int> global_qubit;
+  int num_shared_memory_cacheline_qubits;
+  KernelCostType cost;
+  int num_kernels;
+  std::vector<Kernel> kernels;
+  std::unique_ptr<CircuitSeq> sequence;
+  read_json_style_vector(ss, local_qubit);
+  read_json_style_vector(ss, global_qubit);
+  ss >> num_shared_memory_cacheline_qubits;
+  ss >> cost;
+  ss >> num_kernels;
+  kernels.reserve(num_kernels);
+  for (int i = 0; i < num_kernels; i++) {
+    std::getline(ss, s, '@');
+    kernels.emplace_back(Kernel::from_qasm_style_string(ctx, s));
+  }
+  std::getline(ss, s, '\0');  // the rest
+  sequence = CircuitSeq::from_qasm_style_string(ctx, s);
+  auto result = Schedule(std::move(sequence), local_qubit, global_qubit,
+                         num_shared_memory_cacheline_qubits, ctx);
+  result.cost_ = cost;
+  result.kernels = std::move(kernels);
+  return result;
+}
+
+bool Schedule::save_to_file(Context *ctx, const std::string &filename,
+                            int param_precision) const {
+  std::ofstream fout(filename);
+  if (!fout.is_open()) {
+    return false;
+  }
+  int num_shared_memory_cacheline_qubits = 0;
+  for (auto cacheline : shared_memory_cacheline_qubit_mask_) {
+    if (cacheline) {
+      num_shared_memory_cacheline_qubits++;
+    }
+  }
+  fout << to_json_style_string(local_qubit_) << std::endl;
+  fout << to_json_style_string(global_qubit_) << std::endl;
+  fout << num_shared_memory_cacheline_qubits << std::endl;
+  fout << cost_ << std::endl;
+  fout << kernels.size() << std::endl;
+  for (auto &kernel : kernels) {
+    fout << kernel.to_qasm_style_string(ctx, param_precision);
+    fout << "@" << std::endl;  // separator
+  }
+  // the original sequence
+  fout << sequence_->to_qasm_style_string(ctx, param_precision);
+  return true;
+}
+
 std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence,
               const std::vector<std::vector<int>> &local_qubits,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, int use_simple_dp_times) {
+              bool attach_single_qubit_gates, int use_simple_dp_times,
+              const std::string &cache_file_name_prefix) {
   constexpr bool debug = false;
   std::vector<Schedule> result;
+  if (!cache_file_name_prefix.empty()) {
+    int num_stages;
+    std::ifstream fin(cache_file_name_prefix + ".schedule");
+    if (fin.is_open()) {
+      // use cached result
+      fin >> num_stages;
+      fin.close();
+      result.reserve(num_stages);
+      for (int i = 0; i < num_stages; i++) {
+        result.emplace_back(
+            Schedule::from_file(ctx, cache_file_name_prefix + ".stage" +
+                                         std::to_string(i) + ".schedule"));
+      }
+      return result;
+    }
+  }
   result.reserve(local_qubits.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
@@ -2262,17 +2348,17 @@ get_schedules(const CircuitSeq &sequence,
                     }
                   }
                 }
-                schedule.kernels[i].gates.insert_gate(
+                schedule.kernels[i].gates->insert_gate(
                     insert_location, sequence.gates[gate_index].get());
                 insert_location++;
               }
               return gate_indices.size();
             };
 
-        // Purposely using |schedule.kernels[i].gates.gates.size()| because we
-        // may modify |schedule.kernels[i].gates.gates| in this loop.
-        for (int j = 0; j < (int)schedule.kernels[i].gates.gates.size(); j++) {
-          auto &gate = schedule.kernels[i].gates.gates[j];
+        // Purposely using |schedule.kernels[i].gates->gates.size()| because we
+        // may modify |schedule.kernels[i].gates->gates| in this loop.
+        for (int j = 0; j < (int)schedule.kernels[i].gates->gates.size(); j++) {
+          auto &gate = schedule.kernels[i].gates->gates[j];
           auto &gate_indices_queue = gate_indices[gate->to_string()];
           assert(!gate_indices_queue.empty());
 
@@ -2283,15 +2369,15 @@ get_schedules(const CircuitSeq &sequence,
           // We execute the gate now.
           std::vector<bool> control_state;
           if (schedule.kernels[i]
-                  .gates.gates[j]
+                  .gates->gates[j]
                   ->gate->get_num_control_qubits() > 0) {
             assert(schedule.kernels[i]
-                       .gates.gates[j]
+                       .gates->gates[j]
                        ->gate->get_num_control_qubits() ==
                    (int)should_flip_control_qubit[original_index].size());
             int k = 0;
             for (auto &qubit : schedule.kernels[i]
-                                   .gates.gates[j]
+                                   .gates->gates[j]
                                    ->get_control_qubit_indices()) {
               control_state.push_back(
                   should_flip_control_qubit[original_index][k] ^ flipping[k] ^
@@ -2301,16 +2387,17 @@ get_schedules(const CircuitSeq &sequence,
             if (!std::all_of(control_state.begin(), control_state.end(),
                              [](bool v) { return v; })) {
               // Not a simple controlled gate
-              schedule.kernels[i].gates.gates[j]->gate =
+              schedule.kernels[i].gates->gates[j]->gate =
                   ctx->get_general_controlled_gate(
-                      schedule.kernels[i].gates.gates[j]->gate->tp,
+                      schedule.kernels[i].gates->gates[j]->gate->tp,
                       control_state);
             }
           }
-          if (schedule.kernels[i].gates.gates[j]->gate->get_num_qubits() == 1 &&
-              schedule.kernels[i].gates.gates[j]->gate->is_sparse() &&
-              !schedule.kernels[i].gates.gates[j]->gate->is_diagonal()) {
-            flipping[schedule.kernels[i].gates.gates[j]->get_min_qubit_index()]
+          if (schedule.kernels[i].gates->gates[j]->gate->get_num_qubits() ==
+                  1 &&
+              schedule.kernels[i].gates->gates[j]->gate->is_sparse() &&
+              !schedule.kernels[i].gates->gates[j]->gate->is_diagonal()) {
+            flipping[schedule.kernels[i].gates->gates[j]->get_min_qubit_index()]
                 .flip();
           }
 
@@ -2335,6 +2422,20 @@ get_schedules(const CircuitSeq &sequence,
         result.push_back(std::move(schedule));
       }
     }
+  }
+  if (!cache_file_name_prefix.empty()) {
+    // Cache the result.
+    int num_stages = (int)result.size();
+    for (int i = 0; i < num_stages; i++) {
+      if (!result[i].save_to_file(ctx, cache_file_name_prefix + ".stage" +
+                                           std::to_string(i) + ".schedule")) {
+        std::cerr << "Error when caching the schedule." << std::endl;
+      }
+    }
+    std::ofstream fout(cache_file_name_prefix + ".schedule");
+    assert(fout.is_open());
+    fout << num_stages;
+    fout.close();
   }
   return result;
 }
@@ -2404,5 +2505,23 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
       return result;
     }
   }
+}
+
+std::vector<Schedule> get_schedules_with_ilp(
+    const CircuitSeq &sequence, int num_local_qubits,
+    const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
+    bool attach_single_qubit_gates, int use_simple_dp_times,
+    const std::string &cache_file_name_prefix, int answer_start_with) {
+  if (std::filesystem::exists(cache_file_name_prefix + ".schedule")) {
+    // cached
+    return get_schedules(sequence, {}, kernel_cost, ctx,
+                         attach_single_qubit_gates, use_simple_dp_times,
+                         cache_file_name_prefix);
+  }
+  auto local_qubits = compute_local_qubits_with_ilp(
+      sequence, num_local_qubits, ctx, interpreter, answer_start_with);
+  return get_schedules(sequence, local_qubits, kernel_cost, ctx,
+                       attach_single_qubit_gates, use_simple_dp_times,
+                       cache_file_name_prefix);
 }
 }  // namespace quartz

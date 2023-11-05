@@ -182,4 +182,18 @@ std::vector<Schedule> get_schedules_with_ilp(
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
     bool attach_single_qubit_gates, int use_simple_dp_times = 0,
     const std::string &cache_file_name_prefix = "", int answer_start_with = 1);
+
+/**
+ * Verify the schedule by random testing an input state and running the
+ * simulation.
+ * Requires the sequence to have no more than 30 qubits.
+ * Requires an exponential amount of memory to the number of qubits (~48 GiB
+ * for 30 qubits).
+ * The time complexity is O(2^(number of qubits) * (number of gates)).
+ * @return True iff simulating the sequence itself and running the simulation
+ * on the schedules yield the same result for each input state tested.
+ */
+bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
+                     const std::vector<Schedule> &schedules,
+                     int random_test_times = 1);
 }  // namespace quartz

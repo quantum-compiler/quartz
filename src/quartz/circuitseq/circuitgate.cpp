@@ -1,7 +1,8 @@
 #include "circuitgate.h"
 
-#include "circuitwire.h"
-#include "context/context.h"
+#include "quartz/circuitseq/circuitwire.h"
+#include "quartz/context/context.h"
+#include "quartz/utils/string_utils.h"
 
 #include <algorithm>
 #include <cassert>
@@ -128,12 +129,15 @@ std::string CircuitGate::to_string() const {
   std::string result;
   if (output_wires.size() == 1) {
     result += output_wires[0]->to_string();
-  } else if (output_wires.size() == 2) {
-    result += "[" + output_wires[0]->to_string();
-    result += ", " + output_wires[1]->to_string();
-    result += "]";
   } else {
-    assert(false && "A circuit gate should have 1 or 2 outputs.");
+    result += "[";
+    for (int i = 0; i < (int)output_wires.size(); i++) {
+      result += output_wires[i]->to_string();
+      if (i != (int)output_wires.size() - 1) {
+        result += ", ";
+      }
+    }
+    result += "]";
   }
   result += " = ";
   result += gate_type_name(gate->tp);
@@ -169,6 +173,7 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     if (!std::all_of(control_state.begin(), control_state.end(),
                      [](bool v) { return v; })) {
       // Not a simple controlled gate
+      result += "//ctrl\n";
       auto control_qubits = get_control_qubit_indices();
       for (int i = 0; i < (int)control_state.size(); i++) {
         if (!control_state[i]) {

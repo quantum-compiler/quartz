@@ -78,8 +78,9 @@ Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
     gen = &static_gen;
   }
   static std::uniform_int_distribution<int> dis_int(0, 1);
+  assert(num_qubits <= 30);
   Vector result(1 << num_qubits);
-  int remaining_numbers = (2 << num_qubits);
+  unsigned int remaining_numbers = (2u << num_qubits);
 
 #ifdef USE_ARBLIB
   constexpr slong kRandPrec = 64;

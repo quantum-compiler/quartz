@@ -17,8 +17,8 @@ class CircuitSeq;
 class Context {
  public:
   explicit Context(const std::vector<GateType> &supported_gates);
-  Context(const std::vector<GateType> &supported_gates, const int num_qubits,
-          const int num_params);
+  Context(const std::vector<GateType> &supported_gates, int num_qubits,
+          int num_params);
   Gate *get_gate(GateType tp);
   Gate *get_general_controlled_gate(GateType tp,
                                     const std::vector<bool> &state);
@@ -31,13 +31,13 @@ class Context {
   const Vector &get_and_gen_input_dis(int num_qubits);
   const Vector &get_and_gen_hashing_dis(int num_qubits);
   std::vector<ParamType> get_and_gen_parameters(int num_params);
-  const Vector &get_generated_input_dis(int num_qubits) const;
-  const Vector &get_generated_hashing_dis(int num_qubits) const;
-  std::vector<ParamType> get_generated_parameters(int num_params) const;
-  std::vector<ParamType> get_all_generated_parameters() const;
+  [[nodiscard]] const Vector &get_generated_input_dis(int num_qubits) const;
+  [[nodiscard]] const Vector &get_generated_hashing_dis(int num_qubits) const;
+  [[nodiscard]] std::vector<ParamType> get_generated_parameters(int num_params) const;
+  [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 
-  bool has_parameterized_gate() const;
+  [[nodiscard]] bool has_parameterized_gate() const;
 
   // A hacky function: set a generated parameter.
   void set_generated_parameter(int id, ParamType param);
@@ -49,8 +49,9 @@ class Context {
   bool get_possible_representative(const CircuitSeqHashType &hash_value,
                                    CircuitSeq *&representative) const;
 
-  ParamType get_param_value(int id) const;
+  [[nodiscard]] ParamType get_param_value(int id) const;
   void set_param_value(int id, const ParamType &param);
+  [[nodiscard]] std::vector<ParamType> get_all_param_values() const;
   // TODO: Use this function when generating symbolic parameters
   int get_new_param_id(bool is_symbolic);
   // TODO: This function should not be needed

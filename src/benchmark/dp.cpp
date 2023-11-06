@@ -156,6 +156,7 @@ int main() {
         answer_start_with = ilp_result;
       }
       fprintf(fout, "\n");
+      fflush(fout);
     }
   }
   fclose(fout);

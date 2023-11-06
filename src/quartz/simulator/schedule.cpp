@@ -1498,10 +1498,7 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
       int j;
       Kernel current_kernel(empty_circuit->clone(),
                             /*qubits=*/std::vector<int>(), tp);
-      KernelCostType current_cost = 0;
-      if (tp == KernelType::shared_memory) {
-        current_cost = kernel_cost.get_shared_memory_init_cost();
-      }
+      KernelCostType current_cost = 0, total_shared_memory_gate_cost = 0;
       for (j = i + 1; j <= max_j; j++) {
         current_kernel.add_gate(sequence_->gates[j - 1].get(),
                                 non_insular_qubit_indices.empty()
@@ -1509,11 +1506,14 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
                                     : non_insular_qubit_indices[j - 1]);
         if (tp == KernelType::shared_memory) {
           if (shared_memory_gate_costs.empty()) {
-            current_cost += kernel_cost.get_shared_memory_gate_cost(
-                sequence_->gates[j - 1]->gate->tp);
+            total_shared_memory_gate_cost +=
+                kernel_cost.get_shared_memory_gate_cost(
+                    sequence_->gates[j - 1]->gate->tp);
           } else {
-            current_cost += shared_memory_gate_costs[j - 1];
+            total_shared_memory_gate_cost += shared_memory_gate_costs[j - 1];
           }
+          current_cost = current_kernel.cost(kernel_cost, local_qubit_,
+                                             &total_shared_memory_gate_cost);
         } else {
           current_cost =
               current_kernel.cost(kernel_cost, local_qubit_, nullptr);
@@ -1866,14 +1866,18 @@ get_schedules(const CircuitSeq &sequence,
       local_qubits.size());
   std::vector<std::vector<KernelCostType>> shared_memory_gate_costs(
       local_qubits.size());
-  bool warned_about_cx = false;
 
   // |should_flip_control_qubit[i][j]|: if the |j|-th qubit in the |i|-th gate
   // should be flipped if we remove all single-qubit sparse non-diagonal gates
   // (e.g., X gate)
-  // |flipping[i]|: if the |i|-th qubit is flipped now if we remove them
+  // |flipping[j]|: if the |j|-th qubit is flipped now if we remove them
   std::vector<std::vector<bool>> should_flip_control_qubit(num_gates);
   std::vector<bool> flipping(num_qubits, false);
+
+  // Whether to attach multi-qubit (when only one qubit is local)
+  // non-diagonal gates (e.g., CX gate).
+  constexpr bool attach_cx = false;
+  bool warned_about_cx = false;
 
   if (debug) {
     std::cout << "get_schedules for " << sequence.to_string(true) << std::endl;
@@ -2036,7 +2040,14 @@ get_schedules(const CircuitSeq &sequence,
               current_local_qubits.push_back(wire->index);
             }
           }
-          if (current_local_qubits.size() == 1) {
+          bool attach_this_gate = current_local_qubits.size() == 1;
+          if (!attach_cx) {
+            attach_this_gate =
+                attach_this_gate &&
+                (sequence.gates[i]->gate->get_num_qubits() == 1 ||
+                 sequence.gates[i]->gate->is_diagonal());
+          }
+          if (attach_this_gate) {
             // Do not put single-qubit gates into |current_seq|.
             // Update |single_qubit_gate_indices| and
             // |has_dense_single_qubit_gate| instead.
@@ -2355,7 +2366,7 @@ get_schedules(const CircuitSeq &sequence,
                     insert_location, sequence.gates[gate_index].get());
                 insert_location++;
               }
-              return gate_indices.size();
+              return (int)gate_indices.size();
             };
 
         // Purposely using |schedule.kernels[i].gates->gates.size()| because we
@@ -2551,7 +2562,7 @@ bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
     const auto sz = 1 << sequence.get_num_qubits();
     Vector input_dis = Vector::random_generate(sequence.get_num_qubits());
     auto input_parameters = ctx->get_all_param_values();
-    assert(input_parameters.size() >= sequence.get_num_input_parameters());
+    assert((int)input_parameters.size() >= sequence.get_num_input_parameters());
     input_parameters.resize(sequence.get_num_input_parameters());
     std::vector<ParamType> all_parameters;
     Vector expected_output;

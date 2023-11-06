@@ -772,7 +772,7 @@ bool Schedule::compute_kernel_schedule(
       }
 
       // Count the number of qubits intersecting with each open kernel.
-      const int num_kernels = current_status.open_kernels.size();
+      const int num_kernels = (int)current_status.open_kernels.size();
       std::vector<int> intersect_kernel_indices, active_size, touching_size;
       for (int j = 0; j < num_kernels; j++) {
         bool touching_set_has_j = false;
@@ -1876,7 +1876,10 @@ get_schedules(const CircuitSeq &sequence,
 
   // Whether to attach multi-qubit (when only one qubit is local)
   // non-diagonal gates (e.g., CX gate).
-  constexpr bool attach_cx = false;
+  constexpr bool attach_cx = true;
+  // Should be set to true, otherwise we only guarantee the schedule to be
+  // correct when all global qubits are |0> for each stage.
+  constexpr bool attach_cx_safely = true;
   bool warned_about_cx = false;
 
   if (debug) {
@@ -2059,14 +2062,29 @@ get_schedules(const CircuitSeq &sequence,
               has_dense_single_qubit_gate[current_local_qubits[0]] = true;
             }
 
-            if ((sequence.gates[i]->gate->tp == GateType::cx ||
-                 sequence.gates[i]->gate->tp == GateType::ccx) &&
-                !warned_about_cx) {
-              warned_about_cx = true;
-              std::cerr << "Warning: CX or CCX gate attached to another gate. "
-                        << "The schedule may be different for each device, "
-                        << "but we only output the schedule for the device "
-                        << "where CX or CCX is not executed here." << std::endl;
+            if (attach_cx_safely) {
+              // Although CX or CCX gates, when all control qubits are global,
+              // can have the only local qubit insular because it is simply
+              // an X gate or identity gate, we do not know if we need to
+              // adjust anything else when we swap this gate with an adjacent
+              // insular gate because we do not know the device we are computing
+              // the schedule on has the control qubit |0> or |1>.
+              // So we set this qubit to be non-insular just to be safe.
+              if (sequence.gates[i]->gate->get_num_qubits() > 1 &&
+                  !sequence.gates[i]->gate->is_diagonal()) {
+                has_dense_single_qubit_gate[current_local_qubits[0]] = true;
+              }
+            } else {
+              if ((sequence.gates[i]->gate->tp == GateType::cx ||
+                   sequence.gates[i]->gate->tp == GateType::ccx) &&
+                  !warned_about_cx) {
+                warned_about_cx = true;
+                std::cerr
+                    << "Warning: CX or CCX gate attached to another gate. "
+                    << "The schedule may be different for each device, "
+                    << "but we only output the schedule for the device "
+                    << "where CX or CCX is not executed here." << std::endl;
+              }
             }
           } else {
             // Either a global gate or a multi-qubit gate.

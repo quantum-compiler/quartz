@@ -34,6 +34,7 @@ int main() {
   for (int i = 28; i <= 34; i++) {
     num_qubits.push_back(i);
   }
+  num_qubits.push_back(42);
   for (int num_q : num_qubits) {
     std::cout << num_q << " qubits:" << std::endl;
     for (const auto &circuit : circuit_names) {

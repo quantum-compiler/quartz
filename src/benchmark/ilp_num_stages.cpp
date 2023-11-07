@@ -139,7 +139,8 @@ int main() {
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
-               GateType::cx, GateType::cz, GateType::cp, GateType::swap});
+               GateType::cx, GateType::cz, GateType::cp, GateType::swap,
+               GateType::rz, GateType::p, GateType::ccx, GateType::rx});
   std::vector<std::string> circuit_names = {"ae",
                                             "dj",
                                             "ghz",
@@ -152,20 +153,30 @@ int main() {
                                             "su2random",
                                             "twolocalrandom",
                                             "wstate"};
+  std::vector<std::string> circuit_names_nwq = {"bv", "ising", "qsvm", "vqc"};
   // 31 or 42 total qubits, 23-42 local qubits
+  constexpr bool run_nwq = false;
   std::vector<int> num_qubits = {31, 42};
+  if (run_nwq) {
+    num_qubits.pop_back();
+  }
   std::vector<int> num_local_qubits;
   for (int i = 42; i >= 23; i--) {
     num_local_qubits.push_back(i);
   }
   FILE *fout = fopen("ilp_result.csv", "w");
-  for (auto circuit : circuit_names) {
+  for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
     fprintf(fout, "%s\n", circuit.c_str());
     for (int num_q : num_qubits) {
+      // requires running test_remove_swap first
       auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
-                    ".qasm");
+          &ctx,
+          (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
+                      (circuit == std::string("hhl") ? "" : "n") +
+                      std::to_string(num_q) + ".qasm")
+                   : (std::string("circuit/MQTBench_") + std::to_string(num_q) +
+                      "q/" + circuit + "_indep_qiskit_" +
+                      std::to_string(num_q) + "_no_swap.qasm")));
 
       fprintf(fout, "%d, ", num_q);
       for (int local_q : num_local_qubits) {
@@ -181,10 +192,15 @@ int main() {
       fprintf(fout, "\n");
     }
     for (int num_q : num_qubits) {
+      // requires running test_remove_swap first
       auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
-                    ".qasm");
+          &ctx,
+          (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
+                      (circuit == std::string("hhl") ? "" : "n") +
+                      std::to_string(num_q) + ".qasm")
+                   : (std::string("circuit/MQTBench_") + std::to_string(num_q) +
+                      "q/" + circuit + "_indep_qiskit_" +
+                      std::to_string(num_q) + "_no_swap.qasm")));
 
       fprintf(fout, "%d, ", num_q);
       int answer_start_with = 1;

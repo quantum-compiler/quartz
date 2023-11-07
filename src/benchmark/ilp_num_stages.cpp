@@ -14,7 +14,8 @@
 using namespace quartz;
 
 int num_stages_by_heuristics(CircuitSeq *seq, int num_local_qubits,
-                             std::vector<std::vector<bool>> &local_qubits) {
+                             std::vector<std::vector<bool>> &local_qubits,
+                             int &num_swaps) {
   int num_qubits = seq->get_num_qubits();
   std::unordered_map<CircuitGate *, bool> executed;
   // No initial configuration -- all qubits are global.
@@ -128,6 +129,13 @@ int num_stages_by_heuristics(CircuitSeq *seq, int num_local_qubits,
     }
     std::cout << "}" << std::endl;
     local_qubits.push_back(local_qubit);
+    if (num_stages != 1) {
+      for (int i = 0; i < num_local_qubits; i++) {
+        if (!local_qubits[num_stages - 2][candidate_indices[i]]) {
+          num_swaps++;
+        }
+      }
+    }
   }
   std::cout << num_stages << " stages." << std::endl;
   return num_stages;
@@ -141,18 +149,8 @@ int main() {
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
                GateType::rz, GateType::p, GateType::ccx, GateType::rx});
-  std::vector<std::string> circuit_names = {"ae",
-                                            "dj",
-                                            "ghz",
-                                            "graphstate",
-                                            "qft",
-                                            "qftentangled",
-                                            "qpeexact",
-                                            "qpeinexact",
-                                            "realamprandom",
-                                            "su2random",
-                                            "twolocalrandom",
-                                            "wstate"};
+  std::vector<std::string> circuit_names = {"ae",  "ghz",      "graphstate",
+                                            "qft", "qpeexact", "su2random"};
   std::vector<std::string> circuit_names_nwq = {"bv", "ising", "qsvm", "vqc"};
   // 31 or 42 total qubits, 23-42 local qubits
   constexpr bool run_nwq = false;
@@ -179,17 +177,26 @@ int main() {
                       std::to_string(num_q) + "_no_swap.qasm")));
 
       fprintf(fout, "%d, ", num_q);
+      std::vector<int> n_swaps;
       for (int local_q : num_local_qubits) {
         if (local_q > num_q) {
           continue;
         }
         std::vector<std::vector<bool>> local_qubits_by_heuristics;
+        int num_swaps = 0;
         int heuristics_result = num_stages_by_heuristics(
-            seq.get(), local_q, local_qubits_by_heuristics);
+            seq.get(), local_q, local_qubits_by_heuristics, num_swaps);
+        n_swaps.push_back(num_swaps);
         fprintf(fout, "%d, ", heuristics_result);
         fflush(fout);
       }
       fprintf(fout, "\n");
+      fprintf(fout, "%d, ", num_q);
+      for (auto &num_swaps : n_swaps) {
+        fprintf(fout, "%d, ", num_swaps);
+      }
+      fprintf(fout, "\n");
+      fflush(fout);
     }
     for (int num_q : num_qubits) {
       // requires running test_remove_swap first
@@ -204,6 +211,7 @@ int main() {
 
       fprintf(fout, "%d, ", num_q);
       int answer_start_with = 1;
+      std::vector<int> n_swaps;
       for (int local_q : num_local_qubits) {
         if (local_q > num_q) {
           continue;
@@ -212,19 +220,37 @@ int main() {
         local_qubits = compute_local_qubits_with_ilp(
             *seq, local_q, &ctx, &interpreter, answer_start_with);
         int ilp_result = (int)local_qubits.size();
+        int num_swaps = 0;
+        std::vector<bool> prev_local(num_q, false);
         for (int j = 0; j < ilp_result; j++) {
           std::cout << "Stage " << j << ": ";
           std::cout << local_qubits.size() << " local qubits, ";
           for (int k : local_qubits[j]) {
             std::cout << k << " ";
+            if (j > 0) {
+              if (!prev_local[k]) {
+                num_swaps++;
+              }
+            }
+          }
+          prev_local.assign(num_q, false);
+          for (int k : local_qubits[j]) {
+            prev_local[k] = true;
           }
           std::cout << std::endl;
         }
+        n_swaps.push_back(num_swaps);
         fprintf(fout, "%d, ", ilp_result);
         fflush(fout);
         answer_start_with = ilp_result;
       }
       fprintf(fout, "\n");
+      fprintf(fout, "%d, ", num_q);
+      for (auto &num_swaps : n_swaps) {
+        fprintf(fout, "%d, ", num_swaps);
+      }
+      fprintf(fout, "\n");
+      fflush(fout);
     }
   }
   fclose(fout);

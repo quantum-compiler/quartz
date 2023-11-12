@@ -149,108 +149,109 @@ int main() {
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
                GateType::rz, GateType::p, GateType::ccx, GateType::rx});
-  std::vector<std::string> circuit_names = {"ae",  "ghz",      "graphstate",
-                                            "qft", "qpeexact", "su2random"};
+  std::vector<std::string> circuit_names = {"ae",         "dj",    "ghz",
+                                            "graphstate", "qft",   "qpeexact",
+                                            "su2random",  "wstate"};
   std::vector<std::string> circuit_names_nwq = {"bv", "ising", "qsvm", "vqc"};
-  // 31 or 42 total qubits, 23-42 local qubits
-  constexpr bool run_nwq = false;
-  std::vector<int> num_qubits = {31, 42};
-  if (run_nwq) {
-    num_qubits.pop_back();
-  }
-  std::vector<int> num_local_qubits;
-  for (int i = 42; i >= 23; i--) {
-    num_local_qubits.push_back(i);
-  }
   FILE *fout = fopen("ilp_result.csv", "w");
-  for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
-    fprintf(fout, "%s\n", circuit.c_str());
-    for (int num_q : num_qubits) {
-      // requires running test_remove_swap first
-      auto seq = CircuitSeq::from_qasm_file(
-          &ctx,
-          (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
-                      (circuit == std::string("hhl") ? "" : "n") +
-                      std::to_string(num_q) + ".qasm")
-                   : (std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                      "q/" + circuit + "_indep_qiskit_" +
-                      std::to_string(num_q) + "_no_swap.qasm")));
+  for (int run_nwq = 0; run_nwq <= 1; run_nwq++) {
+    // 31 or 42 total qubits, 0-23 global qubits
+    std::vector<int> num_qubits = {31, 42};
+    constexpr int kMaxGlobalQubitsFor31 = 16;
+    std::vector<int> num_global_qubits;
+    for (int i = 0; i <= 24; i++) {
+      num_global_qubits.push_back(i);
+    }
+    for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
+      fprintf(fout, "%s\n", circuit.c_str());
+      for (int num_q : num_qubits) {
+        // requires running test_remove_swap first
+        auto seq = CircuitSeq::from_qasm_file(
+            &ctx, (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
+                              (circuit == std::string("hhl") ? "" : "n") +
+                              std::to_string(num_q) + ".qasm")
+                           : (std::string("circuit/MQTBench_") +
+                              std::to_string(num_q) + "q/" + circuit +
+                              "_indep_qiskit_" + std::to_string(num_q) +
+                              "_no_swap.qasm")));
 
-      fprintf(fout, "%d, ", num_q);
-      std::vector<int> n_swaps;
-      for (int local_q : num_local_qubits) {
-        if (local_q > num_q) {
-          continue;
+        fprintf(fout, "%d, ", num_q);
+        std::vector<int> n_swaps;
+        for (int global_q : num_global_qubits) {
+          if (num_q == 31 && global_q > kMaxGlobalQubitsFor31) {
+            continue;
+          }
+          std::vector<std::vector<bool>> local_qubits_by_heuristics;
+          int num_swaps = 0;
+          int heuristics_result =
+              num_stages_by_heuristics(seq.get(), num_q - global_q,
+                                       local_qubits_by_heuristics, num_swaps);
+          n_swaps.push_back(num_swaps);
+          fprintf(fout, "%d, ", heuristics_result);
+          fflush(fout);
         }
-        std::vector<std::vector<bool>> local_qubits_by_heuristics;
-        int num_swaps = 0;
-        int heuristics_result = num_stages_by_heuristics(
-            seq.get(), local_q, local_qubits_by_heuristics, num_swaps);
-        n_swaps.push_back(num_swaps);
-        fprintf(fout, "%d, ", heuristics_result);
+        fprintf(fout, "\n");
+        fprintf(fout, "%d, ", num_q);
+        for (auto &num_swaps : n_swaps) {
+          fprintf(fout, "%d, ", num_swaps);
+        }
+        fprintf(fout, "\n");
         fflush(fout);
       }
-      fprintf(fout, "\n");
-      fprintf(fout, "%d, ", num_q);
-      for (auto &num_swaps : n_swaps) {
-        fprintf(fout, "%d, ", num_swaps);
-      }
-      fprintf(fout, "\n");
-      fflush(fout);
-    }
-    for (int num_q : num_qubits) {
-      // requires running test_remove_swap first
-      auto seq = CircuitSeq::from_qasm_file(
-          &ctx,
-          (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
-                      (circuit == std::string("hhl") ? "" : "n") +
-                      std::to_string(num_q) + ".qasm")
-                   : (std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                      "q/" + circuit + "_indep_qiskit_" +
-                      std::to_string(num_q) + "_no_swap.qasm")));
+      for (int num_q : num_qubits) {
+        // requires running test_remove_swap first
+        auto seq = CircuitSeq::from_qasm_file(
+            &ctx, (run_nwq ? (std::string("circuit/NWQBench/") + circuit + "_" +
+                              (circuit == std::string("hhl") ? "" : "n") +
+                              std::to_string(num_q) + ".qasm")
+                           : (std::string("circuit/MQTBench_") +
+                              std::to_string(num_q) + "q/" + circuit +
+                              "_indep_qiskit_" + std::to_string(num_q) +
+                              "_no_swap.qasm")));
 
-      fprintf(fout, "%d, ", num_q);
-      int answer_start_with = 1;
-      std::vector<int> n_swaps;
-      for (int local_q : num_local_qubits) {
-        if (local_q > num_q) {
-          continue;
-        }
-        std::vector<std::vector<int>> local_qubits;
-        local_qubits = compute_local_qubits_with_ilp(
-            *seq, local_q, &ctx, &interpreter, answer_start_with);
-        int ilp_result = (int)local_qubits.size();
-        int num_swaps = 0;
-        std::vector<bool> prev_local(num_q, false);
-        for (int j = 0; j < ilp_result; j++) {
-          std::cout << "Stage " << j << ": ";
-          std::cout << local_qubits.size() << " local qubits, ";
-          for (int k : local_qubits[j]) {
-            std::cout << k << " ";
-            if (j > 0) {
-              if (!prev_local[k]) {
-                num_swaps++;
+        fprintf(fout, "%d, ", num_q);
+        int answer_start_with = 1;
+        std::vector<int> n_swaps;
+        for (int global_q : num_global_qubits) {
+          if (num_q == 31 && global_q > kMaxGlobalQubitsFor31) {
+            continue;
+          }
+          std::vector<std::vector<int>> local_qubits;
+          local_qubits = compute_local_qubits_with_ilp(
+              *seq, num_q - global_q, &ctx, &interpreter, answer_start_with);
+          int ilp_result = (int)local_qubits.size();
+          int num_swaps = 0;
+          std::vector<bool> prev_local(num_q, false);
+          for (int j = 0; j < ilp_result; j++) {
+            std::cout << "Stage " << j << ": ";
+            std::cout << local_qubits.size() << " local qubits, ";
+            for (int k : local_qubits[j]) {
+              std::cout << k << " ";
+              if (j > 0) {
+                if (!prev_local[k]) {
+                  num_swaps++;
+                }
               }
             }
+            prev_local.assign(num_q, false);
+            for (int k : local_qubits[j]) {
+              prev_local[k] = true;
+            }
+            std::cout << std::endl;
           }
-          prev_local.assign(num_q, false);
-          for (int k : local_qubits[j]) {
-            prev_local[k] = true;
-          }
-          std::cout << std::endl;
+          n_swaps.push_back(num_swaps);
+          fprintf(fout, "%d, ", ilp_result);
+          fflush(fout);
+          answer_start_with = ilp_result;
         }
-        n_swaps.push_back(num_swaps);
-        fprintf(fout, "%d, ", ilp_result);
+        fprintf(fout, "\n");
+        fprintf(fout, "%d, ", num_q);
+        for (auto &num_swaps : n_swaps) {
+          fprintf(fout, "%d, ", num_swaps);
+        }
+        fprintf(fout, "\n");
         fflush(fout);
-        answer_start_with = ilp_result;
       }
-      fprintf(fout, "\n");
-      fprintf(fout, "%d, ", num_q);
-      for (auto &num_swaps : n_swaps) {
-        fprintf(fout, "%d, ", num_swaps);
-      }
-      fprintf(fout, "\n");
-      fflush(fout);
     }
   }
   fclose(fout);

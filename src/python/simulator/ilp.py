@@ -141,6 +141,188 @@ def solve_ilp(
         return result
 
 
+def solve_global_ilp(
+        circuit_gate_qubits,
+        circuit_gate_executable_type,
+        out_gate,
+        num_qubits,
+        num_local_qubits,
+        num_global_qubits,
+        global_cost_factor,
+        num_iterations,
+        print_solution=False,
+):
+    print(
+        f"Solving ILP for num_qubits={num_qubits}, num_local_qubits={num_local_qubits}, num_global_qubits={num_global_qubits}, num_iterations={num_iterations}..."
+    )
+    assert (num_local_qubits + num_global_qubits <= num_qubits)
+    # Check if the ILP is feasible in M rounds.
+    prob = pulp.LpProblem(
+        f"{num_qubits}_{num_local_qubits}_{num_global_qubits}_{num_iterations}", pulp.LpMinimize
+    )
+    num_gates = len(circuit_gate_qubits)
+
+    # a[i, j] = 1 iff the i-th qubit is a local qubit in the j-th iteration
+    a = pulp.LpVariable.dicts(
+        "a",
+        [(i, j) for i in range(num_qubits) for j in range(num_iterations)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
+
+    # b[i, j] = 1 iff the i-th gate is finished before or at the j-th iteration
+    b = pulp.LpVariable.dicts(
+        "b",
+        [(i, j) for i in range(num_gates) for j in range(num_iterations + 1)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
+
+    # s[i, j] = 1 iff a[i, j + 1] = 1 and a[i, j] = 0
+    s = pulp.LpVariable.dicts(
+        "s",
+        [(i, j) for i in range(num_qubits) for j in range(num_iterations - 1)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
+
+    # g[i, j] = 1 iff the i-th qubit is a global qubit in the j-th iteration
+    g = pulp.LpVariable.dicts(
+        "g",
+        [(i, j) for i in range(num_qubits) for j in range(num_iterations)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
+
+    # t[i, j] = 1 iff g[i, j + 1] = 1 and g[i, j] = 0
+    t = pulp.LpVariable.dicts(
+        "t",
+        [(i, j) for i in range(num_qubits) for j in range(num_iterations - 1)],
+        0,
+        1,
+        pulp.LpInteger,
+    )
+
+    # Minimize the total number of swaps + |global_cost_factor| * global swaps.
+    prob += sum([s[i, j] + global_cost_factor * t[i, j] for i in range(num_qubits) for j in range(num_iterations - 1)])
+
+    # For each iteration, we have exactly k local qubits.
+    for j in range(num_iterations):
+        prob += sum([a[i, j] for i in range(num_qubits)]) == num_local_qubits
+
+    # Similar for global qubits.
+    for j in range(num_iterations):
+        prob += sum([g[i, j] for i in range(num_qubits)]) == num_global_qubits
+
+    # The definition of |s|.
+    for i in range(num_qubits):
+        for j in range(num_iterations - 1):
+            prob += a[i, j + 1] <= a[i, j] + s[i, j]
+
+    # The definition of |t|.
+    for i in range(num_qubits):
+        for j in range(num_iterations - 1):
+            prob += g[i, j + 1] <= g[i, j] + t[i, j]
+
+    # A qubit cannot be both global and local.
+    for i in range(num_qubits):
+        for j in range(num_iterations):
+            prob += a[i, j] + g[i, j] <= 1
+
+    # If a gate is executed before or at the j-th iteration,
+    # this should also hold in the (j+1)-th iteration.
+    for i in range(num_gates):
+        for j in range(num_iterations):
+            prob += b[i, j] <= b[i, j + 1]
+
+    for i in range(num_gates):
+        if circuit_gate_executable_type[i] == 2:
+            # If a "local-only" gate is executed at the j-th iteration,
+            # its qubits must be local at the j-th iteration.
+            for qubit_id in circuit_gate_qubits[i]:
+                for j in range(num_iterations):
+                    prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
+        elif circuit_gate_executable_type[i] == 1:
+            # If a "target-qubit local-only" gate is executed at the j-th iteration,
+            # the target qubit must be local at the j-th iteration.
+            # XXX: assume there is always 1 target qubit.
+            assert len(circuit_gate_qubits[i]) >= 2
+            qubit_id = circuit_gate_qubits[i][-1]
+            for j in range(num_iterations):
+                prob += b[i, j + 1] - b[i, j] <= a[qubit_id, j]
+
+    # Dependencies
+    for i1 in range(num_gates):
+        for i2 in out_gate[i1]:
+            for j in range(num_iterations + 1):
+                prob += b[i1, j] >= b[i2, j]
+
+    # At the beginning, all gates should not be executed.
+    for i in range(num_gates):
+        prob += b[i, 0] == 0
+
+    # At the end, all gates should be executed.
+    for i in range(num_gates):
+        prob += b[i, num_iterations] == 1
+
+    print("Available solvers:", pulp.listSolvers(onlyAvailable=True))
+    solver = pulp.HiGHS_CMD()
+    try:
+        prob.solve(solver)
+    except:
+        prob.solve()
+    if print_solution:
+        print("Status:", pulp.LpStatus[prob.status])
+        for v in prob.variables():
+            print(v.name, "=", v.varValue)
+        executed = set()
+        for j in range(1, num_iterations + 1):
+            print("Iteration", j)
+            for v in prob.variables():
+                if v.name.startswith("b") and v.varValue == 1.0:
+                    if v.name.endswith(str(j) + ")"):
+                        gate_id = int(v.name.split("(")[1].split(",")[0])
+                        if gate_id not in executed:
+                            print(gate_id)
+                            executed.add(gate_id)
+        for j in range(num_iterations):
+            for v in prob.variables():
+                if v.name.startswith("a") and v.varValue == 1.0:
+                    if v.name.endswith(str(j) + ")"):
+                        print(v.name.split("(")[1].split(",")[0], end=" ")
+            print()
+
+    if prob.status is not pulp.LpStatusOptimal:
+        return []  # an empty list
+    else:
+        # return the solution
+        result = [[] for _ in range(num_iterations)]
+        for j in range(num_iterations):
+            for v in prob.variables():
+                if v.name.startswith("a") and abs(v.varValue - 1.0) < 1e-6:
+                    if v.name.endswith(str(j) + ")"):
+                        result[j].append(int(v.name.split("(")[1].split(",")[0]))
+            assert len(result[j]) == num_local_qubits
+            result[j] = sorted(result[j])
+            assert len(result[j]) == num_local_qubits
+            global_qubits = set()
+            for v in prob.variables():
+                if v.name.startswith("g") and abs(v.varValue - 1.0) < 1e-6:
+                    if v.name.endswith(str(j) + ")"):
+                        global_qubits.add(int(v.name.split("(")[1].split(",")[0]))
+            for qubit in range(num_qubits):
+                if qubit not in result[j] and qubit not in global_qubits:
+                    # regional qubits
+                    result[j].append(qubit)
+            for qubit in sorted(global_qubits):
+                result[j].append(qubit)
+        return result
+
+
 def preprocess_circuit_seq(circuit_seq, index_offset, num_qubits):
     always_executable_gates = {
         gates.x.XGate,

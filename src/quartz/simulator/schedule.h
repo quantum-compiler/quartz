@@ -109,6 +109,7 @@ class Schedule {
   void print_kernel_schedule() const;
 
   [[nodiscard]] const std::vector<int> &get_qubit_layout() const;
+  void print_qubit_layout(int num_global_qubits) const;
   [[nodiscard]] std::vector<std::pair<int, int>>
   get_local_swaps_from_previous_stage(const Schedule &prev_schedule) const;
 
@@ -195,17 +196,14 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
  * @param num_regional_qubits The number of regional qubits per node.
  * @param ctx The Context object.
  * @param interpreter The Python interpreter.
- * @param num_global_stages_start_with We know that the number of stages
- * between (local + regional) and global qubits is at least this number
- * (default is 1). A larger number, if guaranteed to be correct, may accelerate
- * this function.
+ * @param answer_start_with We know that the number of stages is at least this
+ * number (default is 1). A larger number, if guaranteed to be correct,
+ * may accelerate this function.
  * @return The qubit layout for each stage.
  */
-std::vector<std::vector<int>>
-compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
-                              int num_regional_qubits, Context *ctx,
-                              PythonInterpreter *interpreter,
-                              int num_global_stages_start_with = 1);
+std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
+    const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
+    Context *ctx, PythonInterpreter *interpreter, int answer_start_with = 1);
 
 /**
  * Call the above two functions sequentially, use the cached files if possible.

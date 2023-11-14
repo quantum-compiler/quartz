@@ -17,9 +17,8 @@ namespace quartz {
  */
 class Schedule {
  public:
-  Schedule(std::unique_ptr<CircuitSeq> &&sequence,
-           const std::vector<int> &local_qubit,
-           const std::vector<int> &global_qubit,
+  Schedule(std::unique_ptr<CircuitSeq> &&sequence, int num_local_qubits,
+           const std::vector<int> &qubit_layout,
            int num_shared_memory_cacheline_qubits, Context *ctx);
 
   // Compute the number of down sets for the circuit sequence.
@@ -109,6 +108,10 @@ class Schedule {
   void print_kernel_info() const;
   void print_kernel_schedule() const;
 
+  [[nodiscard]] const std::vector<int> &get_qubit_layout() const;
+  [[nodiscard]] std::vector<std::pair<int, int>>
+  get_local_swaps_from_previous_stage(const Schedule &prev_schedule) const;
+
   /**
    * Remove kernels with no gates and update the cost.
    * @return The number of empty kernels removed.
@@ -127,13 +130,11 @@ class Schedule {
   // The original circuit sequence.
   std::unique_ptr<CircuitSeq> sequence_;
 
-  // The set of local qubits.
-  // |local_qubit_[0]| is the least significant bit.
-  std::vector<int> local_qubit_;
+  int num_local_qubits_;
 
-  // The set of non-local qubits.
-  // |global_qubit_[0]| is the least significant bit.
-  std::vector<int> global_qubit_;
+  // |qubit_layout_[0]| is the least significant bit.
+  // The first |num_local_qubits_| qubits are local.
+  std::vector<int> qubit_layout_;
 
   // The mask for local qubits.
   std::vector<bool> local_qubit_mask_;
@@ -148,7 +149,8 @@ class Schedule {
  * Compute the schedule using dynamic programming.
  * See more information in Schedule::compute_kernel_schedule().
  * @param sequence The entire circuit sequence.
- * @param local_qubits The local qubits in each stage.
+ * @param num_local_qubits The number of local qubits per device.
+ * @param qubit_layout The qubit layout in each stage.
  * @param kernel_cost The cost function of kernels.
  * @param ctx The Context object.
  * @param attach_single_qubit_gates An optimization to reduce the running
@@ -162,23 +164,54 @@ class Schedule {
  * @return The kernel schedule for each stage.
  */
 std::vector<Schedule>
-get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<int>> &local_qubits,
+get_schedules(const CircuitSeq &sequence, int num_local_qubits,
+              const std::vector<std::vector<int>> &qubit_layout,
               const KernelCost &kernel_cost, Context *ctx,
               bool attach_single_qubit_gates, int use_simple_dp_times = 0,
               const std::string &cache_file_name_prefix = "");
 
 class PythonInterpreter;
+
+/**
+ * Compute the local qubits using single-level ILP.
+ * @param sequence The entire circuit sequence.
+ * @param num_local_qubits The number of local qubits per device.
+ * @param ctx The Context object.
+ * @param interpreter The Python interpreter.
+ * @param answer_start_with We know that the number of stages is at least this
+ * number (default is 1). A larger number, if guaranteed to be correct,
+ * may accelerate this function.
+ * @return The local qubits for each stage.
+ */
 std::vector<std::vector<int>>
 compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               Context *ctx, PythonInterpreter *interpreter,
                               int answer_start_with = 1);
 
 /**
+ * Compute the qubit layout using two-level ILP.
+ * @param sequence The entire circuit sequence.
+ * @param num_local_qubits The number of local qubits per device.
+ * @param num_regional_qubits The number of regional qubits per node.
+ * @param ctx The Context object.
+ * @param interpreter The Python interpreter.
+ * @param num_global_stages_start_with We know that the number of stages
+ * between (local + regional) and global qubits is at least this number
+ * (default is 1). A larger number, if guaranteed to be correct, may accelerate
+ * this function.
+ * @return The qubit layout for each stage.
+ */
+std::vector<std::vector<int>>
+compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
+                              int num_regional_qubits, Context *ctx,
+                              PythonInterpreter *interpreter,
+                              int num_global_stages_start_with = 1);
+
+/**
  * Call the above two functions sequentially, use the cached files if possible.
  */
 std::vector<Schedule> get_schedules_with_ilp(
-    const CircuitSeq &sequence, int num_local_qubits,
+    const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
     bool attach_single_qubit_gates, int use_simple_dp_times = 0,
     const std::string &cache_file_name_prefix = "", int answer_start_with = 1);

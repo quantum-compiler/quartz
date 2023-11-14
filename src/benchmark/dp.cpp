@@ -84,22 +84,15 @@ int main() {
             has_local_q_at_least_num_q = true;
           }
           auto t0 = std::chrono::steady_clock::now();
-          std::vector<std::vector<int>> local_qubits;
-          if (local_q == num_q) {
-            std::vector<int> stage(num_q);
-            for (int i = 0; i < num_q; i++) {
-              stage[i] = i;
-            }
-            local_qubits.push_back(stage);
-          } else {
-            local_qubits = compute_local_qubits_with_ilp(
-                *seq, local_q, &ctx, &interpreter, answer_start_with);
-          }
-          int ilp_result = (int)local_qubits.size();
-          std::cout << local_qubits.size() << " stages." << std::endl;
+          std::vector<std::vector<int>> qubit_layout;
+          qubit_layout = compute_qubit_layout_with_ilp(
+              *seq, local_q, std::min(2, num_q - local_q), &ctx, &interpreter,
+              answer_start_with);
+          int ilp_result = (int)qubit_layout.size();
+          std::cout << qubit_layout.size() << " stages." << std::endl;
           auto t1 = std::chrono::steady_clock::now();
           auto schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
@@ -113,7 +106,7 @@ int main() {
           fflush(fout);
           auto t2 = std::chrono::steady_clock::now();
           schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/-1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
@@ -127,7 +120,7 @@ int main() {
           fflush(fout);
           auto t5 = std::chrono::steady_clock::now();
           schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/0,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
@@ -140,7 +133,7 @@ int main() {
           fprintf(fout, "%.1f, ", total_cost);
           fflush(fout);
           auto t6 = std::chrono::steady_clock::now();
-          fprintf(fout, "%.3f, %.3f, %.3f",
+          fprintf(fout, "%.3f, %.3f, %.3f, %.3f",
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t2 - t1)
                           .count() /
@@ -151,6 +144,10 @@ int main() {
                       1000.0,
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t6 - t5)
+                          .count() /
+                      1000.0,
+                  (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                      t1 - t0)
                           .count() /
                       1000.0);
           answer_start_with = ilp_result;

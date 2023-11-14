@@ -185,10 +185,11 @@ int main() {
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        auto schedules = get_schedules_with_ilp(
-            *seq, local_q, kernel_cost, &ctx, &interpreter,
-            /*attach_single_qubit_gates=*/true,
-            /*use_simple_dp_times=*/0, "tmp");
+        auto schedules =
+            get_schedules_with_ilp(*seq, local_q, std::min(2, num_q - local_q),
+                                   kernel_cost, &ctx, &interpreter,
+                                   /*attach_single_qubit_gates=*/true,
+                                   /*use_simple_dp_times=*/0, "tmp");
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();

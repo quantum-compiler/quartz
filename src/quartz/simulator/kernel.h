@@ -37,8 +37,8 @@ class Kernel {
    * O(||qubits|| * cost_function.get_shared_memory_num_cacheline_qubits()
    *   + ||gates|| * 1(customized_shared_memory_gate_cost == nullptr)).
    * @param cost_function The cost function of kernels.
-   * @param local_qubit_layout The qubit layout to determine if a shared-memory
-   * kernel is feasible. |local_qubit_layout[0]| stores the least significant
+   * @param qubit_layout The qubit layout to determine if a shared-memory
+   * kernel is feasible. |qubit_layout[0]| stores the least significant
    * qubit.
    * @param customized_shared_memory_gate_cost Sometimes we may want to
    * customize the sum of the cost of gates in a shared-memory kernel.
@@ -48,7 +48,7 @@ class Kernel {
    */
   [[nodiscard]] KernelCostType cost(
       const KernelCost &cost_function,
-      const std::vector<int> &local_qubit_layout = {},
+      const std::vector<int> &qubit_layout = {},
       const KernelCostType *customized_shared_memory_gate_cost = nullptr) const;
   /**
    * Add a gate and update the |qubits| set.

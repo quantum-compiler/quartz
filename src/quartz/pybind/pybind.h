@@ -21,10 +21,11 @@ class PythonInterpreter {
 
   std::vector<std::vector<int>>
   solve_global_ilp(const std::vector<std::vector<int>> &circuit_gate_qubits,
-            const std::vector<int> &circuit_gate_executable_type,
-            const std::vector<std::vector<int>> &out_gate, int num_qubits,
-            int num_local_qubits, int num_global_qubits, double global_cost_factor, int num_iterations,
-            bool print_solution = false);
+                   const std::vector<int> &circuit_gate_executable_type,
+                   const std::vector<std::vector<int>> &out_gate,
+                   int num_qubits, int num_local_qubits, int num_global_qubits,
+                   double global_cost_factor, int num_iterations,
+                   bool print_solution = false);
 
  private:
   pybind11::scoped_interpreter guard_;

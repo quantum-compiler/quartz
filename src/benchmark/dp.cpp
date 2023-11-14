@@ -155,7 +155,6 @@ int main() {
           }
           fprintf(fout, "%.1f, ", total_cost);
           fflush(fout);
-          auto t6 = std::chrono::steady_clock::now();
           fprintf(fout, "%.3f, %.3f, %.3f, %.3f",
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t1end - t1)

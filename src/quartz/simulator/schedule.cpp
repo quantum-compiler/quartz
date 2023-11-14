@@ -2529,9 +2529,9 @@ compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               int num_regional_qubits, Context *ctx,
                               PythonInterpreter *interpreter,
                               int num_global_stages_start_with) {
-  std::vector<std::vector<int>> first_level =
-      compute_local_qubits_with_ilp(sequence, num_local_qubits, ctx,
-                                    interpreter, num_global_stages_start_with);
+  std::vector<std::vector<int>> first_level = compute_local_qubits_with_ilp(
+      sequence, num_local_qubits + num_regional_qubits, ctx, interpreter,
+      num_global_stages_start_with);
   std::vector<std::vector<int>> result_layout;
   result_layout.reserve(first_level.size());
   const int num_qubits = sequence.get_num_qubits();

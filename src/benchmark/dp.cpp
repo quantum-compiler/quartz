@@ -133,7 +133,7 @@ int main() {
           fprintf(fout, "%.1f, ", total_cost);
           fflush(fout);
           auto t6 = std::chrono::steady_clock::now();
-          fprintf(fout, "%.3f, %.3f, %.3f",
+          fprintf(fout, "%.3f, %.3f, %.3f, %.3f",
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t2 - t1)
                           .count() /
@@ -144,6 +144,10 @@ int main() {
                       1000.0,
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t6 - t5)
+                          .count() /
+                      1000.0,
+                  (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                      t1 - t0)
                           .count() /
                       1000.0);
           answer_start_with = ilp_result;

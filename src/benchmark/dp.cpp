@@ -85,17 +85,9 @@ int main() {
           }
           auto t0 = std::chrono::steady_clock::now();
           std::vector<std::vector<int>> qubit_layout;
-          if (local_q == num_q) {
-            std::vector<int> stage(num_q);
-            for (int i = 0; i < num_q; i++) {
-              stage[i] = i;
-            }
-            qubit_layout.push_back(stage);
-          } else {
-            qubit_layout = compute_qubit_layout_with_ilp(
-                *seq, local_q, std::min(2, num_q - local_q), &ctx, &interpreter,
-                answer_start_with);
-          }
+          qubit_layout = compute_qubit_layout_with_ilp(
+              *seq, local_q, std::min(2, num_q - local_q), &ctx, &interpreter,
+              answer_start_with);
           int ilp_result = (int)qubit_layout.size();
           std::cout << qubit_layout.size() << " stages." << std::endl;
           auto t1 = std::chrono::steady_clock::now();

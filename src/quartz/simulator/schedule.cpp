@@ -3,6 +3,7 @@
 #include "quartz/pybind/pybind.h"
 #include "quartz/utils/string_utils.h"
 
+#include <chrono>
 #include <deque>
 #include <filesystem>
 #include <queue>
@@ -2455,6 +2456,13 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
                               int answer_start_with) {
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
+  if (num_qubits == num_local_qubits) {
+    std::vector<int> result(num_qubits);
+    for (int i = 0; i < num_qubits; i++) {
+      result[i] = i;
+    }
+    return {result};
+  }
   std::vector<std::vector<int>> circuit_gate_qubits;
   std::vector<int> circuit_gate_executable_type;
   std::unordered_map<CircuitGate *, int> gate_index;
@@ -2697,7 +2705,6 @@ compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
     while (start_gate_index < num_gates && executed[start_gate_index]) {
       start_gate_index++;
     }
-    std::cout << current_seq->to_string(true) << std::endl;
   }
   if (start_gate_index != num_gates) {
     std::cerr << "Gate number " << start_gate_index
@@ -2714,17 +2721,29 @@ std::vector<Schedule> get_schedules_with_ilp(
     bool attach_single_qubit_gates, int use_simple_dp_times,
     const std::string &cache_file_name_prefix, int answer_start_with) {
   if (std::filesystem::exists(cache_file_name_prefix + ".schedule")) {
+    std::cout << "Use cached schedule " << cache_file_name_prefix << ".schedule"
+              << std::endl;
     // cached
     return get_schedules(sequence, num_local_qubits, {}, kernel_cost, ctx,
                          attach_single_qubit_gates, use_simple_dp_times,
                          cache_file_name_prefix);
   }
+  auto t_start = std::chrono::steady_clock::now();
   auto qubit_layout = compute_qubit_layout_with_ilp(
       sequence, num_local_qubits, num_regional_qubits, ctx, interpreter,
       answer_start_with);
-  return get_schedules(sequence, num_local_qubits, qubit_layout, kernel_cost,
-                       ctx, attach_single_qubit_gates, use_simple_dp_times,
-                       cache_file_name_prefix);
+  auto result = get_schedules(sequence, num_local_qubits, qubit_layout,
+                              kernel_cost, ctx, attach_single_qubit_gates,
+                              use_simple_dp_times, cache_file_name_prefix);
+  auto t_end = std::chrono::steady_clock::now();
+  std::cout << "Computed and cached schedule " << cache_file_name_prefix
+            << ".schedule in "
+            << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   t_end - t_start)
+                       .count() /
+                   1000.0
+            << " seconds." << std::endl;
+  return result;
 }
 
 bool verify_schedule(Context *ctx, const CircuitSeq &sequence,

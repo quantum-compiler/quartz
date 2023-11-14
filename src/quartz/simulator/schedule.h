@@ -109,6 +109,7 @@ class Schedule {
   void print_kernel_schedule() const;
 
   [[nodiscard]] const std::vector<int> &get_qubit_layout() const;
+  void print_qubit_layout(int num_global_qubits) const;
   [[nodiscard]] std::vector<std::pair<int, int>>
   get_local_swaps_from_previous_stage(const Schedule &prev_schedule) const;
 

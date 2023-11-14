@@ -83,11 +83,13 @@ int main() {
             local_q = num_q;
             has_local_q_at_least_num_q = true;
           }
+          int regional_q = std::min(2, num_q - local_q);
+          int global_q = num_q - local_q - regional_q;
           auto t0 = std::chrono::steady_clock::now();
           std::vector<std::vector<int>> qubit_layout;
           qubit_layout = compute_qubit_layout_with_ilp(
-              *seq, local_q, std::min(2, num_q - local_q), &ctx, &interpreter,
-              answer_start_with);
+              *seq, local_q, regional_q, &ctx, &interpreter, answer_start_with);
+          auto t0end = std::chrono::steady_clock::now();
           int ilp_result = (int)qubit_layout.size();
           std::cout << qubit_layout.size() << " stages." << std::endl;
           auto t1 = std::chrono::steady_clock::now();
@@ -97,10 +99,22 @@ int main() {
               /*use_simple_dp_times=*/1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
                   std::to_string(local_q) + "_simple");
+          auto t1end = std::chrono::steady_clock::now();
           KernelCostType total_cost = 0;
           for (auto &schedule : schedules) {
             // schedule.print_kernel_info();
             total_cost += schedule.cost_;
+          }
+          std::cout << "Schedule 0: layout ";
+          schedules[0].print_qubit_layout(global_q);
+          for (int i = 1; i < (int)schedules.size(); i++) {
+            std::cout << "Schedule " << i << ": swap";
+            auto local_swaps = schedules[i].get_local_swaps_from_previous_stage(
+                schedules[i - 1]);
+            for (auto &s : local_swaps) {
+              std::cout << " (" << s.first << ", " << s.second << ")";
+            }
+            std::cout << std::endl;
           }
           fprintf(fout, "%.1f, ", total_cost);
           fflush(fout);
@@ -111,6 +125,7 @@ int main() {
               /*use_simple_dp_times=*/-1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
                   std::to_string(local_q) + "_max_weight");
+          auto t2end = std::chrono::steady_clock::now();
           total_cost = 0;
           for (auto &schedule : schedules) {
             // schedule.print_kernel_info();
@@ -125,6 +140,7 @@ int main() {
               /*use_simple_dp_times=*/0,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
                   std::to_string(local_q) + "_complicated");
+          auto t5end = std::chrono::steady_clock::now();
           total_cost = 0;
           for (auto &schedule : schedules) {
             // schedule.print_kernel_info();
@@ -135,19 +151,19 @@ int main() {
           auto t6 = std::chrono::steady_clock::now();
           fprintf(fout, "%.3f, %.3f, %.3f, %.3f",
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t2 - t1)
+                      t1end - t1)
                           .count() /
                       1000.0,
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t5 - t2)
+                      t2end - t2)
                           .count() /
                       1000.0,
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t6 - t5)
+                      t5end - t5)
                           .count() /
                       1000.0,
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t1 - t0)
+                      t0end - t0)
                           .count() /
                       1000.0);
           answer_start_with = ilp_result;

@@ -1690,11 +1690,8 @@ void Schedule::print_kernel_info() const {
 void Schedule::print_kernel_schedule() const {
   const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
-            << " kernels: cost = " << cost_ << ", qubit layout";
-  for (auto &qubit : qubit_layout_) {
-    std::cout << " " << qubit;
-  }
-  std::cout << std::endl;
+            << " kernels: cost = " << cost_ << ", qubit layout ";
+  print_qubit_layout(0);
   for (int i = 0; i < num_kernels; i++) {
     std::cout << "Kernel " << i << ": ";
     std::cout << kernels[i].to_string() << std::endl;
@@ -1703,6 +1700,21 @@ void Schedule::print_kernel_schedule() const {
 
 const std::vector<int> &Schedule::get_qubit_layout() const {
   return qubit_layout_;
+}
+
+void Schedule::print_qubit_layout(int num_global_qubits) const {
+  for (int i = 0; i < (int)qubit_layout_.size(); i++) {
+    std::cout << qubit_layout_[i];
+    if (i == num_local_qubits_ - 1) {
+      std::cout << "|";
+    } else if (num_global_qubits > 0 &&
+               i == (int)qubit_layout_.size() - 1 - num_global_qubits) {
+      std::cout << ";";
+    } else {
+      std::cout << " ";
+    }
+  }
+  std::cout << std::endl;
 }
 
 std::vector<std::pair<int, int>> Schedule::get_local_swaps_from_previous_stage(
@@ -1729,7 +1741,13 @@ std::vector<std::pair<int, int>> Schedule::get_local_swaps_from_previous_stage(
       if (current_location.find(expected_layout[i]) != current_location.end()) {
         // found a cycle
         int j = i;
+        int cycle_len = 0;
         do {
+          cycle_len++;
+          if (cycle_len == 2) {
+            std::cerr << "Warning: the pairs of local swaps may intersect."
+                      << std::endl;
+          }
           // swap len(cycle) - 1 times
           result.emplace_back(j, current_location[expected_layout[j]]);
           current_location[current_layout[j]] =
@@ -2596,7 +2614,7 @@ std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
     // TODO: make global cost factor configurable
     result = interpreter->solve_global_ilp(
         circuit_gate_qubits, circuit_gate_executable_type, out_gate, num_qubits,
-        num_local_qubits, num_global_qubits, 4, num_iterations);
+        num_local_qubits, num_global_qubits, 3, num_iterations);
     if (!result.empty()) {
       break;
     }
@@ -2621,55 +2639,90 @@ std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
     }
     auto &previous_layout = result_layout.back();
     std::vector<int> current_stage_layout = previous_layout;
-    // std::vector<int> global_to_regional_swaps;
     std::deque<int> non_local_to_local_swaps;
     for (int i = num_qubits - 1; i >= num_qubits - num_global_qubits; i--) {
-      if (!is_global[previous_layout[i]]) {
-        // no longer global
-        if (is_local[previous_layout[i]]) {
-          // global-local swap
-          non_local_to_local_swaps.push_back(i);
-        } else {
-          std::cerr << "Global-to-regional swap detected. This is "
-                       "correctly handled but may affect performance."
-                    << std::endl;
-        }
+      if (is_local[previous_layout[i]]) {
+        // global-local swap
+        non_local_to_local_swaps.push_front(i);
       }
     }
     for (int i = num_qubits - num_global_qubits - 1; i >= num_local_qubits;
          i--) {
       if (is_local[previous_layout[i]]) {
         // regional-local swap
-        non_local_to_local_swaps.push_back(i);
+        non_local_to_local_swaps.push_front(i);
       }
     }
+
+    // Find non-intersecting swaps to approximate the qubit set change.
     int swap_loc_min = num_local_qubits - (int)non_local_to_local_swaps.size();
     int swap_loc_max = num_local_qubits - 1;
-    for (int i = 0; i < num_local_qubits; i++) {
+    while (swap_loc_min <= swap_loc_max) {
+      // Find the next non-local qubit that is already in the swap region.
+      // If the lowest one should be global but the highest one should be
+      // regional, swap them.
+      while (swap_loc_min <= swap_loc_max &&
+             !is_global[current_stage_layout[swap_loc_min]]) {
+        swap_loc_min++;
+      }
+      while (swap_loc_min <= swap_loc_max &&
+             (is_local[current_stage_layout[swap_loc_max]] ||
+              is_global[current_stage_layout[swap_loc_max]])) {
+        swap_loc_max--;
+      }
+      if (swap_loc_min <= swap_loc_max) {
+        assert(swap_loc_min != swap_loc_max);
+        std::swap(current_stage_layout[swap_loc_min],
+                  current_stage_layout[swap_loc_max]);
+        swap_loc_min++;
+        swap_loc_max--;
+      }
+    }
+    swap_loc_min = num_local_qubits - (int)non_local_to_local_swaps.size();
+    swap_loc_max = num_local_qubits - 1;
+    std::deque<int> remaining_local_swap_locations;
+    for (int i = swap_loc_min; i <= swap_loc_max; i++) {
+      if (is_local[current_stage_layout[i]]) {
+        // These local qubits needs to be swapped out from these most
+        // significant bits.
+        remaining_local_swap_locations.push_back(i);
+      }
+    }
+    for (int i = 0; i < swap_loc_min; i++) {
       if (!is_local[current_stage_layout[i]]) {
         if (is_global[current_stage_layout[i]]) {
           // local-global swap, swap as far as possible
-          std::swap(current_stage_layout[i],
-                    current_stage_layout[swap_loc_max]);
-          std::swap(current_stage_layout[swap_loc_max],
-                    current_stage_layout[non_local_to_local_swaps.front()]);
-          swap_loc_max--;
-          non_local_to_local_swaps.pop_front();
-          i--;
+          std::swap(
+              current_stage_layout[i],
+              current_stage_layout[remaining_local_swap_locations.back()]);
+          remaining_local_swap_locations.pop_back();
         } else {
           // local-regional swap, swap as close as possible
-          std::swap(current_stage_layout[i],
-                    current_stage_layout[swap_loc_min]);
-          std::swap(current_stage_layout[swap_loc_min],
-                    current_stage_layout[non_local_to_local_swaps.back()]);
-          swap_loc_min++;
-          non_local_to_local_swaps.pop_back();
-          i--;
+          std::swap(
+              current_stage_layout[i],
+              current_stage_layout[remaining_local_swap_locations.front()]);
+          remaining_local_swap_locations.pop_front();
         }
       }
     }
-    assert(non_local_to_local_swaps.empty());
-    assert(swap_loc_max == swap_loc_min - 1);
+    // Perform the local-to-non-local swaps.
+    for (int i = swap_loc_min; i <= swap_loc_max; i++) {
+      std::swap(
+          current_stage_layout[i],
+          current_stage_layout[non_local_to_local_swaps[i - swap_loc_min]]);
+    }
+    // Check if the approximation is good.
+    int num_global_qubits_not_global = 0;
+    for (int i = num_qubits - num_global_qubits; i < num_qubits; i++) {
+      if (!is_global[current_stage_layout[i]]) {
+        num_global_qubits_not_global++;
+      }
+    }
+    if (num_global_qubits_not_global > 0) {
+      std::cerr << num_global_qubits_not_global
+                << " qubits cannot become global efficiently in this stage."
+                << std::endl;
+    }
     assert((int)current_stage_layout.size() == num_qubits);
     result_layout.emplace_back(std::move(current_stage_layout));
   }

@@ -217,14 +217,14 @@ int main() {
             continue;
           }
           std::vector<std::vector<int>> local_qubits;
-          local_qubits = compute_local_qubits_with_ilp(
-              *seq, num_q - global_q, &ctx, &interpreter, answer_start_with);
+          local_qubits = compute_qubit_layout_with_ilp(
+              *seq, num_q - global_q, 0, &ctx, &interpreter, answer_start_with);
           int ilp_result = (int)local_qubits.size();
           int num_swaps = 0;
           std::vector<bool> prev_local(num_q, false);
           for (int j = 0; j < ilp_result; j++) {
             std::cout << "Stage " << j << ": ";
-            std::cout << local_qubits.size() << " local qubits, ";
+            std::cout << local_qubits[j].size() << " local qubits, ";
             for (int k : local_qubits[j]) {
               std::cout << k << " ";
               if (j > 0) {

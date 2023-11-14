@@ -11,20 +11,19 @@
 
 namespace quartz {
 
-Schedule::Schedule(std::unique_ptr<CircuitSeq> &&sequence,
-                   const std::vector<int> &local_qubit,
-                   const std::vector<int> &global_qubit,
+Schedule::Schedule(std::unique_ptr<CircuitSeq> &&sequence, int num_local_qubits,
+                   const std::vector<int> &qubit_layout,
                    int num_shared_memory_cacheline_qubits, Context *ctx)
-    : cost_(), sequence_(std::move(sequence)), local_qubit_(local_qubit),
-      global_qubit_(global_qubit), ctx_(ctx) {
-  assert((int)local_qubit.size() + (int)global_qubit.size() ==
-         sequence_->get_num_qubits());
-  assert((int)local_qubit.size() >= num_shared_memory_cacheline_qubits);
+    : cost_(), sequence_(std::move(sequence)),
+      num_local_qubits_(num_local_qubits), qubit_layout_(qubit_layout),
+      ctx_(ctx) {
+  assert((int)qubit_layout.size() == sequence_->get_num_qubits());
+  assert(num_local_qubits >= num_shared_memory_cacheline_qubits);
   local_qubit_mask_.assign(sequence_->get_num_qubits(), false);
   shared_memory_cacheline_qubit_mask_.assign(sequence_->get_num_qubits(),
                                              false);
-  for (int i = 0; i < (int)local_qubit.size(); i++) {
-    local_qubit_mask_[local_qubit[i]] = true;
+  for (int i = 0; i < num_local_qubits; i++) {
+    local_qubit_mask_[qubit_layout[i]] = true;
     if (i < num_shared_memory_cacheline_qubits) {
       shared_memory_cacheline_qubit_mask_[i] = true;
     }
@@ -511,13 +510,8 @@ bool Schedule::compute_kernel_schedule(
   constexpr bool debug = false;
   if (debug) {
     std::cout << "Start DP:" << std::endl;
-    std::cout << "Local qubits: ";
-    for (auto &i : local_qubit_) {
-      std::cout << i << ", ";
-    }
-    std::cout << std::endl;
-    std::cout << "Global qubits: ";
-    for (auto &i : global_qubit_) {
+    std::cout << "Qubit layout: ";
+    for (auto &i : qubit_layout_) {
       std::cout << i << ", ";
     }
     std::cout << std::endl;
@@ -1418,10 +1412,10 @@ bool Schedule::compute_kernel_schedule_simple(
                 shared_memory_gate_costs[i - 1];
           }
           current_cost =
-              k[j].cost(kernel_cost, local_qubit_,
+              k[j].cost(kernel_cost, qubit_layout_,
                         &shared_memory_possible_kernels_gate_cost[j]);
         } else {
-          current_cost = k[j].cost(kernel_cost, local_qubit_, nullptr);
+          current_cost = k[j].cost(kernel_cost, qubit_layout_, nullptr);
         }
         if (current_cost >= (KernelCostType)INFINITY) {
           // optimization: larger kernels are infeasible
@@ -1512,11 +1506,11 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
           } else {
             total_shared_memory_gate_cost += shared_memory_gate_costs[j - 1];
           }
-          current_cost = current_kernel.cost(kernel_cost, local_qubit_,
+          current_cost = current_kernel.cost(kernel_cost, qubit_layout_,
                                              &total_shared_memory_gate_cost);
         } else {
           current_cost =
-              current_kernel.cost(kernel_cost, local_qubit_, nullptr);
+              current_kernel.cost(kernel_cost, qubit_layout_, nullptr);
         }
         if (current_cost >= (KernelCostType)INFINITY) {
           // optimization: larger kernels are infeasible
@@ -1685,8 +1679,8 @@ void Schedule::print_kernel_info() const {
   }
   std::cout << "Kernel info: " << num_kernels << " kernels (" << num_fusion
             << " fusion, " << num_shared_memory
-            << " shared-memory), cost = " << cost_ << ", local qubits";
-  for (auto &qubit : local_qubit_) {
+            << " shared-memory), cost = " << cost_ << ", qubit layout";
+  for (auto &qubit : qubit_layout_) {
     std::cout << " " << qubit;
   }
   std::cout << std::endl;
@@ -1695,8 +1689,8 @@ void Schedule::print_kernel_info() const {
 void Schedule::print_kernel_schedule() const {
   const int num_kernels = get_num_kernels();
   std::cout << "Kernel schedule with " << num_kernels
-            << " kernels: cost = " << cost_ << ", local qubits";
-  for (auto &qubit : local_qubit_) {
+            << " kernels: cost = " << cost_ << ", qubit layout";
+  for (auto &qubit : qubit_layout_) {
     std::cout << " " << qubit;
   }
   std::cout << std::endl;
@@ -1704,6 +1698,54 @@ void Schedule::print_kernel_schedule() const {
     std::cout << "Kernel " << i << ": ";
     std::cout << kernels[i].to_string() << std::endl;
   }
+}
+
+const std::vector<int> &Schedule::get_qubit_layout() const {
+  return qubit_layout_;
+}
+
+std::vector<std::pair<int, int>> Schedule::get_local_swaps_from_previous_stage(
+    const Schedule &prev_schedule) const {
+  auto expected_layout = qubit_layout_;
+  const auto &prev_layout = prev_schedule.qubit_layout_;
+  std::vector<bool> is_prev_local(qubit_layout_.size(), false);
+  for (int i = 0; i < num_local_qubits_; i++) {
+    is_prev_local[prev_layout[i]] = true;
+  }
+  int should_swap_ptr = num_local_qubits_ - 1;
+  for (int i = (int)qubit_layout_.size() - 1; i >= num_local_qubits_; i--) {
+    if (is_prev_local[expected_layout[i]]) {
+      // a local-to-non-local swap
+      std::swap(expected_layout[i], expected_layout[should_swap_ptr--]);
+    }
+  }
+  // now we get the local swaps from prev_layout to expected_layout
+  auto current_layout = prev_layout;
+  std::vector<std::pair<int, int>> result;
+  std::unordered_map<int, int> current_location;
+  for (int i = 0; i < num_local_qubits_; i++) {
+    if (current_layout[i] != expected_layout[i]) {
+      if (current_location.find(expected_layout[i]) != current_location.end()) {
+        // found a cycle
+        int j = i;
+        do {
+          // swap len(cycle) - 1 times
+          result.emplace_back(j, current_location[expected_layout[j]]);
+          current_location[current_layout[j]] =
+              current_location[expected_layout[j]];
+          int next_j = current_location[expected_layout[j]];
+          std::swap(current_layout[j],
+                    current_layout[current_location[expected_layout[j]]]);
+          j = next_j;
+        } while (current_layout[j] != expected_layout[j] &&
+                 current_location.find(expected_layout[j]) !=
+                     current_location.end());
+      } else {
+        current_location[current_layout[i]] = i;
+      }
+    }
+  }
+  return result;
 }
 
 int Schedule::remove_empty_kernels(const KernelCost &kernel_cost) {
@@ -1738,22 +1780,22 @@ Schedule Schedule::from_file(Context *ctx, const std::string &filename) {
   if (!fin.is_open()) {
     std::cerr << "Failed to open schedule file " << filename << std::endl;
     assert(false);
-    return {nullptr, {}, {}, 0, ctx};
+    return {nullptr, 0, {}, 0, ctx};
   }
   std::stringstream ss;
   ss << fin.rdbuf();  // read out the content
   fin.close();
 
   std::string s;
-  std::vector<int> local_qubit;
-  std::vector<int> global_qubit;
+  int num_local_qubits;
+  std::vector<int> qubit_layout;
   int num_shared_memory_cacheline_qubits;
   KernelCostType cost;
   int num_kernels;
   std::vector<Kernel> kernels;
   std::unique_ptr<CircuitSeq> sequence;
-  read_json_style_vector(ss, local_qubit);
-  read_json_style_vector(ss, global_qubit);
+  ss >> num_local_qubits;
+  read_json_style_vector(ss, qubit_layout);
   ss >> num_shared_memory_cacheline_qubits;
   ss >> cost;
   ss >> num_kernels;
@@ -1764,7 +1806,7 @@ Schedule Schedule::from_file(Context *ctx, const std::string &filename) {
   }
   std::getline(ss, s, '\0');  // the rest
   sequence = CircuitSeq::from_qasm_style_string(ctx, s);
-  auto result = Schedule(std::move(sequence), local_qubit, global_qubit,
+  auto result = Schedule(std::move(sequence), num_local_qubits, qubit_layout,
                          num_shared_memory_cacheline_qubits, ctx);
   result.cost_ = cost;
   result.kernels = std::move(kernels);
@@ -1783,8 +1825,8 @@ bool Schedule::save_to_file(Context *ctx, const std::string &filename,
       num_shared_memory_cacheline_qubits++;
     }
   }
-  fout << to_json_style_string(local_qubit_) << std::endl;
-  fout << to_json_style_string(global_qubit_) << std::endl;
+  fout << num_local_qubits_ << std::endl;
+  fout << to_json_style_string(qubit_layout_) << std::endl;
   fout << num_shared_memory_cacheline_qubits << std::endl;
   fout << cost_ << std::endl;
   fout << kernels.size() << std::endl;
@@ -1798,8 +1840,8 @@ bool Schedule::save_to_file(Context *ctx, const std::string &filename,
 }
 
 std::vector<Schedule>
-get_schedules(const CircuitSeq &sequence,
-              const std::vector<std::vector<int>> &local_qubits,
+get_schedules(const CircuitSeq &sequence, int num_local_qubits,
+              const std::vector<std::vector<int>> &qubit_layout,
               const KernelCost &kernel_cost, Context *ctx,
               bool attach_single_qubit_gates, int use_simple_dp_times,
               const std::string &cache_file_name_prefix) {
@@ -1821,7 +1863,7 @@ get_schedules(const CircuitSeq &sequence,
       return result;
     }
   }
-  result.reserve(local_qubits.size());
+  result.reserve(qubit_layout.size());
   const int num_qubits = sequence.get_num_qubits();
   const int num_gates = sequence.get_num_gates();
   std::vector<int> current_local_qubit_layout;
@@ -1863,9 +1905,9 @@ get_schedules(const CircuitSeq &sequence,
   // only computed when |attach_single_qubit_gates| is true
   std::vector<std::pair<int, int>> dp_sequence_position(num_gates);
   std::vector<std::vector<std::vector<int>>> non_insular_qubit_indices(
-      local_qubits.size());
+      qubit_layout.size());
   std::vector<std::vector<KernelCostType>> shared_memory_gate_costs(
-      local_qubits.size());
+      qubit_layout.size());
 
   // |should_flip_control_qubit[i][j]|: if the |j|-th qubit in the |i|-th gate
   // should be flipped if we remove all single-qubit sparse non-diagonal gates
@@ -1900,84 +1942,19 @@ get_schedules(const CircuitSeq &sequence,
   }
 
   int num_stage = -1;
-  for (auto &local_qubit : local_qubits) {
+  for (auto &stage_qubit : qubit_layout) {
     num_stage++;
     // Convert vector<int> to vector<bool>.
     local_qubit_mask.assign(num_qubits, false);
     if (debug) {
-      std::cout << "local qubits: ";
-    }
-    for (auto &i : local_qubit) {
-      local_qubit_mask[i] = true;
-      if (debug) {
+      std::cout << "qubit layout: ";
+      for (auto &i : stage_qubit) {
         std::cout << i << " ";
       }
-    }
-    if (debug) {
       std::cout << std::endl;
     }
-    if (current_local_qubit_layout.empty()) {
-      // First iteration. Take the initial layout from |local_qubits[0]|.
-      current_local_qubit_layout = local_qubit;
-      current_global_qubit_layout.reserve(num_qubits - local_qubit.size());
-      // The global qubits are sorted in ascending order.
-      for (int i = 0; i < num_qubits; i++) {
-        if (!local_qubit_mask[i]) {
-          current_global_qubit_layout.push_back(i);
-        }
-      }
-    } else {
-      // Update the layout.
-      // We should have the same number of local qubits.
-      assert(local_qubit.size() == current_local_qubit_layout.size());
-      int num_global_swaps = 0;
-      for (auto &i : current_global_qubit_layout) {
-        if (local_qubit_mask[i]) {
-          // A global-to-local swap.
-          num_global_swaps++;
-        }
-      }
-      int should_swap_ptr = 0;
-      for (int i = (int)current_local_qubit_layout.size() - num_global_swaps;
-           i < (int)current_local_qubit_layout.size(); i++) {
-        if (!local_qubit_mask[current_local_qubit_layout[i]]) {
-          // This qubit should be swapped with a global qubit,
-          // and it is already at the correct position.
-          continue;
-        }
-        while (local_qubit_mask[current_local_qubit_layout[should_swap_ptr]]) {
-          should_swap_ptr++;
-        }
-        // Find the first local qubit that should be swapped with a global
-        // qubit, and perform a local swap.
-        std::swap(current_local_qubit_layout[i],
-                  current_local_qubit_layout[should_swap_ptr]);
-        should_swap_ptr++;
-      }
-      for (auto &i : current_global_qubit_layout) {
-        if (local_qubit_mask[i]) {
-          // Swap the new local qubit with the qubit at its corresponding
-          // position.
-          std::swap(
-              i,
-              current_local_qubit_layout
-                  [(int)current_local_qubit_layout.size() - num_global_swaps]);
-          num_global_swaps--;
-        }
-      }
-    }
-    if (debug) {
-      std::cout << "current layout: local ";
-      for (auto &i : current_local_qubit_layout) {
-        std::cout << i << " ";
-        assert(local_qubit_mask[i]);
-      }
-      std::cout << ", global ";
-      for (auto &i : current_global_qubit_layout) {
-        std::cout << i << " ";
-        assert(!local_qubit_mask[i]);
-      }
-      std::cout << std::endl;
+    for (int i = 0; i < num_local_qubits; i++) {
+      local_qubit_mask[stage_qubit[i]] = true;
     }
 
     // Returns the total shared-memory gate costs.
@@ -2193,9 +2170,9 @@ get_schedules(const CircuitSeq &sequence,
 
     // Attach some more single-qubit gates if necessary.
     std::vector<bool> local_in_next_stage(num_qubits, false);
-    if (num_stage != (int)local_qubits.size() - 1) {
-      for (auto &qubit : local_qubits[num_stage + 1]) {
-        local_in_next_stage[qubit] = true;
+    if (num_stage != (int)qubit_layout.size() - 1) {
+      for (int i = 0; i < num_local_qubits; i++) {
+        local_in_next_stage[qubit_layout[num_stage + 1][i]] = true;
       }
     }
     for (int qubit = 0; qubit < num_qubits; qubit++) {
@@ -2203,7 +2180,7 @@ get_schedules(const CircuitSeq &sequence,
         continue;
       }
       bool need_to_attach = false;
-      if (num_stage == (int)local_qubits.size() - 1) {
+      if (num_stage == (int)qubit_layout.size() - 1) {
         // The last stage. We need to execute all the remaining single-qubit
         // gates.
         if (last_gate_index[qubit] == -1) {
@@ -2255,10 +2232,10 @@ get_schedules(const CircuitSeq &sequence,
             dp_sequence_position[last_gate_index[qubit]].first != num_stage) {
           // We need to be careful when it comes to cross-stage attaches.
           std::vector<bool> local_in_other_stage(num_qubits, false);
-          for (auto &q :
-               local_qubits[dp_sequence_position[last_gate_index[qubit]]
-                                .first]) {
-            local_in_other_stage[q] = true;
+          for (int i = 0; i < num_local_qubits; i++) {
+            local_in_other_stage
+                [qubit_layout[dp_sequence_position[last_gate_index[qubit]]
+                                  .first][i]] = true;
           }
           if (!local_in_other_stage[qubit]) {
             // We cannot attach because this is a global qubit in that stage.
@@ -2315,8 +2292,7 @@ get_schedules(const CircuitSeq &sequence,
       }
     }
 
-    result.emplace_back(std::move(current_seq), current_local_qubit_layout,
-                        current_global_qubit_layout,
+    result.emplace_back(std::move(current_seq), num_local_qubits, stage_qubit,
                         kernel_cost.get_shared_memory_num_cacheline_qubits(),
                         ctx);
     while (start_gate_index < num_gates && executed[start_gate_index]) {
@@ -2540,21 +2516,214 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
   }
 }
 
+std::vector<std::vector<int>>
+compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
+                              int num_regional_qubits, Context *ctx,
+                              PythonInterpreter *interpreter,
+                              int num_global_stages_start_with) {
+  std::vector<std::vector<int>> first_level =
+      compute_local_qubits_with_ilp(sequence, num_local_qubits, ctx,
+                                    interpreter, num_global_stages_start_with);
+  std::vector<std::vector<int>> result_layout;
+  result_layout.reserve(first_level.size());
+  const int num_qubits = sequence.get_num_qubits();
+  const int num_gates = sequence.get_num_gates();
+  const int num_global_qubits =
+      num_qubits - num_local_qubits - num_regional_qubits;
+  assert(num_global_qubits >= 0);
+  std::vector<bool> executed(num_gates, false);
+  int start_gate_index = 0;  // an optimization
+  for (auto &local_or_regional : first_level) {
+    // Greedily execute a stage.
+    auto current_seq = std::make_unique<CircuitSeq>(
+        num_qubits, sequence.get_num_input_parameters());
+    std::vector<bool> in_this_stage(num_qubits, false);
+    for (auto &index : local_or_regional) {
+      in_this_stage[index] = true;
+    }
+    // A non-insular qubit of a gate blocks this qubit.
+    std::vector<bool> qubit_blocked(num_qubits, false);
+    // An insular qubit of a gate blocks this qubit.
+    std::vector<bool> qubit_insularly_blocked(num_qubits, false);
+    for (int i = start_gate_index; i < num_gates; i++) {
+      if (executed[i]) {
+        continue;
+      }
+      bool executable = true;
+      for (auto &qubit : sequence.gates[i]->get_qubit_indices()) {
+        if (qubit_blocked[qubit]) {
+          executable = false;
+          break;
+        }
+      }
+      const auto &current_non_insular_indices =
+          sequence.gates[i]->get_non_insular_qubit_indices();
+      for (auto &qubit : current_non_insular_indices) {
+        if (qubit_insularly_blocked[qubit]) {
+          executable = false;
+          break;
+        }
+      }
+      // We only require non-insular indices to be local or regional in this
+      // stage.
+      for (auto &qubit : current_non_insular_indices) {
+        if (!in_this_stage[qubit]) {
+          executable = false;
+          break;
+        }
+      }
+      if (executable) {
+        // Execute the gate.
+        executed[i] = true;
+        current_seq->add_gate(sequence.gates[i].get());
+      } else {
+        // Block the non-insular qubits.
+        for (auto &qubit : current_non_insular_indices) {
+          qubit_blocked[qubit] = true;
+        }
+        // "Insularly" block the insular qubits so that we cannot execute any
+        // gate with the same non-insular qubit in this stage.
+        for (auto &qubit : sequence.gates[i]->get_insular_qubit_indices()) {
+          qubit_insularly_blocked[qubit] = true;
+        }
+      }
+    }
+    auto second_level = compute_local_qubits_with_ilp(
+        *current_seq, num_local_qubits, ctx, interpreter);
+    for (int j = 0; j < (int)second_level.size(); j++) {
+      std::vector<bool> is_local(num_qubits, false);
+
+      // can be less than total local qubits
+      int current_num_local_qubits = 0;
+      for (auto &qubit : second_level[j]) {
+        if (in_this_stage[qubit]) {
+          is_local[qubit] = true;
+          current_num_local_qubits++;
+        }
+      }
+
+      if (result_layout.empty()) {
+        // first stage
+        std::vector<int> current_stage;
+        current_stage.reserve(num_qubits);
+        // local qubits
+        for (int i = 0; i < num_qubits; i++) {
+          if (is_local[i]) {
+            current_stage.push_back(i);
+          }
+        }
+        // regional qubits
+        for (int i = 0; i < num_qubits; i++) {
+          if (in_this_stage[i] && !is_local[i]) {
+            current_stage.push_back(i);
+          }
+        }
+        // global qubits
+        for (int i = 0; i < num_qubits; i++) {
+          if (!in_this_stage[i]) {
+            current_stage.push_back(i);
+          }
+        }
+        assert((int)current_stage.size() == num_qubits);
+        result_layout.emplace_back(std::move(current_stage));
+      } else {
+        auto &previous_layout = result_layout.back();
+        if (current_num_local_qubits < num_local_qubits) {
+          // get more local qubits from previous stage
+          for (int i = 0; i < num_qubits; i++) {
+            if (!is_local[previous_layout[i]] &&
+                in_this_stage[previous_layout[i]]) {
+              is_local[previous_layout[i]] = true;
+              current_num_local_qubits++;
+              if (current_num_local_qubits == num_local_qubits) {
+                break;
+              }
+            }
+          }
+        }
+        std::vector<int> current_stage = previous_layout;
+        // std::vector<int> global_to_regional_swaps;
+        std::deque<int> non_local_to_local_swaps;
+        for (int i = num_qubits - 1; i >= num_qubits - num_global_qubits; i--) {
+          if (in_this_stage[previous_layout[i]]) {
+            // no longer global
+            if (is_local[previous_layout[i]]) {
+              // global-local swap
+              non_local_to_local_swaps.push_back(i);
+            } else {
+              std::cerr << "Global-to-regional swap detected. This is "
+                           "correctly handled but may affect performance."
+                        << std::endl;
+            }
+          }
+        }
+        for (int i = num_qubits - num_global_qubits - 1; i >= num_local_qubits;
+             i--) {
+          if (is_local[previous_layout[i]]) {
+            // regional-local swap
+            non_local_to_local_swaps.push_back(i);
+          }
+        }
+        int swap_loc_min =
+            num_local_qubits - (int)non_local_to_local_swaps.size();
+        int swap_loc_max = num_local_qubits - 1;
+        for (int i = 0; i < num_local_qubits; i++) {
+          if (!is_local[current_stage[i]]) {
+            if (!in_this_stage[current_stage[i]]) {
+              // local-global swap, swap as far as possible
+              std::swap(current_stage[i], current_stage[swap_loc_max]);
+              std::swap(current_stage[swap_loc_max],
+                        current_stage[non_local_to_local_swaps.front()]);
+              swap_loc_max--;
+              non_local_to_local_swaps.pop_front();
+              i--;
+            } else {
+              // local-regional swap, swap as close as possible
+              std::swap(current_stage[i], current_stage[swap_loc_min]);
+              std::swap(current_stage[swap_loc_min],
+                        current_stage[non_local_to_local_swaps.back()]);
+              swap_loc_min++;
+              non_local_to_local_swaps.pop_back();
+              i--;
+            }
+          }
+        }
+        assert(non_local_to_local_swaps.empty());
+        assert(swap_loc_max == swap_loc_min - 1);
+        assert((int)current_stage.size() == num_qubits);
+        result_layout.emplace_back(std::move(current_stage));
+      }
+    }
+    while (start_gate_index < num_gates && executed[start_gate_index]) {
+      start_gate_index++;
+    }
+    std::cout << current_seq->to_string(true) << std::endl;
+  }
+  if (start_gate_index != num_gates) {
+    std::cerr << "Gate number " << start_gate_index
+              << " is not executed yet when computing qubit layout."
+              << std::endl;
+    assert(false);
+  }
+  return result_layout;
+}
+
 std::vector<Schedule> get_schedules_with_ilp(
-    const CircuitSeq &sequence, int num_local_qubits,
+    const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
     bool attach_single_qubit_gates, int use_simple_dp_times,
     const std::string &cache_file_name_prefix, int answer_start_with) {
   if (std::filesystem::exists(cache_file_name_prefix + ".schedule")) {
     // cached
-    return get_schedules(sequence, {}, kernel_cost, ctx,
+    return get_schedules(sequence, num_local_qubits, {}, kernel_cost, ctx,
                          attach_single_qubit_gates, use_simple_dp_times,
                          cache_file_name_prefix);
   }
-  auto local_qubits = compute_local_qubits_with_ilp(
-      sequence, num_local_qubits, ctx, interpreter, answer_start_with);
-  return get_schedules(sequence, local_qubits, kernel_cost, ctx,
-                       attach_single_qubit_gates, use_simple_dp_times,
+  auto qubit_layout = compute_qubit_layout_with_ilp(
+      sequence, num_local_qubits, num_regional_qubits, ctx, interpreter,
+      answer_start_with);
+  return get_schedules(sequence, num_local_qubits, qubit_layout, kernel_cost,
+                       ctx, attach_single_qubit_gates, use_simple_dp_times,
                        cache_file_name_prefix);
 }
 

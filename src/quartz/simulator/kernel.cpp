@@ -79,7 +79,7 @@ std::string Kernel::to_qasm_style_string(Context *ctx,
 
 KernelCostType
 Kernel::cost(const KernelCost &cost_function,
-             const std::vector<int> &local_qubit_layout,
+             const std::vector<int> &qubit_layout,
              const KernelCostType *customized_shared_memory_gate_cost) const {
   if (type == KernelType::fusion) {
     auto &vec = cost_function.get_fusion_kernel_costs();
@@ -98,17 +98,17 @@ Kernel::cost(const KernelCost &cost_function,
         return (KernelCostType)(INFINITY);
       }
       // we need the local qubit layout to determine the cacheline qubits.
-      assert(local_qubit_layout.size() >=
+      assert(qubit_layout.size() >=
              cost_function.get_shared_memory_num_cacheline_qubits());
       int extra_qubits = (int)qubits.size() -
                          cost_function.get_shared_memory_num_free_qubits();
       for (auto &qubit : qubits) {
         if (std::find(
-                local_qubit_layout.begin(),
-                local_qubit_layout.begin() +
+                qubit_layout.begin(),
+                qubit_layout.begin() +
                     cost_function.get_shared_memory_num_cacheline_qubits(),
                 qubit) !=
-            local_qubit_layout.begin() +
+            qubit_layout.begin() +
                 cost_function.get_shared_memory_num_cacheline_qubits()) {
           extra_qubits--;
           if (extra_qubits <= 0) {

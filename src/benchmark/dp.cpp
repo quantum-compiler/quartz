@@ -84,22 +84,23 @@ int main() {
             has_local_q_at_least_num_q = true;
           }
           auto t0 = std::chrono::steady_clock::now();
-          std::vector<std::vector<int>> local_qubits;
+          std::vector<std::vector<int>> qubit_layout;
           if (local_q == num_q) {
             std::vector<int> stage(num_q);
             for (int i = 0; i < num_q; i++) {
               stage[i] = i;
             }
-            local_qubits.push_back(stage);
+            qubit_layout.push_back(stage);
           } else {
-            local_qubits = compute_local_qubits_with_ilp(
-                *seq, local_q, &ctx, &interpreter, answer_start_with);
+            qubit_layout = compute_qubit_layout_with_ilp(
+                *seq, local_q, std::min(2, num_q - local_q), &ctx, &interpreter,
+                answer_start_with);
           }
-          int ilp_result = (int)local_qubits.size();
-          std::cout << local_qubits.size() << " stages." << std::endl;
+          int ilp_result = (int)qubit_layout.size();
+          std::cout << qubit_layout.size() << " stages." << std::endl;
           auto t1 = std::chrono::steady_clock::now();
           auto schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
@@ -113,7 +114,7 @@ int main() {
           fflush(fout);
           auto t2 = std::chrono::steady_clock::now();
           schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/-1,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
@@ -127,7 +128,7 @@ int main() {
           fflush(fout);
           auto t5 = std::chrono::steady_clock::now();
           schedules = get_schedules(
-              *seq, local_qubits, kernel_cost, &ctx,
+              *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
               /*use_simple_dp_times=*/0,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +

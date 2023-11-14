@@ -105,10 +105,13 @@ int main() {
             // schedule.print_kernel_info();
             total_cost += schedule.cost_;
           }
-          std::cout << "Schedule 0: layout ";
+          std::cout << "Schedule for " << circuit << " with " << num_q
+                    << " qubits and " << local_q
+                    << " local qubits:" << std::endl;
+          std::cout << "Stage 0: layout ";
           schedules[0].print_qubit_layout(global_q);
           for (int i = 1; i < (int)schedules.size(); i++) {
-            std::cout << "Schedule " << i << ": swap";
+            std::cout << "Stage " << i << ": swap";
             auto local_swaps = schedules[i].get_local_swaps_from_previous_stage(
                 schedules[i - 1]);
             for (auto &s : local_swaps) {

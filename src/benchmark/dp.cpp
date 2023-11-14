@@ -111,13 +111,17 @@ int main() {
           std::cout << "Stage 0: layout ";
           schedules[0].print_qubit_layout(global_q);
           for (int i = 1; i < (int)schedules.size(); i++) {
-            std::cout << "Stage " << i << ": swap";
+            std::cout << "Stage " << i << ": layout ";
+            schedules[i].print_qubit_layout(global_q);
             auto local_swaps = schedules[i].get_local_swaps_from_previous_stage(
                 schedules[i - 1]);
-            for (auto &s : local_swaps) {
-              std::cout << " (" << s.first << ", " << s.second << ")";
+            if (!local_swaps.empty()) {
+              std::cout << "  swap";
+              for (auto &s : local_swaps) {
+                std::cout << " (" << s.first << ", " << s.second << ")";
+              }
+              std::cout << std::endl;
             }
-            std::cout << std::endl;
           }
           fprintf(fout, "%.1f, ", total_cost);
           fflush(fout);

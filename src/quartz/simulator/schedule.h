@@ -201,11 +201,9 @@ compute_local_qubits_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
  * may accelerate this function.
  * @return The qubit layout for each stage.
  */
-std::vector<std::vector<int>>
-compute_qubit_layout_with_ilp(const CircuitSeq &sequence, int num_local_qubits,
-                              int num_regional_qubits, Context *ctx,
-                              PythonInterpreter *interpreter,
-                              int answer_start_with = 1);
+std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
+    const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
+    Context *ctx, PythonInterpreter *interpreter, int answer_start_with = 1);
 
 /**
  * Call the above two functions sequentially, use the cached files if possible.

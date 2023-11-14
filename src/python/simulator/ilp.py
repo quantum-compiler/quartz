@@ -142,23 +142,24 @@ def solve_ilp(
 
 
 def solve_global_ilp(
-        circuit_gate_qubits,
-        circuit_gate_executable_type,
-        out_gate,
-        num_qubits,
-        num_local_qubits,
-        num_global_qubits,
-        global_cost_factor,
-        num_iterations,
-        print_solution=False,
+    circuit_gate_qubits,
+    circuit_gate_executable_type,
+    out_gate,
+    num_qubits,
+    num_local_qubits,
+    num_global_qubits,
+    global_cost_factor,
+    num_iterations,
+    print_solution=False,
 ):
     print(
         f"Solving ILP for num_qubits={num_qubits}, num_local_qubits={num_local_qubits}, num_global_qubits={num_global_qubits}, num_iterations={num_iterations}..."
     )
-    assert (num_local_qubits + num_global_qubits <= num_qubits)
+    assert num_local_qubits + num_global_qubits <= num_qubits
     # Check if the ILP is feasible in M rounds.
     prob = pulp.LpProblem(
-        f"{num_qubits}_{num_local_qubits}_{num_global_qubits}_{num_iterations}", pulp.LpMinimize
+        f"{num_qubits}_{num_local_qubits}_{num_global_qubits}_{num_iterations}",
+        pulp.LpMinimize,
     )
     num_gates = len(circuit_gate_qubits)
 
@@ -208,7 +209,13 @@ def solve_global_ilp(
     )
 
     # Minimize the total number of swaps + |global_cost_factor| * global swaps.
-    prob += sum([s[i, j] + global_cost_factor * t[i, j] for i in range(num_qubits) for j in range(num_iterations - 1)])
+    prob += sum(
+        [
+            s[i, j] + global_cost_factor * t[i, j]
+            for i in range(num_qubits)
+            for j in range(num_iterations - 1)
+        ]
+    )
 
     # For each iteration, we have exactly k local qubits.
     for j in range(num_iterations):

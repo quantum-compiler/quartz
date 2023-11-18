@@ -278,7 +278,12 @@ bool Schedule::compute_end_schedule(
 bool Schedule::compute_kernel_schedule(
     const KernelCost &kernel_cost,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
-    const std::vector<KernelCostType> &shared_memory_gate_costs) {
+    const std::vector<KernelCostType> &shared_memory_gate_costs,
+    int max_num_dp_states, int shrink_to_num_dp_states) {
+  assert(max_num_dp_states >= 1);
+  if (shrink_to_num_dp_states == 0) {
+    shrink_to_num_dp_states = (max_num_dp_states + 1) / 2;
+  }
   const int num_qubits = sequence_->get_num_qubits();
   const int num_gates = sequence_->get_num_gates();
   auto kernel_costs = kernel_cost.get_fusion_kernel_costs();
@@ -597,10 +602,7 @@ bool Schedule::compute_kernel_schedule(
     auto current_single_gate_shared_memory_kernel_hash =
         current_single_gate_shared_memory_kernel.get_hash();
 
-    // TODO: make these numbers configurable
-    constexpr int kMaxNumOfStatus = 2000;
-    constexpr int kShrinkToNumOfStatus = 1000;
-    if (f_prev.size() > kMaxNumOfStatus) {
+    if (f_prev.size() > max_num_dp_states) {
       // Pruning.
       std::vector<std::pair<
           KernelCostType,
@@ -609,7 +611,7 @@ bool Schedule::compute_kernel_schedule(
           costs;
       if (debug) {
         std::cout << "Shrink f[" << i << "] from " << f_prev.size()
-                  << " elements to " << kShrinkToNumOfStatus << " elements."
+                  << " elements to " << shrink_to_num_dp_states << " elements."
                   << std::endl;
       }
       costs.reserve(f_prev.size());
@@ -635,12 +637,12 @@ bool Schedule::compute_kernel_schedule(
       }
       // Retrieve the first |kShrinkToNumOfStatus| lowest cost.
       std::nth_element(
-          costs.begin(), costs.begin() + kShrinkToNumOfStatus, costs.end(),
+          costs.begin(), costs.begin() + shrink_to_num_dp_states, costs.end(),
           [](const auto &p1, const auto &p2) { return p1.first < p2.first; });
       std::unordered_map<Status, std::pair<KernelCostType, LocalSchedule>,
                          StatusHash>
           new_f;
-      for (int j = 0; j < kShrinkToNumOfStatus; j++) {
+      for (int j = 0; j < shrink_to_num_dp_states; j++) {
         // Extract the node and insert to the new unordered_map.
         new_f.insert(f_prev.extract(costs[j].second));
       }
@@ -648,7 +650,8 @@ bool Schedule::compute_kernel_schedule(
       if (debug) {
         std::cout << "Costs shrank from [" << lowest_cost << ", "
                   << highest_cost << "] to [" << lowest_cost << ", "
-                  << costs[kShrinkToNumOfStatus - 1].first << "]." << std::endl;
+                  << costs[shrink_to_num_dp_states - 1].first << "]."
+                  << std::endl;
       }
     }
 
@@ -1662,6 +1665,46 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
   return true;
 }
 
+bool Schedule::compute_kernel_schedule_greedy_pack_fusion(
+    const KernelCost &kernel_cost, int num_qubits_to_pack) {
+  const int num_gates = sequence_->get_num_gates();
+  kernels.clear();
+  cost_ = 0;
+  auto empty_circuit = std::make_unique<CircuitSeq>(
+      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
+  auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
+                       KernelType::fusion);
+  std::vector<int> kernel_qubits;
+  for (int i = 0; i < num_gates; i++) {
+    const auto &qubits = sequence_->gates[i]->get_qubit_indices();
+    assert((int)qubits.size() <= num_qubits_to_pack);  // fits in one kernel
+    // Update the qubits for the current kernel.
+    for (const auto &qubit : qubits) {
+      if (std::find(kernel_qubits.begin(), kernel_qubits.end(), qubit) ==
+          kernel_qubits.end()) {
+        kernel_qubits.push_back(qubit);
+      }
+    }
+    if ((int)kernel_qubits.size() > num_qubits_to_pack) {
+      // We cannot put gates[i] into the current kernel.
+      cost_ += kernel.cost(kernel_cost);
+      kernels.emplace_back(std::move(kernel));
+      // Create a new kernel.
+      kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
+                      KernelType::fusion);
+      kernel.add_gate(sequence_->gates[i].get());
+      kernel_qubits = kernel.qubits;
+    } else {
+      // Add gates[i] to the current kernel.
+      kernel.add_gate(sequence_->gates[i].get());
+    }
+  }
+  // The last kernel.
+  cost_ += kernel.cost(kernel_cost);
+  kernels.emplace_back(std::move(kernel));
+  return true;
+}
+
 int Schedule::get_num_kernels() const { return (int)kernels.size(); }
 
 void Schedule::print_kernel_info() const {
@@ -1862,7 +1905,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence, int num_local_qubits,
               const std::vector<std::vector<int>> &qubit_layout,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, int use_simple_dp_times,
+              bool attach_single_qubit_gates, int max_num_dp_states,
               const std::string &cache_file_name_prefix) {
   constexpr bool debug = false;
   std::vector<Schedule> result;
@@ -2326,16 +2369,17 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
   num_stage = -1;
   for (auto &schedule : result) {
     num_stage++;
-    if (use_simple_dp_times > 0 || use_simple_dp_times == -1) {
+    if (max_num_dp_states < 0) {
+      schedule.compute_kernel_schedule_greedy_pack_fusion(kernel_cost,
+                                                          -max_num_dp_states);
+    } else if (max_num_dp_states == -1) {
       schedule.compute_kernel_schedule_simple_repeat(
-          use_simple_dp_times, kernel_cost,
-          non_insular_qubit_indices[num_stage],
+          1, kernel_cost, non_insular_qubit_indices[num_stage],
           shared_memory_gate_costs[num_stage]);
     } else {
-      assert(use_simple_dp_times == 0);
-      schedule.compute_kernel_schedule(kernel_cost,
-                                       non_insular_qubit_indices[num_stage],
-                                       shared_memory_gate_costs[num_stage]);
+      schedule.compute_kernel_schedule(
+          kernel_cost, non_insular_qubit_indices[num_stage],
+          shared_memory_gate_costs[num_stage], max_num_dp_states);
     }
   }
   if (attach_single_qubit_gates) {
@@ -2732,14 +2776,14 @@ std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
 std::vector<Schedule> get_schedules_with_ilp(
     const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
-    bool attach_single_qubit_gates, int use_simple_dp_times,
+    bool attach_single_qubit_gates, int max_num_dp_states,
     const std::string &cache_file_name_prefix, int answer_start_with) {
   if (std::filesystem::exists(cache_file_name_prefix + ".schedule")) {
     std::cout << "Use cached schedule " << cache_file_name_prefix << ".schedule"
               << std::endl;
     // cached
     return get_schedules(sequence, num_local_qubits, {}, kernel_cost, ctx,
-                         attach_single_qubit_gates, use_simple_dp_times,
+                         attach_single_qubit_gates, max_num_dp_states,
                          cache_file_name_prefix);
   }
   auto t_start = std::chrono::steady_clock::now();
@@ -2748,7 +2792,7 @@ std::vector<Schedule> get_schedules_with_ilp(
       answer_start_with);
   auto result = get_schedules(sequence, num_local_qubits, qubit_layout,
                               kernel_cost, ctx, attach_single_qubit_gates,
-                              use_simple_dp_times, cache_file_name_prefix);
+                              max_num_dp_states, cache_file_name_prefix);
   auto t_end = std::chrono::steady_clock::now();
   std::cout << "Computed and cached schedule " << cache_file_name_prefix
             << ".schedule in "

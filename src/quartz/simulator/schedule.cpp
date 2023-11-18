@@ -2372,7 +2372,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
     if (max_num_dp_states < 0) {
       schedule.compute_kernel_schedule_greedy_pack_fusion(kernel_cost,
                                                           -max_num_dp_states);
-    } else if (max_num_dp_states == -1) {
+    } else if (max_num_dp_states == 0) {
       schedule.compute_kernel_schedule_simple_repeat(
           1, kernel_cost, non_insular_qubit_indices[num_stage],
           shared_memory_gate_costs[num_stage]);

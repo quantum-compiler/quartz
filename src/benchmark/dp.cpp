@@ -45,7 +45,7 @@ int main() {
       },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   std::vector<int> dp_t = {-5,  0,   2,   4,    10,   20,  50,
-                           100, 200, 500, 1000, 2000, 5000};
+                           100, 200, 500, 1000, 2000, 3000};
   FILE *fout = fopen("../dp_result.csv", "w");
   for (int run_nwq = 0; run_nwq <= 1; run_nwq++) {
     for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {

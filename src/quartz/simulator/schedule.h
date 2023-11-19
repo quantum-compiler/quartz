@@ -181,7 +181,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence, int num_local_qubits,
               const std::vector<std::vector<int>> &qubit_layout,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, int max_num_dp_states = 0,
+              bool attach_single_qubit_gates, int max_num_dp_states = 500,
               const std::string &cache_file_name_prefix = "");
 
 class PythonInterpreter;
@@ -224,7 +224,7 @@ std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
 std::vector<Schedule> get_schedules_with_ilp(
     const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
-    bool attach_single_qubit_gates, int max_num_dp_states = 0,
+    bool attach_single_qubit_gates, int max_num_dp_states = 500,
     const std::string &cache_file_name_prefix = "", int answer_start_with = 1);
 
 /**

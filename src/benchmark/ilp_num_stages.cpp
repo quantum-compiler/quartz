@@ -224,7 +224,7 @@ int main() {
           std::vector<bool> prev_local(num_q, false);
           for (int j = 0; j < ilp_result; j++) {
             std::cout << "Stage " << j << ": ";
-            std::cout << local_qubits[j].size() << " local qubits, ";
+            local_qubits.resize(num_q - global_q);
             for (int k : local_qubits[j]) {
               std::cout << k << " ";
               if (j > 0) {

@@ -109,8 +109,8 @@ class Schedule {
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
-  bool compute_kernel_schedule_greedy_pack_fusion(
-      const KernelCost &kernel_cost, int num_qubits_to_pack);
+  bool compute_kernel_schedule_greedy_pack_fusion(const KernelCost &kernel_cost,
+                                                  int num_qubits_to_pack);
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_info() const;

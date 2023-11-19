@@ -64,13 +64,18 @@ class Schedule {
    * @param shared_memory_gate_costs The cost for each gate if put into a
    * shared-memory kernel, if any of them should be considered differently from
    * what we would have computed from the gate itself.
+   * @param max_num_dp_states The maximum number of DP states per iteration.
+   * @param shrink_to_num_dp_states If the number of DP states exceeds
+   * |max_num_dp_states|, shrink the number of DP states to this number.
+   * If this number is 0, use ceil(|max_num_dp_states| / 2).
    * @return True iff the computation succeeds. The results are stored in
    * the member variables |kernels| and |cost_|.
    */
   bool compute_kernel_schedule(
       const KernelCost &kernel_cost,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
-      const std::vector<KernelCostType> &shared_memory_gate_costs = {});
+      const std::vector<KernelCostType> &shared_memory_gate_costs = {},
+      int max_num_dp_states = 500, int shrink_to_num_dp_states = 0);
 
   /**
    * Compute the schedule using a simple quadratic dynamic programming
@@ -103,6 +108,9 @@ class Schedule {
       int repeat, const KernelCost &kernel_cost,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
+
+  bool compute_kernel_schedule_greedy_pack_fusion(const KernelCost &kernel_cost,
+                                                  int num_qubits_to_pack);
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_info() const;
@@ -156,9 +164,14 @@ class Schedule {
  * @param ctx The Context object.
  * @param attach_single_qubit_gates An optimization to reduce the running
  * time of this function. Requires the input circuit to be fully entangled.
- * @param use_simple_dp_times Temporary. If this variable is 0,
- * use the complicated DP algorithm. If this variable is positive, use
- * the simple DP algorithm.
+ * @param max_num_dp_states
+ * If this variable is negative,
+ * use the greedy algorithm to pack towards this number of qubits (absolute
+ * value).
+ * If this variable is 0,
+ * use the simple DP algorithm.
+ * If this variable is positive, set the |max_num_dp_states| to this number
+ * in the DP algorithm.
  * @param cache_file_name_prefix If this variable is not empty,
  * use the cached files if possible (in this case, no other variables are used),
  * and compute the schedules and cache them into files otherwise.
@@ -168,7 +181,7 @@ std::vector<Schedule>
 get_schedules(const CircuitSeq &sequence, int num_local_qubits,
               const std::vector<std::vector<int>> &qubit_layout,
               const KernelCost &kernel_cost, Context *ctx,
-              bool attach_single_qubit_gates, int use_simple_dp_times = 0,
+              bool attach_single_qubit_gates, int max_num_dp_states = 500,
               const std::string &cache_file_name_prefix = "");
 
 class PythonInterpreter;
@@ -211,7 +224,7 @@ std::vector<std::vector<int>> compute_qubit_layout_with_ilp(
 std::vector<Schedule> get_schedules_with_ilp(
     const CircuitSeq &sequence, int num_local_qubits, int num_regional_qubits,
     const KernelCost &kernel_cost, Context *ctx, PythonInterpreter *interpreter,
-    bool attach_single_qubit_gates, int use_simple_dp_times = 0,
+    bool attach_single_qubit_gates, int max_num_dp_states = 500,
     const std::string &cache_file_name_prefix = "", int answer_start_with = 1);
 
 /**

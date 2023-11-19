@@ -44,6 +44,8 @@ int main() {
           return 0.5;
       },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
+  std::vector<int> dp_t = {-5,  0,   2,   4,   10,  20,   50,   100, 200,
+                           300, 400, 500, 600, 800, 1000, 2000, 3000};
   FILE *fout = fopen("../dp_result.csv", "w");
   for (int run_nwq = 0; run_nwq <= 1; run_nwq++) {
     for (const auto &circuit : (run_nwq ? circuit_names_nwq : circuit_names)) {
@@ -96,9 +98,9 @@ int main() {
           auto schedules = get_schedules(
               *seq, local_q, qubit_layout, kernel_cost, &ctx,
               /*attach_single_qubit_gates=*/true,
-              /*use_simple_dp_times=*/1,
+              /*max_num_dp_states=*/500,
               /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
-                  std::to_string(local_q) + "_simple");
+                  std::to_string(local_q));
           auto t1end = std::chrono::steady_clock::now();
           KernelCostType total_cost = 0;
           for (auto &schedule : schedules) {
@@ -123,55 +125,41 @@ int main() {
             std::cout << "Stage " << i << ": layout ";
             schedules[i].print_qubit_layout(global_q);
           }
-          fprintf(fout, "%.1f, ", total_cost);
-          fflush(fout);
-          auto t2 = std::chrono::steady_clock::now();
-          schedules = get_schedules(
-              *seq, local_q, qubit_layout, kernel_cost, &ctx,
-              /*attach_single_qubit_gates=*/true,
-              /*use_simple_dp_times=*/-1,
-              /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
-                  std::to_string(local_q) + "_max_weight");
-          auto t2end = std::chrono::steady_clock::now();
-          total_cost = 0;
-          for (auto &schedule : schedules) {
-            // schedule.print_kernel_info();
-            total_cost += schedule.cost_;
+          std::vector<double> ts;
+          for (int t : dp_t) {
+            auto t2 = std::chrono::steady_clock::now();
+            schedules =
+                get_schedules(*seq, local_q, qubit_layout, kernel_cost, &ctx,
+                              /*attach_single_qubit_gates=*/true,
+                              /*max_num_dp_states=*/t,
+                              /*cache_file_name_prefix=*/"");
+            auto t2end = std::chrono::steady_clock::now();
+            total_cost = 0;
+            for (auto &schedule : schedules) {
+              // schedule.print_kernel_info();
+              total_cost += schedule.cost_;
+            }
+            fprintf(fout, "%.1f, ", total_cost);
+            fflush(fout);
+            ts.push_back(
+                (double)std::chrono::duration_cast<std::chrono::microseconds>(
+                    t2end - t2)
+                    .count() /
+                1e6);
           }
-          fprintf(fout, "%.1f, ", total_cost);
-          fflush(fout);
-          auto t5 = std::chrono::steady_clock::now();
-          schedules = get_schedules(
-              *seq, local_q, qubit_layout, kernel_cost, &ctx,
-              /*attach_single_qubit_gates=*/true,
-              /*use_simple_dp_times=*/0,
-              /*cache_file_name_prefix=*/circuit + std::to_string(num_q) + "_" +
-                  std::to_string(local_q) + "_complicated");
-          auto t5end = std::chrono::steady_clock::now();
-          total_cost = 0;
-          for (auto &schedule : schedules) {
-            // schedule.print_kernel_info();
-            total_cost += schedule.cost_;
-          }
-          fprintf(fout, "%.1f, ", total_cost);
-          fflush(fout);
-          fprintf(fout, "%.3f, %.3f, %.3f, %.3f",
+          fprintf(fout, "%.6f",
                   (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                       t1end - t1)
                           .count() /
-                      1000.0,
-                  (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t2end - t2)
-                          .count() /
-                      1000.0,
-                  (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                      t5end - t5)
-                          .count() /
-                      1000.0,
-                  (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+                      1e6);
+          for (auto t : ts) {
+            fprintf(fout, ", %.6f", t);
+          }
+          fprintf(fout, ", %.6f",
+                  (double)std::chrono::duration_cast<std::chrono::microseconds>(
                       t0end - t0)
                           .count() /
-                      1000.0);
+                      1e6);
           answer_start_with = ilp_result;
         }
         fprintf(fout, "\n");

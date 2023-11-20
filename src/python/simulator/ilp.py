@@ -99,11 +99,11 @@ def solve_ilp(
         prob += b[i, num_iterations] == 1
 
     print("Available solvers:", pulp.listSolvers(onlyAvailable=True))
-    solver = pulp.HiGHS_CMD()
+    solver = pulp.HiGHS_CMD(timeLimit=3600)
     try:
         prob.solve(solver)
     except:
-        prob.solve()
+        prob.solve(pulp.PULP_CBC_CMD(timeLimit=3600))
     if print_solution:
         print("Status:", pulp.LpStatus[prob.status])
         for v in prob.variables():

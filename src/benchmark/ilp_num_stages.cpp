@@ -218,7 +218,8 @@ int main() {
           }
           std::vector<std::vector<int>> local_qubits;
           local_qubits = compute_qubit_layout_with_ilp(
-              *seq, num_q - global_q, 0, &ctx, &interpreter, answer_start_with);
+              *seq, num_q - global_q, std::min(2, global_q), &ctx, &interpreter,
+              answer_start_with);
           int ilp_result = (int)local_qubits.size();
           int num_swaps = 0;
           std::vector<bool> prev_local(num_q, false);

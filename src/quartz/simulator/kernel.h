@@ -53,6 +53,8 @@ class Kernel {
   /**
    * Add a gate and update the |qubits| set.
    * @param gate The gate to be added, calling |CircuitGate::add_gate(gate)|.
+   * @param is_local_qubit An oracle to return if a qubit is local, assumed to
+   * run in constant time.
    * @param customized_non_insular_qubits Sometimes we may want to customize
    * the set of non-insular qubits in a shared-memory kernel.
    * If this variable is not empty and if the kernel type is shared-memory,
@@ -65,9 +67,12 @@ class Kernel {
 
   /**
    * Verify if the kernel is executable.
-   * @return True iff the qubits of each gate are in the |qubits| set
-   * if this is a fusion kernel, or iff the non-insular qubits of each gate
-   * are in the |qubits| set if this is a shared-memory kernel.
+   * @param is_local_qubit An oracle to return if a qubit is local, assumed to
+   * run in constant time.
+   * @return True iff all non-insular qubits are local and:
+   * the qubits of each gate are in the |qubits| set if this is a fusion kernel,
+   * or the non-insular qubits of each gate are in the |qubits| set if this is a
+   * shared-memory kernel.
    */
   [[nodiscard]] bool
   verify(const std::function<bool(int)> &is_local_qubit) const;

@@ -81,6 +81,8 @@ class Schedule {
    * Compute the schedule using a simple quadratic dynamic programming
    * algorithm. The memory complexity is also quadratic.
    * @param kernel_cost The cost function of kernels.
+   * @param is_local_qubit An oracle to return if a qubit is local, assumed to
+   * run in constant time.
    * @param non_insular_qubit_indices The set of non-insular qubit indices
    * for each gate, if any of them should be considered differently from
    * what we would have computed from the gate itself.

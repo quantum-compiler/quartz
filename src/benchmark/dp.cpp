@@ -125,6 +125,7 @@ int main() {
             std::cout << "Stage " << i << ": layout ";
             schedules[i].print_qubit_layout(global_q);
           }
+          verify_schedule(&ctx, *seq, schedules, /*random_test_times=*/0);
           std::vector<double> ts;
           for (int t : dp_t) {
             auto t2 = std::chrono::steady_clock::now();

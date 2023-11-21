@@ -1362,6 +1362,7 @@ bool Schedule::compute_kernel_schedule(
 
 bool Schedule::compute_kernel_schedule_simple(
     const KernelCost &kernel_cost,
+    const std::function<bool(int)> &is_local_qubit,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
   const int num_gates = sequence_->get_num_gates();
@@ -1400,7 +1401,7 @@ bool Schedule::compute_kernel_schedule_simple(
       }
       int j;
       for (j = 0; j < (int)k.size(); j++) {
-        k[j].add_gate(sequence_->gates[i - 1].get(),
+        k[j].add_gate(sequence_->gates[i - 1].get(), is_local_qubit,
                       non_insular_qubit_indices.empty()
                           ? std::vector<int>()
                           : non_insular_qubit_indices[i - 1]);
@@ -1458,7 +1459,7 @@ bool Schedule::compute_kernel_schedule_simple(
     auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                          dp_from[kernel_split_locations[i - 1]].second);
     for (int j = location; j < kernel_split_locations[i - 1]; j++) {
-      kernel.add_gate(sequence_->gates[j].get());
+      kernel.add_gate(sequence_->gates[j].get(), is_local_qubit);
     }
     kernels.push_back(std::move(kernel));
   }
@@ -1467,6 +1468,7 @@ bool Schedule::compute_kernel_schedule_simple(
 
 bool Schedule::compute_kernel_schedule_simple_reversed(
     const KernelCost &kernel_cost,
+    const std::function<bool(int)> &is_local_qubit,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
   const int num_gates = sequence_->get_num_gates();
@@ -1498,7 +1500,7 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
                             /*qubits=*/std::vector<int>(), tp);
       KernelCostType current_cost = 0, total_shared_memory_gate_cost = 0;
       for (j = i + 1; j <= max_j; j++) {
-        current_kernel.add_gate(sequence_->gates[j - 1].get(),
+        current_kernel.add_gate(sequence_->gates[j - 1].get(), is_local_qubit,
                                 non_insular_qubit_indices.empty()
                                     ? std::vector<int>()
                                     : non_insular_qubit_indices[j - 1]);
@@ -1538,7 +1540,7 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
     auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                          dp_from[i].second);
     for (int j = i; j < dp_from[i].first; j++) {
-      kernel.add_gate(sequence_->gates[j].get());
+      kernel.add_gate(sequence_->gates[j].get(), is_local_qubit);
     }
     kernels.push_back(std::move(kernel));
   }
@@ -1547,6 +1549,7 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
 
 bool Schedule::compute_kernel_schedule_simple_repeat(
     int repeat, const KernelCost &kernel_cost,
+    const std::function<bool(int)> &is_local_qubit,
     const std::vector<std::vector<int>> &non_insular_qubit_indices,
     const std::vector<KernelCostType> &shared_memory_gate_costs) {
   assert(repeat >= 1 || repeat == -1);
@@ -1557,8 +1560,9 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
     special = true;
     cost_ = INFINITY;
   } else {
-    if (!compute_kernel_schedule_simple_reversed(
-            kernel_cost, non_insular_qubit_indices, shared_memory_gate_costs)) {
+    if (!compute_kernel_schedule_simple_reversed(kernel_cost, is_local_qubit,
+                                                 non_insular_qubit_indices,
+                                                 shared_memory_gate_costs)) {
       return false;
     }
   }
@@ -1650,7 +1654,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       current_shared_memory_gate_costs = std::move(permuted_costs);
     }
     if (!compute_kernel_schedule_simple_reversed(
-            kernel_cost, current_non_insular_qubit_indices,
+            kernel_cost, is_local_qubit, current_non_insular_qubit_indices,
             current_shared_memory_gate_costs)) {
       return false;
     }
@@ -1666,7 +1670,8 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
 }
 
 bool Schedule::compute_kernel_schedule_greedy_pack_fusion(
-    const KernelCost &kernel_cost, int num_qubits_to_pack) {
+    const KernelCost &kernel_cost,
+    const std::function<bool(int)> &is_local_qubit, int num_qubits_to_pack) {
   const int num_gates = sequence_->get_num_gates();
   kernels.clear();
   cost_ = 0;
@@ -1692,11 +1697,11 @@ bool Schedule::compute_kernel_schedule_greedy_pack_fusion(
       // Create a new kernel.
       kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                       KernelType::fusion);
-      kernel.add_gate(sequence_->gates[i].get());
+      kernel.add_gate(sequence_->gates[i].get(), is_local_qubit);
       kernel_qubits = kernel.qubits;
     } else {
       // Add gates[i] to the current kernel.
-      kernel.add_gate(sequence_->gates[i].get());
+      kernel.add_gate(sequence_->gates[i].get(), is_local_qubit);
     }
   }
   // The last kernel.
@@ -2369,12 +2374,15 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
   num_stage = -1;
   for (auto &schedule : result) {
     num_stage++;
+    const auto &is_local_qubit = [&schedule](int index) {
+      return schedule.is_local_qubit(index);
+    };
     if (max_num_dp_states < 0) {
-      schedule.compute_kernel_schedule_greedy_pack_fusion(kernel_cost,
-                                                          -max_num_dp_states);
+      schedule.compute_kernel_schedule_greedy_pack_fusion(
+          kernel_cost, is_local_qubit, -max_num_dp_states);
     } else if (max_num_dp_states == 0) {
       schedule.compute_kernel_schedule_simple_repeat(
-          1, kernel_cost, non_insular_qubit_indices[num_stage],
+          1, kernel_cost, is_local_qubit, non_insular_qubit_indices[num_stage],
           shared_memory_gate_costs[num_stage]);
     } else {
       schedule.compute_kernel_schedule(
@@ -2807,9 +2815,26 @@ std::vector<Schedule> get_schedules_with_ilp(
 bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
                      const std::vector<Schedule> &schedules,
                      int random_test_times) {
+  for (auto &schedule : schedules) {
+    const auto &is_local_qubit = [&schedule](int index) {
+      return schedule.is_local_qubit(index);
+    };
+    for (auto &kernel : schedule.kernels) {
+      if (!kernel.verify(is_local_qubit)) {
+        std::cerr << "In schedule " << (&schedule - schedules.data()) << ", ";
+        std::cerr << "kernel " << (&kernel - schedule.kernels.data())
+                  << " is not well-formed:" << std::endl
+                  << kernel.to_string() << std::endl;
+        return false;
+      }
+    }
+  }
+  if (random_test_times == 0) {
+    return true;
+  }
   if (sequence.get_num_qubits() > 30) {
-    std::cerr << "We only support verifying schedules for circuits with no more"
-                 " than 30 qubits (the input circuit has "
+    std::cerr << "We only support verifying schedules by random testing for "
+                 "circuits with no more than 30 qubits (the input circuit has "
               << sequence.get_num_qubits() << " qubits)." << std::endl;
     return true;
   }

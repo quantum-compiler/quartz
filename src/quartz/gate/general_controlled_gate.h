@@ -51,31 +51,25 @@ class GeneralControlledGate : public Gate {
     // return result;
     return controlled_gate_->get_matrix(params);
   }
-  bool is_symmetric() const override {
-    if (std::find(state_.begin(), state_.end(), false) == state_.end()) {
-      // Same as the original gate
-      return controlled_gate_->is_symmetric();
-    }
-    // Otherwise, no guarantee
-    return false;
+  [[nodiscard]] bool is_symmetric() const override {
+    // Same as the original gate
+    return controlled_gate_->is_symmetric();
   }
-  bool is_sparse() const override {
+  [[nodiscard]] bool is_sparse() const override {
     // Same as the original gate
     return controlled_gate_->is_sparse();
   }
-  bool is_diagonal() const override {
-    if (std::find(state_.begin(), state_.end(), false) == state_.end()) {
-      // Same as the original gate
-      return controlled_gate_->is_diagonal();
-    }
-    // Otherwise, no guarantee
-    return false;
+  [[nodiscard]] bool is_diagonal() const override {
+    // Same as the original gate
+    return controlled_gate_->is_diagonal();
   }
-  int get_num_control_qubits() const override {
+  [[nodiscard]] int get_num_control_qubits() const override {
     // Same as the original gate
     return controlled_gate_->get_num_control_qubits();
   }
-  std::vector<bool> get_control_state() const override { return state_; }
+  [[nodiscard]] std::vector<bool> get_control_state() const override {
+    return state_;
+  }
   Gate *controlled_gate_;
   std::vector<bool> state_;
 };

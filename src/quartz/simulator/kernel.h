@@ -60,7 +60,17 @@ class Kernel {
    * @return True iff the gate is successfully added.
    */
   bool add_gate(CircuitGate *gate,
+                const std::function<bool(int)> &is_local_qubit,
                 const std::vector<int> &customized_non_insular_qubits = {});
+
+  /**
+   * Verify if the kernel is executable.
+   * @return True iff the qubits of each gate are in the |qubits| set
+   * if this is a fusion kernel, or iff the non-insular qubits of each gate
+   * are in the |qubits| set if this is a shared-memory kernel.
+   */
+  [[nodiscard]] bool
+  verify(const std::function<bool(int)> &is_local_qubit) const;
 
   std::unique_ptr<CircuitSeq> gates;
   std::vector<int> qubits;

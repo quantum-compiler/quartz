@@ -137,6 +137,7 @@ Kernel::cost(const KernelCost &cost_function,
 }
 
 bool Kernel::add_gate(CircuitGate *gate,
+                      const std::function<bool(int)> &is_local_qubit,
                       const std::vector<int> &customized_non_insular_qubits) {
   if (gates->add_gate(gate)) {
     auto gate_qubits = (type == KernelType::shared_memory
@@ -145,13 +146,44 @@ bool Kernel::add_gate(CircuitGate *gate,
                                    : customized_non_insular_qubits)
                             : gate->get_qubit_indices());
     for (auto qubit : gate_qubits) {
-      if (std::find(qubits.begin(), qubits.end(), qubit) == qubits.end()) {
+      if (is_local_qubit(qubit) &&
+          std::find(qubits.begin(), qubits.end(), qubit) == qubits.end()) {
         qubits.push_back(qubit);
       }
     }
     return true;
   }
   return false;
+}
+
+bool Kernel::verify(const std::function<bool(int)> &is_local_qubit) const {
+  for (auto &gate : gates->gates) {
+    const auto &gate_qubits = (type == KernelType::shared_memory
+                                   ? gate->get_non_insular_qubit_indices()
+                                   : gate->get_qubit_indices());
+    const auto &insular_qubits = gate->get_insular_qubit_indices();
+    for (auto qubit : gate_qubits) {
+      if (is_local_qubit(qubit) &&
+          std::find(qubits.begin(), qubits.end(), qubit) == qubits.end()) {
+        std::cerr << "Qubit " << qubit << " of gate " << gate->to_string()
+                  << " not active in kernel." << std::endl;
+        return false;
+      }
+      if (!is_local_qubit(qubit)) {
+        if (type == KernelType::shared_memory) {
+          std::cerr << "Non-insular non-local qubit " << qubit
+                    << " detected in a shared-memory kernel." << std::endl;
+          return false;
+        } else if (std::find(insular_qubits.begin(), insular_qubits.end(),
+                             qubit) == insular_qubits.end()) {
+          std::cerr << "Non-insular non-local qubit " << qubit
+                    << " detected in a fusion kernel." << std::endl;
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 size_t KernelInDP::get_hash() const {

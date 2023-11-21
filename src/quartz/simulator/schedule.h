@@ -81,6 +81,8 @@ class Schedule {
    * Compute the schedule using a simple quadratic dynamic programming
    * algorithm. The memory complexity is also quadratic.
    * @param kernel_cost The cost function of kernels.
+   * @param is_local_qubit An oracle to return if a qubit is local, assumed to
+   * run in constant time.
    * @param non_insular_qubit_indices The set of non-insular qubit indices
    * for each gate, if any of them should be considered differently from
    * what we would have computed from the gate itself.
@@ -92,6 +94,7 @@ class Schedule {
    */
   bool compute_kernel_schedule_simple(
       const KernelCost &kernel_cost,
+      const std::function<bool(int)> &is_local_qubit,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
@@ -101,16 +104,19 @@ class Schedule {
    */
   bool compute_kernel_schedule_simple_reversed(
       const KernelCost &kernel_cost,
+      const std::function<bool(int)> &is_local_qubit,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
   bool compute_kernel_schedule_simple_repeat(
       int repeat, const KernelCost &kernel_cost,
+      const std::function<bool(int)> &is_local_qubit,
       const std::vector<std::vector<int>> &non_insular_qubit_indices = {},
       const std::vector<KernelCostType> &shared_memory_gate_costs = {});
 
-  bool compute_kernel_schedule_greedy_pack_fusion(const KernelCost &kernel_cost,
-                                                  int num_qubits_to_pack);
+  bool compute_kernel_schedule_greedy_pack_fusion(
+      const KernelCost &kernel_cost,
+      const std::function<bool(int)> &is_local_qubit, int num_qubits_to_pack);
 
   [[nodiscard]] int get_num_kernels() const;
   void print_kernel_info() const;
@@ -228,12 +234,12 @@ std::vector<Schedule> get_schedules_with_ilp(
     const std::string &cache_file_name_prefix = "", int answer_start_with = 1);
 
 /**
- * Verify the schedule by random testing an input state and running the
- * simulation.
- * Requires the sequence to have no more than 30 qubits.
- * Requires an exponential amount of memory to the number of qubits (~48 GiB
- * for 30 qubits).
- * The time complexity is O(2^(number of qubits) * (number of gates)).
+ * Verify the schedule by checking the well-formedness of each kernel and then
+ * random testing an input state and running the simulation.
+ * If |random_test_times| > 0:
+ * Requires the sequence to have no more than 30 qubits. Requires an exponential
+ * amount of memory to the number of qubits (~48 GiB for 30 qubits). The time
+ * complexity is O(2^(number of qubits) * (number of gates)).
  * @return True iff simulating the sequence itself and running the simulation
  * on the schedules yield the same result for each input state tested.
  */

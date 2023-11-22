@@ -189,7 +189,7 @@ int main() {
             get_schedules_with_ilp(*seq, local_q, std::min(2, num_q - local_q),
                                    kernel_cost, &ctx, &interpreter,
                                    /*attach_single_qubit_gates=*/true,
-                                   /*use_simple_dp_times=*/0, "tmp");
+                                   /*max_num_dp_states=*/500, "tmp");
         for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();

@@ -438,7 +438,7 @@ size_t Graph::hash(void) {
   for (it = outEdges.begin(); it != outEdges.end(); it++) {
     if (it->first.ptr->tp == GateType::input_qubit ||
         it->first.ptr->tp == GateType::input_param) {
-      size_t my_hash = 17 * 13 + (size_t)it->first.ptr;
+      size_t my_hash = 17 * 13 + (size_t)it->first.ptr->tp;
       hash_values[it->first.guid] = my_hash;
       total += my_hash;
       op_queue.push(it->first);
@@ -457,7 +457,7 @@ size_t Graph::hash(void) {
     if (hash_values.find(op.guid) == hash_values.end()) {
       std::set<Edge, EdgeCompare> list = inEdges[op];
       std::set<Edge, EdgeCompare>::const_iterator it2;
-      size_t my_hash = 17 * 13 + (size_t)op.ptr;
+      size_t my_hash = 17 * 13 + (size_t)op.ptr->tp;
       for (it2 = list.begin(); it2 != list.end(); it2++) {
         Edge e = *it2;
         assert(hash_values.find(e.srcOp.guid) != hash_values.end());

@@ -6,6 +6,13 @@ Gate::Gate(GateType tp, int num_qubits, int num_parameters)
 
 MatrixBase *Gate::get_matrix() {
   // Default: no matrix (for parameter gates).
+  std::cerr << "Gate::get_matrix() called." << std::endl;
+  if (is_quantum_gate()) {
+    std::cerr << "Please double-check if you instantiated a \"Gate\" object."
+              << std::endl;
+  } else {
+    std::cerr << "This object is not a quantum gate." << std::endl;
+  }
   return nullptr;
 }
 
@@ -16,6 +23,16 @@ MatrixBase *Gate::get_matrix(const std::vector<ParamType> &params) {
 
 ParamType Gate::compute(const std::vector<ParamType> &input_params) {
   // Default: do no computation (for quantum gates).
+  std::cerr
+      << "Gate::compute(const std::vector<ParamType> &input_params) called."
+      << std::endl;
+  if (is_quantum_gate()) {
+    std::cerr << "This object is not an arithmetic computation \"gate\"."
+              << std::endl;
+  } else {
+    std::cerr << "Please double-check if you instantiated a \"Gate\" object."
+              << std::endl;
+  }
   return 0;
 }
 
@@ -38,7 +55,6 @@ int Gate::get_num_qubits() const { return num_qubits; }
 int Gate::get_num_parameters() const { return num_parameters; }
 
 bool Gate::is_parameter_gate() const {
-  // Only arithmetic computation gates are count
   return num_qubits == 0 && tp != GateType::input_param &&
          tp != GateType::input_qubit;
 }
@@ -50,8 +66,7 @@ bool Gate::is_parametrized_gate() const {
 }
 
 bool Gate::is_toffoli_gate() const {
-  // TODO: add other toffoli gates
-  return tp == GateType::ccz;
+  return num_qubits == 3 && get_num_control_qubits() == 2;
 }
 
 }  // namespace quartz

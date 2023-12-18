@@ -14,8 +14,14 @@ class Gate {
   Gate(GateType tp, int num_qubits, int num_parameters);
   virtual MatrixBase *get_matrix();
   virtual MatrixBase *get_matrix(const std::vector<ParamType> &params);
+  /**
+   * For arithmetic computation "gates", compute the result parameter.
+   */
   virtual ParamType compute(const std::vector<ParamType> &input_params);
-  [[nodiscard]] virtual bool is_commutative() const;  // for traditional gates
+  /**
+   * Only for arithmetic computation "gates".
+   */
+  [[nodiscard]] virtual bool is_commutative() const;
   /**
    * @return True if the gate is a multi-qubit gate and the gate remains
    * the same under any qubit permutation (e.g., CZ, CP, CCZ, SWAP).
@@ -46,11 +52,19 @@ class Gate {
    * Default value is a vector of |get_num_control_qubits()| true's.
    */
   [[nodiscard]] virtual std::vector<bool> get_control_state() const;
+
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_parameters() const;
+  /**
+   * @return True if the gate is an arithmetic computation "gate".
+   * Implemented as having 0 qubits and not input qubit/param "gate".
+   */
   [[nodiscard]] bool is_parameter_gate() const;
   [[nodiscard]] bool is_quantum_gate() const;
   [[nodiscard]] bool is_parametrized_gate() const;
+  /**
+   * @return True if the gate is a 3-qubit gate with 2 control qubits.
+   */
   [[nodiscard]] bool is_toffoli_gate() const;
   virtual ~Gate() = default;
 

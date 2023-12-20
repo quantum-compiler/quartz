@@ -2,7 +2,7 @@
 
 set -ex
 
-cd src/test
+cd ../src/test
 
 python test_nam_worm.py adder_8 ../../nam_worm_output & sleep 60
 python test_nam_worm.py barenco_tof_3 ../../nam_worm_output & sleep 60

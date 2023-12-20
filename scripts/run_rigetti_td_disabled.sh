@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_rigetti_td_disabled
 mkdir -p ../circuit/nam-benchmarks/output_files/rigetti
 ./test_rigetti_td_disabled ../circuit/nam-benchmarks/adder_8.qasm --output ../circuit/nam-benchmarks/output_files/rigetti/adder_8.qasm.output.rigetti &

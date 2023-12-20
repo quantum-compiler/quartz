@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_rigetti
 mkdir -p ../circuit/nam-benchmarks/output_files/rigetti
 if [ $# -eq 0 ]

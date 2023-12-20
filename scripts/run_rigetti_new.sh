@@ -2,7 +2,7 @@
 
 set -ex
 
-cd src/test
+cd ../src/test
 
 python test_rigetti.py dj_nativegates_rigetti_qiskit_opt0_10_norm ../../rigetti_norm_output & sleep 60
 python test_rigetti.py ghz_nativegates_rigetti_qiskit_opt0_10_norm ../../rigetti_norm_output & sleep 60

@@ -2,7 +2,7 @@
 
 set -ex
 
-cd src/test
+cd ../src/test
 
 python test_ionq.py dj_nativegates_ionq_qiskit_opt0_10_norm ../../ionq_output & sleep 60
 python test_ionq.py ghz_nativegates_ionq_qiskit_opt0_10_norm ../../ionq_output & sleep 60

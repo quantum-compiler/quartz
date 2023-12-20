@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_ibmq
 mkdir -p ../circuit/nam-benchmarks/output_files/ibmq
 if [ $# -eq 0 ]

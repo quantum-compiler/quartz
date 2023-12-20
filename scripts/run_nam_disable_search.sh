@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_nam
 mkdir -p ../circuit/nam-benchmarks/output_files/nam
 if [ $# -eq 0 ]

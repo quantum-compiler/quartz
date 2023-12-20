@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_nam_td_disabled
 mkdir -p ../circuit/nam-benchmarks/output_files/nam/log
 ./test_nam_td_disabled ../circuit/nam-benchmarks/qcla_mod_7.qasm --output ../circuit/nam-benchmarks/output_files/nam/qcla_mod_7.qasm.output.nam.disable_td > ../circuit/nam-benchmarks/output_files/nam/log/qcla_mod_7.log &

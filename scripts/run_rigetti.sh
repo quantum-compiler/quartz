@@ -1,5 +1,5 @@
 #!/usr/bin/sh
-cd build
+cd ../build
 make test_rigetti
 if [ $# -eq 0 ]
 then

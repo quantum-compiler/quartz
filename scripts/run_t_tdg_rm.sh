@@ -1,4 +1,4 @@
-cd src/test
+cd ../src/test
 
 python test_t_tdg_rm.py adder_8 ../../t_tdg_rm_output & sleep 10
 python test_t_tdg_rm.py barenco_tof_3 ../../t_tdg_rm_output & sleep 10

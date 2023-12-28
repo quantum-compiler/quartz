@@ -4,7 +4,7 @@ import sys
 import time
 
 import wandb
-from ibm_add_xfer import ibm_add_xfer
+from qtz import ibm_add_xfer
 
 import quartz
 

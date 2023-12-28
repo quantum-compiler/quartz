@@ -76,7 +76,7 @@ class BaseConfig:
     # network
     gnn_type: str = 'QGNN'  # 'QGNN' or 'QGIN'
     gate_type_embed_dim: int = 16
-    gnn_num_layers: int = 4
+    gnn_num_layers: int = 6
     gnn_hidden_dim: int = 128
     gnn_output_dim: int = 128
     gin_num_mlp_layers: int = 2

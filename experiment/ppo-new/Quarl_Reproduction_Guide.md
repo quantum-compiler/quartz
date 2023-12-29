@@ -7,7 +7,7 @@
 To use already setup environment, start the docker container via the following command.
 
 ```shell
-docker run --name quarl --gpus all -itd co1lin/ubuntu-basic
+docker run --name quarl --gpus all -itd co1lin/quarl
 docker exec -it quarl zsh
 cd quartz # /home/ubuntu/quartz
 git checkout quarl-repro

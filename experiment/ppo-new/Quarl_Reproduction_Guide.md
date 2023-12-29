@@ -9,6 +9,8 @@ To use already setup environment, start the docker container via the following c
 ```shell
 docker run --name quarl --gpus all -itd co1lin/ubuntu-basic
 docker exec -it quarl zsh
+cd quartz # /home/ubuntu/quartz
+git checkout quarl-repro
 ```
 
 ### Manual Setup (Recommended for Development)
@@ -43,6 +45,11 @@ docker exec -it quarl zsh
     ```
 
 ## Reproduce
+
+- Program entry: `ppo.py`
+- Output:
+    - local: `outputs`
+    - online: wandb project webpages, e.g. https://wandb.ai/userXYZ/IBM-Finetune-6l-seed
 
 Examples for Table 2, Nam Gate set:
 

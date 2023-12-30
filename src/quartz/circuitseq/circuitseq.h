@@ -39,10 +39,6 @@ class CircuitSeq {
   void add_input_parameter();
   bool remove_last_gate();
 
-  // Generate all possible parameter gates at the beginning.
-  // TODO: Currently we only support |max_recursion_depth == 1|.
-  void generate_parameter_gates(Context *ctx, int max_recursion_depth = 1);
-
   /**
    * Remove a quantum gate or a classical "gate".
    * The time complexity is

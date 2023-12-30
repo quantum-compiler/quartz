@@ -20,8 +20,7 @@ void test_optimization(Context *ctx, const std::string &file_name,
     std::cerr << "Parser failed" << std::endl;
     return;
   }
-  ctx->get_and_gen_input_dis(dag->get_num_qubits());
-  ctx->get_and_gen_hashing_dis(dag->get_num_qubits());
+  ctx->gen_input_and_hashing_dis(dag->get_num_qubits());
   ctx->get_and_gen_parameters(dag->get_num_input_parameters());
 
   quartz::Graph graph(ctx, dag);

@@ -10,8 +10,7 @@ int main() {
   Generator gen(&ctx);
   Dataset dataset;
   EquivalenceSet ecc;
-  gen.generate(3 /*num_qubits*/, 3 /*max_num_input_parameters*/,
-               3 /*max_num_gates*/, 1 /*max_num_param_gates*/, &dataset,
+  gen.generate(3 /*num_qubits*/, 3 /*max_num_gates*/, &dataset,
                /*invoke_python_verifier=*/false, &ecc,
                /*unique_parameters=*/false, /*verbose=*/true);
   std::cout << "ECC generated." << std::endl;

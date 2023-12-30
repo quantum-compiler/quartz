@@ -12,7 +12,21 @@
 namespace quartz {
 class Generator {
  public:
-  explicit Generator(Context *ctx) : context(ctx) {}
+  /**
+   * Create a generator for a context. The context should have the gate set
+   * ready, all parameter expressions generated, and all random testing
+   * distributions generated. This can be done by calling
+   * Context::Context(const std::vector<GateType> &supported_gates,
+   *                  int num_qubits,
+   *                  int num_input_symbolic_params).
+   * Please create different generator objects with different contexts if
+   * you need different parameter expressions, different numbers of parameters,
+   * or different gate sets. It is OK to use the same generator for different
+   * numbers of qubits or different numbers of gates, and the context should
+   * be created with the maximum number of qubits.
+   * @param ctx A context satisfying the above conditions.
+   */
+  explicit Generator(Context *ctx) : ctx_(ctx) {}
 
   /**
    * Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
@@ -42,12 +56,9 @@ class Generator {
    * record the verification time or not.
    */
   void generate(
-      int num_qubits, int num_input_parameters, int max_num_quantum_gates,
-      int max_num_param_gates, Dataset *dataset, bool invoke_python_verifier,
+      int num_qubits, int max_num_quantum_gates, Dataset *dataset, bool invoke_python_verifier,
       EquivalenceSet *equiv_set, bool unique_parameters, bool verbose = false,
-      decltype(std::chrono::steady_clock::now() -
-               std::chrono::steady_clock::now()) *record_verification_time =
-          nullptr);
+      std::chrono::steady_clock::duration *record_verification_time = nullptr);
 
  private:
   void initialize_supported_quantum_gates();
@@ -55,12 +66,12 @@ class Generator {
   // Requires initialize_supported_quantum_gates() to be called first.
   // |dags[i]| is the DAGs with |i| gates.
   void bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
-           int max_num_param_gates, Dataset &dataset,
+           Dataset &dataset,
            std::vector<CircuitSeq *> *new_representatives,
            bool invoke_python_verifier, const EquivalenceSet *equiv_set,
            bool unique_parameters);
 
-  Context *context;
+  Context *ctx_;
   // |supported_quantum_gates_[i]|: supported quantum gates with |i| qubits.
   std::vector<std::vector<GateType>> supported_quantum_gates_;
   Verifier verifier_;

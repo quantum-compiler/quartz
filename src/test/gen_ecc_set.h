@@ -22,8 +22,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   Dataset dataset1;
 
-  gen.generate(num_qubits, num_input_parameters, 1, max_num_param_gates,
-               &dataset1,                           /*invoke_python_verifier=*/
+  gen.generate(num_qubits, 1, &dataset1,            /*invoke_python_verifier=*/
                true, &equiv_set, unique_parameters, /*verbose=*/
                false);
   std::cout << "*** ch(" << file_prefix.substr(0, file_prefix.size() - 5)
@@ -42,9 +41,9 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   // floating-point error, our optimizations will still preserve the
   // resulting circuit matrix up to an error of a small number times machine
   // precision. Plus, this situation is known to be extremely rare.
-  gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-               max_num_param_gates, &dataset1, invoke_python_verifier,
-               &equiv_set, unique_parameters, /*verbose=*/
+  gen.generate(num_qubits, max_num_quantum_gates, &dataset1,
+               invoke_python_verifier, &equiv_set,
+               unique_parameters, /*verbose=*/
                true, &verification_time);
   if (!generate_representative_set) {
     // For better performance

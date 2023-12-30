@@ -25,8 +25,7 @@ int nnz(const std::vector<Vector> &mat, double eps) {
 
 void test_sparsity(const std::vector<GateType> &supported_gates,
                    const std::string &file_prefix, int num_qubits,
-                   int num_input_parameters, int max_num_quantum_gates,
-                   int max_num_param_gates = 1) {
+                   int num_input_parameters, int max_num_quantum_gates) {
   Context ctx(supported_gates, num_qubits, num_input_parameters);
   Generator gen(&ctx);
 
@@ -37,8 +36,7 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
   auto end = std::chrono::steady_clock::now();
 
   start = std::chrono::steady_clock::now();
-  gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-               max_num_param_gates, &dataset, true, &equiv_set,
+  gen.generate(num_qubits, max_num_quantum_gates, &dataset, true, &equiv_set,
                /*unique_parameters=*/false, true);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << dataset.num_total_dags() << " circuits with "
@@ -153,6 +151,6 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
 int main() {
   test_sparsity(
       {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
-      "nam_circuit_324_", 3, 2, 4, 1);
+      "nam_circuit_324_", 3, 2, 4);
   return 0;
 }

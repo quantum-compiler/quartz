@@ -115,7 +115,8 @@ const std::vector<GateType> &Context::get_supported_quantum_gates() const {
 
 void Context::gen_input_and_hashing_dis(const int num_qubits) {
   assert(num_qubits >= 0);
-  assert(random_input_distribution_.size() == random_hashing_distribution_.size());
+  assert(random_input_distribution_.size() ==
+         random_hashing_distribution_.size());
   while (random_input_distribution_.size() <= num_qubits) {
     random_input_distribution_.emplace_back(
         Vector::random_generate((int)random_input_distribution_.size(), &gen));

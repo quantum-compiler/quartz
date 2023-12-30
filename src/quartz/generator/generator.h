@@ -56,8 +56,9 @@ class Generator {
    * record the verification time or not.
    */
   void generate(
-      int num_qubits, int max_num_quantum_gates, Dataset *dataset, bool invoke_python_verifier,
-      EquivalenceSet *equiv_set, bool unique_parameters, bool verbose = false,
+      int num_qubits, int max_num_quantum_gates, Dataset *dataset,
+      bool invoke_python_verifier, EquivalenceSet *equiv_set,
+      bool unique_parameters, bool verbose = false,
       std::chrono::steady_clock::duration *record_verification_time = nullptr);
 
  private:
@@ -65,8 +66,7 @@ class Generator {
 
   // Requires initialize_supported_quantum_gates() to be called first.
   // |dags[i]| is the DAGs with |i| gates.
-  void bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
-           Dataset &dataset,
+  void bfs(const std::vector<std::vector<CircuitSeq *>> &dags, Dataset &dataset,
            std::vector<CircuitSeq *> *new_representatives,
            bool invoke_python_verifier, const EquivalenceSet *equiv_set,
            bool unique_parameters);

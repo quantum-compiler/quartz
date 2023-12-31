@@ -128,7 +128,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
     std::unique_ptr<CircuitSeq> new_dag;
 
     for (auto &dag : dags) {
-      bool is_canonical = dag->canonical_representation(&new_dag);
+      bool is_canonical = dag->canonical_representation(&new_dag, ctx);
       if (!is_canonical) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));

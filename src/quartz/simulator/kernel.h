@@ -53,6 +53,7 @@ class Kernel {
   /**
    * Add a gate and update the |qubits| set.
    * @param gate The gate to be added, calling |CircuitGate::add_gate(gate)|.
+   * @param ctx The context for the circuit sequence.
    * @param is_local_qubit An oracle to return if a qubit is local, assumed to
    * run in constant time.
    * @param customized_non_insular_qubits Sometimes we may want to customize
@@ -62,6 +63,7 @@ class Kernel {
    * @return True iff the gate is successfully added.
    */
   bool add_gate(CircuitGate *gate,
+                Context *ctx,
                 const std::function<bool(int)> &is_local_qubit,
                 const std::vector<int> &customized_non_insular_qubits = {});
 

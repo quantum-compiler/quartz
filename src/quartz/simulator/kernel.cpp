@@ -136,10 +136,10 @@ Kernel::cost(const KernelCost &cost_function,
   }
 }
 
-bool Kernel::add_gate(CircuitGate *gate,
+bool Kernel::add_gate(CircuitGate *gate, Context *ctx,
                       const std::function<bool(int)> &is_local_qubit,
                       const std::vector<int> &customized_non_insular_qubits) {
-  if (gates->add_gate(gate)) {
+  if (gates->add_gate(gate, ctx)) {
     auto gate_qubits = (type == KernelType::shared_memory
                             ? (customized_non_insular_qubits.empty()
                                    ? gate->get_non_insular_qubit_indices()

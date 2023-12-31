@@ -31,22 +31,22 @@ int main() {
 
   auto dag1 = std::make_unique<CircuitSeq>(2);
   auto dag2 = std::make_unique<CircuitSeq>(2);
-  int tmp;
-  dag1->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag1->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
-  dag1->add_gate({1}, {3, 4}, ctx.get_gate(GateType::u2), &tmp);
-  dag1->add_gate({0, 1}, {}, ctx.get_gate(GateType::cx), &tmp);
-  dag1->add_gate({1}, {2, 4}, ctx.get_gate(GateType::u2), &tmp);
+  auto p2 =
+      ctx.get_new_param_expression_id({0, 0}, ctx.get_gate(GateType::add));
+  auto p3 =
+      ctx.get_new_param_expression_id({0, 1}, ctx.get_gate(GateType::add));
+  auto p4 =
+      ctx.get_new_param_expression_id({1, 1}, ctx.get_gate(GateType::add));
 
-  dag2->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({}, {1, 1}, ctx.get_gate(GateType::add), &tmp);
-  dag2->add_gate({0}, {3, 0}, ctx.get_gate(GateType::u2), &tmp);
-  dag2->add_gate({1}, {0, 4}, ctx.get_gate(GateType::u2), &tmp);
-  dag2->add_gate({1, 0}, {}, ctx.get_gate(GateType::cx), &tmp);
-  dag2->add_gate({0}, {0, 3}, ctx.get_gate(GateType::u2), &tmp);
+  dag1->add_gate({0}, {p3, 0}, ctx.get_gate(GateType::u2), &ctx);
+  dag1->add_gate({1}, {p3, p4}, ctx.get_gate(GateType::u2), &ctx);
+  dag1->add_gate({0, 1}, {}, ctx.get_gate(GateType::cx), &ctx);
+  dag1->add_gate({1}, {p2, p4}, ctx.get_gate(GateType::u2), &ctx);
+
+  dag2->add_gate({0}, {p3, 0}, ctx.get_gate(GateType::u2), &ctx);
+  dag2->add_gate({1}, {0, p4}, ctx.get_gate(GateType::u2), &ctx);
+  dag2->add_gate({1, 0}, {}, ctx.get_gate(GateType::cx), &ctx);
+  dag2->add_gate({0}, {0, p3}, ctx.get_gate(GateType::u2), &ctx);
 
   std::cout << std::hex << "dag1->hash() = " << dag1->hash(&ctx) << std::endl;
   std::cout << std::hex << "dag2->hash() = " << dag2->hash(&ctx) << std::endl;

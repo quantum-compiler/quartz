@@ -27,8 +27,8 @@ class CircuitSeq {
 
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices, Gate *gate,
-                int *output_para_index);
-  bool add_gate(CircuitGate *gate);
+                const Context *ctx);
+  bool add_gate(CircuitGate *gate, const Context *ctx);
   // Insert a gate to any position of the circuit sequence.
   // Warning: remove_last_gate() cannot be called anymore after calling
   // insert_gate().
@@ -153,25 +153,29 @@ class CircuitSeq {
    * into |output_seq|.
    * The parameter |output_seq| should be a pointer containing nullptr
    * (otherwise its content will be deleted).
+   * @param ctx The context to construct the canonical representation.
+   * Only when |output| is false, it is OK to pass in a nullptr here.
    * @param output Whether to output the canonical representation. Default is
    * true.
    * @return True iff the CircuitSeq is already under the canonical
    * representation.
    */
   bool canonical_representation(std::unique_ptr<CircuitSeq> *output_seq,
-                                bool output = true) const;
+                                const Context *ctx, bool output = true) const;
   [[nodiscard]] bool is_canonical_representation() const;
   /**
    * Convert this CircuitSeq to canonical representation.
+   * @param ctx The context to construct the canonical representation.
    * @return True iff this is NOT canonical representation
    * (so the function modifies this CircuitSeq).
    */
-  bool to_canonical_representation();
+  bool to_canonical_representation(const Context *ctx);
 
   /**
    * Permute the quantum gates. This function topologically sorts
    * the sequence and picks one quantum gate among all choices
    * each time.
+   * @param ctx The context to construct the new circuit.
    * @param gate_chooser The function used to pick the quantum gate to be
    * placed the first each time, invoked the same number of times as the number
    * of quantum gates. This function takes as input an std::vector of
@@ -185,6 +189,7 @@ class CircuitSeq {
    * @return The permuted circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq> get_gate_permutation(
+      const Context *ctx,
       const std::function<int(const std::vector<CircuitGate *> &)>
           &gate_chooser = nullptr,
       int *result_permutation = nullptr) const;

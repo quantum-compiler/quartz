@@ -216,9 +216,10 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
     it.second[0] = param_index_position[it.second[0]];
   }
   // Construct the CircuitSeq.
-  auto seq = std::make_unique<CircuitSeq>(num_input_qubits, num_input_params);
+  auto seq = std::make_unique<CircuitSeq>(num_input_qubits);
 
   // Add parameter gates.
+  // TODO: do it in Context
   int num_total_params = num_input_params;
   guid_and_param_index.clear();
   while (!gates.empty()) {
@@ -242,9 +243,8 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
           param_indices[inedge.dstIdx] =
               op_2_param_idx[inedge.srcOp][inedge.srcIdx];
         }
-        int output_param_index = 0;
         bool ret = seq->add_gate(/*qubit_indices=*/{}, param_indices,
-                                 edge.dstOp.ptr, &output_param_index);
+                                 edge.dstOp.ptr, context);
         assert(ret);
         // Each parameter gate contains 1 output parameter.
         assert(output_param_index == num_total_params);
@@ -293,7 +293,7 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
           }
         }
         bool ret = seq->add_gate(qubit_indices, param_indices, edge.dstOp.ptr,
-                                 nullptr);
+                                 context);
         assert(ret);
         gates.push(edge.dstOp);
       }

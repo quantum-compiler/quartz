@@ -306,8 +306,11 @@ bool Context::param_is_expression(int id) const {
 }
 
 CircuitWire *Context::get_param_wire(int id) const {
-  assert(id >= 0 && id < (int)parameter_wires_.size());
-  return parameter_wires_[id].get();
+  if (id >= 0 && id < (int)parameter_wires_.size()) {
+    return parameter_wires_[id].get();
+  } else {
+    return nullptr;  // out of range
+  }
 }
 
 std::vector<int> Context::get_param_permutation(

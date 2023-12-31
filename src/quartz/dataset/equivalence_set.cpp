@@ -571,7 +571,7 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
     std::unordered_set<CircuitSeqHashType> hash_values_to_remove;
     int class_modified = 0;
     for (auto &dag : dags) {
-      bool is_minimal = dag->canonical_representation(&new_dag);
+      bool is_minimal = dag->canonical_representation(&new_dag, ctx);
       if (!is_minimal) {
         class_modified++;
         new_dags.push_back(std::move(new_dag));

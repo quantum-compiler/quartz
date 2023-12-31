@@ -136,20 +136,16 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
 
 bool CircuitSeq::add_gate(const std::vector<int> &qubit_indices,
                           const std::vector<int> &parameter_indices, Gate *gate,
-                          int *output_para_index) {
+                          const Context *ctx) {
+  if (!gate->is_quantum_gate())
+    return false;
   if (gate->get_num_qubits() != qubit_indices.size())
     return false;
   if (gate->get_num_parameters() != parameter_indices.size())
     return false;
-  if (gate->is_parameter_gate() && output_para_index == nullptr)
-    return false;
   // qubit indices must stay in range
   for (auto qubit_idx : qubit_indices)
     if ((qubit_idx < 0) || (qubit_idx >= get_num_qubits()))
-      return false;
-  // parameter indices must stay in range
-  for (auto para_idx : parameter_indices)
-    if ((para_idx < 0) || (para_idx >= parameters.size()))
       return false;
   auto circuit_gate = std::make_unique<CircuitGate>();
   circuit_gate->gate = gate;
@@ -158,38 +154,30 @@ bool CircuitSeq::add_gate(const std::vector<int> &qubit_indices,
     outputs[qubit_idx]->output_gates.push_back(circuit_gate.get());
   }
   for (auto para_idx : parameter_indices) {
-    circuit_gate->input_wires.push_back(parameters[para_idx]);
-    parameters[para_idx]->output_gates.push_back(circuit_gate.get());
+    auto param_wire = ctx->get_param_wire(para_idx);
+    // parameter indices must stay in range
+    if (param_wire == nullptr) {
+      return false;
+    }
+    circuit_gate->input_wires.push_back(param_wire);
   }
-  if (gate->is_parameter_gate()) {
+  for (auto qubit_idx : qubit_indices) {
     auto wire = std::make_unique<CircuitWire>();
-    wire->type = CircuitWire::internal_param;
-    wire->index = *output_para_index = (int)parameters.size();
+    wire->type = CircuitWire::internal_qubit;
+    wire->index = qubit_idx;
     wire->input_gates.push_back(circuit_gate.get());
     circuit_gate->output_wires.push_back(wire.get());
-    parameters.push_back(wire.get());
+    outputs[qubit_idx] = wire.get();  // Update outputs
     wires.push_back(std::move(wire));
-  } else {
-    assert(gate->is_quantum_gate());
-    for (auto qubit_idx : qubit_indices) {
-      auto wire = std::make_unique<CircuitWire>();
-      wire->type = CircuitWire::internal_qubit;
-      wire->index = qubit_idx;
-      wire->input_gates.push_back(circuit_gate.get());
-      circuit_gate->output_wires.push_back(wire.get());
-      outputs[qubit_idx] = wire.get();  // Update outputs
-      wires.push_back(std::move(wire));
-    }
   }
   gates.push_back(std::move(circuit_gate));
   hash_value_valid_ = false;
   return true;
 }
 
-bool CircuitSeq::add_gate(CircuitGate *gate) {
+bool CircuitSeq::add_gate(CircuitGate *gate, const Context *ctx) {
   std::vector<int> qubit_indices;
   std::vector<int> parameter_indices;
-  int output_para_index;
   for (auto &wire : gate->input_wires) {
     if (wire->is_qubit()) {
       qubit_indices.push_back(wire->index);
@@ -197,8 +185,7 @@ bool CircuitSeq::add_gate(CircuitGate *gate) {
       parameter_indices.push_back(wire->index);
     }
   }
-  return add_gate(qubit_indices, parameter_indices, gate->gate,
-                  &output_para_index);
+  return add_gate(qubit_indices, parameter_indices, gate->gate, ctx);
 }
 
 bool CircuitSeq::insert_gate(int insert_position,
@@ -1013,8 +1000,6 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_gates;
 
-  // TODO: Do not generate the distribution here -- we should generate
-  //  earlier to make the result more deterministic.
   ctx->gen_input_and_hashing_dis(num_qubits);
   ctx->get_and_gen_parameters(num_input_params);
 
@@ -1038,7 +1023,8 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
 
-  auto result = std::make_unique<CircuitSeq>(num_qubits, num_input_params);
+  // TODO
+  auto result = std::make_unique<CircuitSeq>(num_qubits);
 
   // gates
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
@@ -1089,11 +1075,7 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
     read_indices(input_qubits, input_params);
     fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
 
-    int output_param_index;
-    result->add_gate(input_qubits, input_params, gate, &output_param_index);
-    if (gate->is_parameter_gate()) {
-      assert(output_param_index == output_params[0]);
-    }
+    result->add_gate(input_qubits, input_params, gate, ctx);
   }
 
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
@@ -1146,14 +1128,14 @@ bool CircuitSeq::to_qasm_file(Context *ctx, const std::string &filename,
 }
 
 bool CircuitSeq::canonical_representation(
-    std::unique_ptr<CircuitSeq> *output_seq, bool output) const {
+    std::unique_ptr<CircuitSeq> *output_seq, const Context *ctx,
+    bool output) const {
   if (output) {
     // |output_seq| cannot be nullptr but its content can (and should)
     // be nullptr.
     assert(output_seq);
     // This deletes the content |output_seq| previously stored.
-    *output_seq = std::make_unique<CircuitSeq>(get_num_qubits(),
-                                               get_num_input_parameters());
+    *output_seq = std::make_unique<CircuitSeq>(get_num_qubits());
   }
 
   bool this_is_canonical_representation = true;
@@ -1173,15 +1155,12 @@ bool CircuitSeq::canonical_representation(
       }
       num_mapped_circuit_gates++;
       if (output) {
-        int output_param_index;
         std::vector<int> param_indices;
         for (auto &input_wire : circuit_gate->input_wires) {
           assert(input_wire->is_parameter());
           param_indices.push_back(input_wire->index);
         }
-        (*output_seq)
-            ->add_gate({}, param_indices, circuit_gate->gate,
-                       &output_param_index);
+        (*output_seq)->add_gate({}, param_indices, circuit_gate->gate, ctx);
       }
     } else {
       have_quantum_gates = true;
@@ -1269,14 +1248,9 @@ bool CircuitSeq::canonical_representation(
             param_indices.push_back(input_wire->index);
           }
         }
-        int output_param_index;
         (*output_seq)
             ->add_gate(qubit_indices, param_indices, smallest_free_gate->gate,
-                       &output_param_index);
-        if (smallest_free_gate->gate->is_parameter_gate()) {
-          assert(smallest_free_gate->output_wires[0]->index ==
-                 output_param_index);
-        }
+                       ctx);
       }
 
       // Update the free wires.
@@ -1295,30 +1269,23 @@ bool CircuitSeq::canonical_representation(
 }
 
 bool CircuitSeq::is_canonical_representation() const {
-  return canonical_representation(nullptr, false);
+  return canonical_representation(nullptr, nullptr, false);
 }
 
-bool CircuitSeq::to_canonical_representation() {
+bool CircuitSeq::to_canonical_representation(const Context *ctx) {
   std::unique_ptr<CircuitSeq> output_seq;
-  if (!canonical_representation(&output_seq, true)) {
-    clone_from(*output_seq, {}, {}, nullptr);
+  if (!canonical_representation(&output_seq, ctx, true)) {
+    clone_from(*output_seq, {}, {}, ctx);
     return true;
   }
   return false;
 }
 
 [[nodiscard]] std::unique_ptr<CircuitSeq> CircuitSeq::get_gate_permutation(
+    const Context *ctx,
     const std::function<int(const std::vector<CircuitGate *> &)> &gate_chooser,
     int *result_permutation) const {
-  auto output_seq = std::make_unique<CircuitSeq>(get_num_qubits(),
-                                                 get_num_input_parameters());
-  // Add all parameter "gates" first.
-  for (auto &circuit_gate : gates) {
-    if (circuit_gate->gate->is_parameter_gate()) {
-      output_seq->add_gate(circuit_gate.get());
-    }
-  }
-
+  auto output_seq = std::make_unique<CircuitSeq>(get_num_qubits());
   int num_mapped_circuit_gates = output_seq->get_num_gates();
 
   std::unordered_map<CircuitWire *, int> wire_id;
@@ -1387,7 +1354,7 @@ bool CircuitSeq::to_canonical_representation() {
       num_mapped_circuit_gates++;
       free_gates.erase(free_gates.begin() + location);
 
-      output_seq->add_gate(free_gate);
+      output_seq->add_gate(free_gate, ctx);
 
       // Update the free wires.
       for (auto &output_wire : free_gate->output_wires) {

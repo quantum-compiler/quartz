@@ -1272,8 +1272,7 @@ bool Schedule::compute_kernel_schedule(
   int start_gate_index = 0;  // an optimization
   for (auto &s : result_schedule.kernels) {
     // Greedily execute a kernel.
-    auto current_seq = std::make_unique<CircuitSeq>(
-        num_qubits, sequence_->get_num_input_parameters());
+    auto current_seq = std::make_unique<CircuitSeq>(num_qubits);
     std::vector<bool> active_in_kernel(num_qubits, false);
     for (auto &index : s.active_qubits) {
       active_in_kernel[index] = true;
@@ -1331,7 +1330,7 @@ bool Schedule::compute_kernel_schedule(
       if (executable) {
         // Execute the gate.
         executed[i] = true;
-        current_seq->add_gate(sequence_->gates[i].get());
+        current_seq->add_gate(sequence_->gates[i].get(), ctx_);
       } else {
         // Block the non-insular qubits.
         for (auto &qubit : current_non_insular_indices) {
@@ -1378,8 +1377,8 @@ bool Schedule::compute_kernel_schedule_simple(
   std::vector<KernelCostType> dp(num_gates + 1);
   std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
   dp[0] = 0;
-  auto empty_circuit = std::make_unique<CircuitSeq>(
-      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
+  auto empty_circuit =
+      std::make_unique<CircuitSeq>(sequence_->get_num_qubits());
   std::map<KernelType, std::deque<Kernel>> possible_kernels;
   possible_kernels.emplace(
       std::make_pair(KernelType::fusion, std::deque<Kernel>()));
@@ -1401,7 +1400,7 @@ bool Schedule::compute_kernel_schedule_simple(
       }
       int j;
       for (j = 0; j < (int)k.size(); j++) {
-        k[j].add_gate(sequence_->gates[i - 1].get(), is_local_qubit,
+        k[j].add_gate(sequence_->gates[i - 1].get(), ctx_, is_local_qubit,
                       non_insular_qubit_indices.empty()
                           ? std::vector<int>()
                           : non_insular_qubit_indices[i - 1]);
@@ -1459,7 +1458,7 @@ bool Schedule::compute_kernel_schedule_simple(
     auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                          dp_from[kernel_split_locations[i - 1]].second);
     for (int j = location; j < kernel_split_locations[i - 1]; j++) {
-      kernel.add_gate(sequence_->gates[j].get(), is_local_qubit);
+      kernel.add_gate(sequence_->gates[j].get(), ctx_, is_local_qubit);
     }
     kernels.push_back(std::move(kernel));
   }
@@ -1484,8 +1483,8 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
   std::vector<KernelCostType> dp(num_gates + 1);
   std::vector<std::pair<int, KernelType>> dp_from(num_gates + 1);
   dp[num_gates] = 0;
-  auto empty_circuit = std::make_unique<CircuitSeq>(
-      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
+  auto empty_circuit =
+      std::make_unique<CircuitSeq>(sequence_->get_num_qubits());
   std::map<KernelType, int> max_j_position;
   max_j_position.emplace(std::make_pair(KernelType::fusion, num_gates));
   max_j_position.emplace(std::make_pair(KernelType::shared_memory, num_gates));
@@ -1500,7 +1499,8 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
                             /*qubits=*/std::vector<int>(), tp);
       KernelCostType current_cost = 0, total_shared_memory_gate_cost = 0;
       for (j = i + 1; j <= max_j; j++) {
-        current_kernel.add_gate(sequence_->gates[j - 1].get(), is_local_qubit,
+        current_kernel.add_gate(sequence_->gates[j - 1].get(), ctx_,
+                                is_local_qubit,
                                 non_insular_qubit_indices.empty()
                                     ? std::vector<int>()
                                     : non_insular_qubit_indices[j - 1]);
@@ -1540,7 +1540,7 @@ bool Schedule::compute_kernel_schedule_simple_reversed(
     auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                          dp_from[i].second);
     for (int j = i; j < dp_from[i].first; j++) {
-      kernel.add_gate(sequence_->gates[j].get(), is_local_qubit);
+      kernel.add_gate(sequence_->gates[j].get(), ctx_, is_local_qubit);
     }
     kernels.push_back(std::move(kernel));
   }
@@ -1630,8 +1630,8 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       }
       return gate_location;
     };
-    sequence_ =
-        sequence_->get_gate_permutation(gate_chooser, gate_permutation_ptr);
+    sequence_ = sequence_->get_gate_permutation(ctx_, gate_chooser,
+                                                gate_permutation_ptr);
     // Permute the corresponding non-insular qubit indices and
     // shared-memory gate costs.
     if (!current_non_insular_qubit_indices.empty()) {
@@ -1675,8 +1675,8 @@ bool Schedule::compute_kernel_schedule_greedy_pack_fusion(
   const int num_gates = sequence_->get_num_gates();
   kernels.clear();
   cost_ = 0;
-  auto empty_circuit = std::make_unique<CircuitSeq>(
-      sequence_->get_num_qubits(), sequence_->get_num_input_parameters());
+  auto empty_circuit =
+      std::make_unique<CircuitSeq>(sequence_->get_num_qubits());
   auto kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                        KernelType::fusion);
   std::vector<int> kernel_qubits;
@@ -1697,11 +1697,11 @@ bool Schedule::compute_kernel_schedule_greedy_pack_fusion(
       // Create a new kernel.
       kernel = Kernel(empty_circuit->clone(), /*qubits=*/std::vector<int>(),
                       KernelType::fusion);
-      kernel.add_gate(sequence_->gates[i].get(), is_local_qubit);
+      kernel.add_gate(sequence_->gates[i].get(), ctx_, is_local_qubit);
       kernel_qubits = kernel.qubits;
     } else {
       // Add gates[i] to the current kernel.
-      kernel.add_gate(sequence_->gates[i].get(), is_local_qubit);
+      kernel.add_gate(sequence_->gates[i].get(), ctx_, is_local_qubit);
     }
   }
   // The last kernel.
@@ -2058,8 +2058,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
           return res;
         };
 
-    auto current_seq = std::make_unique<CircuitSeq>(
-        num_qubits, sequence.get_num_input_parameters());
+    auto current_seq = std::make_unique<CircuitSeq>(num_qubits);
     std::vector<bool> qubit_blocked(num_qubits, false);
     for (int i = start_gate_index; i < num_gates; i++) {
       if (executed[i]) {
@@ -2139,7 +2138,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
             }
           } else {
             // Either a global gate or a multi-qubit gate.
-            current_seq->add_gate(sequence.gates[i].get());
+            current_seq->add_gate(sequence.gates[i].get(), ctx);
             // Attach single-qubit gates to this gate.
             auto gate_cost = kernel_cost.get_shared_memory_gate_cost(
                 sequence.gates[i]->gate->tp);
@@ -2230,7 +2229,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
             gate_indices[sequence.gates[i]->to_string()].push(i);
           }
         } else {
-          current_seq->add_gate(sequence.gates[i].get());
+          current_seq->add_gate(sequence.gates[i].get(), ctx);
         }
       } else {
         // Block the qubits.
@@ -2373,7 +2372,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
                       << " is kept." << std::endl;
           }
           int gate_id = single_qubit_gate_indices[qubit][0];
-          current_seq->add_gate(sequence.gates[gate_id].get());
+          current_seq->add_gate(sequence.gates[gate_id].get(), ctx);
           // Only update them for gates that are passed into the DP.
           // Update |dp_sequence_position| and |non_insular_qubit_indices|.
           dp_sequence_position[gate_id] = std::make_pair(
@@ -2878,12 +2877,11 @@ bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
               << sequence.get_num_qubits() << " qubits)." << std::endl;
     return true;
   }
-  auto seq = std::make_unique<CircuitSeq>(sequence.get_num_qubits(),
-                                          sequence.get_num_input_parameters());
+  auto seq = std::make_unique<CircuitSeq>(sequence.get_num_qubits());
   for (auto &schedule : schedules) {
     for (auto &kernel : schedule.kernels) {
       for (auto &gate : kernel.gates->gates) {
-        seq->add_gate(gate.get());
+        seq->add_gate(gate.get(), ctx);
       }
     }
   }

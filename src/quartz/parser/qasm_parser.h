@@ -149,8 +149,7 @@ bool QASMParser::load_qasm_stream(
           qreg.second = num_qubits;
           num_qubits = new_num_qubits;
         }
-        seq = new CircuitSeq(num_qubits,
-                             /*num_input_parameters=*/num_total_params);
+        seq = new CircuitSeq(num_qubits);
       }
       Gate *gate = context->get_gate(gate_type);
       if (!gate) {

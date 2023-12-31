@@ -13,12 +13,10 @@
 #include <utility>
 
 namespace quartz {
-CircuitSeq::CircuitSeq(int num_qubits, int num_input_parameters)
-    : num_qubits(num_qubits), num_input_parameters(num_input_parameters),
-      hash_value_(0), hash_value_valid_(false) {
-  wires.reserve(num_qubits + num_input_parameters);
+CircuitSeq::CircuitSeq(int num_qubits)
+    : num_qubits(num_qubits), hash_value_(0), hash_value_valid_(false) {
+  wires.reserve(num_qubits);
   outputs.reserve(num_qubits);
-  parameters.reserve(num_input_parameters);
   // Initialize num_qubits qubits
   for (int i = 0; i < num_qubits; i++) {
     auto wire = std::make_unique<CircuitWire>();
@@ -27,17 +25,11 @@ CircuitSeq::CircuitSeq(int num_qubits, int num_input_parameters)
     outputs.push_back(wire.get());
     wires.push_back(std::move(wire));
   }
-  // Initialize num_input_parameters parameters
-  for (int i = 0; i < num_input_parameters; i++) {
-    auto wire = std::make_unique<CircuitWire>();
-    wire->type = CircuitWire::input_param;
-    wire->index = i;
-    parameters.push_back(wire.get());
-    wires.push_back(std::move(wire));
-  }
 }
 
-CircuitSeq::CircuitSeq(const CircuitSeq &other) { clone_from(other, {}, {}); }
+CircuitSeq::CircuitSeq(const CircuitSeq &other) {
+  clone_from(other, {}, {}, nullptr);
+}
 
 std::unique_ptr<CircuitSeq> CircuitSeq::clone() const {
   return std::make_unique<CircuitSeq>(*this);
@@ -50,8 +42,7 @@ bool CircuitSeq::fully_equivalent(const CircuitSeq &other) const {
   // Do not check the hash value because of floating point errors
   // and it is possible that one of the two sequences may have not calculated
   // the hash value.
-  if (num_qubits != other.num_qubits ||
-      num_input_parameters != other.num_input_parameters) {
+  if (num_qubits != other.num_qubits) {
     return false;
   }
   if (wires.size() != other.wires.size() ||
@@ -1310,7 +1301,7 @@ bool CircuitSeq::is_canonical_representation() const {
 bool CircuitSeq::to_canonical_representation() {
   std::unique_ptr<CircuitSeq> output_seq;
   if (!canonical_representation(&output_seq, true)) {
-    clone_from(*output_seq, {}, {});
+    clone_from(*output_seq, {}, {}, nullptr);
     return true;
   }
   return false;
@@ -1412,17 +1403,24 @@ bool CircuitSeq::to_canonical_representation() {
 
 std::unique_ptr<CircuitSeq>
 CircuitSeq::get_permuted_seq(const std::vector<int> &qubit_permutation,
-                             const std::vector<int> &param_permutation) const {
-  auto result = std::make_unique<CircuitSeq>(0, 0);
-  result->clone_from(*this, qubit_permutation, param_permutation);
+                             const std::vector<int> &input_param_permutation,
+                             Context *ctx) const {
+  auto result = std::make_unique<CircuitSeq>(0);
+  if (input_param_permutation.empty()) {
+    result->clone_from(*this, qubit_permutation, input_param_permutation, ctx);
+  } else {
+    auto all_param_permutation =
+        ctx->get_param_permutation(input_param_permutation);
+    result->clone_from(*this, qubit_permutation, all_param_permutation, ctx);
+  }
   return result;
 }
 
 void CircuitSeq::clone_from(const CircuitSeq &other,
                             const std::vector<int> &qubit_permutation,
-                            const std::vector<int> &param_permutation) {
+                            const std::vector<int> &param_permutation,
+                            const Context *ctx) {
   num_qubits = other.num_qubits;
-  num_input_parameters = other.num_input_parameters;
   original_fingerprint_ = other.original_fingerprint_;
   std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
   std::unordered_map<CircuitGate *, CircuitGate *> gates_mapping;
@@ -1459,29 +1457,18 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       assert(wires[qubit_permutation[i]].get() != other.wires[i].get());
       wires_mapping[other.wires[i].get()] = wires[qubit_permutation[i]].get();
     }
-    const int num_permuted_parameters =
-        std::min(num_input_parameters, (int)param_permutation.size());
-    for (int i_inc = 0; i_inc < num_permuted_parameters; i_inc++) {
-      assert(param_permutation[i_inc] >= 0 &&
-             param_permutation[i_inc] < num_input_parameters);
-      const int i = num_qubits + i_inc;
-      wires[num_qubits + param_permutation[i_inc]] =
-          std::make_unique<CircuitWire>(*(other.wires[i]));
-      wires[num_qubits + param_permutation[i_inc]]->index =
-          param_permutation[i_inc];  // update index
-      assert(wires[num_qubits + param_permutation[i_inc]].get() !=
-             other.wires[i].get());
-      wires_mapping[other.wires[i].get()] =
-          wires[num_qubits + param_permutation[i_inc]].get();
-    }
-    for (int i = num_qubits + num_permuted_parameters;
-         i < (int)other.wires.size(); i++) {
-      wires[i] = std::make_unique<CircuitWire>(*(other.wires[i]));
-      if (wires[i]->is_qubit()) {
-        wires[i]->index = qubit_permutation[wires[i]->index];  // update index
+    if (!param_permutation.empty()) {
+      for (auto &circuit_gate : gates) {
+        for (auto &input_wire : circuit_gate->input_wires) {
+          if (input_wire->is_parameter() &&
+              input_wire->index < (int)param_permutation.size() &&
+              input_wire->index != param_permutation[input_wire->index]) {
+            // permute the parameter
+            input_wire =
+                ctx->get_param_wire(param_permutation[input_wire->index]);
+          }
+        }
       }
-      assert(wires[i].get() != other.wires[i].get());
-      wires_mapping[other.wires[i].get()] = wires[i].get();
     }
   }
   for (int i = 0; i < (int)other.gates.size(); i++) {

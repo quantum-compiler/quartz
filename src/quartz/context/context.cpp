@@ -300,6 +300,61 @@ bool Context::param_has_value(int id) const {
          !is_parameter_symbolic_[id];
 }
 
+bool Context::param_is_expression(int id) const {
+  return id >= 0 && id < (int)parameter_wires_.size() &&
+         !parameter_wires_[id]->input_gates.empty();
+}
+
+CircuitWire *Context::get_param_wire(int id) const {
+  assert(id >= 0 && id < (int)parameter_wires_.size());
+  return parameter_wires_[id].get();
+}
+
+std::vector<int> Context::get_param_permutation(
+    const std::vector<int> &input_param_permutation) {
+  int num_parameters = (int)is_parameter_symbolic_.size();
+  std::vector<int> result = input_param_permutation;
+  result.resize(num_parameters, -1);  // fill with -1
+  for (int i = (int)input_param_permutation.size(); i < num_parameters; i++) {
+    if (param_is_expression(i)) {
+      auto gate = get_param_wire(i)->input_gates[0];
+      std::vector<int> input_indices;
+      input_indices.reserve(gate->input_wires.size());
+      for (auto &wire : gate->input_wires) {
+        assert(wire->index < i);
+        input_indices.push_back(result[wire->index]);  // get permuted input
+      }
+      auto input_0 = get_param_wire(input_indices[0]);
+      for (auto &potential_gate : input_0->output_gates) {
+        // same gate type (pointer comparison)
+        if (potential_gate->gate == gate->gate &&
+            input_indices.size() == potential_gate->input_wires.size()) {
+          bool same_indices = true;
+          for (int j = 0; j < (int)input_indices.size(); j++) {
+            if (input_indices[j] != potential_gate->input_wires[j]->index) {
+              same_indices = false;
+              break;
+            }
+          }
+          if (same_indices) {
+            // found permuted expression
+            result[i] = potential_gate->output_wires[0]->index;
+            break;
+          }
+        }
+      }
+      if (result[i] == -1) {
+        // still not found, create new expression
+        result[i] = get_new_param_expression_id(input_indices, gate->gate);
+      }
+    } else {
+      // not an expression, map to itself
+      result[i] = i;
+    }
+  }
+  return result;
+}
+
 void Context::generate_parameter_expressions(
     int max_num_operators_per_expression) {
   assert(max_num_operators_per_expression == 1);

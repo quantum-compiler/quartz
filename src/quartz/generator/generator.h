@@ -29,16 +29,13 @@ class Generator {
   explicit Generator(Context *ctx) : ctx_(ctx) {}
 
   /**
-   * Use BFS to generate all equivalent DAGs with |num_qubits| qubits,
-   * |num_input_parameters| input parameters (probably with some unused),
-   * and <= |max_num_quantum_gates| gates.
+   * Use BFS to generate all equivalent circuits with |num_qubits| qubits
+   * and <= |max_num_quantum_gates| gates,
+   * using the gate set and the input parameters (expressions) in the context.
    *
    * @param num_qubits number of qubits in the circuits generated.
-   * @param num_input_parameters number of input parameters in the circuits
-   * generated.
    * @param max_num_quantum_gates max number of quantum gates in the circuits
    * generated.
-   * @param max_num_param_gates currently unused.
    * @param dataset the |Dataset| object to store the result.
    * @param invoke_python_verifier if true, invoke Z3 verifier in Python to
    * verify that the equivalences we found are indeed equivalent. Otherwise,
@@ -49,13 +46,14 @@ class Generator {
    * @param equiv_set should be an empty |EquivalenceSet| object at the
    * beginning, and will store the intermediate ECC sets during generation.
    * @param unique_parameters if true, we only search for DAGs that use
-   * each input parameters only once (note: use a doubled parameter, i.e.,
-   * Rx(2theta) is considered using the parameter theta once).
+   * each input parameter (expression) only once (note: using a doubled parameter, i.e.,
+   * Rx(2theta) is considered using the parameter theta once because ).
    * @param verbose print debug message or not.
    * @param record_verification_time use |std::chrono::steady_clock| to
    * record the verification time or not.
+   * @return True if the generation is successful.
    */
-  void generate(
+  bool generate(
       int num_qubits, int max_num_quantum_gates, Dataset *dataset,
       bool invoke_python_verifier, EquivalenceSet *equiv_set,
       bool unique_parameters, bool verbose = false,

@@ -4,12 +4,12 @@
 
 namespace quartz {
 
-void Generator::generate(
+bool Generator::generate(
     int num_qubits, int max_num_quantum_gates, Dataset *dataset,
     bool invoke_python_verifier, EquivalenceSet *equiv_set,
     bool unique_parameters, bool verbose,
     std::chrono::steady_clock::duration *record_verification_time) {
-  auto empty_dag = std::make_unique<CircuitSeq>(num_qubits, 0);
+  auto empty_dag = std::make_unique<CircuitSeq>(num_qubits);
   empty_dag->hash(ctx_);  // generate other hash values
   std::vector<CircuitSeq *> dags_to_search(1, empty_dag.get());
   if (invoke_python_verifier) {

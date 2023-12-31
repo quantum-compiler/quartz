@@ -95,10 +95,23 @@ class Context {
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] bool param_is_symbolic(int id) const;
   [[nodiscard]] bool param_has_value(int id) const;
+  [[nodiscard]] bool param_is_expression(int id) const;
+
+  [[nodiscard]] CircuitWire *get_param_wire(int id) const;
+
+  /**
+   * Derive the permutation of all parameter expressions from an input
+   * parameter permutation.
+   * @param input_param_permutation The input parameter permutation.
+   * @return The permutation of all parameters (expressions).
+   */
+  [[nodiscard]] std::vector<int>
+  get_param_permutation(const std::vector<int> &input_param_permutation);
 
   /**
    * Generate all parameter expressions using existing parameters and
-   * operators.
+   * operators. After calling this function, no new parameters or parameter
+   * expressions should be created in order for the generator to work properly.
    * @param max_num_operators_per_expression Restrict each parameter expression
    * to use at most |max_num_operators_per_expression| operators.
    * Currently we only support |max_num_operators_per_expression| = 1.

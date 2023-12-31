@@ -18,7 +18,7 @@ class Context;
 class CircuitSeq {
  public:
   // TODO: Input parameters should be handled in Context instead of here
-  CircuitSeq(int num_qubits, int num_input_parameters);
+  explicit CircuitSeq(int num_qubits);
   CircuitSeq(const CircuitSeq &other);  // clone a CircuitSeq
   [[nodiscard]] std::unique_ptr<CircuitSeq> clone() const;
   [[nodiscard]] bool fully_equivalent(const CircuitSeq &other) const;
@@ -192,14 +192,17 @@ class CircuitSeq {
    * Permute the qubits and input parameters.
    * @param qubit_permutation The qubit permutation. The size must be the
    * same as the number of qubits.
-   * @param param_permutation The input parameter permutation. If the size is
-   * smaller than the total number of input parameters, this function only
+   * @param input_param_permutation The input parameter permutation. If the size
+   * is smaller than the total number of input parameters, this function only
    * permutes a prefix of input parameters corresponding to |param_permutation|.
+   * @param ctx The context, only needed when |param_permutation| is not empty.
+   * When |param_permutation| is empty, it is safe to pass in a nullptr.
    * @return The permuted circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
   get_permuted_seq(const std::vector<int> &qubit_permutation,
-                   const std::vector<int> &param_permutation) const;
+                   const std::vector<int> &input_param_permutation,
+                   Context *ctx) const;
 
   // Returns quantum gates which do not topologically depend on any other
   // quantum gates.
@@ -216,7 +219,8 @@ class CircuitSeq {
  private:
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
-                  const std::vector<int> &param_permutation);
+                  const std::vector<int> &param_permutation,
+                  const Context *ctx);
 
   /**
    * Remove a quantum gate from the graph, remove its output wires by default,

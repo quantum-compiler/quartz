@@ -13,13 +13,12 @@ int main() {
   std::cout << "Hello, World!" << std::endl;
   Context ctx({GateType::x, GateType::y, GateType::add, GateType::neg,
                GateType::u2, GateType::u3, GateType::cx},
-              2, 0);
-  ctx.get_and_gen_parameters(2);
+              2, 2);
 
   auto y = ctx.get_gate(GateType::y);
   y->get_matrix()->print();
 
-  CircuitSeq dag(2, 0);
+  CircuitSeq dag(2);
   dag.add_gate({0}, {}, y, nullptr);
   std::cout << "Is_canonical=" << dag.is_canonical_representation()
             << std::endl;
@@ -30,8 +29,8 @@ int main() {
   dag.evaluate(input_dis, {}, output_dis);
   output_dis.print();
 
-  auto dag1 = std::make_unique<CircuitSeq>(2, 2);
-  auto dag2 = std::make_unique<CircuitSeq>(2, 2);
+  auto dag1 = std::make_unique<CircuitSeq>(2);
+  auto dag2 = std::make_unique<CircuitSeq>(2);
   int tmp;
   dag1->add_gate({}, {0, 0}, ctx.get_gate(GateType::add), &tmp);
   dag1->add_gate({}, {0, 1}, ctx.get_gate(GateType::add), &tmp);

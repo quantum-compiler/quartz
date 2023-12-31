@@ -886,7 +886,7 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
       permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
         permuted_dags.emplace_back(
-            dag->get_permuted_seq(qubit_permutation, param_permutation));
+            dag->get_permuted_seq(qubit_permutation, param_permutation, ctx));
       }
       for (auto &permuted_dag : permuted_dags) {
         for (const auto &permuted_class :
@@ -1002,7 +1002,7 @@ int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
       permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
         permuted_dags.emplace_back(
-            dag->get_permuted_seq(qubit_permutation, param_permutation));
+            dag->get_permuted_seq(qubit_permutation, param_permutation, ctx));
       }
       for (auto &permuted_dag : permuted_dags) {
         for (const auto &permuted_class :

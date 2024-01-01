@@ -394,23 +394,11 @@ int CircuitSeq::remove_swap_gates() {
 }
 
 bool CircuitSeq::evaluate(const Vector &input_dis,
-                          const std::vector<ParamType> &input_parameters,
-                          Vector &output_dis,
-                          std::vector<ParamType> *parameter_values) const {
+                          const std::vector<ParamType> &parameter_values,
+                          Vector &output_dis) const {
   // We should have 2**n entries for the distribution
   if (input_dis.size() != (1 << get_num_qubits()))
     return false;
-  if (input_parameters.size() != get_num_input_parameters())
-    return false;
-  assert(get_num_input_parameters() <= get_num_total_parameters());
-  bool output_parameter_values = true;
-  if (!parameter_values) {
-    parameter_values = new std::vector<ParamType>();
-    output_parameter_values = false;
-  }
-  *parameter_values = input_parameters;
-  parameter_values->resize(get_num_total_parameters());
-
   output_dis = input_dis;
 
   // Assume the gates are already sorted in the topological order.
@@ -422,24 +410,13 @@ bool CircuitSeq::evaluate(const Vector &input_dis,
       if (input_wire->is_qubit()) {
         qubit_indices.push_back(input_wire->index);
       } else {
-        params.push_back((*parameter_values)[input_wire->index]);
+        params.push_back(parameter_values[input_wire->index]);
       }
     }
-    if (gates[i]->gate->is_parameter_gate()) {
-      // A parameter gate. Compute the new parameter.
-      assert(gates[i]->output_wires.size() == 1);
-      const auto &output_wire = gates[i]->output_wires[0];
-      (*parameter_values)[output_wire->index] = gates[i]->gate->compute(params);
-    } else {
-      // A quantum gate. Update the distribution.
-      assert(gates[i]->gate->is_quantum_gate());
-      auto *mat = gates[i]->gate->get_matrix(params);
-      output_dis.apply_matrix(mat, qubit_indices);
-    }
-  }
-  if (!output_parameter_values) {
-    // Delete the temporary variable newed in this function.
-    delete parameter_values;
+    // A quantum gate. Update the distribution.
+    assert(gates[i]->gate->is_quantum_gate());
+    auto *mat = gates[i]->gate->get_matrix(params);
+    output_dis.apply_matrix(mat, qubit_indices);
   }
   return true;
 }
@@ -556,10 +533,9 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
   }
   const Vector &input_dis = ctx->get_generated_input_dis(get_num_qubits());
   Vector output_dis;
-  auto input_parameters =
-      ctx->get_generated_parameters(get_num_input_parameters());
-  std::vector<ParamType> all_parameters;
-  evaluate(input_dis, input_parameters, output_dis, &all_parameters);
+  auto input_parameters = ctx->get_all_generated_parameters();
+  auto all_parameters = ctx->compute_parameters(input_parameters);
+  evaluate(input_dis, all_parameters, output_dis);
   ComplexType dot_product =
       output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
 
@@ -611,16 +587,15 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
 std::vector<Vector> CircuitSeq::get_matrix(Context *ctx) const {
   const auto sz = 1 << get_num_qubits();
   Vector input_dis(sz);
-  auto input_parameters =
-      ctx->get_generated_parameters(get_num_input_parameters());
-  std::vector<ParamType> all_parameters;
+  auto input_parameters = ctx->get_all_generated_parameters();
+  auto all_parameters = ctx->compute_parameters(input_parameters);
   std::vector<Vector> result(sz);
   for (int S = 0; S < sz; S++) {
     input_dis[S] = ComplexType(1);
     if (S > 0) {
       input_dis[S - 1] = ComplexType(0);
     }
-    evaluate(input_dis, input_parameters, result[S], &all_parameters);
+    evaluate(input_dis, all_parameters, result[S]);
   }
   return result;
 }

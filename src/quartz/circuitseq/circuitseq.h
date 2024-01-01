@@ -106,13 +106,17 @@ class CircuitSeq {
    * @return The number of gates removed.
    */
   int remove_swap_gates();
-  // Evaluate the output distribution given input distribution and
-  // input parameters. Also output all parameter values (including input
-  // and internal parameters) when |parameter_values| is not nullptr.
+  /**
+   * Evaluate the output distribution given input distribution and parameters.
+   * @param input_dis The input distribution.
+   * @param parameter_values All parameter values, computed by
+   * Context::compute_parameters().
+   * @param output_dis The output distribution to write to.
+   * @return True iff the evaluation is successful.
+   */
   bool evaluate(const Vector &input_dis,
-                const std::vector<ParamType> &input_parameters,
-                Vector &output_dis,
-                std::vector<ParamType> *parameter_values = nullptr) const;
+                const std::vector<ParamType> &parameter_values,
+                Vector &output_dis) const;
   [[nodiscard]] int get_num_qubits() const;
   [[nodiscard]] int get_num_input_parameters() const;
   [[nodiscard]] int get_num_total_parameters() const;

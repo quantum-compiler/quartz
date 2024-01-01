@@ -71,7 +71,7 @@ class Context {
    * @return A vector such that the |i|-th index stores the value of the
    * parameter with index |i|.
    */
-  [[nodiscard]] std::vector<ParamType> get_all_param_values() const;
+  [[nodiscard]] std::vector<ParamType> get_all_input_param_values() const;
   /**
    * Create a new concrete parameter.
    * @return The index of the new concrete parameter.
@@ -98,6 +98,14 @@ class Context {
   [[nodiscard]] bool param_is_expression(int id) const;
 
   [[nodiscard]] CircuitWire *get_param_wire(int id) const;
+
+  /**
+   * Compute all parameters given the input symbolic parameter values.
+   * @param input_parameters The input symbolic parameter values.
+   * @return A vector containing all parameters.
+   */
+  [[nodiscard]] std::vector<ParamType>
+  compute_parameters(const std::vector<ParamType> &input_parameters);
 
   /**
    * Derive the permutation of all parameter expressions from an input

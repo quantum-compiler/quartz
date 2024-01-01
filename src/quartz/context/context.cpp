@@ -224,7 +224,7 @@ void Context::set_param_value(int id, const ParamType &param) {
   parameter_values_[id] = param;
 }
 
-std::vector<ParamType> Context::get_all_param_values() const {
+std::vector<ParamType> Context::get_all_input_param_values() const {
   return parameter_values_;
 }
 
@@ -311,6 +311,22 @@ CircuitWire *Context::get_param_wire(int id) const {
   } else {
     return nullptr;  // out of range
   }
+}
+
+std::vector<ParamType>
+Context::compute_parameters(const std::vector<ParamType> &input_parameters) {
+  auto result = input_parameters;
+  result.resize(is_parameter_symbolic_.size());
+  for (auto &expr : parameter_expressions_) {
+    std::vector<ParamType> params;
+    for (const auto &input_wire : expr->input_wires) {
+      params.push_back(result[input_wire->index]);
+    }
+    assert(expr->output_wires.size() == 1);
+    const auto &output_wire = expr->output_wires[0];
+    result[output_wire->index] = expr->gate->compute(params);
+  }
+  return result;
 }
 
 std::vector<int> Context::get_param_permutation(

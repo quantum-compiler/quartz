@@ -2888,17 +2888,13 @@ bool verify_schedule(Context *ctx, const CircuitSeq &sequence,
   for (int test = 0; test < random_test_times; test++) {
     const auto sz = 1 << sequence.get_num_qubits();
     Vector input_dis = Vector::random_generate(sequence.get_num_qubits());
-    auto input_parameters = ctx->get_all_param_values();
-    assert((int)input_parameters.size() >= sequence.get_num_input_parameters());
-    input_parameters.resize(sequence.get_num_input_parameters());
-    std::vector<ParamType> all_parameters;
+    auto input_parameters = ctx->get_all_input_param_values();
+    auto all_parameters = ctx->compute_parameters(input_parameters);
     Vector expected_output;
     Vector found_output;
-    bool ok = sequence.evaluate(input_dis, input_parameters, expected_output,
-                                &all_parameters);
+    bool ok = sequence.evaluate(input_dis, all_parameters, expected_output);
     assert(ok);
-    ok = seq->evaluate(input_dis, input_parameters, found_output,
-                       &all_parameters);
+    ok = seq->evaluate(input_dis, all_parameters, found_output);
     assert(ok);
     for (int i = 0; i < sz; i++) {
       if (std::abs(found_output[i] - expected_output[i]) >

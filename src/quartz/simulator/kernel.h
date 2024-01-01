@@ -62,8 +62,7 @@ class Kernel {
    * we use this qubit set to update |qubits|.
    * @return True iff the gate is successfully added.
    */
-  bool add_gate(CircuitGate *gate,
-                Context *ctx,
+  bool add_gate(CircuitGate *gate, Context *ctx,
                 const std::function<bool(int)> &is_local_qubit,
                 const std::vector<int> &customized_non_insular_qubits = {});
 

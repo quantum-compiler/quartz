@@ -46,8 +46,8 @@ class Generator {
    * @param equiv_set should be an empty |EquivalenceSet| object at the
    * beginning, and will store the intermediate ECC sets during generation.
    * @param unique_parameters if true, we only search for DAGs that use
-   * each input parameter (expression) only once (note: using a doubled parameter, i.e.,
-   * Rx(2theta) is considered using the parameter theta once because ).
+   * each input parameter (expression) only once (note: using a doubled
+   * parameter, i.e., Rx(2theta) is considered using the parameter theta once).
    * @param verbose print debug message or not.
    * @param record_verification_time use |std::chrono::steady_clock| to
    * record the verification time or not.

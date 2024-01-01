@@ -173,7 +173,8 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     Gate *gate;
 
     auto search_parameters =
-        [this, &dag, &gate, &qubit_indices, &parameter_indices, &try_to_add_to_result,
+        [this, &dag, &gate, &qubit_indices, &parameter_indices,
+         &try_to_add_to_result,
          &unique_parameters, &input_param_masks](int num_remaining_parameters,
                                                  const InputParamMaskType
                                                      &current_usage_mask,
@@ -188,8 +189,8 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
             if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
               while (std::next_permutation(qubit_indices.begin(),
                                            qubit_indices.end())) {
-                ret = dag->add_gate(qubit_indices, parameter_indices, gate,
-                                    ctx_);
+                ret =
+                    dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
                 assert(ret);
                 try_to_add_to_result(dag);
                 ret = dag->remove_last_gate();

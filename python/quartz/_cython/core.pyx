@@ -150,9 +150,9 @@ cdef class PyGate:
 cdef class PyDAG:
     cdef CircuitSeq_ptr dag
 
-    def __cinit__(self, *, int num_qubits=-1, int num_input_params=-1):
-        if num_qubits >= 0 and num_input_params >= 0:
-            self.dag = new CircuitSeq(num_qubits, num_input_params)
+    def __cinit__(self, *, int num_qubits=-1):
+        if num_qubits >= 0:
+            self.dag = new CircuitSeq(num_qubits)
         else:
             self.dag = NULL
 
@@ -166,18 +166,6 @@ cdef class PyDAG:
     @property
     def num_qubits(self):
         return self.dag.get_num_qubits()
-
-    @property
-    def num_input_parameters(self):
-        return self.dag.get_num_input_parameters()
-
-    @property
-    def num_total_parameters(self):
-        return self.dag.get_num_total_parameters()
-
-    @property
-    def num_internal_parameters(self):
-        return self.dag.get_num_internal_parameters()
 
     @property
     def num_gates(self):

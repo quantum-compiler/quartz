@@ -21,41 +21,84 @@ class CircuitSeq {
   explicit CircuitSeq(int num_qubits);
   CircuitSeq(const CircuitSeq &other);  // clone a CircuitSeq
   [[nodiscard]] std::unique_ptr<CircuitSeq> clone() const;
+  /**
+   * Compare if two circuit sequences are fully equivalent except for the hash
+   * value.
+   * @param other The other circuit sequence to be compared.
+   * @return True iff two circuit sequences are fully equivalent.
+   */
   [[nodiscard]] bool fully_equivalent(const CircuitSeq &other) const;
+  /**
+   * Compute the hash value and compare if two circuit sequences are fully
+   * equivalent including the hash value.
+   * @param ctx The context to compute the hash value.
+   * @param other The other circuit sequence to be compared.
+   * @return True iff two circuit sequences are fully equivalent.
+   */
   [[nodiscard]] bool fully_equivalent(Context *ctx, CircuitSeq &other);
   [[nodiscard]] bool less_than(const CircuitSeq &other) const;
 
+  /**
+   * Add a gate at the end of the circuit sequence.
+   * @param qubit_indices The qubit indices of the gate.
+   * @param parameter_indices The parameter indices of the gate.
+   * @param gate The gate type.
+   * @param ctx The context for parameters.
+   * @return True iff the insertion is successful.
+   */
   bool add_gate(const std::vector<int> &qubit_indices,
                 const std::vector<int> &parameter_indices, Gate *gate,
                 const Context *ctx);
+  /**
+   * Add a gate at the end of the circuit sequence.
+   * @param gate The gate object. A gate with the same type, the same qubit
+   * indices, and the same parameter indices will be inserted.
+   * @param ctx The context for parameters.
+   * @return True iff the insertion is successful.
+   */
   bool add_gate(CircuitGate *gate, const Context *ctx);
-  // Insert a gate to any position of the circuit sequence.
-  // Warning: remove_last_gate() cannot be called anymore after calling
-  // insert_gate().
+  /**
+   * Insert a gate to any position of the circuit sequence.
+   * Warning: remove_last_gate() cannot be called anymore after calling
+   * insert_gate().
+   * @param insert_position The gate position to insert.
+   * @param qubit_indices The qubit indices of the gate.
+   * @param parameter_indices The parameter indices of the gate.
+   * @param gate The gate type.
+   * @param ctx The context for parameters.
+   * @return True iff the insertion is successful.
+   */
   bool insert_gate(int insert_position, const std::vector<int> &qubit_indices,
                    const std::vector<int> &parameter_indices, Gate *gate,
-                   int *output_para_index);
-  bool insert_gate(int insert_position, CircuitGate *gate);
-  void add_input_parameter();
+                   const Context *ctx);
+  /**
+   * Insert a gate to any position of the circuit sequence.
+   * Warning: remove_last_gate() cannot be called anymore after calling
+   * insert_gate().
+   * @param insert_position The gate position to insert.
+   * @param gate The gate object. A gate with the same type, the same qubit
+   * indices, and the same parameter indices will be inserted.
+   * @param ctx The context for parameters.
+   * @return True iff the insertion is successful.
+   */
+  bool insert_gate(int insert_position, CircuitGate *gate, const Context *ctx);
+  /**
+   * Remove the last gate, assuming add_gate() was just called.
+   * @return True iff the removal is successful.
+   */
   bool remove_last_gate();
 
   /**
-   * Remove a quantum gate or a classical "gate".
-   * The time complexity is
-   * O((number of gates removed) * (total number of gates)
-   * + (number of wires removed) * (total number of wires)).
+   * Remove a quantum gate.
    * @param circuit_gate the gate to be removed.
-   * @return The number of gates removed.
+   * @return True iff the removal is successful.
    */
-  int remove_gate(CircuitGate *circuit_gate);
+  bool remove_gate(CircuitGate *circuit_gate);
   /**
    * Remove the first quantum gate (if there is one).
-   * The time complexity is
-   * O((total number of gates)
-   * + (number of wires removed) * (total number of wires)).
-   * @return The number of gates removed.
+   * @return True iff the removal is successful.
    */
-  int remove_first_quantum_gate();
+  bool remove_first_quantum_gate();
   /**
    * Remove all swap gates, adjusting logical qubit indices correspondingly.
    * The time complexity is

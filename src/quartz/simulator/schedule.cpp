@@ -2437,7 +2437,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
       for (int i = 0; i < schedule.get_num_kernels(); i++) {
         // Returns the number of gates inserted.
         auto insert_single_qubit_gates =
-            [&schedule, &i, &sequence, &flipping, &debug](
+            [&schedule, &i, &sequence, &flipping, &ctx, &debug](
                 const std::vector<int> &gate_indices, int insert_location) {
               for (auto &gate_index : gate_indices) {
                 if (sequence.gates[gate_index]->gate->get_num_qubits() == 1 &&
@@ -2467,7 +2467,7 @@ get_schedules(const CircuitSeq &sequence, int num_local_qubits,
                   std::cout << "insert back " << gate_index << std::endl;
                 }
                 schedule.kernels[i].gates->insert_gate(
-                    insert_location, sequence.gates[gate_index].get());
+                    insert_location, sequence.gates[gate_index].get(), ctx);
                 insert_location++;
               }
               return (int)gate_indices.size();

@@ -191,14 +191,14 @@ bool CircuitSeq::add_gate(CircuitGate *gate, const Context *ctx) {
 bool CircuitSeq::insert_gate(int insert_position,
                              const std::vector<int> &qubit_indices,
                              const std::vector<int> &parameter_indices,
-                             Gate *gate, int *output_para_index) {
+                             Gate *gate, const Context *ctx) {
+  if (!gate->is_quantum_gate())
+    return false;
   if (insert_position < 0 || insert_position > (int)gates.size())
     return false;
   if (gate->get_num_qubits() != qubit_indices.size())
     return false;
   if (gate->get_num_parameters() != parameter_indices.size())
-    return false;
-  if (gate->is_parameter_gate() && output_para_index == nullptr)
     return false;
   // qubit indices must stay in range
   for (auto qubit_idx : qubit_indices)
@@ -224,55 +224,46 @@ bool CircuitSeq::insert_gate(int insert_position,
   circuit_gate->gate = gate;
   for (auto qubit_idx : qubit_indices) {
     circuit_gate->input_wires.push_back(previous_wires[qubit_idx]);
-    if (gate->is_quantum_gate()) {
-      auto wire = std::make_unique<CircuitWire>();
-      wire->type = CircuitWire::internal_qubit;
-      wire->index = qubit_idx;
-      wire->input_gates.push_back(circuit_gate.get());
-      circuit_gate->output_wires.push_back(wire.get());
-      if (outputs[qubit_idx] == previous_wires[qubit_idx]) {
-        outputs[qubit_idx] = wire.get();  // Update outputs
-      } else {
-        for (auto &output_gate : previous_wires[qubit_idx]->output_gates) {
-          // Should have exactly one |output_gate|
-          for (auto &input_wire : output_gate->input_wires) {
-            if (input_wire == previous_wires[qubit_idx]) {
-              input_wire = wire.get();
-              break;
-            }
+    auto wire = std::make_unique<CircuitWire>();
+    wire->type = CircuitWire::internal_qubit;
+    wire->index = qubit_idx;
+    wire->input_gates.push_back(circuit_gate.get());
+    circuit_gate->output_wires.push_back(wire.get());
+    if (outputs[qubit_idx] == previous_wires[qubit_idx]) {
+      outputs[qubit_idx] = wire.get();  // Update outputs
+    } else {
+      for (auto &output_gate : previous_wires[qubit_idx]->output_gates) {
+        // Should have exactly one |output_gate|
+        for (auto &input_wire : output_gate->input_wires) {
+          if (input_wire == previous_wires[qubit_idx]) {
+            input_wire = wire.get();
+            break;
           }
         }
       }
-      // XXX: the wires are placed at the end, so it will be not compatible
-      // with remove_last_gate().
-      wires.push_back(std::move(wire));
     }
-    previous_wires[qubit_idx]->output_gates.push_back(circuit_gate.get());
-  }
-  for (auto para_idx : parameter_indices) {
-    circuit_gate->input_wires.push_back(parameters[para_idx]);
-    parameters[para_idx]->output_gates.push_back(circuit_gate.get());
-  }
-  if (gate->is_parameter_gate()) {
-    auto wire = std::make_unique<CircuitWire>();
-    wire->type = CircuitWire::internal_param;
-    wire->index = *output_para_index = (int)parameters.size();
-    wire->input_gates.push_back(circuit_gate.get());
-    circuit_gate->output_wires.push_back(wire.get());
-    parameters.push_back(wire.get());
     // XXX: the wires are placed at the end, so it will be not compatible
     // with remove_last_gate().
     wires.push_back(std::move(wire));
+    previous_wires[qubit_idx]->output_gates.push_back(circuit_gate.get());
+  }
+  for (auto para_idx : parameter_indices) {
+    auto param_wire = ctx->get_param_wire(para_idx);
+    // parameter indices must stay in range
+    if (param_wire == nullptr) {
+      return false;
+    }
+    circuit_gate->input_wires.push_back(param_wire);
   }
   gates.insert(gates.begin() + insert_position, std::move(circuit_gate));
   hash_value_valid_ = false;
   return true;
 }
 
-bool CircuitSeq::insert_gate(int insert_position, CircuitGate *gate) {
+bool CircuitSeq::insert_gate(int insert_position, CircuitGate *gate,
+                             const Context *ctx) {
   std::vector<int> qubit_indices;
   std::vector<int> parameter_indices;
-  int output_para_index;
   for (auto &wire : gate->input_wires) {
     if (wire->is_qubit()) {
       qubit_indices.push_back(wire->index);
@@ -281,27 +272,7 @@ bool CircuitSeq::insert_gate(int insert_position, CircuitGate *gate) {
     }
   }
   return insert_gate(insert_position, qubit_indices, parameter_indices,
-                     gate->gate, &output_para_index);
-}
-
-void CircuitSeq::add_input_parameter() {
-  auto wire = std::make_unique<CircuitWire>();
-  wire->type = CircuitWire::input_param;
-  wire->index = num_input_parameters;
-  parameters.insert(parameters.begin() + num_input_parameters, wire.get());
-  wires.insert(wires.begin() + num_qubits + num_input_parameters,
-               std::move(wire));
-
-  num_input_parameters++;
-
-  // Update internal parameters' indices
-  for (auto &it : wires) {
-    if (it->type == CircuitWire::internal_param) {
-      it->index++;
-    }
-  }
-
-  // This function should not modify the hash value.
+                     gate->gate, ctx);
 }
 
 bool CircuitSeq::remove_last_gate() {
@@ -313,31 +284,24 @@ bool CircuitSeq::remove_last_gate() {
   auto *gate = circuit_gate->gate;
   // Remove gates from input wires.
   for (auto *input_wire : circuit_gate->input_wires) {
-    assert(!input_wire->output_gates.empty());
-    assert(input_wire->output_gates.back() == circuit_gate);
-    input_wire->output_gates.pop_back();
+    if (input_wire->is_qubit()) {
+      assert(!input_wire->output_gates.empty());
+      assert(input_wire->output_gates.back() == circuit_gate);
+      input_wire->output_gates.pop_back();
+    }
   }
 
-  if (gate->is_parameter_gate()) {
-    // Remove the parameter.
-    assert(!wires.empty());
-    assert(wires.back()->type == CircuitWire::internal_param);
-    assert(wires.back()->index == (int)parameters.size() - 1);
-    parameters.pop_back();
+  assert(gate->is_quantum_gate());
+  // Restore the outputs.
+  for (auto *input_wire : circuit_gate->input_wires) {
+    if (input_wire->is_qubit()) {
+      outputs[input_wire->index] = input_wire;
+    }
+  }
+  // Remove the qubit wires.
+  while (!wires.empty() && !wires.back()->input_gates.empty() &&
+         wires.back()->input_gates.back() == circuit_gate) {
     wires.pop_back();
-  } else {
-    assert(gate->is_quantum_gate());
-    // Restore the outputs.
-    for (auto *input_wire : circuit_gate->input_wires) {
-      if (input_wire->is_qubit()) {
-        outputs[input_wire->index] = input_wire;
-      }
-    }
-    // Remove the qubit wires.
-    while (!wires.empty() && !wires.back()->input_gates.empty() &&
-           wires.back()->input_gates.back() == circuit_gate) {
-      wires.pop_back();
-    }
   }
 
   // Remove the circuit_gate.
@@ -347,74 +311,29 @@ bool CircuitSeq::remove_last_gate() {
   return true;
 }
 
-int CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
+bool CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
   auto gate_pos = std::find_if(
       gates.begin(), gates.end(),
       [&](std::unique_ptr<CircuitGate> &p) { return p.get() == circuit_gate; });
   if (gate_pos == gates.end()) {
-    return 0;
+    return false;
   }
-
   auto *gate = circuit_gate->gate;
-
-  int ret = 1;
-
-  if (gate->is_parameter_gate()) {
-    // Remove gates from input wires.
-    for (auto *input_wire : circuit_gate->input_wires) {
-      assert(!input_wire->output_gates.empty());
-      auto it = std::find(input_wire->output_gates.begin(),
-                          input_wire->output_gates.end(), circuit_gate);
-      assert(it != input_wire->output_gates.end());
-      input_wire->output_gates.erase(it);
-    }
-    // Remove the parameter.
-    assert(circuit_gate->output_wires.size() == 1);
-    auto wire = circuit_gate->output_wires[0];
-    assert(wire->type == CircuitWire::internal_param);
-    while (!wire->output_gates.empty()) {
-      // Remove gates using the parameter at first.
-      // Note: we can't use a for loop with iterators because they
-      // will be invalidated.
-      ret += remove_gate(wire->output_gates[0]);
-    }
-    auto it = std::find_if(
-        wires.begin(), wires.end(),
-        [&](std::unique_ptr<CircuitWire> &p) { return p.get() == wire; });
-    assert(it != wires.end());
-    auto idx = wire->index;
-    assert(idx >= get_num_input_parameters());
-    wires.erase(it);
-    parameters.erase(parameters.begin() + idx);
-    // Update the parameter indices.
-    for (auto &j : wires) {
-      if (j->is_parameter() && j->index > idx) {
-        j->index--;
-      }
-    }
-  } else {
-    assert(gate->is_quantum_gate());
-    remove_quantum_gate_from_graph(circuit_gate);
-  }
-
+  assert(gate->is_quantum_gate());
+  remove_quantum_gate_from_graph(circuit_gate);
   // Remove the gate.
-  gate_pos = std::find_if(
-      gates.begin(), gates.end(),
-      [&](std::unique_ptr<CircuitGate> &p) { return p.get() == circuit_gate; });
-  assert(gate_pos != gates.end());
   gates.erase(gate_pos);
-
   hash_value_valid_ = false;
-  return ret;
+  return true;
 }
 
-int CircuitSeq::remove_first_quantum_gate() {
+bool CircuitSeq::remove_first_quantum_gate() {
   for (auto &circuit_gate : gates) {
     if (circuit_gate->gate->is_quantum_gate()) {
       return remove_gate(circuit_gate.get());
     }
   }
-  return 0;  // nothing removed
+  return false;  // nothing removed
 }
 
 int CircuitSeq::remove_swap_gates() {
@@ -1472,11 +1391,13 @@ void CircuitSeq::remove_quantum_gate_from_graph(
     std::unordered_set<CircuitWire *> *output_wires_to_be_removed) {
   // Remove gates from input wires.
   for (auto *input_wire : circuit_gate->input_wires) {
-    assert(!input_wire->output_gates.empty());
-    auto it = std::find(input_wire->output_gates.begin(),
-                        input_wire->output_gates.end(), circuit_gate);
-    assert(it != input_wire->output_gates.end());
-    input_wire->output_gates.erase(it);
+    if (input_wire->is_qubit()) {
+      assert(!input_wire->output_gates.empty());
+      auto it = std::find(input_wire->output_gates.begin(),
+                          input_wire->output_gates.end(), circuit_gate);
+      assert(it != input_wire->output_gates.end());
+      input_wire->output_gates.erase(it);
+    }
   }
   int num_outputs = (int)circuit_gate->output_wires.size();
   int j = 0;

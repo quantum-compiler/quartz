@@ -407,6 +407,23 @@ void Context::generate_parameter_expressions(
   }
 }
 
+std::vector<InputParamMaskType> Context::get_param_masks() const {
+  std::vector<InputParamMaskType> param_mask(is_parameter_symbolic_.size());
+  for (int i = 0; i < (int)param_mask.size(); i++) {
+    if (!param_is_expression(i)) {
+      param_mask[i] = ((InputParamMaskType)1) << i;
+    }
+  }
+  for (auto &expr : parameter_expressions_) {
+    const auto &output_wire = expr->output_wires[0];
+    param_mask[output_wire->index] = 0;
+    for (const auto &input_wire : expr->input_wires) {
+      param_mask[output_wire->index] |= param_mask[input_wire->index];
+    }
+  }
+  return param_mask;
+}
+
 double Context::random_number() {
   static std::uniform_real_distribution<double> dis_real(0, 1);
   return dis_real(gen);

@@ -25,6 +25,10 @@ bool Generator::generate(
 
   initialize_supported_quantum_gates();
 
+  if (unique_parameters) {
+    input_param_masks_ = ctx_->get_param_masks();
+  }
+
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().
   std::vector<std::unique_ptr<CircuitSeq>> dag_holder;
@@ -91,6 +95,7 @@ bool Generator::generate(
       */
     }
   }
+  return true;
 }
 
 void Generator::initialize_supported_quantum_gates() {
@@ -154,10 +159,9 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     auto new_dag = std::make_unique<CircuitSeq>(*old_dag);
     auto dag = new_dag.get();
     InputParamMaskType input_param_usage_mask;
-    std::vector<InputParamMaskType> input_param_masks;
     if (unique_parameters) {
-      std::tie(input_param_usage_mask, input_param_masks) =
-          dag->get_input_param_mask();
+      input_param_usage_mask =
+          dag->get_input_param_usage_mask(input_param_masks_);
     }
     std::vector<bool> last_gate_used_qubit_index(dag->get_num_qubits(), false);
     int last_gate_min_qubit_index = -1;
@@ -172,53 +176,51 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     std::vector<int> qubit_indices, parameter_indices;
     Gate *gate;
 
-    auto search_parameters =
-        [this, &dag, &gate, &qubit_indices, &parameter_indices,
-         &try_to_add_to_result,
-         &unique_parameters, &input_param_masks](int num_remaining_parameters,
-                                                 const InputParamMaskType
-                                                     &current_usage_mask,
-                                                 auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-          if (num_remaining_parameters == 0) {
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
+    auto search_parameters = [this, &dag, &gate, &qubit_indices,
+                              &parameter_indices, &try_to_add_to_result,
+                              &unique_parameters](int num_remaining_parameters,
+                                                  const InputParamMaskType
+                                                      &current_usage_mask,
+                                                  auto
+                                                      &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+      if (num_remaining_parameters == 0) {
+        bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
+        assert(ret);
+        try_to_add_to_result(dag);
+        ret = dag->remove_last_gate();
+        assert(ret);
+        if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
+          while (std::next_permutation(qubit_indices.begin(),
+                                       qubit_indices.end())) {
+            ret = dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
             assert(ret);
             try_to_add_to_result(dag);
             ret = dag->remove_last_gate();
             assert(ret);
-            if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
-              while (std::next_permutation(qubit_indices.begin(),
-                                           qubit_indices.end())) {
-                ret =
-                    dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
-                assert(ret);
-                try_to_add_to_result(dag);
-                ret = dag->remove_last_gate();
-                assert(ret);
-              }
-            }
-            return;
           }
+        }
+        return;
+      }
 
-          for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-            if (unique_parameters) {
-              if (current_usage_mask & input_param_masks[p1]) {
-                // p1 contains an already used input parameter.
-                continue;
-              }
-              parameter_indices.push_back(p1);
-              search_parameters_ref(num_remaining_parameters - 1,
-                                    current_usage_mask | input_param_masks[p1],
-                                    search_parameters_ref);
-              parameter_indices.pop_back();
-            } else {
-              parameter_indices.push_back(p1);
-              search_parameters_ref(num_remaining_parameters - 1,
-                                    /*unused*/ 0, search_parameters_ref);
-              parameter_indices.pop_back();
-            }
+      for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+        if (unique_parameters) {
+          if (current_usage_mask & input_param_masks_[p1]) {
+            // p1 contains an already used input parameter.
+            continue;
           }
-        };
+          parameter_indices.push_back(p1);
+          search_parameters_ref(num_remaining_parameters - 1,
+                                current_usage_mask | input_param_masks_[p1],
+                                search_parameters_ref);
+          parameter_indices.pop_back();
+        } else {
+          parameter_indices.push_back(p1);
+          search_parameters_ref(num_remaining_parameters - 1,
+                                /*unused*/ 0, search_parameters_ref);
+          parameter_indices.pop_back();
+        }
+      }
+    };
     // Add 1 quantum gate according to the qubit index order.
 
     for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {

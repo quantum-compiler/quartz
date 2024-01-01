@@ -72,6 +72,7 @@ class Generator {
   Context *ctx_;
   // |supported_quantum_gates_[i]|: supported quantum gates with |i| qubits.
   std::vector<std::vector<GateType>> supported_quantum_gates_;
+  std::vector<InputParamMaskType> input_param_masks_;
   Verifier verifier_;
 };
 

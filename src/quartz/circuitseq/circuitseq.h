@@ -131,8 +131,8 @@ class CircuitSeq {
   // Returns a pair. The first component denotes the input parameters
   // already used in this CircuitSeq. The second component denotes the input
   // parameters used in each of the parameters in this CircuitSeq.
-  [[nodiscard]] std::pair<InputParamMaskType, std::vector<InputParamMaskType>>
-  get_input_param_mask() const;
+  [[nodiscard]] InputParamMaskType get_input_param_usage_mask(
+      const std::vector<InputParamMaskType> &param_masks) const;
   CircuitSeqHashType hash(Context *ctx);
   // Evaluate the output distribution 2^|num_qubits| times, with the i-th
   // time the input distribution being a vector with only the i-th entry

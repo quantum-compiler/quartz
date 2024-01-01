@@ -480,8 +480,7 @@ bool EquivalenceSet::simplify(Context *ctx,
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (other_simplification &&
-        remove_unused_qubits_and_input_params(ctx, verbose)) {
+    if (other_simplification && remove_unused_qubits(ctx, verbose)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -650,8 +649,7 @@ int EquivalenceSet::remove_unused_internal_params(Context *ctx, bool verbose) {
   return num_class_modified;
 }
 
-int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
-                                                          bool verbose) {
+int EquivalenceSet::remove_unused_qubits(Context *ctx, bool verbose) {
   std::vector<EquivalenceClass *> classes_to_remove;
   std::vector<std::unique_ptr<EquivalenceClass>> classes_to_insert;
   for (auto &item : classes_) {
@@ -662,7 +660,6 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
     }
     auto &rep = dags.front();
     std::vector<bool> qubit_used(rep->get_num_qubits(), false);
-    std::vector<bool> input_param_used(rep->get_num_input_parameters(), false);
     for (const auto &dag : dags) {
       assert(qubit_used.size() == dag->get_num_qubits());
       for (int i = 0; i < (int)qubit_used.size(); i++) {
@@ -672,30 +669,14 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
           }
         }
       }
-
-      if (dag->get_num_input_parameters() > (int)input_param_used.size()) {
-        input_param_used.resize(dag->get_num_input_parameters(), false);
-      }
-      for (int i = 0; i < dag->get_num_input_parameters(); i++) {
-        if (!input_param_used[i]) {
-          if (dag->input_param_used(i)) {
-            input_param_used[i] = true;
-          }
-        }
-      }
     }
-    std::vector<int> unused_qubits, unused_input_params;
+    std::vector<int> unused_qubits;
     for (int i = 0; i < (int)qubit_used.size(); i++) {
       if (!qubit_used[i]) {
         unused_qubits.push_back(i);
       }
     }
-    for (int i = 0; i < (int)input_param_used.size(); i++) {
-      if (!input_param_used[i]) {
-        unused_input_params.push_back(i);
-      }
-    }
-    if (unused_qubits.empty() && unused_input_params.empty()) {
+    if (unused_qubits.empty()) {
       // No unused ones
       continue;
     }
@@ -710,87 +691,67 @@ int EquivalenceSet::remove_unused_qubits_and_input_params(Context *ctx,
       }
     }
 
-    // Only keep the ones with a (possibly empty) suffix of input
-    // parameters removed, because others must be redundant Warning:
-    // this optimization presumes that initially all circuits share the
-    // same number of input parameters.
-    bool keep_dag_class = true;
-    if (!unused_input_params.empty()) {
-      for (int i = 0; i < (int)unused_input_params.size(); i++) {
-        if (unused_input_params[i] !=
-            input_param_used.size() - unused_input_params.size() + i) {
-          keep_dag_class = false;
-          break;
-        }
-      }
-    }
-
     if (verbose) {
       std::cout << "Remove unused qubits and input params: " << item->hash(ctx)
                 << std::endl;
     }
 
-    if (keep_dag_class) {
-      // Construct a new CircuitSeq class
-      classes_to_insert.push_back(std::make_unique<EquivalenceClass>());
-      auto &new_dag_class = classes_to_insert.back();
-      new_dag_class->reserve(item->size());
-      auto dags_unique_ptr = item->extract();
-      bool already_exist = false;
-      // We only need to check the first CircuitSeq to see if the class
-      // already exists.
-      bool first_dag = true;
-      for (auto &dag : dags_unique_ptr) {
-        bool ret = dag->remove_unused_qubits(unused_qubits);
-        assert(ret);
-        ret = dag->remove_unused_input_params(unused_input_params);
-        assert(ret);
-        auto check_hash_value = [&](const CircuitSeqHashType &hash_value) {
-          if (already_exist) {
-            return;
-          }
-          for (auto &possible_class : get_possible_classes(hash_value)) {
-            for (auto &other_dag : possible_class->get_all_dags()) {
-              if (dag->fully_equivalent(*other_dag)) {
-                already_exist = true;
-                break;
-              }
-            }
-            if (already_exist) {
+    // Construct a new CircuitSeq class
+    classes_to_insert.push_back(std::make_unique<EquivalenceClass>());
+    auto &new_dag_class = classes_to_insert.back();
+    new_dag_class->reserve(item->size());
+    auto dags_unique_ptr = item->extract();
+    bool already_exist = false;
+    // We only need to check the first CircuitSeq to see if the class
+    // already exists.
+    bool first_dag = true;
+    for (auto &dag : dags_unique_ptr) {
+      bool ret = dag->remove_unused_qubits(unused_qubits);
+      assert(ret);
+      auto check_hash_value = [&](const CircuitSeqHashType &hash_value) {
+        if (already_exist) {
+          return;
+        }
+        for (auto &possible_class : get_possible_classes(hash_value)) {
+          for (auto &other_dag : possible_class->get_all_dags()) {
+            if (dag->fully_equivalent(*other_dag)) {
+              already_exist = true;
               break;
             }
-          }
-        };
-        if (first_dag) {
-          auto hash_value = dag->hash(ctx);
-          check_hash_value(hash_value);
-          for (const auto &other_hash : dag->other_hash_values()) {
-            check_hash_value(other_hash);
           }
           if (already_exist) {
             break;
           }
-          first_dag = false;
         }
-        new_dag_class->insert(std::move(dag));
+      };
+      if (first_dag) {
+        auto hash_value = dag->hash(ctx);
+        check_hash_value(hash_value);
+        for (const auto &other_hash : dag->other_hash_values()) {
+          check_hash_value(other_hash);
+        }
+        if (already_exist) {
+          break;
+        }
+        first_dag = false;
       }
-      if (already_exist) {
-        // Remove the new class.
-        classes_to_insert.pop_back();
-        keep_dag_class = false;  // unused
-      } else {
-        // Add pointers to the new class.
-        for (auto &dag : new_dag_class->get_all_dags()) {
-          assert(dag);
-          set_possible_class(dag->hash(ctx), new_dag_class.get());
-          for (const auto &other_hash : dag->other_hash_values()) {
-            set_possible_class(other_hash, new_dag_class.get());
-          }
+      new_dag_class->insert(std::move(dag));
+    }
+    if (already_exist) {
+      // Remove the new class.
+      classes_to_insert.pop_back();
+    } else {
+      // Add pointers to the new class.
+      for (auto &dag : new_dag_class->get_all_dags()) {
+        assert(dag);
+        set_possible_class(dag->hash(ctx), new_dag_class.get());
+        for (const auto &other_hash : dag->other_hash_values()) {
+          set_possible_class(other_hash, new_dag_class.get());
         }
-        if (verbose) {
-          std::cout << "ECC " << item->hash(ctx) << " -> new ECC "
-                    << new_dag_class->hash(ctx) << std::endl;
-        }
+      }
+      if (verbose) {
+        std::cout << "ECC " << item->hash(ctx) << " -> new ECC "
+                  << new_dag_class->hash(ctx) << std::endl;
       }
     }
   }

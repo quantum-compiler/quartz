@@ -123,11 +123,13 @@ class EquivalenceSet {
   // Return the number of equivalent classes modified.
   int remove_unused_internal_params(Context *ctx, bool verbose = false);
 
-  // Remove unused qubits and input parameters if they are unused in
-  // each CircuitSeq of an equivalent class.
-  // Return the number of equivalent classes removed
-  // (and possibly inserted again).
-  int remove_unused_qubits_and_input_params(Context *ctx, bool verbose = false);
+  /**
+   * Remove unused qubits if they are unused in each CircuitSeq of an
+   * equivalent class.
+   * @return The number of equivalent classes removed
+   * (and possibly inserted again).
+   */
+  int remove_unused_qubits(Context *ctx, bool verbose = false);
 
   // For each pair of circuits in one equivalence class, if they share
   // a common "first" gate or a common "last" gate, remove the latter one.

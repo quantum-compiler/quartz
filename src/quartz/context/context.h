@@ -126,6 +126,13 @@ class Context {
    */
   void generate_parameter_expressions(int max_num_operators_per_expression = 1);
 
+  /**
+   * Compute and return which input parameters are used in each of the
+   * parameter expressions.
+   * @return The mask for each parameter expression.
+   */
+  [[nodiscard]] std::vector<InputParamMaskType> get_param_masks() const;
+
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].
   double random_number();

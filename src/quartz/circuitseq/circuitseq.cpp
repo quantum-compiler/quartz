@@ -469,32 +469,20 @@ bool CircuitSeq::input_param_used(int param_index) const {
   return !wires[get_num_qubits() + param_index]->output_gates.empty();
 }
 
-std::pair<InputParamMaskType, std::vector<InputParamMaskType>>
-CircuitSeq::get_input_param_mask() const {
-  std::vector<InputParamMaskType> param_mask(get_num_total_parameters());
-  for (int i = 0; i < get_num_input_parameters(); i++) {
-    param_mask[i] = 1 << i;
-  }
-  for (int i = get_num_input_parameters(); i < get_num_total_parameters();
-       i++) {
-    param_mask[i] = 0;
-    assert(parameters[i]->input_gates.size() == 1);
-    for (auto &input_wire : parameters[i]->input_gates[0]->input_wires) {
-      param_mask[i] |= param_mask[input_wire->index];
-    }
-  }
+InputParamMaskType CircuitSeq::get_input_param_usage_mask(
+    const std::vector<InputParamMaskType> &param_masks) const {
   InputParamMaskType usage_mask{0};
   for (auto &circuit_gate : gates) {
-    // Only consider quantum gate usages of parameters
+    // A quantum gate using parameters.
     if (circuit_gate->gate->is_parametrized_gate()) {
       for (auto &input_wire : circuit_gate->input_wires) {
         if (input_wire->is_parameter()) {
-          usage_mask |= param_mask[input_wire->index];
+          usage_mask |= param_masks[input_wire->index];
         }
       }
     }
   }
-  return std::make_pair(usage_mask, param_mask);
+  return usage_mask;
 }
 
 void CircuitSeq::generate_hash_values(

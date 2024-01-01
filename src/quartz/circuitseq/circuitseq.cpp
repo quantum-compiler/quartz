@@ -1281,6 +1281,11 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   outputs.reserve(other.outputs.size());
   parameters.clear();
   parameters.reserve(other.parameters.size());
+  for (int i = 0; i < (int)other.gates.size(); i++) {
+    gates.emplace_back(std::make_unique<CircuitGate>(*(other.gates[i])));
+    assert(gates[i].get() != other.gates[i].get());
+    gates_mapping[other.gates[i].get()] = gates[i].get();
+  }
   if (qubit_permutation.empty() && param_permutation.empty()) {
     // A simple clone.
     hash_value_ = other.hash_value_;
@@ -1320,11 +1325,6 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       }
     }
   }
-  for (int i = 0; i < (int)other.gates.size(); i++) {
-    gates.emplace_back(std::make_unique<CircuitGate>(*(other.gates[i])));
-    assert(gates[i].get() != other.gates[i].get());
-    gates_mapping[other.gates[i].get()] = gates[i].get();
-  }
   for (auto &wire : wires) {
     for (auto &circuit_gate : wire->input_gates) {
       circuit_gate = gates_mapping[circuit_gate];
@@ -1335,7 +1335,9 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   }
   for (auto &circuit_gate : gates) {
     for (auto &wire : circuit_gate->input_wires) {
-      wire = wires_mapping[wire];
+      if (wire->is_qubit()) {
+        wire = wires_mapping[wire];
+      }
     }
     for (auto &wire : circuit_gate->output_wires) {
       wire = wires_mapping[wire];

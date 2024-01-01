@@ -247,8 +247,9 @@ class CircuitSeq {
    * @param input_param_permutation The input parameter permutation. If the size
    * is smaller than the total number of input parameters, this function only
    * permutes a prefix of input parameters corresponding to |param_permutation|.
-   * @param ctx The context, only needed when |param_permutation| is not empty.
-   * When |param_permutation| is empty, it is safe to pass in a nullptr.
+   * @param ctx The context, only needed when |input_param_permutation| is not
+   * empty. When |input_param_permutation| is empty, it is safe to pass in a
+   * nullptr.
    * @return The permuted circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
@@ -269,6 +270,18 @@ class CircuitSeq {
   static bool same_gate(CircuitGate *gate1, CircuitGate *gate2);
 
  private:
+  /**
+   * Clone the circuit from another circuit sequence.
+   * @param other The source circuit sequence.
+   * @param qubit_permutation The qubit permutation (optional).
+   * If not empty, the size must be the same as the number of qubits.
+   * @param param_permutation The parameter permutation (optional).
+   * If empty, |ctx| is not used and all parameters will be from the same
+   * context as |other|.
+   * @param ctx The context, only needed when |param_permutation| is not empty.
+   * When |param_permutation| is empty, it is safe to pass in a nullptr.
+   * @return The permuted circuit sequence.
+   */
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
                   const std::vector<int> &param_permutation,

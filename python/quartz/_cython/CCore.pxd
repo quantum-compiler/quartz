@@ -72,11 +72,8 @@ ctypedef Context* Context_ptr
 
 cdef extern from "circuitseq/circuitseq.h" namespace "quartz":
     cdef cppclass CircuitSeq:
-        CircuitSeq(int, int) except +
+        CircuitSeq(int) except +
         int get_num_qubits() const
-        int get_num_input_parameters() const
-        int get_num_total_parameters() const
-        int get_num_internal_parameters() const
         int get_num_gates() const
 
 ctypedef CircuitSeq* CircuitSeq_ptr

@@ -52,9 +52,6 @@ class EquivalenceClass {
       Context *ctx,
       std::unordered_set<CircuitSeqHashType> &hash_values_to_remove);
 
-  // Return the number of circuits modified.
-  int remove_unused_internal_parameters(Context *ctx);
-
   // Return the hash of the first CircuitSeq.
   CircuitSeqHashType hash(Context *ctx);
 
@@ -118,10 +115,6 @@ class EquivalenceSet {
   // Return the number of equivalent classes modified.
   int normalize_to_canonical_representations(Context *ctx,
                                              bool verbose = false);
-
-  // Remove unused internal parameters.
-  // Return the number of equivalent classes modified.
-  int remove_unused_internal_params(Context *ctx, bool verbose = false);
 
   /**
    * Remove unused qubits if they are unused in each CircuitSeq of an

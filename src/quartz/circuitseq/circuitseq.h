@@ -148,17 +148,6 @@ class CircuitSeq {
   // Returns false iff an error occurs.
   bool remove_unused_qubits(std::vector<int> unused_qubits);
 
-  // Remove the parameter set of |unused_input_params|, given that they
-  // are unused input parameters Returns false iff an error occurs.
-  bool remove_unused_input_params(std::vector<int> unused_input_params);
-
-  // Remove a suffix of unused input parameters.
-  CircuitSeq &shrink_unused_input_parameters();
-  [[nodiscard]] std::unique_ptr<CircuitSeq>
-  clone_and_shrink_unused_input_parameters() const;
-  [[nodiscard]] bool has_unused_parameter() const;
-  // Returns the number of internal parameters removed.
-  int remove_unused_internal_parameters();
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string(bool line_number = false) const;
   [[nodiscard]] std::string to_json() const;

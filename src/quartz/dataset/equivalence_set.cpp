@@ -142,19 +142,6 @@ int EquivalenceClass::remove_common_first_or_last_gates(
   return (int)removing_ids.size();
 }
 
-int EquivalenceClass::remove_unused_internal_parameters(Context *ctx) {
-  int num_dag_modified = 0;
-  for (auto &dag : dags_) {
-    if (dag->remove_unused_internal_parameters()) {
-      num_dag_modified++;
-      // Restore the hash value.
-      // (probably |circuitseq->hash_value_valid_ = true;| also works)
-      dag->hash(ctx);
-    }
-  }
-  return num_dag_modified;
-}
-
 CircuitSeqHashType EquivalenceClass::hash(Context *ctx) {
   for (auto &dag : dags_) {
     if (dag) {
@@ -457,7 +444,7 @@ bool EquivalenceSet::simplify(Context *ctx,
                               bool other_simplification, bool verbose) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 6;
+  constexpr int kNumOptimizationsToPerform = 5;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
@@ -469,12 +456,6 @@ bool EquivalenceSet::simplify(Context *ctx,
     }
     if (normalize_to_minimal_circuit_representation &&
         normalize_to_canonical_representations(ctx, verbose)) {
-      remaining_optimizations = kNumOptimizationsToPerform;
-      ever_simplified = true;
-    } else if (!--remaining_optimizations) {
-      break;
-    }
-    if (other_simplification && remove_unused_internal_params(ctx, verbose)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -630,20 +611,6 @@ int EquivalenceSet::normalize_to_canonical_representations(Context *ctx,
         // Add the hash value.
         set_possible_class(hash_value, item.get());
       }
-    }
-  }
-  return num_class_modified;
-}
-
-int EquivalenceSet::remove_unused_internal_params(Context *ctx, bool verbose) {
-  int num_class_modified = 0;
-  for (auto &item : classes_) {
-    if (item->remove_unused_internal_parameters(ctx)) {
-      if (verbose) {
-        std::cout << "Remove unused internal params: " << item->hash(ctx)
-                  << std::endl;
-      }
-      num_class_modified++;
     }
   }
   return num_class_modified;

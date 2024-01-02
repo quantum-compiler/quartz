@@ -38,11 +38,8 @@ class Context {
    * Two deterministic (random) distributions for each number of qubits.
    */
   void gen_input_and_hashing_dis(int num_qubits);
-  std::vector<ParamType> get_and_gen_parameters(int num_params);
   [[nodiscard]] const Vector &get_generated_input_dis(int num_qubits) const;
   [[nodiscard]] const Vector &get_generated_hashing_dis(int num_qubits) const;
-  [[nodiscard]] std::vector<ParamType>
-  get_generated_parameters(int num_params) const;
   [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 
@@ -91,8 +88,8 @@ class Context {
    */
   int get_new_param_expression_id(const std::vector<int> &parameter_indices,
                                   Gate *op);
-  // TODO: This function should not be needed
   [[nodiscard]] int get_num_parameters() const;
+  [[nodiscard]] int get_num_input_symbolic_parameters() const;
   [[nodiscard]] bool param_is_symbolic(int id) const;
   [[nodiscard]] bool param_has_value(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
@@ -139,6 +136,15 @@ class Context {
 
  private:
   bool insert_gate(GateType tp);
+
+  /**
+   * Generate random values for random testing for input symbolic parameters.
+   * The results are stored in |random_parameters_|.
+   * The size of |random_parameters_| should be equal to the number of input
+   * symbolic parameters.
+   * @param num_params The number of input symbolic parameters.
+   */
+  void gen_random_parameters(int num_params);
 
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;

@@ -779,20 +779,20 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
   std::sort(classes_.begin(), classes_.end(),
             UniquePtrEquivalenceClassComparator());
   std::vector<EquivalenceClass *> classes_to_remove;
+  const int num_input_param = ctx->get_num_input_symbolic_parameters();
+  auto param_masks = ctx->get_param_masks();
   for (auto &item : classes_) {
     if (item->size() == 0) {
       continue;
     }
     const auto &dags = item->get_all_dags();
-    int min_num_input_param = dags[0]->get_num_input_parameters();
+    // Compute which input parameters are used in all circuits in this ECC.
+    auto param_mask = dags[0]->get_input_param_usage_mask(param_masks);
     for (auto &dag : dags) {
-      min_num_input_param =
-          std::min(min_num_input_param, dag->get_num_input_parameters());
-      if (min_num_input_param <= 1) {
-        break;
-      }
+      param_mask = param_mask & dag->get_input_param_usage_mask(param_masks);
     }
-    if (min_num_input_param <= 1) {
+    if (param_mask == 0 || param_mask == (param_mask & (-param_mask))) {
+      // At most 1 common parameter.
       // No way to permute the parameters.
       continue;
     }
@@ -801,20 +801,36 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
     for (int i = 0; i < (int)qubit_permutation.size(); i++) {
       qubit_permutation[i] = i;
     }
-    std::vector<int> param_permutation(min_num_input_param);
-    for (int i = 0; i < min_num_input_param; i++) {
-      param_permutation[i] = i;
+    std::vector<int> masked_param_location;
+    for (int i = 0; i < num_input_param; i++) {
+      if (param_mask & (((InputParamMaskType)1) << i)) {
+        masked_param_location.push_back(i);
+      }
+    }
+    std::vector<int> masked_param_permutation(masked_param_location.size());
+    for (int i = 0; i < (int)masked_param_location.size(); i++) {
+      masked_param_permutation[i] = i;
+    }
+    std::vector<int> input_param_permutation(num_input_param);
+    for (int i = 0; i < num_input_param; i++) {
+      input_param_permutation[i] = i;
     }
     bool found_permuted_equivalence = false;
     do {
+      // Get the permutation for all input parameters from the masked
+      // permutation.
+      for (int i = 0; i < (int)masked_param_location.size(); i++) {
+        input_param_permutation[masked_param_location[i]] =
+            masked_param_location[masked_param_permutation[i]];
+      }
       // Check all permutations including the identity (because
       // we want to merge ECCs with the same CircuitSeq).
       std::set<EquivalenceClass *> permuted_classes;
       std::vector<std::unique_ptr<CircuitSeq>> permuted_dags;
       permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
-        permuted_dags.emplace_back(
-            dag->get_permuted_seq(qubit_permutation, param_permutation, ctx));
+        permuted_dags.emplace_back(dag->get_permuted_seq(
+            qubit_permutation, input_param_permutation, ctx));
       }
       for (auto &permuted_dag : permuted_dags) {
         for (const auto &permuted_class :
@@ -850,8 +866,8 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
         }
         break;
       }
-    } while (std::next_permutation(param_permutation.begin(),
-                                   param_permutation.end()));
+    } while (std::next_permutation(masked_param_permutation.begin(),
+                                   masked_param_permutation.end()));
     if (found_permuted_equivalence) {
       // Remove this equivalence class.
       classes_to_remove.push_back(item.get());
@@ -906,7 +922,6 @@ int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
       continue;
     }
     const auto &dags = item->get_all_dags();
-    int min_num_input_param = dags[0]->get_num_input_parameters();
     int num_qubits = dags[0]->get_num_qubits();
     if (num_qubits <= 1) {
       // No way to permute the qubit.
@@ -916,11 +931,6 @@ int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
     for (int i = 0; i < num_qubits; i++) {
       qubit_permutation[i] = i;
     }
-    // |param_permutation| is always the identity.
-    std::vector<int> param_permutation(min_num_input_param);
-    for (int i = 0; i < min_num_input_param; i++) {
-      param_permutation[i] = i;
-    }
     bool found_permuted_equivalence = false;
     do {
       // Check all permutations including the identity (because
@@ -929,8 +939,8 @@ int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
       std::vector<std::unique_ptr<CircuitSeq>> permuted_dags;
       permuted_dags.reserve(dags.size());
       for (auto &dag : dags) {
-        permuted_dags.emplace_back(
-            dag->get_permuted_seq(qubit_permutation, param_permutation, ctx));
+        permuted_dags.emplace_back(dag->get_permuted_seq(
+            qubit_permutation, /*no parameter permutation*/ {}, ctx));
       }
       for (auto &permuted_dag : permuted_dags) {
         for (const auto &permuted_class :

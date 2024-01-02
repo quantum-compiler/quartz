@@ -21,7 +21,6 @@ void test_optimization(Context *ctx, const std::string &file_name,
     return;
   }
   ctx->gen_input_and_hashing_dis(dag->get_num_qubits());
-  ctx->get_and_gen_parameters(dag->get_num_input_parameters());
 
   quartz::Graph graph(ctx, dag);
   std::cout << graph.total_cost() << " gates in circuit before optimizing."

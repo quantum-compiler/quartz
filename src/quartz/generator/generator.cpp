@@ -202,7 +202,7 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
         return;
       }
 
-      for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
+      for (int p1 = 0; p1 < (int)input_param_masks_.size(); p1++) {
         if (unique_parameters) {
           if (current_usage_mask & input_param_masks_[p1]) {
             // p1 contains an already used input parameter.

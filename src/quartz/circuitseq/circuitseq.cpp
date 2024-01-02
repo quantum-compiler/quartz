@@ -94,13 +94,6 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
   if (get_num_gates() != other.get_num_gates()) {
     return get_num_gates() < other.get_num_gates();
   }
-  if (get_num_input_parameters() != other.get_num_input_parameters()) {
-    return get_num_input_parameters() < other.get_num_input_parameters();
-  }
-  if (get_num_total_parameters() != other.get_num_total_parameters()) {
-    // We want fewer quantum gates, i.e., more traditional parameters.
-    return get_num_total_parameters() > other.get_num_total_parameters();
-  }
   for (int i = 0; i < (int)gates.size(); i++) {
     if (gates[i]->gate->tp != other.gates[i]->gate->tp) {
       return gates[i]->gate->tp < other.gates[i]->gate->tp;
@@ -542,8 +535,7 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
     // Apply phase shift for e^(ip) or e^(-ip) for p being a parameter
     // (either input or internal).
     CircuitSeqHashType tmp;
-    assert(all_parameters.size() == get_num_total_parameters());
-    const int num_total_params = get_num_total_parameters();
+    const int num_total_params = (int)all_parameters.size();
     for (int i = 0; i < num_total_params; i++) {
       const auto &param = all_parameters[i];
       ComplexType shifted =
@@ -686,10 +678,6 @@ std::string CircuitSeq::to_json() const {
   result += "[";
   result += std::to_string(get_num_qubits());
   result += ",";
-  result += std::to_string(get_num_input_parameters());
-  result += ",";
-  result += std::to_string(get_num_total_parameters());
-  result += ",";
   result += std::to_string(get_num_gates());
   result += ",";
 
@@ -769,18 +757,11 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
 
   // basic info
-  int num_qubits, num_input_params, num_total_params, num_gates;
+  int num_qubits, num_gates;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
   fin >> num_qubits;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
-  fin >> num_input_params;
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
-  fin >> num_total_params;
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_gates;
-
-  ctx->gen_input_and_hashing_dis(num_qubits);
-  ctx->get_and_gen_parameters(num_input_params);
 
   // ignore other hash values
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');

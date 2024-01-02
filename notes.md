@@ -2,8 +2,4 @@
 result += "[";
 result += std::to_string(get_num_qubits());
 result += ",";
-result += std::to_string(get_num_input_parameters());
-result += ",";
-result += std::to_string(get_num_total_parameters());
-result += ",";
 result += std::to_string(get_num_gates());

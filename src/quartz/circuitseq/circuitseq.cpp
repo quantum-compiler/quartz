@@ -670,54 +670,57 @@ std::string CircuitSeq::to_string(bool line_number) const {
   return result;
 }
 
-std::string CircuitSeq::to_json() const {
+std::string CircuitSeq::to_json(bool keep_hash_value) const {
   std::string result;
   result += "[";
 
-  // basic info
+  // basic info (meta data)
   result += "[";
   result += std::to_string(get_num_qubits());
   result += ",";
   result += std::to_string(get_num_gates());
-  result += ",";
 
-  result += "[";
-  if (hash_value_valid_) {
-    bool first_other_hash_value = true;
-    for (const auto &val : other_hash_values_with_phase_shift_id()) {
-      if (first_other_hash_value) {
-        first_other_hash_value = false;
-      } else {
-        result += ",";
-      }
-      static char buffer[64];
-      auto [ptr, ec] =
-          std::to_chars(buffer, buffer + sizeof(buffer), val.first, /*base=*/
-                        16);
-      assert(ec == std::errc());
-      auto hash_value = std::string(buffer, ptr);
-      if (kCheckPhaseShiftInGenerator && val.second != kNoPhaseShift) {
-        // hash value and phase shift id
-        result += "[\"" + hash_value + "\"," + std::to_string(val.second) + "]";
-      } else {
-        // hash value only
-        result += "\"" + hash_value + "\"";
+  if (keep_hash_value) {
+    result += ",[";
+    if (hash_value_valid_) {
+      bool first_other_hash_value = true;
+      for (const auto &val : other_hash_values_with_phase_shift_id()) {
+        if (first_other_hash_value) {
+          first_other_hash_value = false;
+        } else {
+          result += ",";
+        }
+        static char buffer[64];
+        auto [ptr, ec] =
+            std::to_chars(buffer, buffer + sizeof(buffer), val.first, /*base=*/
+                          16);
+        assert(ec == std::errc());
+        auto hash_value = std::string(buffer, ptr);
+        if (kCheckPhaseShiftInGenerator && val.second != kNoPhaseShift) {
+          // hash value and phase shift id
+          result +=
+              "[\"" + hash_value + "\"," + std::to_string(val.second) + "]";
+        } else {
+          // hash value only
+          result += "\"" + hash_value + "\"";
+        }
       }
     }
+    result += "]";
+
+    result += ",";
+    result += "[";
+    // std::to_chars for floating-point numbers is not supported by some
+    // compilers, including GCC with version < 11.
+    result += to_string_with_precision(original_fingerprint_.real(),
+                                       /*precision=*/17);
+    result += ",";
+    result += to_string_with_precision(original_fingerprint_.imag(),
+                                       /*precision=*/17);
+    result += "]";
   }
-  result += "]";
 
-  result += ",";
-  result += "[";
-  // std::to_chars for floating-point numbers is not supported by some
-  // compilers, including GCC with version < 11.
-  result += to_string_with_precision(original_fingerprint_.real(),
-                                     /*precision=*/17);
-  result += ",";
-  result += to_string_with_precision(original_fingerprint_.imag(),
-                                     /*precision=*/17);
-  result += "]";
-
+  // end of meta data
   result += "], ";
 
   // gates

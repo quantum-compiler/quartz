@@ -3,11 +3,9 @@ import math
 import z3
 
 meta_index_num_qubits = 0
-meta_index_num_input_parameters = 1
-meta_index_num_total_parameters = 2
-meta_index_num_gates = 3
-meta_index_other_hash_values = 4
-meta_index_original_fingerprint = 5
+meta_index_num_gates = 1
+meta_index_other_hash_values = 2  # needs CircuitSeq::to_json(/*keep_hash_value=*/true)
+meta_index_original_fingerprint = 3  # needs CircuitSeq::to_json(/*keep_hash_value=*/true)
 
 kCheckPhaseShiftOfPiOver4Index = 10000  # A copy of the value in utils.h
 

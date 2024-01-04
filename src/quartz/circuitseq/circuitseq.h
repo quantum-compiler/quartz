@@ -150,7 +150,7 @@ class CircuitSeq {
 
   void print(Context *ctx) const;
   [[nodiscard]] std::string to_string(bool line_number = false) const;
-  [[nodiscard]] std::string to_json() const;
+  [[nodiscard]] std::string to_json(bool keep_hash_value = true) const;
   static std::unique_ptr<CircuitSeq> read_json(Context *ctx, std::istream &fin);
   static std::unique_ptr<CircuitSeq>
   from_qasm_file(Context *ctx, const std::string &filename);
@@ -314,14 +314,14 @@ class CircuitSeq {
   // For both floating-point error tolerance
   // and equivalences under a phase shift.
   // The first component of the pair is the hash value,
-  // and the second component is the id of the phase shifted.
-  // For now, the id is hard-coded as follows:
+  // and the second component is the ID of the phase shifted.
+  // For now, the ID is hard-coded as follows:
   //   - |kNoPhaseShift|: no shift
-  //   - p \in [0, get_num_total_parameters()):
+  //   - p \in [0, ctx->get_num_parameters()):
   //       shifted by e^(i * (p-th parameter))
-  //   - p \in [get_num_total_parameters(), 2 *
-  //   get_num_total_parameters()):
-  //       shifted by e^(-i * ((p - get_num_total_parameters())-th
+  //   - p \in [ctx->get_num_parameters(), 2 *
+  //   ctx->get_num_parameters()):
+  //       shifted by e^(-i * ((p - ctx->get_num_parameters())-th
   //       parameter))
   std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>>
       other_hash_values_;

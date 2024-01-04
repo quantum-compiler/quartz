@@ -130,6 +130,19 @@ class Context {
    */
   [[nodiscard]] std::vector<InputParamMaskType> get_param_masks() const;
 
+  /**
+   * Dump the parameter information into a Json-style string.
+   * @return The string of parameter information.
+   */
+  [[nodiscard]] std::string param_info_to_json() const;
+
+  /**
+   * Load parameter information from a Json stream
+   * (clear all existing parameters).
+   * @param fin The input stream.
+   */
+  void load_param_info_from_json(std::istream &fin);
+
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].
   double random_number();

@@ -19,15 +19,16 @@ std::string to_json_style_string(const std::vector<T> &vec) {
 }
 
 /**
- * Read a json array from a stringstream into a vector.
+ * Read a json array from an istream or stringstream into a vector.
+ * @tparam S std::istream or std::stringstream.
  * @tparam T The type of the item in the vector.
- * @param ss The stringstream with a json array at the beginning, created by
- * to_json_style_string(vec) above.
+ * @param ss The istream/stringstream with a json array at the beginning,
+ * created by to_json_style_string(vec) above.
  * @param vec The returned vector. The original content is deleted.
  * @return True iff the read is successful.
  */
-template <typename T>
-bool read_json_style_vector(std::stringstream &ss, std::vector<T> &vec) {
+template <typename S, typename T>
+bool read_json_style_vector(S &ss, std::vector<T> &vec) {
   char c;
   while (ss >> c) {
     if (c == '[') {

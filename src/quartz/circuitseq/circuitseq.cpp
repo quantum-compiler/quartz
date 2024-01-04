@@ -718,33 +718,15 @@ std::string CircuitSeq::to_json() const {
                                      /*precision=*/17);
   result += "]";
 
-  result += "],";
+  result += "], ";
 
   // gates
   const int num_gates = (int)gates.size();
   result += "[";
   for (int i = 0; i < num_gates; i++) {
-    result += "[";
-    result += "\"" + gate_type_name(gates[i]->gate->tp) + "\", ";
-    if (gates[i]->output_wires.size() == 1) {
-      result += "[\"" + gates[i]->output_wires[0]->to_string() + "\"],";
-    } else if (gates[i]->output_wires.size() == 2) {
-      result += "[\"" + gates[i]->output_wires[0]->to_string();
-      result += "\", \"" + gates[i]->output_wires[1]->to_string();
-      result += "\"],";
-    } else {
-      assert(false && "A circuit gate should have 1 or 2 outputs.");
-    }
-    result += "[";
-    for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
-      result += "\"" + gates[i]->input_wires[j]->to_string() + "\"";
-      if (j != (int)gates[i]->input_wires.size() - 1) {
-        result += ", ";
-      }
-    }
-    result += "]]";
+    result += gates[i]->to_json();
     if (i + 1 != num_gates)
-      result += ",";
+      result += ", ";
   }
   result += "]";
 
@@ -783,7 +765,6 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
 
-  // TODO
   auto result = std::make_unique<CircuitSeq>(num_qubits);
 
   // gates
@@ -799,42 +780,10 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
     }
 
     // New gate
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-    std::string name;
-    std::getline(fin, name, '\"');
-    auto gate_type = to_gate_type(name);
-    Gate *gate = ctx->get_gate(gate_type);
-
+    Gate *gate;
     std::vector<int> input_qubits, input_params, output_qubits, output_params;
-    auto read_indices = [&](std::vector<int> &qubit_indices,
-                            std::vector<int> &param_indices) {
-      fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-      while (true) {
-        fin.get(ch);
-        while (ch != '\"' && ch != ']') {
-          fin.get(ch);
-        }
-        if (ch == ']') {
-          break;
-        }
-
-        // New index
-        fin.get(ch);
-        assert(ch == 'P' || ch == 'Q');
-        int index;
-        fin >> index;
-        fin.ignore();  // '\"'
-        if (ch == 'Q') {
-          qubit_indices.push_back(index);
-        } else {
-          param_indices.push_back(index);
-        }
-      }
-    };
-    read_indices(output_qubits, output_params);
-    read_indices(input_qubits, input_params);
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
-
+    CircuitGate::read_json(fin, ctx, input_qubits, input_params, output_qubits,
+                           output_params, gate);
     result->add_gate(input_qubits, input_params, gate, ctx);
   }
 

@@ -1,7 +1,8 @@
 #include "context.h"
 
-#include "../gate/all_gates.h"
 #include "quartz/circuitseq/circuitseq.h"
+#include "quartz/gate/all_gates.h"
+#include "quartz/utils/string_utils.h"
 
 #include <cassert>
 #include <cmath>
@@ -408,6 +409,77 @@ std::vector<InputParamMaskType> Context::get_param_masks() const {
     }
   }
   return param_mask;
+}
+
+std::string Context::param_info_to_json() const {
+  std::string result = "[";
+  result += "[";
+  result += std::to_string(is_parameter_symbolic_.size());
+  for (int i = 0; i < (int)is_parameter_symbolic_.size(); i++) {
+    if (param_is_expression(i)) {
+      result += parameter_wires_[i]->input_gates[0]->to_json();
+    } else if (is_parameter_symbolic_[i]) {
+      result += "\"\"";
+    } else {
+      result +=
+          to_string_with_precision(parameter_values_[i], /*precision=*/17);
+    }
+    if (i != (int)is_parameter_symbolic_.size() - 1) {
+      result += ", ";
+    }
+  }
+  result += "], ";
+  result += to_json_style_string(random_parameters_);
+  result += "]";
+  return result;
+}
+
+void Context::load_param_info_from_json(std::istream &fin) {
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  int num_params;
+  fin >> num_params;
+  is_parameter_symbolic_.clear();
+  is_parameter_symbolic_.reserve(num_params);
+  parameter_wires_.clear();
+  parameter_wires_.reserve(num_params);
+  parameter_values_.clear();
+  parameter_values_.reserve(num_params);
+  parameter_expressions_.clear();
+  for (int i = 0; i < num_params; i++) {
+    char ch;
+    fin >> ch;
+    while (ch != '[' && ch != '\"' && ch != '-' && !std::isdigit(ch) &&
+           ch != ']') {
+      fin >> ch;
+    }
+    assert(ch != ']');
+    if (ch == '[') {
+      // parameter expression
+      Gate *gate;
+      std::vector<int> input_qubits, input_params, output_qubits, output_params;
+      CircuitGate::read_json(fin, this, input_qubits, input_params,
+                             output_qubits, output_params, gate);
+      int id = get_new_param_expression_id(input_params, gate);
+      assert(id == i);
+    } else if (ch == '\"') {
+      // symbolic parameter
+      fin >> ch;
+      assert(ch == '\"');  // ""
+      int id = get_new_param_id();
+      assert(id == i);
+    } else {
+      // concrete parameter
+      fin.unget();
+      ParamType val;
+      fin >> val;
+      int id = get_new_param_id(val);
+      assert(id == i);
+    }
+  }
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
+  bool ret = read_json_style_vector(fin, random_parameters_);
+  assert(ret);
 }
 
 double Context::random_number() {

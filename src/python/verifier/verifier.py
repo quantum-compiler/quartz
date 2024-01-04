@@ -208,7 +208,10 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
         < kCheckPhaseShiftOfPiOver4Index + 8
     ):
         k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index
-        phase_shift_lambda = (kPhaseFactorConstantCosTable[k], kPhaseFactorConstantSinTable[k])
+        phase_shift_lambda = (
+            kPhaseFactorConstantCosTable[k],
+            kPhaseFactorConstantSinTable[k],
+        )
     elif phase_shift_id < len(all_parameters):
         phase_shift_lambda = all_parameters[phase_shift_id]
     else:
@@ -405,7 +408,9 @@ def equivalent(
 
     solver = z3.Solver()
     num_qubits = dag1_meta[meta_index_num_qubits]
-    equation_list = copy.deepcopy(equation_list_for_params)  # avoid changing |equation_list_for_params|
+    equation_list = copy.deepcopy(
+        equation_list_for_params
+    )  # avoid changing |equation_list_for_params|
     if check_phase_shift_in_smt_solver:
         # Let z3 check phase shift
         cosL = z3.Real("cosL")
@@ -791,9 +796,7 @@ def find_equivalences(
                             # Warning: If CircuitSeq::hash() is modified,
                             # the expression |is_fixed_for_all_dags| should be modified correspondingly.
                             is_fixed_for_all_dags = (
-                                0
-                                <= phase_shift_id
-                                < len(param_info)
+                                0 <= phase_shift_id < len(param_info)
                                 or len(param_info)
                                 <= phase_shift_id
                                 < len(param_info) * 2

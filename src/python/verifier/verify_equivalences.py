@@ -6,10 +6,10 @@ from verifier import *
 sys.path.append("..")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Usage example: python verify_equivalences.py input.json output.json -n
     # Do not invoke verify solver and assume we can verify it
-    if len(sys.argv) == 4 and str(sys.argv[3]) == '-n':
+    if len(sys.argv) == 4 and str(sys.argv[3]) == "-n":
         find_equivalences(
             sys.argv[1],
             sys.argv[2],

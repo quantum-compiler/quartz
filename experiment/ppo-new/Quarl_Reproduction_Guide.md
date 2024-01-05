@@ -9,20 +9,20 @@ To use already setup environment, start the docker container via the following c
 ```shell
 docker run --name quarl --gpus all -itd co1lin/quarl
 docker exec -it quarl zsh
-cd quartz # /home/ubuntu/quartz
-git checkout quarl-repro
+cd quarl-artifact # /home/ubuntu/quarl-artifact
+git pull && git checkout quarl-repro
 ```
 
 ### Manual Setup (Recommended for Development)
 
-1. Setup the Python environment with [mamba](https://github.com/quantum-compiler/quartz/blob/master/INSTALL.md#install-from-source). 
+1. Setup the Python environment with [mamba](https://github.com/quantum-compiler/Quarl-artifact/blob/master/INSTALL.md#install-from-source). 
 
-2. Install Quartz following [this section](https://github.com/quantum-compiler/quartz/blob/master/INSTALL.md#install-from-source), in which a mamba (conda) environment `quartz` is created.
+2. Install Quartz following [this section](https://github.com/quantum-compiler/Quarl-artifact/blob/master/INSTALL.md#install-from-source), in which a mamba (conda) environment `quartz` is created.
 
 3. Install packages for Quarl:
 
     ```shell
-    # at the root dir of quartz repo
+    # at the root dir of quarl-artifact repo
     git checkout quarl-repro
     cd experiment/ppo-new
     mamba activate quartz
@@ -35,7 +35,7 @@ git checkout quarl-repro
 5. Download the checkpoints for AI models and create some folders:
 
     ```shell
-    # at the root dir of quartz repo
+    # at the root dir of quarl-artifact repo
     git checkout quarl-repro
     cd experiment/ppo-new # this is the folder for Quarl experiments
     

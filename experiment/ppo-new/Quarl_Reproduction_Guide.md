@@ -63,13 +63,7 @@ CKPT=ckpts/nam2_rm_iter_404_6l.pt BS=4800 CIRC=mod_red_21 GPU=2 bash scripts/nam
 CKPT=ckpts/nam2_rm_iter_404_6l.pt BS=3200 CIRC=adder_8 GPU=3 bash scripts/nam2_rm_search.sh
 ```
 
-Examples for Table 3, CNOT count on Nam Gate set:
-
-```shell
-# w/o rotation merging pre-processing
-CKPT=ckpts/nam2_iter_111_6l_cx.pt BS=4800 CIRC=mod_red_21 GPU=0 bash scripts/nam2_search_cx.sh
-CKPT=ckpts/nam2_iter_111_6l_cx.pt BS=3200 CIRC=adder_8 GPU=1 bash scripts/nam2_search_cx.sh
-```
+(Metrics in Table 3 are obtained from experiments for Table 2.)
 
 Examples for Table 4, IBM Gate set:
 

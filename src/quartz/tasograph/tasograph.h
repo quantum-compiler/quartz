@@ -342,6 +342,9 @@ class Graph {
   std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
+
+ private:
+  std::map<Op, int> param_idx_;
 };
 
-};  // namespace quartz
+}  // namespace quartz

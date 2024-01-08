@@ -630,8 +630,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
         if (is_constant_input_parameter(srcOp, i)) {
           // Check if the constant input parameter is the same
           auto xfer_param_value = paramValues.find(in.idx)->second;
-          auto graph_param_value =
-              graph->constant_param_values.find(mappedOp)->second;
+          auto graph_param_value = graph->get_param_value(mappedOp);
           if (std::abs(xfer_param_value - graph_param_value) > eps)
             return false;
         }
@@ -646,8 +645,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           if (is_constant_input_parameter(srcOp, i)) {
             // Check if the constant input parameter is the same
             auto xfer_param_value = paramValues.find(in.idx)->second;
-            auto graph_param_value =
-                graph->constant_param_values.find(mappedOp)->second;
+            auto graph_param_value = graph->get_param_value(mappedOp);
             if (std::abs(xfer_param_value - graph_param_value) > eps)
               return false;
           }
@@ -660,8 +658,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
               if (is_constant_input_parameter(srcOp, i)) {
                 // Check if the constant input parameter is the same
                 auto xfer_param_value = paramValues.find(in.idx)->second;
-                auto graph_param_value =
-                    graph->constant_param_values.find(e.srcOp)->second;
+                auto graph_param_value = graph->get_param_value(e.srcOp);
                 if (std::abs(xfer_param_value - graph_param_value) > eps)
                   return false;
               }
@@ -948,8 +945,9 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 //           // New constant parameters
 //           Op input_constant_param_op(context->next_global_unique_id(),
 //                                      context->get_gate(GateType::input_param));
-//           newGraph->constant_param_values[input_constant_param_op] =
-//               paramValues.find(dstOp->inputs[i].idx)->second;
+//           newGraph->param_idx[input_constant_param_op] =
+//               context->get_new_param_id(
+//                   paramValues.find(dstOp->inputs[i].idx)->second);
 //           newGraph->add_edge(input_constant_param_op, dstOp->mapOp, 0, i);
 //           continue;
 //         };
@@ -971,7 +969,6 @@ bool GraphXfer::create_new_operator(const OpX *opx, Op &op) {
 
 std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
   std::shared_ptr<Graph> new_graph(new Graph(graph->context));
-  new_graph->constant_param_values = graph->constant_param_values;
   new_graph->special_op_guid = graph->special_op_guid;
   new_graph->input_qubit_op_2_qubit_idx = graph->input_qubit_op_2_qubit_idx;
   new_graph->inEdges = graph->inEdges;
@@ -1025,8 +1022,9 @@ std::shared_ptr<Graph> GraphXfer::create_new_graph(const Graph *graph) const {
           // New constant parameters
           Op input_constant_param_op(context->next_global_unique_id(),
                                      context->get_gate(GateType::input_param));
-          new_graph->constant_param_values[input_constant_param_op] =
-              paramValues.find(dst_opx->inputs[i].idx)->second;
+          new_graph->param_idx[input_constant_param_op] =
+              context->get_new_param_id(
+                  paramValues.find(dst_opx->inputs[i].idx)->second);
           new_graph->add_edge(input_constant_param_op, dst_opx->mapOp, 0, i);
           continue;
         };

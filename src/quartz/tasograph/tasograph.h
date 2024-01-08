@@ -310,6 +310,12 @@ class Graph {
   subgraph(const std::unordered_set<Op, OpHash> &ops) const;
   std::vector<std::shared_ptr<Graph>>
   topology_partition(const int partition_gate_count) const;
+  /**
+   * Return the parameter value if the Op is a constant parameter,
+   * or return 0 otherwise.
+   */
+  ParamType get_param_value(const Op &op) const;
+  bool param_has_value(const Op &op) const;
 
  private:
   void replace_node(Op oldOp, Op newOp);
@@ -339,12 +345,9 @@ class Graph {
   size_t special_op_guid;
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
-  std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
-
- private:
-  std::map<Op, int> param_idx_;
+  std::unordered_map<Op, int, OpHash> param_idx;
 };
 
 }  // namespace quartz

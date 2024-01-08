@@ -106,14 +106,8 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
           // into multiple ops in Graph.
           Op srcOp = Op(context->next_global_unique_id(),
                         context->get_gate(GateType::input_param));
-          param_idx_[srcOp] = input_node->index;
-
+          param_idx[srcOp] = input_node->index;
           add_edge(srcOp, dstOp, 0, dstIdx);
-
-          if (context->param_has_value(input_node->index)) {
-            constant_param_values[srcOp] =
-                context->get_param_value(input_node->index);
-          }
         } else {
           assert(input_node->type == CircuitWire::internal_param);
           auto ex = input_node->input_gates[0];
@@ -184,7 +178,6 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
 Graph::Graph(const Graph &graph) {
   context = graph.context;
-  constant_param_values = graph.constant_param_values;
   special_op_guid = graph.special_op_guid;
   input_qubit_op_2_qubit_idx = graph.input_qubit_op_2_qubit_idx;
   pos_2_logical_qubit = graph.pos_2_logical_qubit;
@@ -193,73 +186,11 @@ Graph::Graph(const Graph &graph) {
 }
 
 std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
-  int num_input_qubits = get_num_qubits();
-  int num_input_params = 0;
-  std::unordered_map<Op, std::vector<int>, OpHash> op_2_param_idx;
-  // We need to topologically sort the Ops while prioritizing the ones
-  // with smaller guid.
   std::priority_queue<Op, std::vector<Op>, std::greater<>> gates;
   std::unordered_map<Op, int, OpHash> gate_indegree;
 
-  // Find all input parameters.
-  std::vector<std::pair<int, int>> guid_and_param_index;
-  for (const auto &it : outEdges) {
-    if (it.first.ptr->tp == GateType::input_param &&
-        op_2_param_idx.count(it.first) == 0) {
-      int idx = num_input_params++;
-      op_2_param_idx[it.first] = std::vector<int>(1, idx);
-      guid_and_param_index.emplace_back(it.first.guid, idx);
-      gates.push(it.first);
-    }
-  }
-  // Sort input parameter index by guid.
-  // This is the order originally in CircuitSeq.
-  std::sort(guid_and_param_index.begin(), guid_and_param_index.end());
-  std::vector<int> param_index_position(num_input_params, 0);
-  for (int i = 0; i < num_input_params; i++) {
-    param_index_position[guid_and_param_index[i].second] = i;
-  }
-  for (auto &it : op_2_param_idx) {
-    it.second[0] = param_index_position[it.second[0]];
-  }
   // Construct the CircuitSeq.
-  auto seq = std::make_unique<CircuitSeq>(num_input_qubits);
-
-  // Add parameter gates.
-  // TODO: do it in Context
-  int num_total_params = num_input_params;
-  guid_and_param_index.clear();
-  while (!gates.empty()) {
-    const auto &gate = gates.top();
-    gates.pop();
-    if (outEdges.count(gate) == 0) {
-      continue;
-    }
-    for (auto &edge : outEdges.find(gate)->second) {
-      if (!edge.dstOp.ptr->is_parameter_gate()) {
-        continue;
-      }
-      if (gate_indegree.count(edge.dstOp) == 0) {
-        gate_indegree[edge.dstOp] = edge.dstOp.ptr->get_num_parameters();
-      }
-      gate_indegree[edge.dstOp]--;
-      if (!gate_indegree[edge.dstOp]) {
-        // Append the gate.
-        std::vector<int> param_indices(edge.dstOp.ptr->get_num_parameters(), 0);
-        for (auto &inedge : inEdges.find(edge.dstOp)->second) {
-          param_indices[inedge.dstIdx] =
-              op_2_param_idx[inedge.srcOp][inedge.srcIdx];
-        }
-        bool ret = seq->add_gate(/*qubit_indices=*/{}, param_indices,
-                                 edge.dstOp.ptr, context);
-        assert(ret);
-        // Each parameter gate contains 1 output parameter.
-        assert(output_param_index == num_total_params);
-        op_2_param_idx[edge.dstOp] = std::vector<int>(1, num_total_params++);
-        gates.push(edge.dstOp);
-      }
-    }
-  }
+  auto seq = std::make_unique<CircuitSeq>((int)get_num_qubits());
 
   // Add quantum gates.
   std::unordered_map<Op, std::vector<int>, OpHash> op_2_qubit_idx;
@@ -271,8 +202,8 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
     }
   }
   while (!gates.empty()) {
-    // Cannot use "const auto &" here!
-    auto gate = gates.top();
+    // Cannot use "const auto &" here because |gates.pop()| deletes the object.
+    Op gate = gates.top();
     gates.pop();
     if (outEdges.count(gate) == 0) {
       continue;
@@ -295,8 +226,10 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
               inedge.srcOp.ptr->tp == GateType::input_param) {
             // Parameters are ordered after qubits in Op.
             assert(inedge.dstIdx >= edge.dstOp.ptr->get_num_qubits());
+            auto param_idx_it = param_idx.find(inedge.srcOp);
+            assert(param_idx_it != param_idx.end());
             param_indices[inedge.dstIdx - edge.dstOp.ptr->get_num_qubits()] =
-                op_2_param_idx[inedge.srcOp][inedge.srcIdx];
+                param_idx_it->second;
           }
         }
         bool ret = seq->add_gate(qubit_indices, param_indices, edge.dstOp.ptr,
@@ -354,7 +287,7 @@ Op Graph::add_parameter(const ParamType p) {
   Gate *gate = context->get_gate(GateType::input_param);
   auto guid = context->next_global_unique_id();
   Op op(guid, gate);
-  constant_param_values[op] = p;
+  param_idx[op] = context->get_new_param_id(p);
   return op;
 }
 
@@ -655,7 +588,7 @@ void Graph::remove_node(Op oldOp) {
   }
   inEdges.erase(oldOp);
   outEdges.erase(oldOp);
-  constant_param_values.erase(oldOp);
+  param_idx.erase(oldOp);
 }
 
 void Graph::remove_node_wo_input_output_connect(Op oldOp) {
@@ -695,7 +628,7 @@ void Graph::remove_node_wo_input_output_connect(Op oldOp) {
   }
   inEdges.erase(oldOp);
   outEdges.erase(oldOp);
-  constant_param_values.erase(oldOp);
+  param_idx.erase(oldOp);
 }
 
 void Graph::remove_edge(Op srcOp, Op dstOp) {
@@ -764,7 +697,7 @@ void Graph::constant_and_rotation_elimination() {
       auto list = inEdges[op];
       for (auto it = list.begin(); it != list.end(); ++it) {
         auto src_op = it->srcOp;
-        if (constant_param_values.find(src_op) == constant_param_values.end()) {
+        if (!param_has_value(src_op)) {
           all_constants = false;
           break;
         }
@@ -774,7 +707,7 @@ void Graph::constant_and_rotation_elimination() {
           ParamType params[2], result = 0;
           for (auto it = list.begin(); it != list.end(); ++it) {
             auto edge = *it;
-            params[edge.dstIdx] = constant_param_values[edge.srcOp];
+            params[edge.dstIdx] = get_param_value(edge.srcOp);
             remove_node(edge.srcOp);
           }
           result = params[0] + params[1];
@@ -791,17 +724,17 @@ void Graph::constant_and_rotation_elimination() {
           Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
           add_edge(merged_op, output_dst_op, 0, output_dst_idx);
-          constant_param_values[merged_op] = result;
+          param_idx[merged_op] = context->get_new_param_id(result);
         } else if (op.ptr->tp == GateType::neg) {
           ParamType param = 0, result = 0;
           auto edge = *list.begin();
-          param = constant_param_values[edge.srcOp];
+          param = get_param_value(edge.srcOp);
           result = -param;
           // Normalize result to [0, 2pi)
           result = std::fmod(result, 2 * PI);
           if (result < 0)
             result += 2 * PI;
-          constant_param_values[edge.srcOp] = result;
+          param_idx[edge.srcOp] = context->get_new_param_id(result);
           // Find destination
           assert(outEdges[op].size() == 1);
           auto output_dst_op = (*outEdges[op].begin()).dstOp;
@@ -831,14 +764,13 @@ void Graph::constant_and_rotation_elimination() {
           all_parameter_is_0 = false;
           break;
         } else if (in_edge.dstIdx >= num_qubits) {
-          if (constant_param_values.find(in_edge.srcOp) ==
-              constant_param_values.end()) {
+          if (!param_has_value(in_edge.srcOp)) {
             // Not a constant parameter
             all_parameter_is_0 = false;
             break;
           } else {
             // A constant parameter
-            if (!equal_to_2k_pi(constant_param_values[in_edge.srcOp])) {
+            if (!equal_to_2k_pi(get_param_value(in_edge.srcOp))) {
               // The constant parameter is not 2kpi
               all_parameter_is_0 = false;
               break;
@@ -990,21 +922,19 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
     }
   }
   for (int i = num_qubits; i < num_qubits + num_params; ++i) {
-    if (constant_param_values.find(param_idx_2_op_0[i]) !=
-            constant_param_values.end() &&
-        constant_param_values.find(param_idx_2_op_1[i]) !=
-            constant_param_values.end()) {
+    if (param_has_value(param_idx_2_op_0[i]) &&
+        param_has_value(param_idx_2_op_1[i])) {
       // Index i parameter at both Ops are constant
-      ParamType sum = constant_param_values[param_idx_2_op_0[i]] +
-                      constant_param_values[param_idx_2_op_1[i]];
+      ParamType sum = get_param_value(param_idx_2_op_0[i]) +
+                      get_param_value(param_idx_2_op_1[i]);
       remove_node(param_idx_2_op_0[i]);
       remove_node(param_idx_2_op_1[i]);
       Op new_constant_op(context->next_global_unique_id(),
                          context->get_gate(GateType::input_param));
       add_edge(new_constant_op, op_0, 0, i);
-      constant_param_values[new_constant_op] = sum;
+      param_idx[new_constant_op] = context->get_new_param_id(sum);
     } else {
-      // Add a add gate
+      // Add an add gate
       Op new_add_op(context->next_global_unique_id(),
                     context->get_gate(GateType::add));
       add_edge(param_idx_2_op_0[i], new_add_op, 0, 0);
@@ -1012,6 +942,9 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
       add_edge(new_add_op, op_0, 0, i);
       remove_edge(param_idx_2_op_0[i], op_0);
       remove_edge(param_idx_2_op_1[i], op_1);
+      param_idx[new_add_op] = context->get_new_param_expression_id(
+          {param_idx[param_idx_2_op_0[i]], param_idx[param_idx_2_op_1[i]]},
+          context->get_gate(GateType::add));
     }
   }
   remove_node(op_1);
@@ -1177,9 +1110,8 @@ void Graph::rotation_merging(GateType target_rotation) {
         bool all_param_is_0 = true;
         for (auto edge : in_edges) {
           if (edge.dstIdx >= num_qubits) {
-            if (constant_param_values.find(edge.srcOp) ==
-                    constant_param_values.end() ||
-                !equal_to_2k_pi(constant_param_values[edge.srcOp])) {
+            if (!param_has_value(edge.srcOp) ||
+                !equal_to_2k_pi(get_param_value(edge.srcOp))) {
               all_param_is_0 = false;
               break;
             }
@@ -1334,11 +1266,10 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
           // Print parameters
           if (edge.dstIdx >= num_qubits) {
             // Parameter inputs
-            assert(constant_param_values.find(edge.srcOp) !=
-                   constant_param_values.end());  // All parameters should be
-                                                  // constant
+            // All parameters should be constant
+            assert(param_has_value(edge.srcOp));
             param_values[edge.dstIdx - num_qubits] =
-                constant_param_values.find(edge.srcOp)->second;
+                get_param_value(edge.srcOp);
           }
         }
         bool first = true;
@@ -2684,15 +2615,13 @@ bool Graph::equal(const Graph &other) const {
       auto edges1 = inEdges.find(ops1[i])->second;
       for (auto it = edges1.cbegin(); it != edges1.cend(); ++it) {
         if (it->srcOp.ptr->tp == GateType::input_param) {
-          params1[it->dstIdx - num_qubits] =
-              constant_param_values.find(it->srcOp)->second;
+          params1[it->dstIdx - num_qubits] = get_param_value(it->srcOp);
         }
       }
       auto edges2 = other.inEdges.find(ops2[i])->second;
       for (auto it = edges2.cbegin(); it != edges2.cend(); ++it) {
         if (it->srcOp.ptr->tp == GateType::input_param) {
-          params2[it->dstIdx - num_qubits] =
-              other.constant_param_values.find(it->srcOp)->second;
+          params2[it->dstIdx - num_qubits] = other.get_param_value(it->srcOp);
         }
       }
       for (int j = 0; j < num_params; j++) {
@@ -2787,12 +2716,9 @@ Graph::subgraph(const std::unordered_set<Op, OpHash> &ops) const {
         assert(e.srcOp.ptr->tp == GateType::input_param);
         assert(ops.find(e.srcOp) != ops.end());
         new_graph->add_edge(e.srcOp, op, e.srcIdx, e.dstIdx);
-        // Add constant values if the parameter have one
-        if (constant_param_values.find(e.srcOp) !=
-            constant_param_values.end()) {
-          new_graph->constant_param_values[e.srcOp] =
-              constant_param_values.find(e.srcOp)->second;
-        }
+        auto idx = param_idx.find(e.srcOp);
+        assert(idx != param_idx.end());
+        new_graph->param_idx[e.srcOp] = idx->second;
       }
     }
   }
@@ -2864,4 +2790,26 @@ Graph::topology_partition(const int partition_gate_count) const {
   }
   return subgraphs;
 }
-};  // namespace quartz
+
+ParamType Graph::get_param_value(const Op &op) const {
+  auto idx = param_idx.find(op);
+  if (idx == param_idx.end()) {
+    return 0;  // not a parameter
+  }
+  if (!context->param_has_value(idx->second)) {
+    return 0;  // not constant
+  }
+  return context->get_param_value(idx->second);
+}
+
+bool Graph::param_has_value(const Op &op) const {
+  auto idx = param_idx.find(op);
+  if (idx == param_idx.end()) {
+    return false;  // not a parameter
+  }
+  if (!context->param_has_value(idx->second)) {
+    return false;  // not constant
+  }
+  return true;
+}
+}  // namespace quartz

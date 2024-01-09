@@ -43,7 +43,7 @@ int main() {
          "phase_shift_before_verify.json phase_shift_verified.json True True");
   equiv_set.load_json(&ctx, "phase_shift_verified.json");
   equiv_set.simplify(&ctx);
-  equiv_set.save_json("phase_shift_verified_simplified.json");
+  equiv_set.save_json(&ctx, "phase_shift_verified_simplified.json");
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "Test phase shift with BFS verified: there are "
             << equiv_set.num_total_dags() << " circuits in "

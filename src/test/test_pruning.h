@@ -118,7 +118,8 @@ void test_pruning(
                        true,  /*common_subcircuit_pruning=*/
                        false, /*other_simplification=*/
                        true);
-    equiv_set.save_json(file_prefix + "pruning_other_simplification.json");
+    equiv_set.save_json(&ctx,
+                        file_prefix + "pruning_other_simplification.json");
     end = std::chrono::steady_clock::now();
     std::cout << std::dec << "Representative pruning: there are "
               << equiv_set.num_total_dags() << " circuits in "
@@ -139,7 +140,7 @@ void test_pruning(
     equiv_set.load_json(&ctx, file_prefix + "pruning.json");
     start = std::chrono::steady_clock::now();
     equiv_set.simplify(&ctx);
-    equiv_set.save_json(file_prefix + "pruning_simplified.json");
+    equiv_set.save_json(&ctx, file_prefix + "pruning_simplified.json");
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
     std::cout << std::dec << "Representative pruning: there are "

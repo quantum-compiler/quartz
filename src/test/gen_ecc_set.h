@@ -93,7 +93,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   auto start2 = std::chrono::steady_clock::now();
   equiv_set.simplify(&ctx);
   auto end2 = std::chrono::steady_clock::now();
-  equiv_set.save_json(file_prefix + "complete_ECC_set.json");
+  equiv_set.save_json(&ctx, file_prefix + "complete_ECC_set.json");
   auto end = std::chrono::steady_clock::now();
 
   std::cout << file_prefix.substr(0, file_prefix.size() - 1)

@@ -317,10 +317,9 @@ class CircuitSeq {
   std::vector<std::unique_ptr<CircuitWire>> wires;
   std::vector<std::unique_ptr<CircuitGate>> gates;
   std::vector<CircuitWire *> outputs;
-  std::vector<CircuitWire *> parameters;
 
  private:
-  int num_qubits, num_input_parameters;
+  int num_qubits;
   CircuitSeqHashType hash_value_;
   // For both floating-point error tolerance
   // and equivalences under a phase shift.

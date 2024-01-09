@@ -197,10 +197,6 @@ bool CircuitSeq::insert_gate(int insert_position,
   for (auto qubit_idx : qubit_indices)
     if ((qubit_idx < 0) || (qubit_idx >= get_num_qubits()))
       return false;
-  // parameter indices must stay in range
-  for (auto para_idx : parameter_indices)
-    if ((para_idx < 0) || (para_idx >= parameters.size()))
-      return false;
   // Find the location to insert.
   std::vector<CircuitWire *> previous_wires(get_num_qubits());
   for (int i = 0; i < get_num_qubits(); i++) {
@@ -1153,8 +1149,6 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   gates.reserve(other.gates.size());
   outputs.clear();
   outputs.reserve(other.outputs.size());
-  parameters.clear();
-  parameters.reserve(other.parameters.size());
   for (int i = 0; i < (int)other.gates.size(); i++) {
     gates.emplace_back(std::make_unique<CircuitGate>(*(other.gates[i])));
     assert(gates[i].get() != other.gates[i].get());
@@ -1219,9 +1213,6 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   }
   for (auto &wire : other.outputs) {
     outputs.emplace_back(wires_mapping[wire]);
-  }
-  for (auto &wire : other.parameters) {
-    parameters.emplace_back(wires_mapping[wire]);
   }
 }
 

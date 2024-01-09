@@ -207,7 +207,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
   std::unordered_map<EquivClassTag, std::vector<EquivClassTag>, PairHash>
       equiv_edges;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  ctx->load_param_info_from_json(fin);
   while (true) {
     char ch;
     fin.get(ch);
@@ -384,15 +384,19 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
   return true;
 }
 
-bool EquivalenceSet::save_json(const std::string &save_file_name) const {
+bool EquivalenceSet::save_json(Context *ctx,
+                               const std::string &save_file_name) const {
   std::ofstream fout;
   fout.open(save_file_name, std::ofstream::out);
   if (!fout.is_open()) {
     return false;
   }
 
-  // To adapt the format
-  fout << "[[]," << std::endl;
+  fout << "[" << std::endl;
+
+  fout << ctx->param_info_to_json() << std::endl;
+
+  fout << "," << std::endl;
 
   fout << "{" << std::endl;
   bool start0 = true;
@@ -411,7 +415,7 @@ bool EquivalenceSet::save_json(const std::string &save_file_name) const {
       } else {
         fout << ",";
       }
-      fout << dag->to_json();
+      fout << dag->to_json(/*keep_hash_value=*/false);
     }
     fout << "]" << std::endl;
   }

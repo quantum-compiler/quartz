@@ -118,21 +118,32 @@ class CircuitSeq {
                 const std::vector<ParamType> &parameter_values,
                 Vector &output_dis) const;
   [[nodiscard]] int get_num_qubits() const;
-  [[nodiscard]] int get_num_input_parameters() const;
-  [[nodiscard]] int get_num_total_parameters() const;
-  [[nodiscard]] int get_num_internal_parameters() const;
   [[nodiscard]] int get_num_gates() const;
   [[nodiscard]] int get_circuit_depth() const;
   [[nodiscard]] static ParamType get_parameter_value(Context *ctx,
                                                      int para_idx);
   [[nodiscard]] bool qubit_used(int qubit_index) const;
-  // Used by a parameter gate is considered as used here.
-  [[nodiscard]] bool input_param_used(int param_index) const;
-  // Returns a pair. The first component denotes the input parameters
-  // already used in this CircuitSeq. The second component denotes the input
-  // parameters used in each of the parameters in this CircuitSeq.
+  /**
+   * Returns the input parameters used in this CircuitSeq as a mask.
+   * @param param_masks The result of |Context::get_param_masks()|.
+   */
   [[nodiscard]] InputParamMaskType get_input_param_usage_mask(
       const std::vector<InputParamMaskType> &param_masks) const;
+  /**
+   * Returns the input parameters used in this CircuitSeq (sorted).
+   */
+  [[nodiscard]] std::vector<int> get_input_param_indices(Context *ctx) const;
+  /**
+   * Returns all parameter (expression) indices directly used used in this
+   * CircuitSeq (sorted).
+   */
+  [[nodiscard]] std::vector<int> get_directly_used_param_indices() const;
+  /**
+   * Returns all operations needed for all parameter expressions used in this
+   * CircuitSeq (in a topological order).
+   */
+  [[nodiscard]] std::vector<CircuitGate *>
+  get_param_expr_ops(Context *ctx) const;
   CircuitSeqHashType hash(Context *ctx);
   // Evaluate the output distribution 2^|num_qubits| times, with the i-th
   // time the input distribution being a vector with only the i-th entry

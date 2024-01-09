@@ -130,8 +130,6 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   ret = dst_dag->remove_unused_qubits(unused_qubits);
   assert(ret);
 
-  // TODO: remove common unused input parameters?
-
   // Eliminate transfers where src circuitseq has unused qubits
   auto src_num_qubits = src_dag->get_num_qubits();
   for (int i = 0; i < src_num_qubits; ++i) {
@@ -139,18 +137,19 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
       return nullptr;
   }
 
-  // Eliminate transfers where src circuitseq has unused input parameters
-  auto src_num_input_params = src_dag->get_num_input_parameters();
-  for (int i = 0; i < src_num_input_params; ++i) {
-    if (!src_dag->input_param_used(i))
+  auto src_input_params = src_dag->get_input_param_indices(_context);
+  auto dst_input_params = dst_dag->get_input_param_indices(_context);
+  // If equal_num_input_params is set, eliminate transfers where dst circuitseq
+  // has an input parameter that is not present in the src circuitseq.
+  if (equal_num_input_params) {
+    std::vector<int> diff;
+    std::set_difference(dst_input_params.begin(), dst_input_params.end(),
+                        src_input_params.begin(), src_input_params.end(),
+                        std::inserter(diff, diff.begin()));
+    if (!diff.empty()) {
       return nullptr;
+    }
   }
-
-  // If equal_num_input_params is set, then the number of input parameters
-  // must be equal
-  if (equal_num_input_params && src_dag->get_num_input_parameters() !=
-                                    dst_dag->get_num_input_parameters())
-    return nullptr;
 
   assert(src_dag->get_num_qubits() == dst_dag->get_num_qubits());
 
@@ -160,33 +159,17 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   // 1. unique_parameters == true when generating ECC sets
   // 2. the completeness of the ECC set
   // Here we refuse to generate transformations whose src and dst circuits
-  // has parameter gates whose inputs are identical.
+  // have identical parameter expressions.
 
-  // Traverse all the gates
-  for (auto &gate_src : src_dag->gates) {
-    // Check if the gate is a parameter gate
-    if (gate_src->gate->is_parameter_gate()) {
-      for (auto &gate_dst : dst_dag->gates) {
-        // Check if the gate is a parameter gate
-        if (gate_dst->gate->is_parameter_gate()) {
-          // Check if the gate are the same type
-          if (gate_src->gate->tp == gate_dst->gate->tp) {
-            // Check if the gates have the same inputs
-            std::set<int> src_gate_input_idx, dst_gate_input_idx;
-            for (int i = 0; i < gate_src->input_wires.size(); ++i) {
-              src_gate_input_idx.insert(gate_src->input_wires[i]->index);
-              dst_gate_input_idx.insert(gate_dst->input_wires[i]->index);
-            }
-            if (src_gate_input_idx != dst_gate_input_idx)
-              continue;
-            // Check if the gates have the same outputs
-            if (gate_src->output_wires[0]->index !=
-                gate_dst->output_wires[0]->index)
-              continue;
-            return nullptr;
-          }
-        }
-      }
+  auto src_param_exprs = src_dag->get_directly_used_param_indices();
+  auto dst_param_exprs = dst_dag->get_directly_used_param_indices();
+  std::vector<int> param_intersection;
+  std::set_intersection(src_param_exprs.begin(), src_param_exprs.end(),
+                        dst_param_exprs.begin(), dst_param_exprs.end(),
+                        std::back_inserter(param_intersection));
+  for (int param_idx : param_intersection) {
+    if (_context->param_is_expression(param_idx)) {
+      return nullptr;
     }
   }
 
@@ -205,16 +188,25 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
     src_to_tx[src_node] = qubit_tensor;
     dst_to_tx[dst_node] = qubit_tensor;
   }
-  for (int i = 0; i < src_dag->get_num_input_parameters(); i++) {
-    CircuitWire *src_node = src_dag->wires[cnt].get();
-    CircuitWire *dst_node = dst_dag->wires[cnt++].get();
-    assert(src_node->is_parameter());
-    assert(dst_node->is_parameter());
-    assert(src_node->index == i);
-    assert(dst_node->index == i);
+  assert(equal_num_input_params);
+  for (int param_idx : src_input_params) {
     TensorX parameter_tensor = graphXfer->new_tensor();
-    src_to_tx[src_node] = parameter_tensor;
-    dst_to_tx[dst_node] = parameter_tensor;
+    src_to_tx[_context->get_param_wire(param_idx)] = parameter_tensor;
+    dst_to_tx[_context->get_param_wire(param_idx)] = parameter_tensor;
+  }
+  for (auto e : src_dag->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      src_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->srcOps.push_back(op);
   }
   for (size_t i = 0; i < src_dag->gates.size(); i++) {
     CircuitGate *e = src_dag->gates[i].get();
@@ -235,6 +227,19 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
       src_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->srcOps.push_back(op);
+  }
+  for (auto e : dst_dag->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      dst_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->dstOps.push_back(op);
   }
   for (size_t i = 0; i < dst_dag->gates.size(); i++) {
     CircuitGate *e = dst_dag->gates[i].get();
@@ -321,23 +326,35 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
   // Since both the src and dst graph are from qasm
   // every parameters have a concrete value
   // Now add every parameter to the GraphXfer object
-  for (int i = 0; i < src_dag->get_num_input_parameters(); i++) {
-    CircuitWire *src_node = src_dag->wires[qubit_num + i].get();
-    assert(src_node->is_parameter());
-    assert(src_node->index == i);
+  auto src_input_params = src_dag->get_input_param_indices(_context);
+  for (int index : src_input_params) {
+    CircuitWire *src_node = _context->get_param_wire(index);
     TensorX parameter_tensor = graphXfer->new_tensor();
     src_to_tx[src_node] = parameter_tensor;
     graphXfer->paramValues[parameter_tensor.idx] =
-        src_dag->get_parameter_value(_context, src_node->index);
+        _context->get_param_value(index);
   }
-  for (int i = 0; i < dst_dag->get_num_input_parameters(); i++) {
-    CircuitWire *dst_node = dst_dag->wires[qubit_num + i].get();
-    assert(dst_node->is_parameter());
-    assert(dst_node->index == i);
+  auto dst_input_params = src_dag->get_input_param_indices(_context);
+  for (int index : dst_input_params) {
+    CircuitWire *dst_node = _context->get_param_wire(index);
     TensorX parameter_tensor = graphXfer->new_tensor();
     dst_to_tx[dst_node] = parameter_tensor;
     graphXfer->paramValues[parameter_tensor.idx] =
-        src_dag->get_parameter_value(_context, dst_node->index);
+        _context->get_param_value(index);
+  }
+  for (auto e : src_dag->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      src_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->srcOps.push_back(op);
   }
   for (size_t i = 0; i < src_dag->gates.size(); i++) {
     CircuitGate *e = src_dag->gates[i].get();
@@ -353,6 +370,19 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
       src_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->srcOps.push_back(op);
+  }
+  for (auto e : dst_dag->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      dst_to_tx[e->output_wires[j]] = output;
+    }
+    graphXfer->dstOps.push_back(op);
   }
   for (size_t i = 0; i < dst_dag->gates.size(); i++) {
     CircuitGate *e = dst_dag->gates[i].get();
@@ -515,8 +545,6 @@ GraphXfer::GraphXfer(Context *_context, const CircuitSeq *src_graph,
                      const CircuitSeq *dst_graph)
     : context(_context), tensorId(0) {
   assert(src_graph->get_num_qubits() == dst_graph->get_num_qubits());
-  assert(src_graph->get_num_input_parameters() ==
-         dst_graph->get_num_input_parameters());
   std::unordered_map<CircuitWire *, TensorX> src_to_tx, dst_to_tx;
   int cnt = 0;
   for (int i = 0; i < src_graph->get_num_qubits(); i++) {
@@ -530,16 +558,25 @@ GraphXfer::GraphXfer(Context *_context, const CircuitSeq *src_graph,
     src_to_tx[src_node] = qubit_tensor;
     dst_to_tx[dst_node] = qubit_tensor;
   }
-  for (int i = 0; i < src_graph->get_num_input_parameters(); i++) {
-    CircuitWire *src_node = src_graph->wires[cnt].get();
-    CircuitWire *dst_node = dst_graph->wires[cnt++].get();
-    assert(src_node->is_parameter());
-    assert(dst_node->is_parameter());
-    assert(src_node->index == i);
-    assert(dst_node->index == i);
+  auto src_input_params = src_graph->get_input_param_indices(context);
+  for (int param_idx : src_input_params) {
     TensorX parameter_tensor = new_tensor();
-    src_to_tx[src_node] = parameter_tensor;
-    dst_to_tx[dst_node] = parameter_tensor;
+    src_to_tx[_context->get_param_wire(param_idx)] = parameter_tensor;
+    dst_to_tx[_context->get_param_wire(param_idx)] = parameter_tensor;
+  }
+  for (auto e : src_graph->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
+      TensorX input = src_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      src_to_tx[e->output_wires[j]] = output;
+    }
+    srcOps.push_back(op);
   }
   for (size_t i = 0; i < src_graph->gates.size(); i++) {
     CircuitGate *e = src_graph->gates[i].get();
@@ -560,6 +597,19 @@ GraphXfer::GraphXfer(Context *_context, const CircuitSeq *src_graph,
       src_to_tx[e->output_wires[j]] = output;
     }
     srcOps.push_back(op);
+  }
+  for (auto e : dst_graph->get_param_expr_ops(_context)) {
+    OpX *op = new OpX(e->gate->tp);
+    for (size_t j = 0; j < e->input_wires.size(); j++) {
+      TensorX input = dst_to_tx[e->input_wires[j]];
+      op->add_input(input);
+    }
+    for (size_t j = 0; j < e->output_wires.size(); j++) {
+      TensorX output(op, j);
+      op->add_output(output);
+      dst_to_tx[e->output_wires[j]] = output;
+    }
+    dstOps.push_back(op);
   }
   for (size_t i = 0; i < dst_graph->gates.size(); i++) {
     CircuitGate *e = dst_graph->gates[i].get();

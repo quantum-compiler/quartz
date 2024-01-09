@@ -416,18 +416,6 @@ bool CircuitSeq::evaluate(const Vector &input_dis,
 
 int CircuitSeq::get_num_qubits() const { return num_qubits; }
 
-int CircuitSeq::get_num_input_parameters() const {
-  return num_input_parameters;
-}
-
-int CircuitSeq::get_num_total_parameters() const {
-  return (int)parameters.size();
-}
-
-int CircuitSeq::get_num_internal_parameters() const {
-  return (int)parameters.size() - num_input_parameters;
-}
-
 int CircuitSeq::get_num_gates() const { return (int)gates.size(); }
 
 int CircuitSeq::get_circuit_depth() const {
@@ -455,13 +443,6 @@ bool CircuitSeq::qubit_used(int qubit_index) const {
   return outputs[qubit_index] != wires[qubit_index].get();
 }
 
-bool CircuitSeq::input_param_used(int param_index) const {
-  assert(wires[get_num_qubits() + param_index]->type ==
-         CircuitWire::input_param);
-  assert(wires[get_num_qubits() + param_index]->index == param_index);
-  return !wires[get_num_qubits() + param_index]->output_gates.empty();
-}
-
 InputParamMaskType CircuitSeq::get_input_param_usage_mask(
     const std::vector<InputParamMaskType> &param_masks) const {
   InputParamMaskType usage_mask{0};
@@ -476,6 +457,69 @@ InputParamMaskType CircuitSeq::get_input_param_usage_mask(
     }
   }
   return usage_mask;
+}
+
+std::vector<int> CircuitSeq::get_input_param_indices(Context *ctx) const {
+  auto mask = get_input_param_usage_mask(ctx->get_param_masks());
+  std::vector<int> ret;
+  for (int i = 0; mask; i++) {
+    if (mask & (((InputParamMaskType)1) << i)) {
+      mask ^= ((InputParamMaskType)1) << i;
+      ret.push_back(i);
+    }
+  }
+  return ret;
+}
+
+std::vector<int> CircuitSeq::get_directly_used_param_indices() const {
+  std::vector<int> ret;
+  for (auto &gate : gates) {
+    for (auto &input_wire : gate->input_wires) {
+      if (input_wire->is_parameter()) {
+        ret.push_back(input_wire->index);
+      }
+    }
+  }
+  std::sort(ret.begin(), ret.end());
+  auto last = std::unique(ret.begin(), ret.end());
+  ret.erase(last, ret.end());
+  return ret;
+}
+
+std::vector<CircuitGate *> CircuitSeq::get_param_expr_ops(Context *ctx) const {
+  // Vector used as a stack
+  std::vector<int> s = get_directly_used_param_indices();
+  std::unordered_set<int> visited_params;
+  std::vector<CircuitGate *> result_ops;
+
+  // Make smaller indices appear earlier.
+  std::reverse(s.begin(), s.end());
+
+  // Non-recursive DFS
+  while (!s.empty()) {
+    int current_param = s.back();
+    if (!ctx->param_is_expression(current_param)) {
+      s.pop_back();
+      continue;
+    }
+    if (visited_params.find(current_param) != visited_params.end()) {
+      // visited, add to result
+      result_ops.push_back(ctx->get_param_wire(current_param)->input_gates[0]);
+      s.pop_back();
+      continue;
+    }
+    // mark visited and search for dependencies
+    visited_params.insert(current_param);
+    for (auto &input_wire :
+         ctx->get_param_wire(current_param)->input_gates[0]->input_wires) {
+      int index = input_wire->index;
+      if (visited_params.find(index) == visited_params.end() &&
+          ctx->param_is_expression(index)) {
+        s.push_back(index);
+      }
+    }
+  }
+  return result_ops;
 }
 
 void CircuitSeq::generate_hash_values(
@@ -902,7 +946,7 @@ bool CircuitSeq::canonical_representation(
       free_gates;
 
   std::vector<CircuitWire *> free_wires;
-  free_wires.reserve(get_num_qubits() + get_num_input_parameters());
+  free_wires.reserve(get_num_qubits());
 
   // Construct the |free_wires| vector with the input qubit wires.
   std::vector<int> wire_in_degree(wires.size(), 0);
@@ -1011,7 +1055,7 @@ bool CircuitSeq::to_canonical_representation(const Context *ctx) {
 
   std::vector<CircuitGate *> free_gates;
   std::vector<CircuitWire *> free_wires;
-  free_wires.reserve(get_num_qubits() + get_num_input_parameters());
+  free_wires.reserve(get_num_qubits());
 
   // Construct the |free_wires| vector with the input qubit wires.
   std::vector<int> wire_in_degree(wires.size(), 0);

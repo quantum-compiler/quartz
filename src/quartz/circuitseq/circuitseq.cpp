@@ -1,8 +1,9 @@
 #include "circuitseq.h"
 
-#include "../context/context.h"
-#include "../gate/gate.h"
-#include "../parser/qasm_parser.h"
+#include "quartz/context/context.h"
+#include "quartz/gate/gate.h"
+#include "quartz/parser/qasm_parser.h"
+#include "quartz/utils/string_utils.h"
 
 #include <algorithm>
 #include <cassert>

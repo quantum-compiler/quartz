@@ -24,9 +24,7 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
 
   fout << "[" << std::endl;
 
-  fout << ctx->param_info_to_json() << std::endl;
-
-  fout << "," << std::endl;
+  fout << ctx->param_info_to_json() << "," << std::endl;
 
   fout << "{" << std::endl;
   bool start0 = true;

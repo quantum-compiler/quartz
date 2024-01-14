@@ -394,9 +394,7 @@ bool EquivalenceSet::save_json(Context *ctx,
 
   fout << "[" << std::endl;
 
-  fout << ctx->param_info_to_json() << std::endl;
-
-  fout << "," << std::endl;
+  fout << ctx->param_info_to_json() << "," << std::endl;
 
   fout << "{" << std::endl;
   bool start0 = true;

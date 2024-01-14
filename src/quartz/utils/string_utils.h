@@ -7,12 +7,33 @@
 
 namespace quartz {
 template <typename T>
+std::string to_string_with_precision(const T &val, int precision = 6) {
+  std::ostringstream out;
+  out.precision(precision);
+  out << std::scientific << val;
+  return out.str();
+}
+
+template <typename T>
 std::string to_json_style_string(const std::vector<T> &vec) {
   std::string result = "[";
   result += std::to_string(vec.size());  // store the size for faster recovery
   for (const auto &item : vec) {
     result += ", ";
     result += std::to_string(item);
+  }
+  result += "]";
+  return result;
+}
+
+template <typename T>
+std::string to_json_style_string_with_precision(const std::vector<T> &vec,
+                                                int precision = 6) {
+  std::string result = "[";
+  result += std::to_string(vec.size());  // store the size for faster recovery
+  for (const auto &item : vec) {
+    result += ", ";
+    result += to_string_with_precision(item, precision);
   }
   result += "]";
   return result;

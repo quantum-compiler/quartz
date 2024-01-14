@@ -427,7 +427,8 @@ std::string Context::param_info_to_json() const {
     }
   }
   result += "], ";
-  result += to_json_style_string(random_parameters_);
+  result +=
+      to_json_style_string_with_precision(random_parameters_, /*precision=*/17);
   result += "]";
   return result;
 }

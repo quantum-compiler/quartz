@@ -416,6 +416,7 @@ std::string Context::param_info_to_json() const {
   result += "[";
   result += std::to_string(is_parameter_symbolic_.size());
   for (int i = 0; i < (int)is_parameter_symbolic_.size(); i++) {
+    result += ", ";
     if (param_is_expression(i)) {
       result += parameter_wires_[i]->input_gates[0]->to_json();
     } else if (is_parameter_symbolic_[i]) {
@@ -423,9 +424,6 @@ std::string Context::param_info_to_json() const {
     } else {
       result +=
           to_string_with_precision(parameter_values_[i], /*precision=*/17);
-    }
-    if (i != (int)is_parameter_symbolic_.size() - 1) {
-      result += ", ";
     }
   }
   result += "], ";

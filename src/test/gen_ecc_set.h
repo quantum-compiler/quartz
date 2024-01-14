@@ -7,14 +7,12 @@ namespace quartz {
 void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
                  bool generate_representative_set, int num_qubits,
-                 int num_input_parameters, int max_num_quantum_gates,
-                 int max_num_param_gates = 1);
+                 int num_input_parameters, int max_num_quantum_gates);
 
 void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
                  bool generate_representative_set, int num_qubits,
-                 int num_input_parameters, int max_num_quantum_gates,
-                 int max_num_param_gates) {
+                 int num_input_parameters, int max_num_quantum_gates) {
   Context ctx(supported_gates, num_qubits, num_input_parameters);
   Generator gen(&ctx);
 

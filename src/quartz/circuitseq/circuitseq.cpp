@@ -1180,6 +1180,10 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       assert(wires[qubit_permutation[i]].get() != other.wires[i].get());
       wires_mapping[other.wires[i].get()] = wires[qubit_permutation[i]].get();
     }
+    for (int i = num_qubits; i < (int)other.wires.size(); i++) {
+      wires[i] = std::make_unique<CircuitWire>(*(other.wires[i]));
+      wires_mapping[other.wires[i].get()] = wires[i].get();
+    }
     if (!param_permutation.empty()) {
       for (auto &circuit_gate : gates) {
         for (auto &input_wire : circuit_gate->input_wires) {

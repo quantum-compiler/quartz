@@ -20,7 +20,8 @@ int main() {
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "../clifford_t_305_complete_ECC_set.json")) {
+  if (!eqs.load_json(&ctx, "../clifford_t_305_complete_ECC_set.json",
+                     /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }

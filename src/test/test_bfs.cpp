@@ -44,7 +44,8 @@ int main() {
     system("python src/python/verifier/verify_equivalences.py "
            "bfs_unverified.json "
            "bfs_unverified_verified.json");
-    equiv_set.load_json(&ctx, "bfs_unverified_verified.json");
+    equiv_set.load_json(&ctx, "bfs_unverified_verified.json",
+                        /*from_verifier=*/true);
     equiv_set.simplify(&ctx);
     equiv_set.save_json(&ctx, "bfs_unverified_simplified.json");
     end = std::chrono::steady_clock::now();
@@ -86,7 +87,7 @@ int main() {
     system("python src/python/verifier/verify_equivalences.py "
            "tmp_before_verify.json "
            "bfs_verified.json");
-    equiv_set.load_json(&ctx, "bfs_verified.json");
+    equiv_set.load_json(&ctx, "bfs_verified.json", /*from_verifier=*/true);
     equiv_set.simplify(&ctx);
     equiv_set.save_json(&ctx, "bfs_verified_simplified.json");
     end = std::chrono::steady_clock::now();

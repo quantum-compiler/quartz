@@ -72,8 +72,8 @@ bool Generator::generate(
       }
 
       dags_to_search.clear();
-      ret =
-          equiv_set->load_json(ctx_, "tmp_after_verify.json", &dags_to_search);
+      ret = equiv_set->load_json(ctx_, "tmp_after_verify.json",
+                                 /*from_verifier=*/true, &dags_to_search);
       assert(ret);
       for (auto &dag : dags_to_search) {
         auto new_dag = std::make_unique<CircuitSeq>(*dag);

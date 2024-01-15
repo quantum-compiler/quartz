@@ -57,7 +57,8 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
     auto end2 = std::chrono::steady_clock::now();
     verification_time += end2 - start2;
     equiv_set.clear();  // this is necessary
-    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+    equiv_set.load_json(&ctx, file_prefix + "pruning.json",
+                        /*from_verifier=*/true);
   } else {
     // Create the ECC set by ourselves.
     equiv_set.clear();  // this is necessary

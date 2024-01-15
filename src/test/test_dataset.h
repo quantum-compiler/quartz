@@ -13,7 +13,7 @@ void test_equivalence_set(const std::vector<GateType> &support_gates,
   Context ctx(support_gates);
   EquivalenceSet eqs;
   auto start = std::chrono::steady_clock::now();
-  if (!eqs.load_json(&ctx, file_name)) {
+  if (!eqs.load_json(&ctx, file_name, /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file." << std::endl;
     return;
   }

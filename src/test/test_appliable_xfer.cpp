@@ -25,7 +25,8 @@ int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::t, GateType::tdg});
   EquivalenceSet eqs;
-  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json")) {
+  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json",
+                     /*from_verifier=*/false)) {
     std::cerr << "Failed to load equivalence file." << std::endl;
     return 1;
   }

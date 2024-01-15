@@ -1542,7 +1542,7 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name)) {
+  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file \"" << equiv_file_name
               << "\"." << std::endl;
     assert(false);
@@ -1627,7 +1627,7 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
   EquivalenceSet eqs;
   // Load equivalent dags from file
   auto start = std::chrono::steady_clock::now();
-  if (!eqs.load_json(ctx, equiv_file_name)) {
+  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
     std::cerr << "Failed to load equivalence file: " << equiv_file_name
               << std::endl;
     exit(1);
@@ -1886,7 +1886,7 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name)) {
+  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file \"" << equiv_file_name
               << "\"." << std::endl;
     assert(false);

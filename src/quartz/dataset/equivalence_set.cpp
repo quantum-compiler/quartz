@@ -180,6 +180,7 @@ bool EquivalenceClass::less_than(const EquivalenceClass &ecc1,
 }
 
 bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
+                               bool from_verifier,
                                std::vector<CircuitSeq *> *new_representatives) {
   std::ifstream fin;
   fin.open(file_name, std::ifstream::in);
@@ -207,7 +208,7 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
   std::unordered_map<EquivClassTag, std::vector<EquivClassTag>, PairHash>
       equiv_edges;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  if (new_representatives == nullptr) {
+  if (!from_verifier) {
     ctx->load_param_info_from_json(fin);
   } else {
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');

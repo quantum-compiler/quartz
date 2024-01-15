@@ -1184,16 +1184,16 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       wires[i] = std::make_unique<CircuitWire>(*(other.wires[i]));
       wires_mapping[other.wires[i].get()] = wires[i].get();
     }
-    if (!param_permutation.empty()) {
-      for (auto &circuit_gate : gates) {
-        for (auto &input_wire : circuit_gate->input_wires) {
-          if (input_wire->is_parameter() &&
-              input_wire->index < (int)param_permutation.size() &&
-              input_wire->index != param_permutation[input_wire->index]) {
-            // permute the parameter
-            input_wire =
-                ctx->get_param_wire(param_permutation[input_wire->index]);
-          }
+  }
+  if (!param_permutation.empty()) {
+    for (auto &circuit_gate : gates) {
+      for (auto &input_wire : circuit_gate->input_wires) {
+        if (input_wire->is_parameter() &&
+            input_wire->index < (int)param_permutation.size() &&
+            input_wire->index != param_permutation[input_wire->index]) {
+          // permute the parameter
+          input_wire =
+              ctx->get_param_wire(param_permutation[input_wire->index]);
         }
       }
     }

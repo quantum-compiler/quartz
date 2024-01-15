@@ -207,40 +207,44 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
   std::unordered_map<EquivClassTag, std::vector<EquivClassTag>, PairHash>
       equiv_edges;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  ctx->load_param_info_from_json(fin);
-  while (true) {
-    char ch;
-    fin.get(ch);
-    while (ch != '[' && ch != ']') {
+  if (new_representatives == nullptr) {
+    ctx->load_param_info_from_json(fin);
+  } else {
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+    while (true) {
+      char ch;
       fin.get(ch);
+      while (ch != '[' && ch != ']') {
+        fin.get(ch);
+      }
+      if (ch == ']') {
+        break;
+      }
+
+      // New equivalence between a pair of equivalence class
+
+      CircuitSeqHashType hash_value;
+      int id;
+
+      // the tags
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+      fin >> std::hex >> hash_value;
+      fin.ignore();  // '_'
+      fin >> std::dec >> id;
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+      EquivClassTag class1 = std::make_pair(hash_value, id);
+
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+      fin >> std::hex >> hash_value;
+      fin.ignore();  // '_'
+      fin >> std::dec >> id;
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+      EquivClassTag class2 = std::make_pair(hash_value, id);
+
+      equiv_edges[class1].push_back(class2);
+      equiv_edges[class2].push_back(class1);
+      fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
     }
-    if (ch == ']') {
-      break;
-    }
-
-    // New equivalence between a pair of equivalence class
-
-    CircuitSeqHashType hash_value;
-    int id;
-
-    // the tags
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-    fin >> std::hex >> hash_value;
-    fin.ignore();  // '_'
-    fin >> std::dec >> id;
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-    EquivClassTag class1 = std::make_pair(hash_value, id);
-
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-    fin >> std::hex >> hash_value;
-    fin.ignore();  // '_'
-    fin >> std::dec >> id;
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
-    EquivClassTag class2 = std::make_pair(hash_value, id);
-
-    equiv_edges[class1].push_back(class2);
-    equiv_edges[class2].push_back(class1);
-    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   }
 
   // BFS to merge the equivalence classes.

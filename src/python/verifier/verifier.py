@@ -445,7 +445,6 @@ def equivalent(
         if num_parameters > 0:
             # Construct the input vector as variables
             vec = input_distribution(num_qubits, equation_list)
-            params = create_parameters(num_parameters, equation_list)
             output_vec1 = evaluate(dag1, vec, params)
             output_vec2 = evaluate(dag2, vec, params)
             equations = z3.And(equation_list)
@@ -585,7 +584,7 @@ def find_equivalences(
 ):
     input_file_data = load_json(input_file)
     data = input_file_data[1]
-    param_info = input_file_data[0][0]
+    param_info = input_file_data[0][0][1:]
     # parameters generated for random testing
     parameters_for_fingerprint = input_file_data[0][1][1:]
     output_dict = {}
@@ -626,7 +625,7 @@ def find_equivalences(
                 current_inputs.append(params[int(input_wire[1:])])
             params.append(compute(op, *current_inputs))
 
-    if False:
+    if True:
         # sequential version
         for hashtag, dags in data.items():
             num_hashtags += 1

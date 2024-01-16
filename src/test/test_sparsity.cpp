@@ -65,7 +65,8 @@ void test_sparsity(const std::vector<GateType> &supported_gates,
           "unverified.json " + file_prefix + "verified.json")
              .c_str());
   equiv_set.clear();
-  equiv_set.load_json(&ctx, file_prefix + "verified.json");
+  equiv_set.load_json(&ctx, file_prefix + "verified.json",
+                      /*from_verifier=*/true);
   equiv_set.normalize_to_canonical_representations(&ctx);
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "There are " << equiv_set.num_total_dags()

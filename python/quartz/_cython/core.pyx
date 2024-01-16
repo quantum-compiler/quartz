@@ -288,7 +288,7 @@ cdef class QuartzContext:
     cdef load_json(self, filename):
         # Load ECC from file
         filename_bytes = filename.encode('utf-8')
-        assert(self.eqs.load_json(self.context, filename_bytes), "Failed to load equivalence set.")
+        assert(self.eqs.load_json(self.context, filename_bytes, false), "Failed to load equivalence set.")
 
     # size_t next_global_unique_id();
     def next_global_unique_id(self):

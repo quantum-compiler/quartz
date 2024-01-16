@@ -136,7 +136,7 @@ cdef extern from "dataset/equivalence_set.h" namespace "quartz":
     cdef cppclass EquivalenceSet:
         EquivalenceSet() except +
         int num_equivalence_classes() const
-        bool load_json(Context *, const string)
+        bool load_json(Context *, const string, bool)
         vector[vector[CircuitSeq_ptr]] get_all_equivalence_sets() except +
 
 

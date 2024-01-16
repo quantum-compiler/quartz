@@ -18,10 +18,14 @@ class CircuitGate;
 
 class Context {
  public:
+  /**
+   * A constructor without parameters.
+   */
   explicit Context(const std::vector<GateType> &supported_gates);
   /**
-   * Generate the random testing values for 2^|num_qubits| coefficients
+   * Generates the random testing values for 2^|num_qubits| coefficients
    * and |num_input_symbolic_params| parameters.
+   * The constructor then calls |generate_parameter_expressions()|.
    */
   Context(const std::vector<GateType> &supported_gates, int num_qubits,
           int num_input_symbolic_params);

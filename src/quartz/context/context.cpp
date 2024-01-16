@@ -32,6 +32,7 @@ Context::Context(const std::vector<GateType> &supported_gates, int num_qubits,
   for (int i = 0; i < num_input_symbolic_params; i++) {
     get_new_param_id();
   }
+  generate_parameter_expressions();
 }
 
 size_t Context::next_global_unique_id(void) {
@@ -365,6 +366,7 @@ void Context::generate_parameter_expressions(
     int max_num_operators_per_expression) {
   assert(max_num_operators_per_expression == 1);
   int num_input_parameters = (int)is_parameter_symbolic_.size();
+  assert(num_input_parameters > 0);
   for (const auto &idx : get_supported_parameter_ops()) {
     Gate *op = get_gate(idx);
     if (op->get_num_parameters() == 1) {

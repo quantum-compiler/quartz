@@ -23,7 +23,7 @@ int main() {
   // gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
   //              GateType::add},
   //             "IBM_4_3_", true, 3, 4, 4);
-  for (int n = 2; n <= 5; n++) {
+  for (int n = 2; n <= 4; n++) {
     for (int q = 3; q <= 3; q++) {
       std::string file_prefix = "Nam_";
       file_prefix += std::to_string(n);

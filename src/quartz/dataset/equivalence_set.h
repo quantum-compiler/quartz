@@ -101,8 +101,7 @@ class EquivalenceSet {
    * the ECC Set to |new_representatives|.
    * @return True iff the ECC Set is successfully loaded.
    */
-  bool load_json(Context *ctx, const std::string &file_name,
-                 bool from_verifier,
+  bool load_json(Context *ctx, const std::string &file_name, bool from_verifier,
                  std::vector<CircuitSeq *> *new_representatives = nullptr);
 
   bool save_json(Context *ctx, const std::string &file_name) const;

@@ -63,9 +63,16 @@ bool CircuitSeq::fully_equivalent(const CircuitSeq &other) const {
       return false;
     }
     for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
-      if (wires_mapping[other.gates[i]->input_wires[j]] !=
-          gates[i]->input_wires[j]) {
-        return false;
+      if (other.gates[i]->input_wires[j]->is_qubit()) {
+        if (wires_mapping[other.gates[i]->input_wires[j]] !=
+            gates[i]->input_wires[j]) {
+          return false;
+        }
+      } else {
+        // parameters should not be mapped
+        if (other.gates[i]->input_wires[j] != gates[i]->input_wires[j]) {
+          return false;
+        }
       }
     }
     for (int j = 0; j < (int)gates[i]->output_wires.size(); j++) {
@@ -789,20 +796,25 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
   fin >> num_gates;
 
-  // ignore other hash values
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  while (true) {
-    char ch;
+  char ch;
+  fin.get(ch);
+  while (ch != '[' && ch != ']') {
     fin.get(ch);
-    while (ch != '[' && ch != ']') {
+  }
+  if (ch == '[') {
+    // ignore other hash values
+    while (true) {
       fin.get(ch);
-    }
-    if (ch == '[') {
-      // A hash value with a phase shift id.
-      fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
-    } else {
-      // ch == ']'
-      break;
+      while (ch != '[' && ch != ']') {
+        fin.get(ch);
+      }
+      if (ch == '[') {
+        // A hash value with a phase shift id.
+        fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+      } else {
+        // ch == ']'
+        break;
+      }
     }
   }
 
@@ -814,7 +826,6 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
   // gates
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
   while (true) {
-    char ch;
     fin.get(ch);
     while (ch != '[' && ch != ']') {
       fin.get(ch);

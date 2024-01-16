@@ -25,9 +25,9 @@ bool Generator::generate(
 
   initialize_supported_quantum_gates();
 
-  if (unique_parameters) {
-    input_param_masks_ = ctx_->get_param_masks();
-  }
+  // We need this even if |unique_parameters| is false because we use its
+  // size as the number of parameters.
+  input_param_masks_ = ctx_->get_param_masks();
 
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().

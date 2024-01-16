@@ -41,7 +41,8 @@ int main() {
   equiv_set.clear();
   system("python src/python/verifier/verify_equivalences.py "
          "phase_shift_before_verify.json phase_shift_verified.json True True");
-  equiv_set.load_json(&ctx, "phase_shift_verified.json");
+  equiv_set.load_json(&ctx, "phase_shift_verified.json",
+                      /*from_verifier=*/true);
   equiv_set.simplify(&ctx);
   equiv_set.save_json(&ctx, "phase_shift_verified_simplified.json");
   end = std::chrono::steady_clock::now();

@@ -524,8 +524,7 @@ def dump_json(data, file_name):
 def find_equivalences_helper(
     hashtag,
     dags,
-    params,
-    equation_list_for_params,
+    param_info,
     parameters_for_fingerprint,
     check_phase_shift_in_smt_solver,
     verbose,
@@ -546,6 +545,7 @@ def find_equivalences_helper(
     #     print(f'{find_equivalence_helper_called} find_equivalences_helper() called, '
     #           f'{total_circuits_verified} circuits verified', flush=True)
     #     find_equivalence_helper_called_bar += 100
+    params, equation_list_for_params = compute_params(param_info)
     for dag in dags:
         for i, other_dag in enumerate(different_dags_with_same_hash):
             equivalent_called += 1
@@ -570,6 +570,33 @@ def find_equivalences_helper(
             current_tag = hashtag + "_" + str(len(different_dags_with_same_hash) - 1)
             output_dict[current_tag] = [dag]
     return hashtag, output_dict, equivalent_called, total_equivalence_found
+
+
+def compute_params(param_info):
+    equation_list_for_params = []
+    # compute all parameters from |param_info|
+    params = []
+    num_symbolic_params = 0
+
+    for i in range(len(param_info)):
+        if param_info[i] == "":  # symbolic
+            num_symbolic_params += 1
+    symbolic_params = create_parameters(num_symbolic_params, equation_list_for_params)
+
+    for i in range(len(param_info)):
+        if param_info[i] == "":  # symbolic
+            params.append(symbolic_params.pop(0))
+        elif isinstance(param_info[i], (int, float)):  # concrete
+            params.append(param_info[i])
+        else:  # expression
+            op = param_info[i][0]
+            current_inputs = []
+            for input_wire in param_info[i][2]:
+                assert input_wire.startswith("P")
+                # parameter input
+                current_inputs.append(params[int(input_wire[1:])])
+            params.append(compute(op, *current_inputs))
+    return params, equation_list_for_params
 
 
 def find_equivalences(
@@ -601,31 +628,9 @@ def find_equivalences(
         f"Considering a total of {sum(len(x) for x in data.values())} circuits split into {len(data)} hash values..."
     )
 
-    equation_list_for_params = []
-    # compute all parameters from |param_info|
-    params = []
-    num_symbolic_params = 0
+    params, equation_list_for_params = compute_params(param_info)
 
-    for i in range(len(param_info)):
-        if param_info[i] == "":  # symbolic
-            num_symbolic_params += 1
-    symbolic_params = create_parameters(num_symbolic_params, equation_list_for_params)
-
-    for i in range(len(param_info)):
-        if param_info[i] == "":  # symbolic
-            params.append(symbolic_params.pop(0))
-        elif isinstance(param_info[i], (int, float)):  # concrete
-            params.append(param_info[i])
-        else:  # expression
-            op = param_info[i][0]
-            current_inputs = []
-            for input_wire in param_info[i][2]:
-                assert input_wire.startswith("P")
-                # parameter input
-                current_inputs.append(params[int(input_wire[1:])])
-            params.append(compute(op, *current_inputs))
-
-    if True:
+    if False:
         # sequential version
         for hashtag, dags in data.items():
             num_hashtags += 1
@@ -691,8 +696,7 @@ def find_equivalences(
                     (
                         hashtag,
                         dags,
-                        params,
-                        equation_list_for_params,
+                        param_info,
                         parameters_for_fingerprint,
                         check_phase_shift_in_smt_solver,
                         verbose,

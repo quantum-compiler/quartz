@@ -475,8 +475,7 @@ bool EquivalenceSet::simplify(Context *ctx,
     } else if (!--remaining_optimizations) {
       break;
     }
-    if (other_simplification &&
-        remove_parameter_non_prefix(ctx, verbose)) {
+    if (other_simplification && remove_parameter_non_prefix(ctx, verbose)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {

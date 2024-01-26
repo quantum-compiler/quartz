@@ -4,31 +4,30 @@
 
 namespace quartz {
 
-void Generator::generate(
-    int num_qubits, int num_input_parameters, int max_num_quantum_gates,
-    int max_num_param_gates, Dataset *dataset, bool invoke_python_verifier,
-    EquivalenceSet *equiv_set, bool unique_parameters, bool verbose,
-    decltype(std::chrono::steady_clock::now() -
-             std::chrono::steady_clock::now()) *record_verification_time) {
-  auto empty_dag =
-      std::make_unique<CircuitSeq>(num_qubits, num_input_parameters);
-  // Generate all possible parameter gates at the beginning.
-  assert(max_num_param_gates == 1);
-  empty_dag->generate_parameter_gates(context);
-  empty_dag->hash(context);  // generate other hash values
+bool Generator::generate(
+    int num_qubits, int max_num_quantum_gates, Dataset *dataset,
+    bool invoke_python_verifier, EquivalenceSet *equiv_set,
+    bool unique_parameters, bool verbose,
+    std::chrono::steady_clock::duration *record_verification_time) {
+  auto empty_dag = std::make_unique<CircuitSeq>(num_qubits);
+  empty_dag->hash(ctx_);  // generate other hash values
   std::vector<CircuitSeq *> dags_to_search(1, empty_dag.get());
   if (invoke_python_verifier) {
     assert(equiv_set);
     auto equiv_class = std::make_unique<EquivalenceClass>();
     equiv_class->insert(std::make_unique<CircuitSeq>(*empty_dag));
-    equiv_set->insert_class(context, std::move(equiv_class));
+    equiv_set->insert_class(ctx_, std::move(equiv_class));
   } else {
-    context->set_representative(std::make_unique<CircuitSeq>(*empty_dag));
+    ctx_->set_representative(std::make_unique<CircuitSeq>(*empty_dag));
   }
-  dataset->insert(context, std::move(empty_dag));
+  dataset->insert(ctx_, std::move(empty_dag));
   std::vector<std::vector<CircuitSeq *>> dags(1, dags_to_search);
 
   initialize_supported_quantum_gates();
+
+  // We need this even if |unique_parameters| is false because we use its
+  // size as the number of parameters.
+  input_param_masks_ = ctx_->get_param_masks();
 
   // To avoid EquivalenceSet deleting the DAGs in |dags| when calling
   // clear().
@@ -43,21 +42,21 @@ void Generator::generate(
     if (!invoke_python_verifier) {
       assert(dataset);
       dags_to_search.clear();
-      bfs(dags, max_num_param_gates, *dataset, &dags_to_search,
-          invoke_python_verifier, nullptr, unique_parameters);
+      bfs(dags, *dataset, &dags_to_search, invoke_python_verifier, nullptr,
+          unique_parameters);
       dags.push_back(dags_to_search);
     } else {
       assert(dataset);
       assert(equiv_set);
-      bfs(dags, max_num_param_gates, *dataset, nullptr, invoke_python_verifier,
-          equiv_set, unique_parameters);
+      bfs(dags, *dataset, nullptr, invoke_python_verifier, equiv_set,
+          unique_parameters);
       // Do not verify when |num_gates == max_num_quantum_gates|.
       // This is to make the behavior the same when
       // |invoke_python_verifier| is true or false.
       if (num_gates == max_num_quantum_gates) {
         break;
       }
-      bool ret = dataset->save_json(context, "tmp_before_verify.json");
+      bool ret = dataset->save_json(ctx_, "tmp_before_verify.json");
       assert(ret);
 
       decltype(std::chrono::steady_clock::now()) start;
@@ -73,8 +72,8 @@ void Generator::generate(
       }
 
       dags_to_search.clear();
-      ret = equiv_set->load_json(context, "tmp_after_verify.json",
-                                 &dags_to_search);
+      ret = equiv_set->load_json(ctx_, "tmp_after_verify.json",
+                                 /*from_verifier=*/true, &dags_to_search);
       assert(ret);
       for (auto &dag : dags_to_search) {
         auto new_dag = std::make_unique<CircuitSeq>(*dag);
@@ -96,23 +95,24 @@ void Generator::generate(
       */
     }
   }
+  return true;
 }
 
 void Generator::initialize_supported_quantum_gates() {
   supported_quantum_gates_.clear();
-  auto gates = context->get_supported_quantum_gates();
+  auto gates = ctx_->get_supported_quantum_gates();
   for (auto &gate : gates) {
     while ((int)supported_quantum_gates_.size() <=
-           context->get_gate(gate)->get_num_qubits()) {
+           ctx_->get_gate(gate)->get_num_qubits()) {
       supported_quantum_gates_.emplace_back();
     }
-    supported_quantum_gates_[context->get_gate(gate)->get_num_qubits()]
-        .push_back(gate);
+    supported_quantum_gates_[ctx_->get_gate(gate)->get_num_qubits()].push_back(
+        gate);
   }
 }
 
 void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
-                    int max_num_param_gates, Dataset &dataset,
+                    Dataset &dataset,
                     std::vector<CircuitSeq *> *new_representatives,
                     bool invoke_python_verifier,
                     const EquivalenceSet *equiv_set, bool unique_parameters) {
@@ -121,10 +121,10 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     if (invoke_python_verifier) {
       // We will verify the equivalence later in Python.
       assert(equiv_set);
-      if (!verifier_.redundant(context, equiv_set, new_dag)) {
+      if (!verifier_.redundant(ctx_, equiv_set, new_dag)) {
         auto new_new_dag = std::make_unique<CircuitSeq>(*new_dag);
         auto new_new_dag_ptr = new_new_dag.get();
-        dataset.insert(context, std::move(new_new_dag));
+        dataset.insert(ctx_, std::move(new_new_dag));
         if (new_representatives) {
           // Warning: this is not the new representatives -- only
           // the new DAGs.
@@ -134,20 +134,20 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     } else {
       // If we will not verify the equivalence later, we should update
       // the representatives in the context now.
-      if (verifier_.redundant(context, new_dag)) {
+      if (verifier_.redundant(ctx_, new_dag)) {
         return;
       }
       // Try to insert to a set with hash value differing no more than 1
       // (see documentation at the function signature of generate()).
       bool ret = dataset.insert_to_nearby_set_if_exists(
-          context, std::make_unique<CircuitSeq>(*new_dag));
+          ctx_, std::make_unique<CircuitSeq>(*new_dag));
       if (ret) {
         // The CircuitSeq's hash value is new to the dataset.
         // Note: this is the second instance of CircuitSeq we create in
         // this function.
         auto rep = std::make_unique<CircuitSeq>(*new_dag);
         auto rep_ptr = rep.get();
-        context->set_representative(std::move(rep));
+        ctx_->set_representative(std::move(rep));
         if (new_representatives) {
           new_representatives->push_back(rep_ptr);
         }
@@ -159,10 +159,9 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     auto new_dag = std::make_unique<CircuitSeq>(*old_dag);
     auto dag = new_dag.get();
     InputParamMaskType input_param_usage_mask;
-    std::vector<InputParamMaskType> input_param_masks;
     if (unique_parameters) {
-      std::tie(input_param_usage_mask, input_param_masks) =
-          dag->get_input_param_mask();
+      input_param_usage_mask =
+          dag->get_input_param_usage_mask(input_param_masks_);
     }
     std::vector<bool> last_gate_used_qubit_index(dag->get_num_qubits(), false);
     int last_gate_min_qubit_index = -1;
@@ -177,52 +176,51 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
     std::vector<int> qubit_indices, parameter_indices;
     Gate *gate;
 
-    auto search_parameters =
-        [&dag, &gate, &qubit_indices, &parameter_indices, &try_to_add_to_result,
-         &unique_parameters, &input_param_masks](int num_remaining_parameters,
-                                                 const InputParamMaskType
-                                                     &current_usage_mask,
-                                                 auto &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
-          if (num_remaining_parameters == 0) {
-            bool ret =
-                dag->add_gate(qubit_indices, parameter_indices, gate, nullptr);
+    auto search_parameters = [this, &dag, &gate, &qubit_indices,
+                              &parameter_indices, &try_to_add_to_result,
+                              &unique_parameters](int num_remaining_parameters,
+                                                  const InputParamMaskType
+                                                      &current_usage_mask,
+                                                  auto
+                                                      &search_parameters_ref /*feed in the lambda implementation to itself as a parameter*/) {
+      if (num_remaining_parameters == 0) {
+        bool ret = dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
+        assert(ret);
+        try_to_add_to_result(dag);
+        ret = dag->remove_last_gate();
+        assert(ret);
+        if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
+          while (std::next_permutation(qubit_indices.begin(),
+                                       qubit_indices.end())) {
+            ret = dag->add_gate(qubit_indices, parameter_indices, gate, ctx_);
             assert(ret);
             try_to_add_to_result(dag);
             ret = dag->remove_last_gate();
             assert(ret);
-            if (gate->get_num_qubits() > 1 && !gate->is_symmetric()) {
-              while (std::next_permutation(qubit_indices.begin(),
-                                           qubit_indices.end())) {
-                ret = dag->add_gate(qubit_indices, parameter_indices, gate,
-                                    nullptr);
-                assert(ret);
-                try_to_add_to_result(dag);
-                ret = dag->remove_last_gate();
-                assert(ret);
-              }
-            }
-            return;
           }
+        }
+        return;
+      }
 
-          for (int p1 = 0; p1 < dag->get_num_total_parameters(); p1++) {
-            if (unique_parameters) {
-              if (current_usage_mask & input_param_masks[p1]) {
-                // p1 contains an already used input parameter.
-                continue;
-              }
-              parameter_indices.push_back(p1);
-              search_parameters_ref(num_remaining_parameters - 1,
-                                    current_usage_mask | input_param_masks[p1],
-                                    search_parameters_ref);
-              parameter_indices.pop_back();
-            } else {
-              parameter_indices.push_back(p1);
-              search_parameters_ref(num_remaining_parameters - 1,
-                                    /*unused*/ 0, search_parameters_ref);
-              parameter_indices.pop_back();
-            }
+      for (int p1 = 0; p1 < (int)input_param_masks_.size(); p1++) {
+        if (unique_parameters) {
+          if (current_usage_mask & input_param_masks_[p1]) {
+            // p1 contains an already used input parameter.
+            continue;
           }
-        };
+          parameter_indices.push_back(p1);
+          search_parameters_ref(num_remaining_parameters - 1,
+                                current_usage_mask | input_param_masks_[p1],
+                                search_parameters_ref);
+          parameter_indices.pop_back();
+        } else {
+          parameter_indices.push_back(p1);
+          search_parameters_ref(num_remaining_parameters - 1,
+                                /*unused*/ 0, search_parameters_ref);
+          parameter_indices.pop_back();
+        }
+      }
+    };
     // Add 1 quantum gate according to the qubit index order.
 
     for (int q1 = 0; q1 < dag->get_num_qubits(); q1++) {
@@ -234,7 +232,7 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
       if (supported_quantum_gates_.size() > 1) {
         if (q1 >= last_gate_min_qubit_index) {
           for (const auto &idx : supported_quantum_gates_[1]) {
-            gate = context->get_gate(idx);
+            gate = ctx_->get_gate(idx);
             search_parameters(gate->get_num_parameters(),
                               input_param_usage_mask, search_parameters);
           }
@@ -252,7 +250,7 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
           }
           qubit_indices.push_back(q2);
           for (const auto &idx : supported_quantum_gates_[2]) {
-            gate = context->get_gate(idx);
+            gate = ctx_->get_gate(idx);
             search_parameters(gate->get_num_parameters(),
                               input_param_usage_mask, search_parameters);
           }
@@ -274,7 +272,7 @@ void Generator::bfs(const std::vector<std::vector<CircuitSeq *>> &dags,
             }
             qubit_indices.push_back(q3);
             for (const auto &idx : supported_quantum_gates_[3]) {
-              gate = context->get_gate(idx);
+              gate = ctx_->get_gate(idx);
               search_parameters(gate->get_num_parameters(),
                                 input_param_usage_mask, search_parameters);
             }

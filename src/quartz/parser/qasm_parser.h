@@ -26,7 +26,7 @@ std::string strip(const std::string &input);
 
 class QASMParser {
  public:
-  QASMParser(Context *ctx) : context(ctx) {}
+  QASMParser(Context *ctx) : ctx_(ctx) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
@@ -50,7 +50,7 @@ class QASMParser {
   }
 
  private:
-  Context *context;
+  Context *ctx_;
 };
 
 // We cannot put this template function implementation in a .cpp file.
@@ -66,7 +66,6 @@ bool QASMParser::load_qasm_stream(
   // ordered alphabetically.
   std::map<std::string, int> index_offset;
   std::unordered_map<ParamType, int> parameters;
-  int num_total_params = context->get_num_parameters();
   bool in_general_controlled_gate_block = false;
   std::vector<bool> general_control_flipped_qubits;
   int num_flipped_qubits;
@@ -149,17 +148,16 @@ bool QASMParser::load_qasm_stream(
           qreg.second = num_qubits;
           num_qubits = new_num_qubits;
         }
-        seq = new CircuitSeq(num_qubits,
-                             /*num_input_parameters=*/num_total_params);
+        seq = new CircuitSeq(num_qubits);
       }
-      Gate *gate = context->get_gate(gate_type);
+      Gate *gate = ctx_->get_gate(gate_type);
       if (!gate) {
         std::cerr << "Unsupported gate in current context: " << command
                   << std::endl;
         return false;
       }
-      int num_qubits = context->get_gate(gate_type)->num_qubits;
-      int num_params = context->get_gate(gate_type)->num_parameters;
+      int num_qubits = ctx_->get_gate(gate_type)->num_qubits;
+      int num_params = ctx_->get_gate(gate_type)->num_parameters;
       std::vector<int> qubit_indices(num_qubits);
       std::vector<int> param_indices(num_params);
       for (int i = 0; i < num_params; ++i) {
@@ -221,12 +219,8 @@ bool QASMParser::load_qasm_stream(
         if (negative)
           p = -p;
         if (parameters.count(p) == 0) {
-          seq->add_input_parameter();
-          int param_id = context->get_new_param_id(/*is_symbolic=*/false);
-          assert(param_id == num_total_params);
-          num_total_params++;
+          int param_id = ctx_->get_new_param_id(p);
           parameters[p] = param_id;
-          context->set_param_value(param_id, p);
         }
         param_indices[i] = parameters[p];
       }
@@ -278,16 +272,16 @@ bool QASMParser::load_qasm_stream(
             }
           }
           auto general_controlled_gate =
-              context->get_general_controlled_gate(gate_type, state);
+              ctx_->get_general_controlled_gate(gate_type, state);
           seq->add_gate(qubit_indices, param_indices, general_controlled_gate,
-                        nullptr);
+                        ctx_);
         } else {
           std::cerr << "Unexpected gate " << command
                     << " in general controlled gate block." << std::endl;
           assert(false);
         }
       } else {
-        seq->add_gate(qubit_indices, param_indices, gate, nullptr);
+        seq->add_gate(qubit_indices, param_indices, gate, ctx_);
       }
     } else {
       std::cerr << "Unknown gate: " << command << std::endl;

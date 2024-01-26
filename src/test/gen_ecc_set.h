@@ -7,14 +7,12 @@ namespace quartz {
 void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
                  bool generate_representative_set, int num_qubits,
-                 int num_input_parameters, int max_num_quantum_gates,
-                 int max_num_param_gates = 1);
+                 int num_input_parameters, int max_num_quantum_gates);
 
 void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
                  bool generate_representative_set, int num_qubits,
-                 int num_input_parameters, int max_num_quantum_gates,
-                 int max_num_param_gates) {
+                 int num_input_parameters, int max_num_quantum_gates) {
   Context ctx(supported_gates, num_qubits, num_input_parameters);
   Generator gen(&ctx);
 
@@ -22,8 +20,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
 
   Dataset dataset1;
 
-  gen.generate(num_qubits, num_input_parameters, 1, max_num_param_gates,
-               &dataset1,                           /*invoke_python_verifier=*/
+  gen.generate(num_qubits, 1, &dataset1,            /*invoke_python_verifier=*/
                true, &equiv_set, unique_parameters, /*verbose=*/
                false);
   std::cout << "*** ch(" << file_prefix.substr(0, file_prefix.size() - 5)
@@ -42,9 +39,9 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   // floating-point error, our optimizations will still preserve the
   // resulting circuit matrix up to an error of a small number times machine
   // precision. Plus, this situation is known to be extremely rare.
-  gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-               max_num_param_gates, &dataset1, invoke_python_verifier,
-               &equiv_set, unique_parameters, /*verbose=*/
+  gen.generate(num_qubits, max_num_quantum_gates, &dataset1,
+               invoke_python_verifier, &equiv_set,
+               unique_parameters, /*verbose=*/
                true, &verification_time);
   if (!generate_representative_set) {
     // For better performance
@@ -60,7 +57,8 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
     auto end2 = std::chrono::steady_clock::now();
     verification_time += end2 - start2;
     equiv_set.clear();  // this is necessary
-    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+    equiv_set.load_json(&ctx, file_prefix + "pruning.json",
+                        /*from_verifier=*/true);
   } else {
     // Create the ECC set by ourselves.
     equiv_set.clear();  // this is necessary
@@ -94,7 +92,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
   auto start2 = std::chrono::steady_clock::now();
   equiv_set.simplify(&ctx);
   auto end2 = std::chrono::steady_clock::now();
-  equiv_set.save_json(file_prefix + "complete_ECC_set.json");
+  equiv_set.save_json(&ctx, file_prefix + "complete_ECC_set.json");
   auto end = std::chrono::steady_clock::now();
 
   std::cout << file_prefix.substr(0, file_prefix.size() - 1)

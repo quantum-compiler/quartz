@@ -164,6 +164,72 @@ std::string CircuitGate::to_string() const {
   return result;
 }
 
+std::string CircuitGate::to_json() const {
+  std::string result;
+  result += "[";
+  result += "\"" + gate_type_name(gate->tp) + "\", ";
+  result += "[";
+  for (int j = 0; j < (int)output_wires.size(); j++) {
+    result += "\"" + output_wires[j]->to_string() + "\"";
+    if (j != (int)output_wires.size() - 1) {
+      result += ", ";
+    }
+  }
+  result += "], ";
+
+  result += "[";
+  for (int j = 0; j < (int)input_wires.size(); j++) {
+    result += "\"" + input_wires[j]->to_string() + "\"";
+    if (j != (int)input_wires.size() - 1) {
+      result += ", ";
+    }
+  }
+  result += "]]";
+  return result;
+}
+
+void CircuitGate::read_json(std::istream &fin, Context *ctx,
+                            std::vector<int> &input_qubits,
+                            std::vector<int> &input_params,
+                            std::vector<int> &output_qubits,
+                            std::vector<int> &output_params, Gate *&gate) {
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), '\"');
+  std::string name;
+  std::getline(fin, name, '\"');
+  auto gate_type = to_gate_type(name);
+  gate = ctx->get_gate(gate_type);
+
+  auto read_indices = [&fin](std::vector<int> &qubit_indices,
+                             std::vector<int> &param_indices) {
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+    while (true) {
+      char ch;
+      fin.get(ch);
+      while (ch != '\"' && ch != ']') {
+        fin.get(ch);
+      }
+      if (ch == ']') {
+        break;
+      }
+
+      // New index
+      fin.get(ch);
+      assert(ch == 'P' || ch == 'Q');
+      int index;
+      fin >> index;
+      fin.ignore();  // '\"'
+      if (ch == 'Q') {
+        qubit_indices.push_back(index);
+      } else {
+        param_indices.push_back(index);
+      }
+    }
+  };
+  read_indices(output_qubits, output_params);
+  read_indices(input_qubits, input_params);
+  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
+}
+
 std::string CircuitGate::to_qasm_style_string(Context *ctx,
                                               int param_precision) const {
   assert(gate->is_quantum_gate());
@@ -190,12 +256,12 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   if (gate->get_num_parameters() > 0) {
     int num_remaining_parameters = gate->get_num_parameters();
     result += "(";
-    for (int j = 0; j < (int)input_wires.size(); j++) {
-      if (input_wires[j]->is_parameter()) {
+    for (auto input_wire : input_wires) {
+      if (input_wire->is_parameter()) {
         assert(ctx->param_has_value(input_wires[j]->index));
         std::ostringstream out;
         out.precision(param_precision);
-        const auto &param_value = ctx->get_param_value(input_wires[j]->index);
+        const auto &param_value = ctx->get_param_value(input_wire->index);
         if (param_value == 0) {
           // optimization: if a parameter is 0, do not output that many digits
           out << "0";
@@ -213,14 +279,14 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   }
   result += " ";
   bool first_qubit = true;
-  for (int j = 0; j < (int)input_wires.size(); j++) {
-    if (input_wires[j]->is_qubit()) {
+  for (auto input_wire : input_wires) {
+    if (input_wire->is_qubit()) {
       if (first_qubit) {
         first_qubit = false;
       } else {
         result += ",";
       }
-      result += "q[" + std::to_string(input_wires[j]->index) + "]";
+      result += "q[" + std::to_string(input_wire->index) + "]";
     }
   }
   result += ";\n";

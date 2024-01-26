@@ -6,6 +6,7 @@ is represented as a real and an imaginary part of a complex number.
 Angles are represented with two real numbers, s and c, satisfying s*s+c*c=1
 """
 
+import copy
 import math
 import multiprocessing as mp
 import os
@@ -155,47 +156,33 @@ def random_parameters(num_parameters):
     return list(zip(param_cos, param_sin))
 
 
-def evaluate(dag, input_dis, input_parameters, use_z3=True):
-    dag_meta = dag[0]
-    num_input_parameters = dag_meta[meta_index_num_input_parameters]
-    num_total_parameters = dag_meta[meta_index_num_total_parameters]
-    assert len(input_parameters) >= num_input_parameters
-    parameters = input_parameters[:num_input_parameters] + [None] * (
-        num_total_parameters - num_input_parameters
-    )
-
+def evaluate(dag, input_dis, params, use_z3=True):
     output_dis = input_dis
     gates = dag[1]
     for gate in gates:
         parameter_values = []
         qubit_indices = []
-        for input in gate[2]:
-            if input.startswith("P"):
+        for input_wire in gate[2]:
+            if input_wire.startswith("P"):
                 # parameter input
-                parameter_values.append(parameters[int(input[1:])])
+                parameter_values.append(params[int(input_wire[1:])])
             else:
-                assert input.startswith("Q")
+                assert input_wire.startswith("Q")
                 # qubit input
-                qubit_indices.append(int(input[1:]))
-        if gate[1][0].startswith("P"):
-            # parameter gate
-            assert len(gate[1]) == 1
-            parameter_index = int(gate[1][0][1:])
-            parameters[parameter_index] = compute(gate[0], *parameter_values)
+                qubit_indices.append(int(input_wire[1:]))
+        assert gate[1][0].startswith("Q")
+        # quantum gate
+        if use_z3:
+            output_dis = apply_matrix(
+                output_dis, get_matrix(gate[0], *parameter_values), qubit_indices
+            )
         else:
-            assert gate[1][0].startswith("Q")
-            # quantum gate
-            if use_z3:
-                output_dis = apply_matrix(
-                    output_dis, get_matrix(gate[0], *parameter_values), qubit_indices
-                )
-            else:
-                output_dis = apply_matrix(
-                    output_dis,
-                    get_matrix(gate[0], *parameter_values, False),
-                    qubit_indices,
-                )
-    return output_dis, parameters
+            output_dis = apply_matrix(
+                output_dis,
+                get_matrix(gate[0], *parameter_values, False),
+                qubit_indices,
+            )
+    return output_dis
 
 
 def phase_shift(vec, lam):
@@ -215,39 +202,20 @@ def phase_shift(vec, lam):
 
 def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     # Warning: If CircuitSeq::hash() is modified, this function should be modified correspondingly.
-    dag_meta = dag[0]
-    num_total_params = dag_meta[meta_index_num_total_parameters]
     if (
         kCheckPhaseShiftOfPiOver4Index
         < phase_shift_id
         < kCheckPhaseShiftOfPiOver4Index + 8
     ):
         k = phase_shift_id - kCheckPhaseShiftOfPiOver4Index
-        cosk_table = [
-            1,
-            1.0 / z3.Sqrt(2),
-            0,
-            -1.0 / z3.Sqrt(2),
-            -1,
-            -1.0 / z3.Sqrt(2),
-            0,
-            1.0 / z3.Sqrt(2),
-        ]
-        sink_table = [
-            0,
-            1.0 / z3.Sqrt(2),
-            1,
-            1.0 / z3.Sqrt(2),
-            0,
-            -1.0 / z3.Sqrt(2),
-            -1,
-            -1.0 / z3.Sqrt(2),
-        ]
-        phase_shift_lambda = (cosk_table[k], sink_table[k])
-    elif phase_shift_id < num_total_params:
+        phase_shift_lambda = (
+            kPhaseFactorConstantCosTable[k],
+            kPhaseFactorConstantSinTable[k],
+        )
+    elif phase_shift_id < len(all_parameters):
         phase_shift_lambda = all_parameters[phase_shift_id]
     else:
-        phase_shift_lambda = all_parameters[phase_shift_id - num_total_params]
+        phase_shift_lambda = all_parameters[phase_shift_id - len(all_parameters)]
         # lam -> -lam: (cos, sin) -> (cos, -sin)
         phase_shift_lambda = (phase_shift_lambda[0], -phase_shift_lambda[1])
     return phase_shift(vec, phase_shift_lambda)
@@ -314,17 +282,14 @@ def search_phase_factor_to_check_equivalence(
             dag1_meta = dag1[0]
             dag2_meta = dag2[0]
             num_qubits = dag1_meta[meta_index_num_qubits]
-            num_parameters = max(
-                dag1_meta[meta_index_num_input_parameters],
-                dag2_meta[meta_index_num_input_parameters],
-            )
+            num_parameters = len(parameters_for_fingerprint)
             if num_parameters == 0:
                 return True
             # Generate a random test to verify it.
             vec = random_input_distribution(num_qubits)
             params = random_parameters(num_parameters)
-            output_vec1 = evaluate(dag1, vec, params, use_z3=False)[0]
-            output_vec2 = evaluate(dag2, vec, params, use_z3=False)[0]
+            output_vec1 = evaluate(dag1, vec, params, use_z3=False)
+            output_vec2 = evaluate(dag2, vec, params, use_z3=False)
             current_phase_factor = [
                 z3.simplify(
                     z3.substitute(
@@ -427,6 +392,8 @@ def search_phase_factor_to_check_equivalence(
 def equivalent(
     dag1,
     dag2,
+    params,
+    equation_list_for_params,
     parameters_for_fingerprint,
     do_not_invoke_smt_solver=False,
     check_phase_shift_in_smt_solver=False,
@@ -441,22 +408,19 @@ def equivalent(
 
     solver = z3.Solver()
     num_qubits = dag1_meta[meta_index_num_qubits]
-    equation_list = []
+    equation_list = copy.deepcopy(
+        equation_list_for_params
+    )  # avoid changing |equation_list_for_params|
     if check_phase_shift_in_smt_solver:
         # Let z3 check phase shift
-        num_parameters = max(
-            dag1_meta[meta_index_num_input_parameters],
-            dag2_meta[meta_index_num_input_parameters],
-        )
-        params = create_parameters(num_parameters, equation_list)
         cosL = z3.Real("cosL")
         sinL = z3.Real("sinL")
         matrix_equal_list = []
         for S in range(1 << num_qubits):
             # Construct a vector with only the S-th place being 1
             vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
-            output_vec1_S = evaluate(dag1, vec_S, params)[0]
-            output_vec2_S = evaluate(dag2, vec_S, params)[0]
+            output_vec1_S = evaluate(dag1, vec_S, params)
+            output_vec2_S = evaluate(dag2, vec_S, params)
             output_vec2_S_shifted = phase_shift(output_vec2_S, [cosL, sinL])
             matrix_equal_list += eq_vector(output_vec1_S, output_vec2_S_shifted)
         solver.add(z3.And(equation_list))
@@ -473,21 +437,16 @@ def equivalent(
         # Phase factor is never provided in generator now
         assert phase_shift_id is None
 
-        num_parameters = max(
-            dag1_meta[meta_index_num_input_parameters],
-            dag2_meta[meta_index_num_input_parameters],
-        )
         # Figure out the phase factor here
-        assert len(parameters_for_fingerprint) >= num_parameters
+        num_parameters = len(parameters_for_fingerprint)
         goal_phase_factor = complex(
             *dag1_meta[meta_index_original_fingerprint]
         ) / complex(*dag2_meta[meta_index_original_fingerprint])
         if num_parameters > 0:
             # Construct the input vector as variables
             vec = input_distribution(num_qubits, equation_list)
-            params = create_parameters(num_parameters, equation_list)
-            output_vec1, all_parameters = evaluate(dag1, vec, params)
-            output_vec2 = evaluate(dag2, vec, params)[0]
+            output_vec1 = evaluate(dag1, vec, params)
+            output_vec2 = evaluate(dag2, vec, params)
             equations = z3.And(equation_list)
             result = search_phase_factor_to_check_equivalence(
                 dag1,
@@ -516,8 +475,8 @@ def equivalent(
             for S in range(1 << num_qubits):
                 # Construct a vector with only the S-th place being 1
                 vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
-                output_vec1_S = evaluate(dag1, vec_S, [])[0]
-                output_vec2_S = evaluate(dag2, vec_S, [])[0]
+                output_vec1_S = evaluate(dag1, vec_S, [])
+                output_vec2_S = evaluate(dag2, vec_S, [])
                 output_vec1 += output_vec1_S
                 output_vec2 += output_vec2_S
             result = search_phase_factor_to_check_equivalence(
@@ -565,6 +524,7 @@ def dump_json(data, file_name):
 def find_equivalences_helper(
     hashtag,
     dags,
+    param_info,
     parameters_for_fingerprint,
     check_phase_shift_in_smt_solver,
     verbose,
@@ -585,12 +545,15 @@ def find_equivalences_helper(
     #     print(f'{find_equivalence_helper_called} find_equivalences_helper() called, '
     #           f'{total_circuits_verified} circuits verified', flush=True)
     #     find_equivalence_helper_called_bar += 100
+    params, equation_list_for_params = compute_params(param_info)
     for dag in dags:
         for i, other_dag in enumerate(different_dags_with_same_hash):
             equivalent_called += 1
             if equivalent(
                 dag,
                 other_dag,
+                params,
+                equation_list_for_params,
                 parameters_for_fingerprint,
                 do_not_invoke_smt_solver,
                 check_phase_shift_in_smt_solver,
@@ -609,6 +572,33 @@ def find_equivalences_helper(
     return hashtag, output_dict, equivalent_called, total_equivalence_found
 
 
+def compute_params(param_info):
+    equation_list_for_params = []
+    # compute all parameters from |param_info|
+    params = []
+    num_symbolic_params = 0
+
+    for i in range(len(param_info)):
+        if param_info[i] == "":  # symbolic
+            num_symbolic_params += 1
+    symbolic_params = create_parameters(num_symbolic_params, equation_list_for_params)
+
+    for i in range(len(param_info)):
+        if param_info[i] == "":  # symbolic
+            params.append(symbolic_params.pop(0))
+        elif isinstance(param_info[i], (int, float)):  # concrete
+            params.append(param_info[i])
+        else:  # expression
+            op = param_info[i][0]
+            current_inputs = []
+            for input_wire in param_info[i][2]:
+                assert input_wire.startswith("P")
+                # parameter input
+                current_inputs.append(params[int(input_wire[1:])])
+            params.append(compute(op, *current_inputs))
+    return params, equation_list_for_params
+
+
 def find_equivalences(
     input_file,
     output_file,
@@ -621,8 +611,9 @@ def find_equivalences(
 ):
     input_file_data = load_json(input_file)
     data = input_file_data[1]
+    param_info = input_file_data[0][0][1:]
     # parameters generated for random testing
-    parameters_for_fingerprint = input_file_data[0]
+    parameters_for_fingerprint = input_file_data[0][1][1:]
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0
@@ -634,8 +625,10 @@ def find_equivalences(
     t_start = time.monotonic()
     num_different_dags_with_same_hash = {}
     print(
-        f"Considering a total of {sum(len(x) for x in data.values())} DAGs split into {len(data)} hash values..."
+        f"Considering a total of {sum(len(x) for x in data.values())} circuits split into {len(data)} hash values..."
     )
+
+    params, equation_list_for_params = compute_params(param_info)
 
     if False:
         # sequential version
@@ -654,6 +647,8 @@ def find_equivalences(
                     if equivalent(
                         dag,
                         other_dag,
+                        params,
+                        equation_list_for_params,
                         parameters_for_fingerprint,
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
@@ -701,6 +696,7 @@ def find_equivalences(
                     (
                         hashtag,
                         dags,
+                        param_info,
                         parameters_for_fingerprint,
                         check_phase_shift_in_smt_solver,
                         verbose,
@@ -785,6 +781,8 @@ def find_equivalences(
                     if equivalent(
                         dags[0],
                         other_dag,
+                        params,
+                        equation_list_for_params,
                         parameters_for_fingerprint,
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
@@ -801,13 +799,10 @@ def find_equivalences(
                             # Warning: If CircuitSeq::hash() is modified,
                             # the expression |is_fixed_for_all_dags| should be modified correspondingly.
                             is_fixed_for_all_dags = (
-                                0
+                                0 <= phase_shift_id < len(param_info)
+                                or len(param_info)
                                 <= phase_shift_id
-                                < dag[0][meta_index_num_input_parameters]
-                                or dag[0][meta_index_num_total_parameters]
-                                <= phase_shift_id
-                                < dag[0][meta_index_num_total_parameters]
-                                + dag[0][meta_index_num_input_parameters]
+                                < len(param_info) * 2
                                 or kCheckPhaseShiftOfPiOver4Index
                                 < phase_shift_id
                                 < kCheckPhaseShiftOfPiOver4Index + 8
@@ -823,6 +818,8 @@ def find_equivalences(
                             if equivalent(
                                 dag,
                                 other_dag,
+                                params,
+                                equation_list_for_params,
                                 parameters_for_fingerprint,
                                 do_not_invoke_smt_solver,
                                 check_phase_shift_in_smt_solver,

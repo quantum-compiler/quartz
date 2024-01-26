@@ -13,7 +13,7 @@ void test_equivalence_set(const std::vector<GateType> &support_gates,
   Context ctx(support_gates);
   EquivalenceSet eqs;
   auto start = std::chrono::steady_clock::now();
-  if (!eqs.load_json(&ctx, file_name)) {
+  if (!eqs.load_json(&ctx, file_name, /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file." << std::endl;
     return;
   }
@@ -39,7 +39,7 @@ void test_equivalence_set(const std::vector<GateType> &support_gates,
             << " DAGs are found." << std::endl;
   if (!save_file_name.empty()) {
     start = std::chrono::steady_clock::now();
-    eqs.save_json(save_file_name);
+    eqs.save_json(&ctx, save_file_name);
     end = std::chrono::steady_clock::now();
     std::cout << "Json saved in "
               << (double)std::chrono::duration_cast<std::chrono::milliseconds>(

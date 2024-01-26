@@ -39,13 +39,4 @@ struct PairHash {
     return std::hash<T>()(x.first) ^ std::hash<U>()(x.second);
   }
 };
-
-template <typename T>
-std::string to_string_with_precision(const T &val, int precision = 6) {
-  std::ostringstream out;
-  out.precision(precision);
-  out << std::scientific << val;
-  return out.str();
-}
-
 }  // namespace quartz

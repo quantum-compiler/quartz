@@ -6,7 +6,6 @@ int main() {
   const int num_qubits = 1;
   const int num_input_parameters = 0;
   const int max_num_quantum_gates = 2;
-  const int max_num_param_gates = 1;
   const bool run_bfs_unverified = false;
   const bool run_bfs_verified = true;  // with representative pruning
 
@@ -24,10 +23,10 @@ int main() {
 
     Dataset dataset2;
     start = std::chrono::steady_clock::now();
-    gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-                 max_num_param_gates, &dataset2, /*verify_equivalences=*/
-                 false, nullptr,                 /*unique_parameters=*/
-                 false,                          /*verbose=*/
+    gen.generate(num_qubits, max_num_quantum_gates,
+                 &dataset2,      /*verify_equivalences=*/
+                 false, nullptr, /*unique_parameters=*/
+                 false,          /*verbose=*/
                  true);
     end = std::chrono::steady_clock::now();
     std::cout << std::dec << "BFS unverified: " << dataset2.num_total_dags()
@@ -45,9 +44,10 @@ int main() {
     system("python src/python/verifier/verify_equivalences.py "
            "bfs_unverified.json "
            "bfs_unverified_verified.json");
-    equiv_set.load_json(&ctx, "bfs_unverified_verified.json");
+    equiv_set.load_json(&ctx, "bfs_unverified_verified.json",
+                        /*from_verifier=*/true);
     equiv_set.simplify(&ctx);
-    equiv_set.save_json("bfs_unverified_simplified.json");
+    equiv_set.save_json(&ctx, "bfs_unverified_simplified.json");
     end = std::chrono::steady_clock::now();
     std::cout
         << std::dec << "BFS unverified: there are "
@@ -66,10 +66,10 @@ int main() {
   if (run_bfs_verified) {
     Dataset dataset3;
     start = std::chrono::steady_clock::now();
-    gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-                 max_num_param_gates, &dataset3, /*verify_equivalences=*/
-                 true, &equiv_set,               /*unique_parameters=*/
-                 false,                          /*verbose=*/
+    gen.generate(num_qubits, max_num_quantum_gates,
+                 &dataset3,        /*verify_equivalences=*/
+                 true, &equiv_set, /*unique_parameters=*/
+                 false,            /*verbose=*/
                  true);
     end = std::chrono::steady_clock::now();
     std::cout << std::dec << "BFS verified: " << dataset3.num_total_dags()
@@ -87,9 +87,9 @@ int main() {
     system("python src/python/verifier/verify_equivalences.py "
            "tmp_before_verify.json "
            "bfs_verified.json");
-    equiv_set.load_json(&ctx, "bfs_verified.json");
+    equiv_set.load_json(&ctx, "bfs_verified.json", /*from_verifier=*/true);
     equiv_set.simplify(&ctx);
-    equiv_set.save_json("bfs_verified_simplified.json");
+    equiv_set.save_json(&ctx, "bfs_verified_simplified.json");
     end = std::chrono::steady_clock::now();
     std::cout
         << std::dec << "BFS verified: there are " << equiv_set.num_total_dags()

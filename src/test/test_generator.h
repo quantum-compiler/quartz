@@ -16,8 +16,7 @@ void test_generator(const std::vector<GateType> &support_gates, int num_qubits,
   Dataset dataset;
   auto start = std::chrono::steady_clock::now();
   EquivalenceSet equiv_set;
-  generator.generate(num_qubits, max_num_input_parameters, max_num_gates,
-                     /*max_num_param_gates=*/1, &dataset,
+  generator.generate(num_qubits, max_num_gates, &dataset,
                      /*invoke_python_verifier=*/false, &equiv_set,
                      /*unique_parameters=*/false);
   auto end = std::chrono::steady_clock::now();
@@ -54,7 +53,7 @@ void test_generator(const std::vector<GateType> &support_gates, int num_qubits,
     for (auto &it : dataset.dataset) {
       bool has_minimal_representation = false;
       for (auto &dag : it.second) {
-        bool result = dag->canonical_representation(&tmp_dag);
+        bool result = dag->canonical_representation(&tmp_dag, &ctx);
         if (result) {
           has_minimal_representation = true;
         } else {

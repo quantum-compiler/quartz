@@ -22,8 +22,7 @@ int main() {
   Dataset dataset;
   EquivalenceSet equiv_set;
   auto start = std::chrono::steady_clock::now();
-  gen.generate(num_qubits, num_input_parameters, max_num_gates,
-               max_num_param_gates, &dataset, /*invoke_python_verifier=*/
+  gen.generate(num_qubits, max_num_gates, &dataset, /*invoke_python_verifier=*/
                true, &equiv_set, /*unique_parameters=*/false, /*verbose=*/
                true);
   auto end = std::chrono::steady_clock::now();
@@ -42,9 +41,10 @@ int main() {
   equiv_set.clear();
   system("python src/python/verifier/verify_equivalences.py "
          "phase_shift_before_verify.json phase_shift_verified.json True True");
-  equiv_set.load_json(&ctx, "phase_shift_verified.json");
+  equiv_set.load_json(&ctx, "phase_shift_verified.json",
+                      /*from_verifier=*/true);
   equiv_set.simplify(&ctx);
-  equiv_set.save_json("phase_shift_verified_simplified.json");
+  equiv_set.save_json(&ctx, "phase_shift_verified_simplified.json");
   end = std::chrono::steady_clock::now();
   std::cout << std::dec << "Test phase shift with BFS verified: there are "
             << equiv_set.num_total_dags() << " circuits in "

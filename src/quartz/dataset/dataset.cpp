@@ -24,22 +24,10 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
 
   fout << "[" << std::endl;
 
-  // The generated parameters for random testing.
-  auto all_parameters = ctx->get_all_generated_parameters();
-  fout << "[";
-  bool start0 = true;
-  for (auto &param : all_parameters) {
-    if (start0) {
-      start0 = false;
-    } else {
-      fout << ", ";
-    }
-    fout << std::scientific << std::setprecision(17) << param;
-  }
-  fout << "]," << std::endl;
+  fout << ctx->param_info_to_json() << "," << std::endl;
 
   fout << "{" << std::endl;
-  start0 = true;
+  bool start0 = true;
   for (const auto &it : dataset) {
     if (it.second.empty()) {
       // Empty CircuitSeq set
@@ -128,7 +116,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
     std::unique_ptr<CircuitSeq> new_dag;
 
     for (auto &dag : dags) {
-      bool is_canonical = dag->canonical_representation(&new_dag);
+      bool is_canonical = dag->canonical_representation(&new_dag, ctx);
       if (!is_canonical) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));

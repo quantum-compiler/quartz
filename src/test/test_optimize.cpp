@@ -14,12 +14,14 @@ int main() {
 
   EquivalenceSet eqs;
   // Load ECC set from file
-  if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json")) {
+  if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
+                     /*from_verifier=*/false)) {
     // generate ECC set
     gen_ecc_set(
         {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
         "Nam_3_3_", true, false, 3, 2, 3);
-    if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json")) {
+    if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
+                       /*from_verifier=*/false)) {
       std::cout << "Failed to load equivalence file." << std::endl;
       assert(false);
     }

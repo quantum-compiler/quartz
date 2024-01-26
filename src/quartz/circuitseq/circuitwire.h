@@ -27,8 +27,7 @@ class CircuitWire {
   Type type;
   // If this wire is a qubit, |index| is the qubit id it corresponds to,
   // ranging [0, get_num_qubits()).
-  // If this wire is a parameter, |index| is the parameter id,
-  // ranging [0, get_num_total_parameters()).
+  // If this wire is a parameter, |index| is the parameter id.
   int index;
   std::vector<CircuitGate *> input_gates;
   std::vector<CircuitGate *> output_gates;

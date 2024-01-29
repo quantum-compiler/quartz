@@ -816,9 +816,9 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
         break;
       }
     }
+    fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   }
 
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), ']');
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
 
   auto result = std::make_unique<CircuitSeq>(num_qubits);

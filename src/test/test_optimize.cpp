@@ -6,7 +6,8 @@ using namespace quartz;
 
 int main() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
-               GateType::h, GateType::rz, GateType::x, GateType::add});
+               GateType::h, GateType::rz, GateType::x, GateType::add},
+              /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
 
   auto graph = Graph::from_qasm_file(
       &ctx, "experiment/circs/nam_circs/barenco_tof_3.qasm");

@@ -110,50 +110,83 @@ class EquivalenceSet {
 
   std::unique_ptr<RepresentativeSet> get_representative_set() const;
 
-  // A final pass of simplification before feeding the equivalences
-  // to the optimizer.
-  // Returns if the pass does some simplification or not.
+  /**
+   * A final pass of simplification before feeding the equivalences
+   * to the optimizer.
+   * @return True iff the pass does any simplification.
+   */
   bool simplify(Context *ctx,
                 bool normalize_to_minimal_circuit_representation = true,
                 bool common_subcircuit_pruning = true,
                 bool other_simplification = true, bool verbose = false);
 
-  // Sort the circuits in each equivalence class by CircuitSeq::less_than().
+  /**
+   * Sort the circuits in each equivalence class by CircuitSeq::less_than().
+   */
   void sort();
 
-  // Remove equivalence classes with only one CircuitSeq.
-  // Return the number of equivalent classes removed.
+  /**
+   * Remove equivalence classes with only one CircuitSeq.
+   * @return The number of equivalence classes removed.
+   */
   int remove_singletons(Context *ctx, bool verbose = false);
 
-  // Normalize each CircuitSeq to have the canonical representation.
-  // Return the number of equivalent classes modified.
+  /**
+   * Normalize each CircuitSeq to have the canonical representation.
+   * @return The number of equivalence classes modified.
+   */
   int normalize_to_canonical_representations(Context *ctx,
                                              bool verbose = false);
 
   /**
    * Remove unused qubits if they are unused in each CircuitSeq of an
    * equivalent class.
-   * @return The number of equivalent classes removed
+   * @return The number of equivalence classes removed
    * (and possibly inserted again).
    */
   int remove_unused_qubits(Context *ctx, bool verbose = false);
 
-  // For each pair of circuits in one equivalence class, if they share
-  // a common "first" gate or a common "last" gate, remove the latter one.
-  // Here "first" means a quantum gate which does not topologically depend
-  // on any other quantum gates, and "last" means a quantum gate which can
-  // appear at last in some topological order of the CircuitSeq.
-  // Return the number of equivalent classes modified.
+  /**
+   * For each pair of circuits in one equivalence class, if they share
+   * a common "first" gate or a common "last" gate, remove the latter one.
+   * Here "first" means a quantum gate which does not topologically depend
+   * on any other quantum gates, and "last" means a quantum gate which can
+   * appear at last in some topological order of the CircuitSeq.
+   * @return The number of equivalence classes modified.
+   */
   int remove_common_first_or_last_gates(Context *ctx, bool verbose = false);
 
-  // If there are two equivalence classes that are equivalent under
-  // permutation of parameters, remove one of them.
-  // Return the number of equivalent classes removed.
+  /**
+   * If one equivalence class uses an input symbolic parameter with a larger
+   * index than an unused parameter, remove the equivalence class because
+   * the equivalences should be captured in another class with the input
+   * symbolic parameters being a prefix of all input symbolic parameters.
+   * @return The number of equivalence classes removed.
+   */
+  int remove_parameter_non_prefix(Context *ctx, bool verbose = false);
+
+  /**
+   * If one equivalence class has an input symbolic parameter that only appears
+   * in one parameter expression and not used anywhere else, remove the
+   * equivalence class because such an expression could be substituted with
+   * that input symbolic parameter.
+   * @return The number of equivalence classes removed.
+   */
+  int remove_parameter_expression_substitutions(Context *ctx,
+                                                bool verbose = false);
+
+  /**
+   * If there are two equivalence classes that are equivalent under
+   * permutation of input symbolic parameters, remove one of them.
+   * @return The number of equivalence classes removed.
+   */
   int remove_parameter_permutations(Context *ctx, bool verbose = false);
 
-  // If there are two equivalence classes that are equivalent under
-  // permutation of qubits, remove one of them.
-  // Return the number of equivalent classes removed.
+  /**
+   * If there are two equivalence classes that are equivalent under
+   * permutation of qubits, remove one of them.
+   * @return The number of equivalence classes removed.
+   */
   int remove_qubit_permutations(Context *ctx, bool verbose = false);
 
   // This function runs in O(1).
@@ -190,6 +223,15 @@ class EquivalenceSet {
   get_containing_class(Context *ctx, CircuitSeq *dag) const;
 
  private:
+  void lazily_remove_class(EquivalenceClass *equiv_class,
+                           const std::vector<CircuitSeq *> &dags, Context *ctx,
+                           std::vector<EquivalenceClass *> &classes_to_remove,
+                           bool verbose, const std::string &pass_name);
+  /**
+   * @return The number of equivalence classes removed.
+   */
+  int do_remove_classes(
+      const std::vector<EquivalenceClass *> &classes_to_remove);
   void set_possible_class(const CircuitSeqHashType &hash_value,
                           EquivalenceClass *equiv_class);
   void remove_possible_class(const CircuitSeqHashType &hash_value,

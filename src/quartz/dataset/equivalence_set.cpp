@@ -451,7 +451,8 @@ bool EquivalenceSet::simplify(Context *ctx,
                               bool other_simplification, bool verbose) {
   bool ever_simplified = false;
   // If there are 2 continuous optimizations with no effect, break.
-  constexpr int kNumOptimizationsToPerform = 5;
+  // This number should be the total number of optimizations minus one.
+  constexpr int kNumOptimizationsToPerform = 7;
   // Initially we want to run all optimizations once.
   int remaining_optimizations = kNumOptimizationsToPerform + 1;
   while (true) {
@@ -469,6 +470,19 @@ bool EquivalenceSet::simplify(Context *ctx,
       break;
     }
     if (other_simplification && remove_unused_qubits(ctx, verbose)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (other_simplification && remove_parameter_non_prefix(ctx, verbose)) {
+      remaining_optimizations = kNumOptimizationsToPerform;
+      ever_simplified = true;
+    } else if (!--remaining_optimizations) {
+      break;
+    }
+    if (other_simplification &&
+        remove_parameter_expression_substitutions(ctx, verbose)) {
       remaining_optimizations = kNumOptimizationsToPerform;
       ever_simplified = true;
     } else if (!--remaining_optimizations) {
@@ -779,6 +793,86 @@ int EquivalenceSet::remove_common_first_or_last_gates(Context *ctx,
   return num_classes_modified;
 }
 
+int EquivalenceSet::remove_parameter_non_prefix(Context *ctx, bool verbose) {
+  std::vector<EquivalenceClass *> classes_to_remove;
+  auto param_masks = ctx->get_param_masks();
+  const int num_input_param = ctx->get_num_input_symbolic_parameters();
+  for (auto &item : classes_) {
+    if (item->size() == 0) {
+      continue;
+    }
+    InputParamMaskType param_mask{0};
+    const auto &dags = item->get_all_dags();
+    // Assume input symbolic parameters have the lowest indices.
+    assert(num_input_param <= 63);
+    for (auto &dag : dags) {
+      param_mask = param_mask | dag->get_input_param_usage_mask(param_masks);
+    }
+    param_mask += 1;  // 0..001..1 -> 0..010..0
+    if ((param_mask & (-param_mask)) != param_mask) {
+      // Not a power of 2 now -- not 0..001..1 or 0 before +1.
+      // A gap in input symbolic parameter mask detected.
+      // Remove this class.
+      lazily_remove_class(item.get(), dags, ctx, classes_to_remove, verbose,
+                          "Remove parameter non-prefixes");
+    }
+  }
+  return do_remove_classes(classes_to_remove);
+}
+
+int EquivalenceSet::remove_parameter_expression_substitutions(Context *ctx,
+                                                              bool verbose) {
+  std::vector<EquivalenceClass *> classes_to_remove;
+  auto param_masks = ctx->get_param_masks();
+  const int num_input_param = ctx->get_num_input_symbolic_parameters();
+  for (auto &item : classes_) {
+    if (item->size() == 0) {
+      continue;
+    }
+    const auto &dags = item->get_all_dags();
+    // Assume input symbolic parameters have the lowest indices.
+    assert(num_input_param <= 63);
+    InputParamMaskType non_input_used_once_in_all_circuits =
+        (((InputParamMaskType)1) << num_input_param) - 1;
+    for (auto &dag : dags) {
+      InputParamMaskType current_usage_mask{0};
+      InputParamMaskType current_usage_mask_used_twice{0};
+      InputParamMaskType current_usage_mask_input_param_only{0};
+      for (auto &circuit_gate : dag->gates) {
+        // A quantum gate using parameters.
+        if (circuit_gate->gate->is_parametrized_gate()) {
+          for (auto &input_wire : circuit_gate->input_wires) {
+            if (input_wire->is_parameter()) {
+              if (input_wire->type == CircuitWire::input_param) {
+                current_usage_mask_input_param_only |=
+                    param_masks[input_wire->index];
+              }
+              current_usage_mask_used_twice |=
+                  current_usage_mask & param_masks[input_wire->index];
+              current_usage_mask |= param_masks[input_wire->index];
+            }
+          }
+        }
+      }
+      auto non_input_used_once =
+          current_usage_mask & (~(current_usage_mask_used_twice |
+                                  current_usage_mask_input_param_only));
+      non_input_used_once_in_all_circuits =
+          non_input_used_once_in_all_circuits & non_input_used_once;
+      if (!non_input_used_once_in_all_circuits) {
+        break;
+      }
+    }
+    if (non_input_used_once_in_all_circuits) {
+      // If there is any input symbolic parameter satisfying the condition,
+      // remove this equivalence class.
+      lazily_remove_class(item.get(), dags, ctx, classes_to_remove, verbose,
+                          "Remove parameter expression substitutions");
+    }
+  }
+  return do_remove_classes(classes_to_remove);
+}
+
 int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
   // This function needs a deterministic order of |classes_| in order for
   // the result to be reproducible.
@@ -877,44 +971,12 @@ int EquivalenceSet::remove_parameter_permutations(Context *ctx, bool verbose) {
                                    masked_param_permutation.end()));
     if (found_permuted_equivalence) {
       // Remove this equivalence class.
-      classes_to_remove.push_back(item.get());
-      if (verbose) {
-        std::cout << "Remove parameter permutations: remove " << item->hash(ctx)
-                  << std::endl;
-        for (auto &dag : dags) {
-          std::cout << "  " << dag->to_json() << std::endl;
-        }
-      }
-      for (auto &dag : dags) {
-        remove_possible_class(dag->hash(ctx), item.get());
-        for (const auto &other_hash : dag->other_hash_values()) {
-          remove_possible_class(other_hash, item.get());
-        }
-      }
+      lazily_remove_class(item.get(), dags, ctx, classes_to_remove, verbose,
+                          "Remove parameter permutations");
     }
   }
 
-  if (classes_to_remove.empty()) {
-    return 0;
-  }
-
-  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
-  std::swap(prev_classes, classes_);
-  // Now |classes_| is empty.
-  assert(prev_classes.size() >= classes_to_remove.size());
-  classes_.reserve(prev_classes.size() - classes_to_remove.size());
-  auto remove_it = classes_to_remove.begin();
-  for (auto &item : prev_classes) {
-    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
-      // Remove the equivalence class.
-      remove_it++;
-    } else {
-      assert(item->size() > 0);
-      classes_.push_back(std::move(item));
-    }
-  }
-
-  return (int)classes_to_remove.size();
+  return do_remove_classes(classes_to_remove);
 }
 
 int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
@@ -987,44 +1049,11 @@ int EquivalenceSet::remove_qubit_permutations(Context *ctx, bool verbose) {
                                    qubit_permutation.end()));
     if (found_permuted_equivalence) {
       // Remove this equivalence class.
-      classes_to_remove.push_back(item.get());
-      if (verbose) {
-        std::cout << "Remove qubit permutations: remove " << item->hash(ctx)
-                  << std::endl;
-        for (auto &dag : dags) {
-          std::cout << "  " << dag->to_json() << std::endl;
-        }
-      }
-      for (auto &dag : dags) {
-        remove_possible_class(dag->hash(ctx), item.get());
-        for (const auto &other_hash : dag->other_hash_values()) {
-          remove_possible_class(other_hash, item.get());
-        }
-      }
+      lazily_remove_class(item.get(), dags, ctx, classes_to_remove, verbose,
+                          "Remove qubit permutations");
     }
   }
-
-  if (classes_to_remove.empty()) {
-    return 0;
-  }
-
-  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
-  std::swap(prev_classes, classes_);
-  // Now |classes_| is empty.
-  assert(prev_classes.size() >= classes_to_remove.size());
-  classes_.reserve(prev_classes.size() - classes_to_remove.size());
-  auto remove_it = classes_to_remove.begin();
-  for (auto &item : prev_classes) {
-    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
-      // Remove the equivalence class.
-      remove_it++;
-    } else {
-      assert(item->size() > 0);
-      classes_.push_back(std::move(item));
-    }
-  }
-
-  return (int)classes_to_remove.size();
+  return do_remove_classes(classes_to_remove);
 }
 
 int EquivalenceSet::num_equivalence_classes() const {
@@ -1156,6 +1185,51 @@ EquivalenceSet::get_containing_class(Context *ctx, CircuitSeq *dag) const {
     }
   }
   return std::vector<EquivalenceClass *>(result.begin(), result.end());
+}
+
+void EquivalenceSet::lazily_remove_class(
+    EquivalenceClass *equiv_class, const std::vector<CircuitSeq *> &dags,
+    Context *ctx, std::vector<EquivalenceClass *> &classes_to_remove,
+    bool verbose, const std::string &pass_name) {
+  classes_to_remove.push_back(equiv_class);
+  if (verbose) {
+    std::cout << pass_name << ": remove " << equiv_class->hash(ctx)
+              << std::endl;
+    for (auto &dag : dags) {
+      std::cout << "  " << dag->to_json() << std::endl;
+    }
+  }
+  for (auto &dag : dags) {
+    remove_possible_class(dag->hash(ctx), equiv_class);
+    for (const auto &other_hash : dag->other_hash_values()) {
+      remove_possible_class(other_hash, equiv_class);
+    }
+  }
+}
+
+int EquivalenceSet::do_remove_classes(
+    const std::vector<EquivalenceClass *> &classes_to_remove) {
+  if (classes_to_remove.empty()) {
+    return 0;
+  }
+
+  std::vector<std::unique_ptr<EquivalenceClass>> prev_classes;
+  std::swap(prev_classes, classes_);
+  // Now |classes_| is empty.
+  assert(prev_classes.size() >= classes_to_remove.size());
+  classes_.reserve(prev_classes.size() - classes_to_remove.size());
+  auto remove_it = classes_to_remove.begin();
+  for (auto &item : prev_classes) {
+    if (remove_it != classes_to_remove.end() && item.get() == *remove_it) {
+      // Remove the equivalence class.
+      remove_it++;
+    } else {
+      assert(item->size() > 0);
+      classes_.push_back(std::move(item));
+    }
+  }
+
+  return (int)classes_to_remove.size();
 }
 
 void EquivalenceSet::set_possible_class(const CircuitSeqHashType &hash_value,

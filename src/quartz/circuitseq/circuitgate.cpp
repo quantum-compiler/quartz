@@ -258,7 +258,6 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     result += "(";
     for (auto input_wire : input_wires) {
       if (input_wire->is_parameter()) {
-        assert(ctx->param_has_value(input_wires[j]->index));
         std::ostringstream out;
         out.precision(param_precision);
         const auto &param_value = ctx->get_param_value(input_wire->index);

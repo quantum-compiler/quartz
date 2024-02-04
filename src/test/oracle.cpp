@@ -1,10 +1,12 @@
+#include "test/oracle.h"
+
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"
 #include "test/gen_ecc_set.h"
 
 using namespace quartz;
 
-int main() {
+int optimize_() {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add},
               /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
@@ -46,5 +48,5 @@ int main() {
 
   graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", true,
                   nullptr, 1);
-  return 0;
+  return 42;
 }

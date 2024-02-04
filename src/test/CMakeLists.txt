@@ -32,6 +32,10 @@ file(GLOB_RECURSE TEST_FROM_AND_TO_QASM "test_from_and_to_qasm.cpp")
 file(GLOB_RECURSE TEST_OPTIMIZE "test_optimize.cpp")
 file(GLOB_RECURSE TEST_CREATE_GRAPHXFER_FROM_QASM "test_create_graphXfer_from_qasm.cpp")
 file(GLOB_RECURSE TEST_PARTITION "test_partition.cpp")
+file(GLOB_RECURSE WRAPPER "wrapper.c")
+file(GLOB_RECURSE ORACLE "oracle.cpp")
+
+
 if(USE_ARBLIB)
     file(GLOB_RECURSE TEST_ARB "test_arb.cpp")
 endif()
@@ -68,6 +72,12 @@ add_executable(test_from_and_to_qasm ${TEST_FROM_AND_TO_QASM} )
 add_executable(test_optimize ${TEST_OPTIMIZE} )
 add_executable(test_create_graphXfer_from_qasm ${TEST_CREATE_GRAPHXFER_FROM_QASM} )
 add_executable(test_partition ${TEST_PARTITION} )
+add_library(oracle SHARED ${ORACLE})
+
+add_executable(wrapper ${WRAPPER})
+target_link_libraries(wrapper oracle)
+target_link_libraries(wrapper quartz_runtime)
+
 if(USE_ARBLIB)
     add_executable(test_arb ${TEST_ARB} )
 endif()

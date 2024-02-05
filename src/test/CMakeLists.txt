@@ -32,7 +32,7 @@ file(GLOB_RECURSE TEST_FROM_AND_TO_QASM "test_from_and_to_qasm.cpp")
 file(GLOB_RECURSE TEST_OPTIMIZE "test_optimize.cpp")
 file(GLOB_RECURSE TEST_CREATE_GRAPHXFER_FROM_QASM "test_create_graphXfer_from_qasm.cpp")
 file(GLOB_RECURSE TEST_PARTITION "test_partition.cpp")
-file(GLOB_RECURSE WRAPPER "wrapper.c")
+file(GLOB_RECURSE WRAPPER "test_wrapper.cpp")
 file(GLOB_RECURSE ORACLE "oracle.cpp")
 
 

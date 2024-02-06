@@ -6,16 +6,16 @@
 
 using namespace quartz;
 
-std::string optimize_(std::string s) {
+std::string optimize_(std::string circ_string, std::string cost_func,
+                      std::string ecc_path, int timeout) {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add},
               /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
 
-  auto graph = Graph::from_qasm_str(&ctx, s);
+  auto graph = Graph::from_qasm_str(&ctx, circ_string);
   assert(graph);
   EquivalenceSet eqs;
-  eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
-                /*from_verifier=*/false);
+  eqs.load_json(&ctx, ecc_path, false);
 
   // Get xfer from the equivalent set
   auto ecc = eqs.get_all_equivalence_sets();
@@ -33,8 +33,20 @@ std::string optimize_(std::string s) {
     }
   }
   // std::cout << "number of xfers: " << xfers.size() << std::endl;
-
-  auto new_graph = graph->optimize(xfers, graph->gate_count() * 1.05,
-                                   "barenco_tof_3", "", false, nullptr, 1);
+  std::function<float(Graph *)> cost_function;
+  float init_cost;
+  if (cost_func == "depth") {
+    std::function<float(Graph *)> cost_function = [](Graph *graph) {
+      return graph->cost_depth();
+    };
+    init_cost = graph->cost_depth();
+  } else {
+    std::function<float(Graph *)> cost_function = [](Graph *graph) {
+      return graph->cost_gate_count();
+    };
+    init_cost = graph->cost_gate_count();
+  }
+  auto new_graph = graph->optimize(xfers, init_cost * 1.05, "barenco_tof_3", "",
+                                   false, cost_function, timeout);
   return new_graph->to_qasm(false, false);
 }

@@ -466,6 +466,16 @@ float Graph::total_cost(void) const {
   }
   return (float)cnt;
 }
+float Graph::cost_gate_count(void) const {
+  size_t cnt = 0;
+  for (const auto &it : inEdges) {
+    if (it.first.ptr->is_quantum_gate())
+      cnt++;
+  }
+  return (float)cnt;
+}
+
+float Graph::cost_depth(void) const { return circuit_depth(); }
 
 int Graph::gate_count() const {
   int cnt = 0;

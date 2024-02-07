@@ -7,13 +7,16 @@
 using namespace quartz;
 
 std::string optimize_(std::string circ_string, std::string cost_func,
-                      std::string ecc_path, int timeout) {
+                      std::string ecc_path, std::string gate_set, int timeout) {
+  // Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
+  //              GateType::h, GateType::rz, GateType::x, GateType::add},
+  //             /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
-               GateType::h, GateType::rz, GateType::x, GateType::add},
+               GateType::h, GateType::t, GateType::x, GateType::tdg},
               /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
-
   auto graph = Graph::from_qasm_str(&ctx, circ_string);
   assert(graph);
+
   EquivalenceSet eqs;
   eqs.load_json(&ctx, ecc_path, false);
 

@@ -475,7 +475,9 @@ float Graph::cost_gate_count(void) const {
   return (float)cnt;
 }
 
-float Graph::cost_depth(void) const { return circuit_depth(); }
+float Graph::cost_depth(void) const {
+  return circuit_depth() + 0.1 * gate_count();
+}
 
 int Graph::gate_count() const {
   int cnt = 0;

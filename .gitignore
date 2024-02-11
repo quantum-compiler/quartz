@@ -61,6 +61,6 @@ install_manifest.txt
 
 # Build
 build/*
-
+mybuild/*
 # others
 .DS_Store

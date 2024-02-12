@@ -7,7 +7,8 @@
 
 using namespace quartz;
 
-int main() {
+int main()
+{
   // gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
   //              GateType::add},
   //             "IBM_3_3_", true, 3, 4, 3);
@@ -34,8 +35,8 @@ int main() {
   //         GateType::add}, file_prefix, true, q, 2, n);
   //   }
   // }
-  gen_ecc_set({GateType::t, GateType::tdg, GateType::h, GateType::x,
-               GateType::cx, GateType::add},
-              "3_2_5_", true, true, 3, 0, 5);
+  gen_ecc_set({GateType::rz, GateType::h, GateType::cx, GateType::x,
+               GateType::add},
+              "3_2_5_", true, true, 3, 2, 5);
   return 0;
 }

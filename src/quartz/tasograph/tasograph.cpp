@@ -183,6 +183,7 @@ Graph::Graph(const Graph &graph) {
   pos_2_logical_qubit = graph.pos_2_logical_qubit;
   inEdges = graph.inEdges;
   outEdges = graph.outEdges;
+  param_idx = graph.param_idx;
 }
 
 std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {

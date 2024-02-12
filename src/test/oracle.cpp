@@ -7,7 +7,7 @@
 using namespace quartz;
 
 std::string optimize_(std::string circ_string, std::string cost_func,
-                      std::string ecc_path, std::string gate_set, int timeout)
+                      std::string ecc_path, std::string gate_set, float timeout)
 {
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add});

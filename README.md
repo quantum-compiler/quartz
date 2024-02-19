@@ -166,6 +166,10 @@ Explanation for some of the parameters:
 
 See [code structure](CODE_STRUCTURE.md) for more information about the organization of the Quartz code base.
 
+## Issues
+
+Please file an issue or contact mingkuan@cmu.edu if you encounter any problems.
+
 ## Contributing
 
 Please let us know if you encounter any bugs or have any suggestions by [submitting an issue](https://github.com/quantum-compiler/quartz/issues).
@@ -173,8 +177,6 @@ Please let us know if you encounter any bugs or have any suggestions by [submitt
 We welcome all contributions to Quartz from bug fixes to new features and extensions.
 
 Please follow [developer guidance](doc/dev_setup.md).
-
-Please subscribe to the Quartz users mailing list (TODO)
 
 ## Citations
 

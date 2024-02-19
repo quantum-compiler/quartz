@@ -9,8 +9,22 @@ using namespace quartz;
 std::string optimize_(std::string circ_string, std::string cost_func,
                       std::string ecc_path, std::string gate_set, float timeout)
 {
-  Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
-               GateType::h, GateType::rz, GateType::x, GateType::add});
+  Context ctx({});
+  if (gate_set == "Nam")
+  {
+    ctx = Context({GateType::input_qubit, GateType::input_param, GateType::cx,
+                   GateType::h, GateType::rz, GateType::x, GateType::add});
+  }
+  else if (gate_set == "CliffordT")
+  {
+    ctx = Context({GateType::input_qubit, GateType::input_param, GateType::cx,
+                   GateType::h, GateType::x, GateType::t, GateType::tdg, GateType::add});
+  }
+  else
+  {
+    std::cout << "Invalid gate set." << std::endl;
+    assert(false);
+  }
   auto graph =
       Graph::from_qasm_str(&ctx, circ_string);
 
@@ -43,7 +57,28 @@ std::string optimize_(std::string circ_string, std::string cost_func,
     }
   }
   // std::cout << "number of xfers: " << xfers.size() << std::endl;
+  std::function<int(Graph *)> cost_function;
+  if (cost_func == "Gate")
+  {
+    auto cost_function = [](Graph *graph)
+    { return graph->total_cost(); };
+  }
+  else if (cost_func == "Depth")
+  {
+    auto cost_function = [](Graph *graph)
+    { return graph->circuit_depth(); };
+  }
+  else if (cost_func == "Mixed")
+  {
+    auto cost_function = [](Graph *graph)
+    { return graph->circuit_depth() + 0.1 * graph->total_cost(); };
+  }
+  else
+  {
+    std::cout << "Invalid cost function." << std::endl;
+    assert(false);
+  }
 
-  auto newgraph = graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", false, nullptr, timeout);
+  auto newgraph = graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", false, cost_function, timeout);
   return newgraph->to_qasm(false, false);
 }

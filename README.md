@@ -3,6 +3,10 @@
 Quartz is a quantum circuit optimizer that automatically generates and verifies circuit transformations for an arbitrary quantum gate set. To optimize an input quantum circuit, Quartz uses these auto-generated circuit transformations to construct a search space of functionally equivalent quantum circuits.
 Quartz uses a cost-based search algorithm to explore the space and discovers highly optimized quantum circuits.
 
+## PLDI 2022 Artifact
+
+If you would like to compare with the Quartz version published in PLDI 2022, please go to https://github.com/quantum-compiler/quartz-artifact.
+
 ## Install Quartz
 
 See [instructions](INSTALL.md) to install Quartz from source code.

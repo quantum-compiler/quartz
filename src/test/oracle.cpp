@@ -60,17 +60,17 @@ std::string optimize_(std::string circ_string, std::string cost_func,
   std::function<int(Graph *)> cost_function;
   if (cost_func == "Gate")
   {
-    auto cost_function = [](Graph *graph)
+    cost_function = [](Graph *graph)
     { return graph->total_cost(); };
   }
   else if (cost_func == "Depth")
   {
-    auto cost_function = [](Graph *graph)
+    cost_function = [](Graph *graph)
     { return graph->circuit_depth(); };
   }
   else if (cost_func == "Mixed")
   {
-    auto cost_function = [](Graph *graph)
+    cost_function = [](Graph *graph)
     { return graph->circuit_depth() + 0.1 * graph->total_cost(); };
   }
   else

@@ -78,7 +78,7 @@ std::string optimize_(std::string circ_string, std::string cost_func,
     std::cout << "Invalid cost function." << std::endl;
     assert(false);
   }
-
-  auto newgraph = graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", false, cost_function, timeout);
+  float init_cost = cost_function(graph.get());
+  auto newgraph = graph->optimize(xfers, init_cost * 1.05, "barenco_tof_3", "", false, cost_function, timeout);
   return newgraph->to_qasm(false, false);
 }

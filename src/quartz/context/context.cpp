@@ -5,10 +5,10 @@
 #include "quartz/utils/string_utils.h"
 
 #include <cassert>
-#include <cmath>
 #include <iostream>
 #include <mutex>
 #include <random>
+#include <set>
 
 namespace quartz {
 Context::Context(const std::vector<GateType> &supported_gates,
@@ -99,10 +99,6 @@ bool Context::insert_gate(GateType tp) {
 
   gates_[tp] = std::move(new_gate);
   return true;
-}
-
-void Context::gen_random_parameters(const int num_params) {
-  param_info_->gen_random_parameters(num_params);
 }
 
 const std::vector<GateType> &Context::get_supported_gates() const {
@@ -203,16 +199,14 @@ void Context::set_param_value(int id, const ParamType &param) {
 }
 
 std::vector<ParamType> Context::get_all_input_param_values() const {
-  return param_info_->parameter_values_;
+  return param_info_->get_all_input_param_values();
 }
 
 int Context::get_new_param_id(const ParamType &param) {
   return param_info_->get_new_param_id(param);
 }
 
-int Context::get_new_param_id() {
-  return param_info_->get_new_param_id();
-}
+int Context::get_new_param_id() { return param_info_->get_new_param_id(); }
 
 int Context::get_new_param_expression_id(
     const std::vector<int> &parameter_indices, Gate *op) {
@@ -228,42 +222,24 @@ int Context::get_num_input_symbolic_parameters() const {
 }
 
 bool Context::param_is_symbolic(int id) const {
-  return id >= 0 && id < (int)param_info_->is_parameter_symbolic_.size() &&
-         param_info_->is_parameter_symbolic_[id];
+  return param_info_->param_is_symbolic(id);
 }
 
 bool Context::param_has_value(int id) const {
-  return id >= 0 && id < (int)param_info_->is_parameter_symbolic_.size() &&
-         !param_info_->is_parameter_symbolic_[id];
+  return param_info_->param_has_value(id);
 }
 
 bool Context::param_is_expression(int id) const {
-  return id >= 0 && id < (int)param_info_->parameter_wires_.size() &&
-         !param_info_->parameter_wires_[id]->input_gates.empty();
+  return param_info_->param_is_expression(id);
 }
 
 CircuitWire *Context::get_param_wire(int id) const {
-  if (id >= 0 && id < (int)param_info_->parameter_wires_.size()) {
-    return param_info_->parameter_wires_[id].get();
-  } else {
-    return nullptr;  // out of range
-  }
+  return param_info_->get_param_wire(id);
 }
 
 std::vector<ParamType>
 Context::compute_parameters(const std::vector<ParamType> &input_parameters) {
-  auto result = input_parameters;
-  result.resize(param_info_->is_parameter_symbolic_.size());
-  for (auto &expr : param_info_->parameter_expressions_) {
-    std::vector<ParamType> params;
-    for (const auto &input_wire : expr->input_wires) {
-      params.push_back(result[input_wire->index]);
-    }
-    assert(expr->output_wires.size() == 1);
-    const auto &output_wire = expr->output_wires[0];
-    result[output_wire->index] = expr->gate->compute(params);
-  }
-  return result;
+  return param_info_->compute_parameters(input_parameters);
 }
 
 std::vector<int> Context::get_param_permutation(
@@ -353,21 +329,7 @@ void Context::generate_parameter_expressions(
 }
 
 std::vector<InputParamMaskType> Context::get_param_masks() const {
-  std::vector<InputParamMaskType> param_mask(
-      param_info_->is_parameter_symbolic_.size());
-  for (int i = 0; i < (int)param_mask.size(); i++) {
-    if (!param_is_expression(i)) {
-      param_mask[i] = ((InputParamMaskType)1) << i;
-    }
-  }
-  for (auto &expr : param_info_->parameter_expressions_) {
-    const auto &output_wire = expr->output_wires[0];
-    param_mask[output_wire->index] = 0;
-    for (const auto &input_wire : expr->input_wires) {
-      param_mask[output_wire->index] |= param_mask[input_wire->index];
-    }
-  }
-  return param_mask;
+  return param_info_->get_param_masks();
 }
 
 std::string Context::param_info_to_json() const {

@@ -3,14 +3,9 @@
 #include "quartz/circuitseq/circuitgate.h"
 #include "quartz/circuitseq/circuitwire.h"
 #include "quartz/gate/gate_utils.h"
-#include "quartz/math/vector.h"
 #include "quartz/utils/utils.h"
 
-#include <algorithm>
-#include <memory>
 #include <random>
-#include <set>
-#include <unordered_map>
 #include <vector>
 
 namespace quartz {
@@ -26,7 +21,15 @@ class ParamInfo {
    */
   explicit ParamInfo(int num_input_symbolic_params);
 
+  /**
+   * Generate random values for random testing for input symbolic parameters.
+   * The results are stored in |random_parameters_|.
+   * The size of |random_parameters_| should be equal to the number of input
+   * symbolic parameters.
+   * @param num_params The number of input symbolic parameters.
+   */
   void gen_random_parameters(int num_params);
+
   [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
 
   /**

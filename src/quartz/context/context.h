@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <memory>
 #include <random>
-#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -162,15 +161,6 @@ class Context {
 
  private:
   bool insert_gate(GateType tp);
-
-  /**
-   * Generate random values for random testing for input symbolic parameters.
-   * The results are stored in |random_parameters_|.
-   * The size of |random_parameters_| should be equal to the number of input
-   * symbolic parameters.
-   * @param num_params The number of input symbolic parameters.
-   */
-  void gen_random_parameters(int num_params);
 
   size_t global_unique_id;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;

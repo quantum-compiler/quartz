@@ -7,8 +7,10 @@
 using namespace quartz;
 
 int main() {
-  Context ctx({GateType::input_qubit, GateType::input_param, GateType::rz,
-               GateType::z});
+  ParamInfo param_info;
+  Context ctx(
+      {GateType::input_qubit, GateType::input_param, GateType::rz, GateType::z},
+      &param_info);
   std::string src_str = "OPENQASM 2.0;\n"
                         "include \"qelib1.inc\";\n"
                         "qreg q[1];\n"

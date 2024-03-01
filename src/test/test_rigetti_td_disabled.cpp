@@ -28,11 +28,13 @@ int main(int argc, char **argv) {
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
 
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::cx, GateType::x,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::rz, GateType::h, GateType::cx, GateType::x,
-                   GateType::add, GateType::input_qubit,
-                   GateType::input_param});
+                   GateType::add, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   // Construct GraphXfers for toffoli flip

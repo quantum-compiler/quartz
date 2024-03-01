@@ -50,10 +50,12 @@ void remove_swap_for_nwq(Context *ctx) {
   }
 }
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
-               GateType::rz, GateType::rx, GateType::p});
+               GateType::rz, GateType::rx, GateType::p},
+              &param_info);
   std::vector<std::string> circuit_names = {"ae",
                                             "dj",
                                             "ghz",

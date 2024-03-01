@@ -22,8 +22,10 @@ template <class T> std::string output_vec(const std::vector<T> &vec) {
 }
 
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::t, GateType::tdg});
+               GateType::cx, GateType::t, GateType::tdg},
+              &param_info);
   EquivalenceSet eqs;
   if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json",
                      /*from_verifier=*/false)) {

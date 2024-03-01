@@ -1,6 +1,7 @@
 #pragma once
 
 #include "quartz/circuitseq/circuitwire.h"
+#include "quartz/context/param_info.h"
 #include "quartz/gate/gate_utils.h"
 #include "quartz/math/vector.h"
 #include "quartz/utils/utils.h"
@@ -19,18 +20,22 @@ class CircuitGate;
 class Context {
  public:
   /**
-   * A constructor without parameters.
+   * A simple constructor, should be used when the generator is not needed.
+   * - Does not generate the random testing values.
+   * - Does not initialize the ParamInfo object for the generator.
    */
-  explicit Context(const std::vector<GateType> &supported_gates);
+  explicit Context(const std::vector<GateType> &supported_gates,
+                   ParamInfo *param_info);
   /**
-   * Generates the random testing values for 2^|num_qubits| coefficients
-   * and |num_input_symbolic_params| parameters.
-   * The constructor then calls |generate_parameter_expressions()|.
+   * Generates the random testing values for 2^|num_qubits| coefficients.
+   * The constructor then calls |generate_parameter_expressions()|,
+   * which initializes the ParamInfo object for the generator.
    */
   Context(const std::vector<GateType> &supported_gates, int num_qubits,
-          int num_input_symbolic_params);
+          ParamInfo *param_info);
 
   Gate *get_gate(GateType tp);
+  [[nodiscard]] bool has_gate(GateType tp) const;
   Gate *get_general_controlled_gate(GateType tp,
                                     const std::vector<bool> &state);
   [[nodiscard]] const std::vector<GateType> &get_supported_gates() const;
@@ -43,14 +48,13 @@ class Context {
    */
   void gen_input_and_hashing_dis(int num_qubits);
   [[nodiscard]] const Vector &get_generated_input_dis(int num_qubits) const;
+  [[nodiscard]] const Vector &get_and_gen_input_dis(int num_qubits);
   [[nodiscard]] const Vector &get_generated_hashing_dis(int num_qubits) const;
+  [[nodiscard]] const Vector &get_and_gen_hashing_dis(int num_qubits);
   [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
   size_t next_global_unique_id();
 
   [[nodiscard]] bool has_parameterized_gate() const;
-
-  // A hacky function: set a generated parameter.
-  void set_generated_parameter(int id, ParamType param);
 
   // These three functions are used in |Verifier::redundant()| for a version
   // of RepGen algorithm that does not invoke Python verifier.
@@ -147,6 +151,11 @@ class Context {
    */
   void load_param_info_from_json(std::istream &fin);
 
+  /**
+   * Return the pointer to the ParamInfo object.
+   */
+  [[nodiscard]] ParamInfo *get_param_info() const;
+
   // This function generates a deterministic series of random numbers
   // ranging [0, 1].
   double random_number();
@@ -173,7 +182,6 @@ class Context {
   std::vector<GateType> supported_quantum_gates_;
   std::vector<Vector> random_input_distribution_;
   std::vector<Vector> random_hashing_distribution_;
-  std::vector<ParamType> random_parameters_;
 
   // A vector to store the representative circuit sequences.
   std::vector<std::unique_ptr<CircuitSeq>> representative_seqs_;
@@ -181,19 +189,15 @@ class Context {
   // Standard mersenne_twister_engine seeded with 0
   std::mt19937 gen{0};
 
-  // Each parameter can be either a concrete parameter (with a value),
-  // an input symbolic parameter, or a symbolic parameter expression.
-  // The concrete parameters are from the input QASM file,
-  // written by QASMParser.
-  // These three vectors should always have the same size.
-  std::vector<ParamType> parameter_values_;
-  std::vector<std::unique_ptr<CircuitWire>> parameter_wires_;
-  std::vector<bool> is_parameter_symbolic_;
-  // A holder for parameter expressions.
-  std::vector<std::unique_ptr<CircuitGate>> parameter_expressions_;
+  // A (shared within a single thread) pointer to a (mutable) parameter info
+  // object.
+  ParamInfo *param_info_;
 };
 
-// TODO: This function does not consider the parameters
+/**
+ * Union two contexts with potentially different gate sets.
+ * Require the ParamInfo object of both contexts to be the same.
+ */
 Context union_contexts(Context *ctx_0, Context *ctx_1);
 
 }  // namespace quartz

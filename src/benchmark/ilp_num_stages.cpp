@@ -145,10 +145,12 @@ int main() {
   auto start = std::chrono::steady_clock::now();
   init_python_interpreter();
   PythonInterpreter interpreter;
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
-               GateType::rz, GateType::p, GateType::ccx, GateType::rx});
+               GateType::rz, GateType::p, GateType::ccx, GateType::rx},
+              &param_info);
   std::vector<std::string> circuit_names = {"ae",         "dj",    "ghz",
                                             "graphstate", "qft",   "qpeexact",
                                             "su2random",  "wstate"};

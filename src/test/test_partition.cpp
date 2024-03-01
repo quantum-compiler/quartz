@@ -5,9 +5,11 @@
 using namespace quartz;
 
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::cx, GateType::x, GateType::rz, GateType::add,
-               GateType::neg});
+               GateType::neg},
+              &param_info);
   auto graph = Graph::from_qasm_file(
       &ctx, "../experiment/circs/scalability_study/adder_64/adder_64.qasm");
   auto subgraphs = graph->topology_partition(512);

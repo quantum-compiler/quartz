@@ -489,7 +489,8 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
 
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_rz_xfer(Context *ctx) {
   Context dst_ctx({GateType::rz, GateType::cx, GateType::input_qubit,
-                   GateType::input_param});
+                   GateType::input_param},
+                  ctx->get_param_info());
   std::pair<RuleParser *, RuleParser *> toffoli_rules =
       RuleParser::ccz_cx_rz_rules();
   std::vector<Command> cmds;
@@ -507,7 +508,8 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_rz_xfer(Context *ctx) {
 
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_u1_xfer(Context *ctx) {
   Context dst_ctx({GateType::u1, GateType::cx, GateType::input_qubit,
-                   GateType::input_param});
+                   GateType::input_param},
+                  ctx->get_param_info());
   std::pair<RuleParser *, RuleParser *> toffoli_rules =
       RuleParser::ccz_cx_u1_rules();
   std::vector<Command> cmds;
@@ -525,7 +527,8 @@ std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_u1_xfer(Context *ctx) {
 
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
   Context dst_ctx({GateType::t, GateType::tdg, GateType::cx,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param},
+                  ctx->get_param_info());
   std::pair<RuleParser *, RuleParser *> toffoli_rules =
       RuleParser::ccz_cx_t_rules();
   std::vector<Command> cmds;

@@ -26,7 +26,8 @@ int nnz(const std::vector<Vector> &mat, double eps) {
 void test_sparsity(const std::vector<GateType> &supported_gates,
                    const std::string &file_prefix, int num_qubits,
                    int num_input_parameters, int max_num_quantum_gates) {
-  Context ctx(supported_gates, num_qubits, num_input_parameters);
+  ParamInfo param_info(/*num_input_symbolic_params=*/num_input_parameters);
+  Context ctx(supported_gates, num_qubits, &param_info);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;

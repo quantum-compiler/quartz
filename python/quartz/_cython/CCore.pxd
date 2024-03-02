@@ -62,17 +62,19 @@ cdef extern from "gate/gate.h" namespace "quartz":
         GateType tp
         int num_qubits, num_parameters
 
+cdef extern from "context/param_info.h" namespace "quartz":
+    cdef cppclass ParamInfo:
+        ParamInfo() except +
+
+ctypedef ParamInfo* ParamInfo_ptr
+
 cdef extern from "context/context.h" namespace "quartz":
     cdef cppclass Context:
-        Context(const vector[GateType]) except +
+        Context(const vector[GateType], ParamInfo_ptr) except +
         size_t next_global_unique_id()
         bool has_parameterized_gate() const
 
 ctypedef Context* Context_ptr
-
-cdef extern from "context/param_info.h" namespace "quartz":
-    cdef cppclass ParamInfo:
-        ParamInfo() except +
 
 cdef extern from "circuitseq/circuitseq.h" namespace "quartz":
     cdef cppclass CircuitSeq:

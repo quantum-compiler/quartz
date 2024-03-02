@@ -68,6 +68,10 @@ cdef extern from "context/context.h" namespace "quartz":
         size_t next_global_unique_id()
         bool has_parameterized_gate() const
 
+cdef extern from "context/param_info.h" namespace "quartz":
+    cdef cppclass ParamInfo:
+        ParamInfo() except +
+
 ctypedef Context* Context_ptr
 
 cdef extern from "circuitseq/circuitseq.h" namespace "quartz":

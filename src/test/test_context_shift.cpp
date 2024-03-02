@@ -3,13 +3,17 @@
 using namespace quartz;
 
 int main() {
+  ParamInfo param_info;
   Context src_ctx({GateType::input_qubit, GateType::input_param, GateType::t,
-                   GateType::tdg});
-  Context dst_ctx({
-      GateType::input_qubit,
-      GateType::input_param,
-      GateType::u1,
-  });
+                   GateType::tdg},
+                  &param_info);
+  Context dst_ctx(
+      {
+          GateType::input_qubit,
+          GateType::input_param,
+          GateType::u1,
+      },
+      &param_info);
   RuleParser rule_parser({
       "t q0 = u1 q0 0.25pi",     // t -> u1
       "h q0 = u2 q0 0 pi",       // h-> u2

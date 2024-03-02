@@ -560,13 +560,13 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
   if (hash_value_valid_) {
     return hash_value_;
   }
-  const Vector &input_dis = ctx->get_generated_input_dis(get_num_qubits());
+  const Vector &input_dis = ctx->get_and_gen_input_dis(get_num_qubits());
   Vector output_dis;
   auto input_parameters = ctx->get_all_generated_parameters();
   auto all_parameters = ctx->compute_parameters(input_parameters);
   evaluate(input_dis, all_parameters, output_dis);
   ComplexType dot_product =
-      output_dis.dot(ctx->get_generated_hashing_dis(get_num_qubits()));
+      output_dis.dot(ctx->get_and_gen_hashing_dis(get_num_qubits()));
 
   original_fingerprint_ = dot_product;
 

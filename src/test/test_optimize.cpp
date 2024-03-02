@@ -5,9 +5,10 @@
 using namespace quartz;
 
 int main() {
+  ParamInfo param_info(/*num_input_symbolic_params=*/2);
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add},
-              /*num_qubits=*/3, /*num_input_symbolic_params=*/2);
+              /*num_qubits=*/3, &param_info);
 
   auto graph = Graph::from_qasm_file(
       &ctx, "experiment/circs/nam_circs/barenco_tof_3.qasm");

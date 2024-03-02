@@ -33,15 +33,15 @@ void Graph::_construct_pos_2_logical_qubit() {
   // Construct pos_2_logical_qubit
   std::unordered_map<Op, int, OpHash> op_in_degree;
   std::queue<Op> op_q;
-  for (auto it = outEdges.cbegin(); it != outEdges.cend(); ++it) {
-    if (it->first.ptr->tp == GateType::input_qubit ||
-        it->first.ptr->tp == GateType::input_param) {
-      op_q.push(it->first);
+  for (const auto &outEdge : outEdges) {
+    if (outEdge.first.ptr->tp == GateType::input_qubit ||
+        outEdge.first.ptr->tp == GateType::input_param) {
+      op_q.push(outEdge.first);
     }
   }
 
-  for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
-    op_in_degree[it->first] = it->second.size();
+  for (const auto &inEdge : inEdges) {
+    op_in_degree[inEdge.first] = (int)inEdge.second.size();
   }
 
   while (!op_q.empty()) {
@@ -93,8 +93,8 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
   // Map all gates in circuitseq to Op
   std::map<CircuitGate *, Op> edge_2_op;
-  auto search_for_params = [this, &edge_2_op](auto &this_ref,
-                                              CircuitGate *e) -> void {
+  auto search_for_params = [this, &edge_2_op, &ctx](auto &this_ref,
+                                                    CircuitGate *e) -> void {
     auto dstOp = edge_2_op[e];
     for (int dstIdx = 0; dstIdx < (int)e->input_wires.size(); dstIdx++) {
       auto &input_node = e->input_wires[dstIdx];
@@ -113,6 +113,7 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
           auto ex = input_node->input_gates[0];
           if (edge_2_op.find(ex) == edge_2_op.end()) {
             // consider expressions recursively
+            edge_2_op[ex] = Op(ctx->next_global_unique_id(), ex->gate);
             this_ref(this_ref, ex);
           }
           auto srcOp = edge_2_op[ex];
@@ -258,6 +259,8 @@ void Graph::set_special_op_guid(size_t _special_op_guid) {
 }
 
 void Graph::add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) {
+  assert(srcOp.ptr);
+  assert(dstOp.ptr);
   if (inEdges.find(dstOp) == inEdges.end()) {
     inEdges[dstOp];
   }
@@ -898,9 +901,17 @@ void Graph::remove(Pos pos, bool left,
 }
 
 bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
+  if (!context->has_gate(GateType::add)) {
+    std::cerr << "Graph::merge_2_rotation_op requires the context to have "
+                 "GateType::add in the gate set."
+              << std::endl;
+    assert(false);
+  }
   // Marge rotation op_1 to rotation op_0
   int num_qubits = op_0.ptr->get_num_qubits();
   int num_params = op_0.ptr->get_num_parameters();
+  assert(op_1.ptr->get_num_qubits() == num_qubits);
+  assert(op_1.ptr->get_num_parameters() == num_params);
 
   std::map<int, Op> param_idx_2_op_0;
   std::map<int, Op> param_idx_2_op_1;
@@ -908,15 +919,13 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
   assert(inEdges.find(op_0) != inEdges.end());
   assert(inEdges.find(op_1) != inEdges.end());
   auto input_edges_0 = inEdges[op_0];
-  for (auto it = input_edges_0.begin(); it != input_edges_0.end(); ++it) {
-    auto edge_0 = *it;
+  for (auto edge_0 : input_edges_0) {
     if (edge_0.dstIdx >= num_qubits) {
       param_idx_2_op_0[edge_0.dstIdx] = edge_0.srcOp;
     }
   }
   auto input_edges_1 = inEdges[op_1];
-  for (auto it = input_edges_1.begin(); it != input_edges_1.end(); ++it) {
-    auto edge_1 = *it;
+  for (auto edge_1 : input_edges_1) {
     if (edge_1.dstIdx >= num_qubits) {
       // Which means that it is a parameter input
       param_idx_2_op_1[edge_1.dstIdx] = edge_1.srcOp;
@@ -953,6 +962,12 @@ bool Graph::merge_2_rotation_op(Op op_0, Op op_1) {
 }
 
 void Graph::rotation_merging(GateType target_rotation) {
+  if (!context->has_gate(GateType::add)) {
+    std::cerr << "Rotation merging requires the context to have GateType::add"
+                 " in the gate set."
+              << std::endl;
+    assert(false);
+  }
   // Step 1: calculate the bitmask of each operator
   std::unordered_map<Pos, uint64_t, PosHash> bitmasks;
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
@@ -1028,10 +1043,11 @@ void Graph::rotation_merging(GateType target_rotation) {
   // Step 2: Propagate all CNOTs
   std::queue<Op> todo_cx;
   std::unordered_set<Op, OpHash> visited_cx;
-  for (const auto &it : inEdges)
+  for (const auto &it : inEdges) {
     if (it.first.ptr->tp == GateType::cx) {
       todo_cx.push(it.first);
     }
+  }
   while (!todo_cx.empty()) {
     const auto cx = todo_cx.front();
     todo_cx.pop();
@@ -1092,7 +1108,7 @@ void Graph::rotation_merging(GateType target_rotation) {
         assert(pos_set.size() >= 1);
         Pos first;
         bool is_first = true;
-        for (auto pos : pos_set) {
+        for (const auto &pos : pos_set) {
           if (is_first) {
             first = pos;
             is_first = false;
@@ -1104,6 +1120,7 @@ void Graph::rotation_merging(GateType target_rotation) {
             //           << pos.op.guid << ")" << std::endl;
           }
         }
+        std::cout << __LINE__ << std::endl;
 
         auto op = first.op;
         auto in_edges = inEdges[op];

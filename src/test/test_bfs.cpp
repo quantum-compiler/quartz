@@ -9,7 +9,8 @@ int main() {
   const bool run_bfs_unverified = false;
   const bool run_bfs_verified = true;  // with representative pruning
 
-  Context ctx({GateType::h}, num_qubits, num_input_parameters);
+  ParamInfo param_info(/*num_input_symbolic_params=*/num_input_parameters);
+  Context ctx({GateType::h}, num_qubits, &param_info);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;

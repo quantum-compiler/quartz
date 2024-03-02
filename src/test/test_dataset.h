@@ -10,7 +10,8 @@ using namespace quartz;
 void test_equivalence_set(const std::vector<GateType> &support_gates,
                           const std::string &file_name,
                           const std::string &save_file_name) {
-  Context ctx(support_gates);
+  ParamInfo param_info;
+  Context ctx(support_gates, &param_info);
   EquivalenceSet eqs;
   auto start = std::chrono::steady_clock::now();
   if (!eqs.load_json(&ctx, file_name, /*from_verifier=*/false)) {

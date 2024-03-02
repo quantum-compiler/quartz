@@ -22,13 +22,16 @@ int main() {
   //                       "-0.25pi; rz q1 -0.25pi; rz q2 -0.25pi;"});
   auto rules = RuleParser::ccz_cx_t_rules();
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::input_qubit,
-                   GateType::input_param});
+                   GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::t, GateType::tdg, GateType::cx, GateType::h,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context union_ctx({GateType::ccz, GateType::t, GateType::tdg, GateType::cx,
-                     GateType::h, GateType::input_qubit,
-                     GateType::input_param});
+                     GateType::h, GateType::input_qubit, GateType::input_param},
+                    &param_info);
   // Construct GraphXfers
   std::vector<Command> cmds;
   Command cmd;

@@ -19,10 +19,13 @@ static std::stringstream summary_result;
 void benchmark_nam(const std::string &circuit_name) {
   std::string circuit_path = "circuit/nam-benchmarks/" + circuit_name + ".qasm";
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::add, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);

@@ -6,8 +6,10 @@ using namespace quartz;
 #include <iostream>
 
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::t, GateType::cx, GateType::tdg});
+               GateType::t, GateType::cx, GateType::tdg},
+              &param_info);
   //   test_optimization(&ctx, "circuit/example-circuits/voqc_fig5.qasm",
   //                     "cmake-build-debug/bfs_verified.json");
 #ifdef __linux

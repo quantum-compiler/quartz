@@ -11,6 +11,7 @@ from CCore cimport (
     Graph,
     GraphXfer,
     Op,
+    ParamInfo,
     QASMParser,
 )
 from cython.operator cimport dereference as deref
@@ -228,6 +229,7 @@ cdef class PyXfer:
         return self.graphXfer.dst_str().decode('utf-8')
 
 cdef class QuartzContext:
+    cdef ParamInfo *param_info
     cdef Context *context
     cdef EquivalenceSet *eqs
     cdef vector[GraphXfer *] v_xfers
@@ -241,7 +243,8 @@ cdef class QuartzContext:
             gate_type_list.append(GateType.input_param)
         if GateType.input_qubit not in gate_type_list:
             gate_type_list.append(GateType.input_qubit)
-        self.context = new Context(gate_type_list)
+        self.param_info = new ParamInfo()
+        self.context = new Context(gate_type_list, self.param_info)
         self.eqs = new EquivalenceSet()
         self.load_json(filename)
 

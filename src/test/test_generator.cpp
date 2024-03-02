@@ -6,7 +6,9 @@
 using namespace quartz;
 
 int main() {
-  Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h}, 3, 3);
+  ParamInfo param_info(/*num_input_symbolic_params=*/3);
+  Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h}, 3,
+              &param_info);
   Generator gen(&ctx);
   Dataset dataset;
   EquivalenceSet ecc;

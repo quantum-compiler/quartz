@@ -16,7 +16,8 @@ void test_pruning(
     int max_num_param_gates = 1, bool run_representative_pruning = true,
     bool run_original = true, bool run_original_unverified = false,
     bool run_original_verified = true, bool unique_parameters = false) {
-  Context ctx(supported_gates, num_qubits, num_input_parameters);
+  ParamInfo param_info(/*num_input_symbolic_params=*/num_input_parameters);
+  Context ctx(supported_gates, num_qubits, &param_info);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;

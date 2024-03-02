@@ -3,8 +3,10 @@
 using namespace quartz;
 
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::add,
-               GateType::cx, GateType::rz, GateType::x, GateType::h});
+               GateType::cx, GateType::rz, GateType::x, GateType::h},
+              &param_info);
   //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::add,
   //                GateType::cz, GateType::rz, GateType::x, GateType::rx1,
   //                GateType::rx3});

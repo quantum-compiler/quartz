@@ -160,7 +160,6 @@ bool QASMParser::load_qasm_stream(
       int num_params = ctx_->get_gate(gate_type)->num_parameters;
       std::vector<int> qubit_indices(num_qubits);
       std::vector<int> param_indices(num_params);
-      std::cout << "num_param " << num_params << std::endl;
       for (int i = 0; i < num_params; ++i) {
         assert(ss.good());
         std::string token;

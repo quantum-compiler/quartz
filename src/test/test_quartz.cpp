@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
   // Use this for voqc gate set(h, rz, x, cx)
   //   auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
   // Use this for ibmq gate set(u1, u2, u3, cx)
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

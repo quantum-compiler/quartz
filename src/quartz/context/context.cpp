@@ -420,10 +420,10 @@ bool Context::has_parameterized_gate() const {
 Context union_contexts(Context *ctx_0, Context *ctx_1) {
   assert(ctx_0->get_param_info() == ctx_1->get_param_info());
   std::vector<GateType> union_vector;
-  std::set<GateType> gate_set_0(ctx_0->get_supported_gates().begin(),
-                                ctx_0->get_supported_gates().end());
-  std::set<GateType> gate_set_1(ctx_1->get_supported_gates().begin(),
-                                ctx_1->get_supported_gates().end());
+  const auto &ctx_0_gates = ctx_0->get_supported_gates();
+  const auto &ctx_1_gates = ctx_1->get_supported_gates();
+  std::set<GateType> gate_set_0(ctx_0_gates.begin(), ctx_0_gates.end());
+  std::set<GateType> gate_set_1(ctx_1_gates.begin(), ctx_1_gates.end());
   for (auto tp : gate_set_0)
     union_vector.push_back(tp);
   for (auto tp : gate_set_1) {

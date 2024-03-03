@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   // Construct GraphXfers for toffoli flip
-  auto xfer_pair = GraphXfer::ccz_cx_u1_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_u1_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

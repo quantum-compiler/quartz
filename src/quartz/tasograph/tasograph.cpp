@@ -445,8 +445,8 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
       assert(
           rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
 
-      tp_2_xfer[gate_tp] =
-          GraphXfer::create_single_gate_GraphXfer(union_ctx, src_cmd, cmds);
+      tp_2_xfer[gate_tp] = GraphXfer::create_single_gate_GraphXfer(
+          src_ctx, dst_ctx, union_ctx, src_cmd, cmds);
     }
   }
   std::shared_ptr<Graph> src_graph(new Graph(*this));
@@ -457,6 +457,7 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
       src_graph = dst_graph;
     }
   }
+  src_graph->context = dst_ctx;
   return src_graph;
 }
 
@@ -720,14 +721,15 @@ void Graph::constant_and_rotation_elimination() {
           if (result < 0)
             result += 2 * PI;
 
-          assert(outEdges[op].size() == 1);
-          auto output_dst_op = (*outEdges[op].begin()).dstOp;
-          auto output_dst_idx = (*outEdges[op].begin()).dstIdx;
-          remove_node(op);
-
           Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
-          add_edge(merged_op, output_dst_op, 0, output_dst_idx);
+          int srcIdx = 0;
+          for (auto &outEdge : outEdges[op]) {
+            auto output_dst_op = outEdge.dstOp;
+            auto output_dst_idx = outEdge.dstIdx;
+            add_edge(merged_op, output_dst_op, srcIdx++, output_dst_idx);
+          }
+          remove_node(op);
           param_idx[merged_op] = context->get_new_param_id(result);
         } else if (op.ptr->tp == GateType::neg) {
           ParamType param = 0, result = 0;
@@ -982,6 +984,8 @@ void Graph::rotation_merging(GateType target_rotation) {
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);
+      assert(param_idx.find(it.first) != param_idx.end());
+      assert(context->param_has_value(param_idx[it.first]));
     }
   }
 
@@ -1120,7 +1124,6 @@ void Graph::rotation_merging(GateType target_rotation) {
             //           << pos.op.guid << ")" << std::endl;
           }
         }
-        std::cout << __LINE__ << std::endl;
 
         auto op = first.op;
         auto in_edges = inEdges[op];
@@ -2086,7 +2089,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
 std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   // Transform ccz to t, an naive solution
   // Simply 1 normal 1 inverse
-  auto xfers = GraphXfer::ccz_cx_t_xfer(ctx);
+  auto xfers = GraphXfer::ccz_cx_t_xfer(ctx, ctx, ctx);
   Graph *graph = this;
   bool flip = false;
   while (true) {
@@ -2112,11 +2115,13 @@ std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
                                                   GraphXfer *xfer,
                                                   GraphXfer *inverse_xfer) {
   std::shared_ptr<Graph> temp_graph(new Graph(*this));
+  temp_graph->context = xfer->union_ctx_;
   while (true) {
     auto new_graph_0 = xfer->run_1_time(0, temp_graph.get());
     auto new_graph_1 = inverse_xfer->run_1_time(0, temp_graph.get());
     if (new_graph_0.get() == nullptr) {
       assert(new_graph_1.get() == nullptr);
+      temp_graph->context = xfer->dst_ctx_;
       return temp_graph;
     }
     new_graph_0->rotation_merging(target_rotation);
@@ -2225,7 +2230,7 @@ Graph::toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
 }
 
 std::shared_ptr<Graph> Graph::ccz_flip_greedy_rz() {
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(context);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(context, context, context);
   std::vector<int> trace;
   toffoli_flip_greedy_with_trace(GateType::rz, xfer_pair.first,
                                  xfer_pair.second, trace);

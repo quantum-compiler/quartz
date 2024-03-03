@@ -79,9 +79,9 @@ class GraphCompare {
 
 class GraphXfer {
  public:
-  GraphXfer(Context *_context);
-  GraphXfer(Context *_context, const CircuitSeq *src_graph,
-            const CircuitSeq *dst_graph);
+  GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
+            const CircuitSeq *src_graph, const CircuitSeq *dst_graph);
   bool src_graph_connected(CircuitSeq *src_graph);
   TensorX new_tensor(void);
   bool is_input_qubit(const OpX *opx, int idx) const;
@@ -115,15 +115,22 @@ class GraphXfer {
   static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
                                                    const std::string &src_str,
                                                    const std::string &dst_str);
-  static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
+  static GraphXfer *create_single_gate_GraphXfer(Context *src_ctx,
+                                                 Context *dst_ctx,
+                                                 Context *union_ctx,
                                                  Command src_cmd,
                                                  std::vector<Command> dst_cmds);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_rz_xfer(Context *ctx);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_u1_xfer(Context *ctx);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_t_xfer(Context *ctx);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_rz_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_u1_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_t_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
 
  public:
-  Context *context;
+  Context *src_ctx_;
+  Context *dst_ctx_;
+  Context *union_ctx_;
   int tensorId;
   std::unordered_map<Op, OpX *, OpHash> mappedOps;
   std::unordered_map<int, std::pair<Op, int>> mappedInputs;

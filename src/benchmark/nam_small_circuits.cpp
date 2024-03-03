@@ -28,7 +28,7 @@ void benchmark_nam(const std::string &circuit_name) {
                   &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

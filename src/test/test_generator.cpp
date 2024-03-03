@@ -24,7 +24,7 @@ int main() {
         first_dag = dag.get();
         is_first = false;
       } else {
-        GraphXfer xfer(&ctx, first_dag, dag.get());
+        GraphXfer xfer(&ctx, &ctx, &ctx, first_dag, dag.get());
       }
     }
   }

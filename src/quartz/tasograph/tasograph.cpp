@@ -445,8 +445,8 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
       assert(
           rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
 
-      tp_2_xfer[gate_tp] =
-          GraphXfer::create_single_gate_GraphXfer(src_ctx, dst_ctx, union_ctx, src_cmd, cmds);
+      tp_2_xfer[gate_tp] = GraphXfer::create_single_gate_GraphXfer(
+          src_ctx, dst_ctx, union_ctx, src_cmd, cmds);
     }
   }
   std::shared_ptr<Graph> src_graph(new Graph(*this));

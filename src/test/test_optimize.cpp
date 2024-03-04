@@ -10,10 +10,6 @@ int main() {
                GateType::h, GateType::rz, GateType::x, GateType::add},
               /*num_qubits=*/3, &param_info);
 
-  auto graph = Graph::from_qasm_file(
-      &ctx, "experiment/circs/nam_circs/barenco_tof_3.qasm");
-  assert(graph);
-
   EquivalenceSet eqs;
   // Load ECC set from file
   if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
@@ -28,6 +24,10 @@ int main() {
       assert(false);
     }
   }
+
+  auto graph = Graph::from_qasm_file(
+      &ctx, "experiment/circs/nam_circs/barenco_tof_3.qasm");
+  assert(graph);
 
   // Get xfer from the equivalent set
   auto ecc = eqs.get_all_equivalence_sets();

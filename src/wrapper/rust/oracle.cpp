@@ -24,8 +24,6 @@ std::string optimize_(std::string circ_string, int n_qubits,
   }
   auto ctx = Context(gate_set_vec, n_qubits, &param_info);
 
-  auto graph = Graph::from_qasm_str(&ctx, circ_string);
-
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(&ctx, ecc_path, false)) {
@@ -48,6 +46,8 @@ std::string optimize_(std::string circ_string, int n_qubits,
       }
     }
   }
+  auto graph = Graph::from_qasm_str(&ctx, circ_string);
+
   // std::cout << "number of xfers: " << xfers.size() << std::endl;
   std::function<int(Graph *)> cost_function;
   if (cost_func == "Gate") {

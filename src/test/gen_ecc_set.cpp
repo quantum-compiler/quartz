@@ -37,6 +37,6 @@ int main() {
   // }
   gen_ecc_set({GateType::t, GateType::tdg, GateType::h, GateType::x,
                GateType::cx, GateType::add},
-              "3_2_5_", true, true, 3, 0, 5);
+              "eccset/Clifford_T_5_3_", true, false, 3, 0, 5);
   return 0;
 }

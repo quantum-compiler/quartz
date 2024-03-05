@@ -196,12 +196,17 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
 
   // Find all input parameters.
   std::vector<std::pair<int, int>> guid_and_param_index;
+  std::map<int, ParamType> constant_params_to_fill;
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_param &&
         op_2_param_idx.count(it.first) == 0) {
       int idx = num_input_params++;
       op_2_param_idx[it.first] = std::vector<int>(1, idx);
       guid_and_param_index.emplace_back(it.first.guid, idx);
+      auto find_value = constant_param_values.find(it.first);
+      if (find_value != constant_param_values.end()) {
+        constant_params_to_fill[idx] = find_value->second;
+      }
       gates.push(it.first);
     }
   }
@@ -211,6 +216,10 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
   std::vector<int> param_index_position(num_input_params, 0);
   for (int i = 0; i < num_input_params; i++) {
     param_index_position[guid_and_param_index[i].second] = i;
+    if (constant_params_to_fill.count(guid_and_param_index[i].second) > 0) {
+      context->set_param_value(
+          i, constant_params_to_fill[guid_and_param_index[i].second]);
+    }
   }
   for (auto &it : op_2_param_idx) {
     it.second[0] = param_index_position[it.second[0]];

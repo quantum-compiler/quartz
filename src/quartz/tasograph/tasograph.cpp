@@ -491,25 +491,26 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
   auto src_gates = src_ctx->get_supported_gates();
   auto dst_gate_set = std::set<GateType>(dst_ctx->get_supported_gates().begin(),
                                          dst_ctx->get_supported_gates().end());
-  std::map<GateType, GraphXfer *> tp_2_xfer;
+  std::vector<GraphXfer *> xfers;
   for (auto gate_tp : src_gates) {
     if (ignore_toffoli && src_ctx->get_gate(gate_tp)->is_toffoli_gate())
       continue;
     if (dst_gate_set.find(gate_tp) == dst_gate_set.end()) {
-      std::vector<Command> cmds;
-      Command src_cmd;
-      assert(
-          rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds));
-
-      tp_2_xfer[gate_tp] =
-          GraphXfer::create_single_gate_GraphXfer(union_ctx, src_cmd, cmds);
+      std::vector<std::vector<Command>> cmds;
+      std::vector<Command> src_cmd;
+      int num_xfers =
+          rule_parser->find_convert_commands(dst_ctx, gate_tp, src_cmd, cmds);
+      assert(num_xfers > 0);
+      for (int i = 0; i < num_xfers; i++) {
+        xfers.push_back(GraphXfer::create_single_gate_GraphXfer(
+            union_ctx, src_cmd[i], cmds[i]));
+      }
     }
   }
   std::shared_ptr<Graph> src_graph(new Graph(*this));
   std::shared_ptr<Graph> dst_graph(nullptr);
-  for (auto it = tp_2_xfer.begin(); it != tp_2_xfer.end(); ++it) {
-    while ((dst_graph = it->second->run_1_time(0, src_graph.get())) !=
-           nullptr) {
+  for (auto &xfer : xfers) {
+    while ((dst_graph = xfer->run_1_time(0, src_graph.get())) != nullptr) {
       src_graph = dst_graph;
     }
   }

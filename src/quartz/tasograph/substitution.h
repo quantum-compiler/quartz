@@ -115,11 +115,10 @@ class GraphXfer {
   static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
                                                    const std::string &src_str,
                                                    const std::string &dst_str);
-  static GraphXfer *create_single_gate_GraphXfer(Context *src_ctx,
-                                                 Context *dst_ctx,
-                                                 Context *union_ctx,
-                                                 Command src_cmd,
-                                                 std::vector<Command> dst_cmds);
+  static GraphXfer *
+  create_single_gate_GraphXfer(Context *src_ctx, Context *dst_ctx,
+                               Context *union_ctx, Command src_cmd,
+                               const std::vector<Command> &dst_cmds);
   static std::pair<GraphXfer *, GraphXfer *>
   ccz_cx_rz_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
   static std::pair<GraphXfer *, GraphXfer *>

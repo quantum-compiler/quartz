@@ -382,40 +382,38 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
   delete src_dag;
   delete dst_dag;
   return graphXfer;
-
-  return graphXfer;
 }
 
 GraphXfer *
 GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
-                                        std::vector<Command> dst_cmds) {
-  // Currently only support source command with no constant parameters
-  // Assume the only added parameters are constant parameters
-  // Assume the number of non constant parameters are equal
+                                        const std::vector<Command> &dst_cmds) {
   GateType src_tp = src_cmd.get_gate_type();
   GraphXfer *graphXfer = new GraphXfer(union_ctx);
 
   Gate *gate = union_ctx->get_gate(src_tp);
-  auto num_qubit = gate->get_num_qubits();
-  auto num_non_constant_params = gate->get_num_parameters();
+  auto num_qubits = gate->get_num_qubits();
 
   OpX *src_op = new OpX(src_tp);
   std::map<int, TensorX> dst_qubits_2_tensorx;
   std::map<int, TensorX> dst_params_2_tensorx;
 
-  for (int i = 0; i < num_qubit; ++i) {
+  for (int i = 0; i < num_qubits; ++i) {
     TensorX qubit_tensor = graphXfer->new_tensor();
     src_op->add_input(qubit_tensor);
     dst_qubits_2_tensorx[i] = qubit_tensor;
   }
 
-  for (int i = 0; i < num_non_constant_params; ++i) {
+  for (int i = 0; i < gate->get_num_parameters(); ++i) {
     TensorX param_tensor = graphXfer->new_tensor();
     src_op->add_input(param_tensor);
-    dst_params_2_tensorx[i] = param_tensor;
+    if (src_cmd.param_idx[i] != -1) {
+      dst_params_2_tensorx[src_cmd.param_idx[i]] = param_tensor;
+    } else {
+      graphXfer->paramValues[param_tensor.idx] = src_cmd.constant_params[i];
+    }
   }
 
-  for (int i = 0; i < num_qubit; ++i) {
+  for (int i = 0; i < num_qubits; ++i) {
     TensorX tensor(src_op, i);
     src_op->add_output(tensor);
   }
@@ -450,7 +448,7 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
     }
     graphXfer->dstOps.push_back(op);
   }
-  for (int i = 0; i < num_qubit; ++i) {
+  for (int i = 0; i < num_qubits; ++i) {
     graphXfer->map_output(src_op->outputs[i],
                           dst_qubits_2_tensorx[src_cmd.qubit_idx[i]]);
   }
@@ -460,54 +458,42 @@ GraphXfer::create_single_gate_GraphXfer(Context *union_ctx, Command src_cmd,
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_rz_xfer(Context *ctx) {
   Context dst_ctx({GateType::rz, GateType::cx, GateType::input_qubit,
                    GateType::input_param});
-  std::pair<RuleParser *, RuleParser *> toffoli_rules =
-      RuleParser::ccz_cx_rz_rules();
-  std::vector<Command> cmds;
-  Command cmd;
-  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                             cmds);
-  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                              cmds);
-  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  delete toffoli_rules.first;
-  delete toffoli_rules.second;
+  auto toffoli_rules = RuleParser::ccz_cx_rz_rules();
+  std::vector<std::vector<Command>> cmds;
+  std::vector<Command> cmd;
+  auto num_xfers =
+      toffoli_rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  assert(num_xfers == 2);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd[1], cmds[1]);
   return std::make_pair(xfer_0, xfer_1);
 }
 
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_u1_xfer(Context *ctx) {
   Context dst_ctx({GateType::u1, GateType::cx, GateType::input_qubit,
                    GateType::input_param});
-  std::pair<RuleParser *, RuleParser *> toffoli_rules =
-      RuleParser::ccz_cx_u1_rules();
-  std::vector<Command> cmds;
-  Command cmd;
-  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                             cmds);
-  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                              cmds);
-  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  delete toffoli_rules.first;
-  delete toffoli_rules.second;
+  auto toffoli_rules = RuleParser::ccz_cx_u1_rules();
+  std::vector<std::vector<Command>> cmds;
+  std::vector<Command> cmd;
+  auto num_xfers =
+      toffoli_rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  assert(num_xfers == 2);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd[1], cmds[1]);
   return std::make_pair(xfer_0, xfer_1);
 }
 
 std::pair<GraphXfer *, GraphXfer *> GraphXfer::ccz_cx_t_xfer(Context *ctx) {
   Context dst_ctx({GateType::t, GateType::tdg, GateType::cx,
                    GateType::input_qubit, GateType::input_param});
-  std::pair<RuleParser *, RuleParser *> toffoli_rules =
-      RuleParser::ccz_cx_t_rules();
-  std::vector<Command> cmds;
-  Command cmd;
-  toffoli_rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                             cmds);
-  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  toffoli_rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd,
-                                              cmds);
-  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd, cmds);
-  delete toffoli_rules.first;
-  delete toffoli_rules.second;
+  auto toffoli_rules = RuleParser::ccz_cx_t_rules();
+  std::vector<std::vector<Command>> cmds;
+  std::vector<Command> cmd;
+  auto num_xfers =
+      toffoli_rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  assert(num_xfers == 2);
+  GraphXfer *xfer_0 = create_single_gate_GraphXfer(ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_1 = create_single_gate_GraphXfer(ctx, cmd[1], cmds[1]);
   return std::make_pair(xfer_0, xfer_1);
 }
 

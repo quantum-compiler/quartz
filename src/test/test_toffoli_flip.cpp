@@ -30,14 +30,13 @@ int main() {
                      GateType::h, GateType::input_qubit,
                      GateType::input_param});
   // Construct GraphXfers
-  std::vector<Command> cmds;
-  Command cmd;
-  rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  //   GraphXfer *xfer =
-  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
-  //   rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  //   GraphXfer *xfer_inverse =
-  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
+  std::vector<std::vector<Command>> cmds;
+  std::vector<Command> cmd;
+  rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  GraphXfer *xfer =
+      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_inverse =
+      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd[1], cmds[1]);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

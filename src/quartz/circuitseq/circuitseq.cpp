@@ -1236,7 +1236,7 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   }
 }
 
-std::unique_ptr<CircuitSeq> CircuitSeq::get_rz_to_t_gates(Context *ctx) const {
+std::unique_ptr<CircuitSeq> CircuitSeq::get_rz_to_t(Context *ctx) const {
   auto result = std::make_unique<CircuitSeq>(num_qubits, num_input_parameters);
   for (auto &gate : gates) {
     if (gate->gate->tp == GateType::rz) {
@@ -1271,6 +1271,54 @@ std::unique_ptr<CircuitSeq> CircuitSeq::get_rz_to_t_gates(Context *ctx) const {
       }
     } else {
       result->add_gate(gate.get());
+    }
+  }
+  return std::move(result);
+}
+
+std::unique_ptr<CircuitSeq> CircuitSeq::get_ccz_to_cx_rz(Context *ctx) const {
+  auto t = ctx->get_new_param_id(/*is_symbolic=*/false);
+  ctx->set_param_value(t, 0.25 * PI);
+  auto tdg = ctx->get_new_param_id(/*is_symbolic=*/false);
+  ctx->set_param_value(tdg, -0.25 * PI);
+  auto result =
+      std::make_unique<CircuitSeq>(num_qubits, ctx->get_num_parameters());
+  for (auto &gate : gates) {
+    if (gate->gate->tp == GateType::ccz) {
+      auto qubit_indices = gate->get_qubit_indices();
+      auto q0 = qubit_indices[0];
+      auto q1 = qubit_indices[1];
+      auto q2 = qubit_indices[2];
+      bool ok;
+      ok = result->add_gate({q1, q2}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q2}, {tdg}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q0, q2}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q2}, {t}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q1, q2}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q2}, {tdg}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q0, q2}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q0, q1}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q1}, {tdg}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q0, q1}, {}, ctx->get_gate(GateType::cx), nullptr);
+      assert(ok);
+      ok = result->add_gate({q0}, {t}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q1}, {t}, ctx->get_gate(GateType::rz), nullptr);
+      assert(ok);
+      ok = result->add_gate({q2}, {t}, ctx->get_gate(GateType::rz), nullptr);
+    } else {
+      bool ok;
+      ok = result->add_gate(gate.get());
+      assert(ok);
     }
   }
   return std::move(result);

@@ -258,10 +258,19 @@ class CircuitSeq {
                    Context *ctx) const;
 
   /**
-   * Get a circuit which replaces Rz gates with T, Tdg, S, Sdg, and Z gates.
+   * Get a circuit which replaces RZ gates with T, Tdg, S, Sdg, and Z gates.
    * Requires all Rz gates to have parameters that are multiples of Pi/4.
    */
-  std::unique_ptr<CircuitSeq> get_rz_to_t_gates(Context *ctx) const;
+  std::unique_ptr<CircuitSeq> get_rz_to_t(Context *ctx) const;
+
+  /**
+   * Get a circuit which replaces CCZ gates with CX and RZ gates.
+   * Use only one decomposition:
+   * ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz q2 0.25pi; cx q1 q2;
+   * rz q2 -0.25pi; cx q0 q2; cx q0 q1; rz q1 -0.25pi; cx q0 q1; rz q0 0.25pi;
+   * rz q1 0.25pi; rz q2 0.25pi;
+   */
+  std::unique_ptr<CircuitSeq> get_ccz_to_cx_rz(Context *ctx) const;
 
   // Returns quantum gates which do not topologically depend on any other
   // quantum gates.

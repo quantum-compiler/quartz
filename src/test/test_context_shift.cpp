@@ -25,7 +25,8 @@ void test_rz_to_t() {
   RuleParser rule_parser({"rz q0 0pi =", "rz q0 0.25pi = t q0",
                           "rz q0 -0.25pi = tdg q0", "rz q0 0.5pi = s q0",
                           "rz q0 -0.5pi = sdg q0", "rz q0 0.75pi = t q0; s q0",
-                          "rz q0 -0.75pi = tdg q0; sdg q0", "rz q0 pi = z q0"});
+                          "rz q0 -0.75pi = tdg q0; sdg q0", "rz q0 pi = z q0",
+                          "rz q0 -pi = z q0"});
   test_context_shift("circuit/example-circuits/rz_multiples.qasm", &src_ctx,
                      &dst_ctx, &union_ctx, &rule_parser);
 }

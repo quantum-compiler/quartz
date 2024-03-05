@@ -205,6 +205,12 @@ class CircuitSeq {
   get_permuted_seq(const std::vector<int> &qubit_permutation,
                    const std::vector<int> &param_permutation) const;
 
+  /**
+   * Get a circuit which replaces Rz gates with T, Tdg, S, Sdg, and Z gates.
+   * Requires all Rz gates to have parameters that are multiples of Pi/4.
+   */
+  std::unique_ptr<CircuitSeq> get_rz_to_t_gates(Context *ctx) const;
+
   // Returns quantum gates which do not topologically depend on any other
   // quantum gates.
   [[nodiscard]] std::vector<CircuitGate *> first_quantum_gates() const;

@@ -1596,7 +1596,8 @@ std::unique_ptr<CircuitSeq> CircuitSeq::get_ccz_to_cx_rz(Context *ctx) const {
   ctx->set_param_value(t, 0.25 * PI);
   auto tdg = ctx->get_new_param_id(/*is_symbolic=*/false);
   ctx->set_param_value(tdg, -0.25 * PI);
-  auto result = std::make_unique<CircuitSeq>(num_qubits, ctx->get_num_parameters());
+  auto result =
+      std::make_unique<CircuitSeq>(num_qubits, ctx->get_num_parameters());
   for (auto &gate : gates) {
     if (gate->gate->tp == GateType::ccz) {
       auto qubit_indices = gate->get_qubit_indices();

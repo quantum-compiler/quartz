@@ -12,7 +12,8 @@ int main() {
   // gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
   //              GateType::add},
   //             "IBM_3_3_", true, 3, 4, 3);
-  // gen_ecc_set({GateType::h, GateType::cz}, "H_CZ_2_2_", false, 2, 0, 2);
+  gen_ecc_set({GateType::h, GateType::cz}, "eccset/H_CZ_2_2_", true, false, 2,
+              0, 2);
   // for (int n = 5; n <= 8; n++) {
   //   std::string file_prefix = "Rigetti_";
   //   file_prefix += std::to_string(n);

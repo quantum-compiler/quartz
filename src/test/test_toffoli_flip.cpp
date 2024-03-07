@@ -36,10 +36,10 @@ int main() {
   std::vector<std::vector<Command>> cmds;
   std::vector<Command> cmd;
   rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  GraphXfer *xfer =
-      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd[0], cmds[0]);
-  GraphXfer *xfer_inverse =
-      GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd[1], cmds[1]);
+  GraphXfer *xfer = GraphXfer::create_single_gate_GraphXfer(
+      &src_ctx, &dst_ctx, &union_ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_inverse = GraphXfer::create_single_gate_GraphXfer(
+      &src_ctx, &dst_ctx, &union_ctx, cmd[1], cmds[1]);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

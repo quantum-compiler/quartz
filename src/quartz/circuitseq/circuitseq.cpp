@@ -1236,6 +1236,46 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
   }
 }
 
+std::unique_ptr<CircuitSeq> CircuitSeq::get_rz_to_t_gates(Context *ctx) const {
+  auto result = std::make_unique<CircuitSeq>(num_qubits, num_input_parameters);
+  for (auto &gate : gates) {
+    if (gate->gate->tp == GateType::rz) {
+      auto val = ctx->get_param_value(gate->input_wires.back()->index);
+      auto val_div_pi_4_float = val * 4 / PI;
+      int val_div_pi_4 = (int)std::round(val_div_pi_4_float);
+      assert(std::abs(val_div_pi_4_float - val_div_pi_4) < 1e-6);
+      val_div_pi_4 %= 8;
+      if (val_div_pi_4 > 4) {
+        val_div_pi_4 -= 8;
+      }
+      auto qubit_indices = gate->get_qubit_indices();
+      if (val_div_pi_4 == -4 || val_div_pi_4 == 4) {
+        result->add_gate(qubit_indices, {}, ctx->get_gate(GateType::z),
+                         nullptr);
+      }
+      if (val_div_pi_4 == 2 || val_div_pi_4 == 3) {
+        result->add_gate(qubit_indices, {}, ctx->get_gate(GateType::s),
+                         nullptr);
+      }
+      if (val_div_pi_4 == -2 || val_div_pi_4 == -3) {
+        result->add_gate(qubit_indices, {}, ctx->get_gate(GateType::sdg),
+                         nullptr);
+      }
+      if (val_div_pi_4 == 1 || val_div_pi_4 == 3) {
+        result->add_gate(qubit_indices, {}, ctx->get_gate(GateType::t),
+                         nullptr);
+      }
+      if (val_div_pi_4 == -1 || val_div_pi_4 == -3) {
+        result->add_gate(qubit_indices, {}, ctx->get_gate(GateType::tdg),
+                         nullptr);
+      }
+    } else {
+      result->add_gate(gate.get());
+    }
+  }
+  return std::move(result);
+}
+
 void CircuitSeq::remove_quantum_gate_from_graph(
     CircuitGate *circuit_gate, bool assert_no_logical_qubit_permutation,
     std::unordered_set<CircuitWire *> *output_wires_to_be_removed) {

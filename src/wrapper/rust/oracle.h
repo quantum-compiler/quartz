@@ -12,8 +12,7 @@ class SuperContext {
   Context ctx;
   std::vector<GraphXfer *> xfers;
   static Context createContext(const std::string &gate_set, int n_qubits,
-                               ParamInfo &param_info,
-                               const std::string &ecc_path) {
+                               ParamInfo &param_info) {
     std::vector<GateType> gates;
     if (gate_set == "Nam") {
       gates = {GateType::input_qubit, GateType::input_param, GateType::cx,
@@ -32,7 +31,7 @@ class SuperContext {
   SuperContext(const std::string &gate_set, int n_qubits,
                const std::string &ecc_path)
       : param_info(0),
-        ctx(createContext(gate_set, n_qubits, param_info, ecc_path)) {
+        ctx(createContext(gate_set, n_qubits, param_info)) {
     xfers = std::vector<GraphXfer *>();
     EquivalenceSet eqs;
     if (!eqs.load_json(&ctx, ecc_path, false)) {

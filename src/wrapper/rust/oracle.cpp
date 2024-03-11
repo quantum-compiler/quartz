@@ -1,16 +1,16 @@
 #include "oracle.h"
 
 using namespace quartz;
-std::unique_ptr<SuperContext> get_context_(const std::string gate_set,
+std::shared_ptr<SuperContext> get_context_(const std::string gate_set,
                                            int n_qubits,
                                            const std::string ecc_path) {
   auto super_context =
-      std::make_unique<SuperContext>(gate_set, n_qubits, ecc_path);
+      std::make_shared<SuperContext>(gate_set, n_qubits, ecc_path);
   return super_context;
 }
 
 std::string optimize_(std::string circ_string, std::string cost_func,
-                      float timeout, std::unique_ptr<SuperContext> super_context
+                      float timeout, std::shared_ptr<SuperContext> super_context
 
 ) {
   auto graph = Graph::from_qasm_str(&super_context->ctx, circ_string);

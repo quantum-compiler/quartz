@@ -8,8 +8,8 @@ using namespace quartz;
 
 class SuperContext {
  public:
-  Context ctx;
   ParamInfo param_info;
+  Context ctx;
   std::vector<GraphXfer *> xfers;
   static Context createContext(const std::string &gate_set, int n_qubits,
                                ParamInfo &param_info,
@@ -57,9 +57,9 @@ class SuperContext {
   ~SuperContext() = default;
 };
 
-std::unique_ptr<SuperContext> get_context_(const std::string gate_set,
+std::shared_ptr<SuperContext> get_context_(const std::string gate_set,
                                            int n_qubits,
                                            const std::string ecc_path);
 std::string optimize_(std::string circ_string, std::string cost_func,
                       float timeout,
-                      std::unique_ptr<SuperContext> super_context);
+                      std::shared_ptr<SuperContext> super_context);

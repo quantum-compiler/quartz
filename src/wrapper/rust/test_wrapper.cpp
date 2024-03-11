@@ -27,11 +27,10 @@ int main() {
   cx q[15], q[19]; 
   h q[21];
   h q[21];)");
-  auto supercontext =
-      get_context_("Nam", 24,
-                   "/home/pengyul/quicr/soam/resources/quartz/build/"
-                   "Nam_4_3_complete_ECC_set.json");
-  std::cout << optimize_(my_circ, "Gate", 1000, std::move(supercontext))
-            << std::endl;
+  auto supercontext = get_context_("Nam", 24,
+                                   "/home/pengyul/quicr/soam/resources/"
+                                   "Nam_4_3_complete_ECC_set.json");
+  std::cout << optimize_(my_circ, "Gate", 1, supercontext) << std::endl;
+  std::cout << optimize_(my_circ, "Gate", 1, supercontext) << std::endl;
   return 0;
 }

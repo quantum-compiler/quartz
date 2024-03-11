@@ -7,7 +7,8 @@
 using namespace quartz;
 
 void test_context_shift(const std::string &filename, Context *src_ctx,
-                        Context *dst_ctx, RuleParser *rule_parser) {
+                        Context *dst_ctx, Context *union_ctx,
+                        RuleParser *rule_parser) {
   QASMParser qasm_parser(src_ctx);
   CircuitSeq *dag = nullptr;
   if (!qasm_parser.load_qasm(filename, dag)) {
@@ -16,8 +17,9 @@ void test_context_shift(const std::string &filename, Context *src_ctx,
   }
 
   Graph graph(src_ctx, dag);
-  // TASOGraph::Graph *graph_new_ctx =
-  //    graph.context_shift(src_ctx, dst_ctx, rule_parser);
+  auto graph_new_ctx =
+      graph.context_shift(src_ctx, dst_ctx, union_ctx, rule_parser);
+  std::cout << graph_new_ctx->to_qasm() << std::endl;
   // graph_new_ctx->constant_eliminate();
   // for (auto it = graph_new_ctx->inEdges.begin();
   //     it != graph_new_ctx->inEdges.end(); ++it) {

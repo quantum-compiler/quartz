@@ -1,54 +1,20 @@
 #include "oracle.h"
 
-#include "quartz/tasograph/substitution.h"
-#include "quartz/tasograph/tasograph.h"
-
 using namespace quartz;
+std::unique_ptr<SuperContext> get_context_(const std::string gate_set,
+                                           int n_qubits,
+                                           const std::string ecc_path) {
+  auto super_context =
+      std::make_unique<SuperContext>(gate_set, n_qubits, ecc_path);
+  return super_context;
+}
 
-std::string optimize_(std::string circ_string, int n_qubits,
-                      std::string cost_func, std::string ecc_path,
-                      std::string gate_set, float timeout) {
-  ParamInfo param_info(0);
-  auto gate_set_vec = std::vector<GateType>();
-  if (gate_set == "Nam") {
-    gate_set_vec = {GateType::input_qubit, GateType::input_param, GateType::cx,
-                    GateType::h,           GateType::rz,          GateType::x,
-                    GateType::add};
-  } else if (gate_set == "CliffordT") {
-    gate_set_vec = {
-        GateType::input_qubit, GateType::input_param, GateType::cx, GateType::h,
-        GateType::rz,          GateType::x,           GateType::t};
-  } else {
-    std::cout << "Invalid gate set." << std::endl;
-    assert(false);
-  }
-  auto ctx = Context(gate_set_vec, n_qubits, &param_info);
+std::string optimize_(std::string circ_string, std::string cost_func,
+                      float timeout, std::unique_ptr<SuperContext> super_context
 
-  EquivalenceSet eqs;
-  // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, ecc_path, false)) {
-    std::cout << "Failed to load equivalence file." << std::endl;
-    assert(false);
-  }
+) {
+  auto graph = Graph::from_qasm_str(&super_context->ctx, circ_string);
 
-  // Get xfer from the equivalent set
-  auto ecc = eqs.get_all_equivalence_sets();
-  std::vector<GraphXfer *> xfers;
-  for (auto eqcs : ecc) {
-    for (auto circ_0 : eqcs) {
-      for (auto circ_1 : eqcs) {
-        if (circ_0 != circ_1) {
-          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_0, circ_1, true);
-          if (xfer != nullptr) {
-            xfers.push_back(xfer);
-          }
-        }
-      }
-    }
-  }
-  auto graph = Graph::from_qasm_str(&ctx, circ_string);
-
-  // std::cout << "number of xfers: " << xfers.size() << std::endl;
   std::function<int(Graph *)> cost_function;
   if (cost_func == "Gate") {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
@@ -63,7 +29,8 @@ std::string optimize_(std::string circ_string, int n_qubits,
     assert(false);
   }
   float init_cost = cost_function(graph.get());
-  auto newgraph = graph->optimize(xfers, init_cost * 1.05, "barenco_tof_3", "",
-                                  false, cost_function, timeout);
+  auto newgraph =
+      graph->optimize(super_context->xfers, init_cost * 1.05, "barenco_tof_3",
+                      "", false, cost_function, timeout);
   return newgraph->to_qasm(false, false);
 }

@@ -1,11 +1,18 @@
 #include "wrapper.h"
 
-#include "oracle.h"
-
 #include <stdio.h>
-rust::String optimize(rust::String circ_string, int n_qubits,
-                      rust::String cost_func, rust::String ecc_path,
-                      rust::String gateset, float timeout) {
-  return optimize_(std::string(circ_string), n_qubits, std::string(cost_func),
-                   std::string(ecc_path), std::string(gateset), timeout);
-}
+// rust::String optimize(rust::String circ_string, rust::String cost_func,
+//                       float timeout,
+//                       std::unique_ptr<SuperContext> super_context) {
+//   return optimize_(std::string(circ_string), std::string(cost_func), timeout,
+//                    super_context);
+// }
+
+// std::unique_ptr<SuperContext> get_context(rust::String gate_set, int
+// n_qubits,
+//                                           rust::String ecc_path) {
+//   return get_context_(std::string(gate_set), n_qubits,
+//   std::string(ecc_path));
+// }
+
+void test() { printf("Hello from C++!\n"); }

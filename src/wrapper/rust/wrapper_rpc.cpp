@@ -8,10 +8,11 @@ using namespace quartz;
 
 int main(int argc, char **argv) {
   int port = atoi(argv[1]);
+
+  rpc::server srv(port);
   auto supercontext = get_context_("Nam", 24,
                                    "/home/pengyul/quicr/soam/resources/"
                                    "Nam_4_3_complete_ECC_set.json");
-  rpc::server srv(port);
   srv.bind("optimize", [supercontext](std::string my_circ) {
     return optimize_(my_circ, "Gate", 10, supercontext);
   });

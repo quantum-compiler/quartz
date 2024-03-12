@@ -2046,8 +2046,9 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          std::cout << "Timeout. Program terminated. Best cost is " << best_cost
-                    << std::endl;
+          // std::cout << "Timeout. Program terminated. Best cost is " <<
+          // best_cost
+          //           << std::endl;
           return best_graph;
         }
         if (new_graph == nullptr)

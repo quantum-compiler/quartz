@@ -1,9 +1,10 @@
 #include "oracle.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"
-using namespace quartz;
 
-int main() {
+#include <thread>
+using namespace quartz;
+void task() {
   std::string my_circ = std::string(R"(OPENQASM 2.0;
   include "qelib1.inc";
   qreg q[24];
@@ -30,7 +31,22 @@ int main() {
   auto supercontext = get_context_("Nam", 24,
                                    "/home/pengyul/quicr/soam/resources/"
                                    "Nam_4_3_complete_ECC_set.json");
-  std::cout << optimize_(my_circ, "Gate", 1, supercontext) << std::endl;
-  std::cout << optimize_(my_circ, "Gate", 1, supercontext) << std::endl;
+  for (int i = 0; i < 5; ++i) {
+    optimize_(my_circ, "Gate", 1, supercontext);
+    std::cout << "Optimization " << i << " done." << std::endl;
+  }
+}
+
+int main() {
+  std::vector<std::thread> threads;
+
+  // for (int i = 0; i < 64; ++i) {
+  //   threads.emplace_back(task);
+  // }
+
+  // for (auto& thread : threads) {
+  //   thread.join();
+  // }
+  task();
   return 0;
 }

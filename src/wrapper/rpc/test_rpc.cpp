@@ -1,6 +1,6 @@
-#include "oracle.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"
+#include "wrapper/oracle.h"
 using namespace quartz;
 
 int main() {

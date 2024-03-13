@@ -240,7 +240,7 @@ class Graph {
            const std::string &circuit_name, bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
            double cost_upper_bound = -1 /*default = current cost * 1.05*/,
-           int timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/);
   /**
    * Optimize this circuit.
    * @param xfers The circuit transformations.
@@ -258,7 +258,7 @@ class Graph {
            const std::string &circuit_name, const std::string &log_file_name,
            bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
-           int timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result = false, bool print_id = false) const;

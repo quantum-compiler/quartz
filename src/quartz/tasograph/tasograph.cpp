@@ -1895,13 +1895,13 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
   //   }
   bestGraph->constant_and_rotation_elimination();
   return bestGraph;
-}  // namespace quartz
+}
 
 std::shared_ptr<Graph>
 Graph::optimize(Context *ctx, const std::string &equiv_file_name,
                 const std::string &circuit_name, bool print_message,
                 std::function<float(Graph *)> cost_function,
-                double cost_upper_bound, int timeout) {
+                double cost_upper_bound, double timeout) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1964,7 +1964,7 @@ std::shared_ptr<Graph>
 Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                 const std::string &circuit_name,
                 const std::string &log_file_name, bool print_message,
-                std::function<float(Graph *)> cost_function, int timeout) {
+                std::function<float(Graph *)> cost_function, double timeout) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -2041,8 +2041,8 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
         auto new_graph =
             graph->apply_xfer(xfer, node, context->has_parameterized_gate());
         auto end = std::chrono::steady_clock::now();
-        if ((int)std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                       start)
+        if ((double)std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                          start)
                     .count() /
                 1000.0 >
             timeout) {

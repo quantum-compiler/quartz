@@ -17,6 +17,7 @@ int main(int argc, char **argv) {
   int nqubits = atoi(argv[6]);
   rpc::server srv(port);
   auto supercontext = get_context_(argv[2], nqubits, argv[3]);
+  std::cout << "Server started on port " << port << std::endl;
   srv.bind("optimize", [supercontext, timeout, argv](std::string my_circ) {
     return optimize_(my_circ, argv[4], timeout, supercontext);
   });

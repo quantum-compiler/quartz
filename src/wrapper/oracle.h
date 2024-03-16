@@ -19,8 +19,9 @@ class SuperContext {
                GateType::h,           GateType::rz,          GateType::x,
                GateType::add};
     } else if (gate_set == "CliffordT") {
-      std::cerr << "Not implemented yet." << std::endl;
-      assert(false);
+      gates = {GateType::input_qubit, GateType::input_param, GateType::t,
+               GateType::tdg,         GateType::h,           GateType::x,
+               GateType::cx,          GateType::add};
     } else {
       std::cerr << "Invalid gate set." << std::endl;
       assert(false);
@@ -30,8 +31,7 @@ class SuperContext {
   }
   SuperContext(const std::string &gate_set, int n_qubits,
                const std::string &ecc_path)
-      : param_info(0),
-        ctx(createContext(gate_set, n_qubits, param_info)) {
+      : param_info(0), ctx(createContext(gate_set, n_qubits, param_info)) {
     xfers = std::vector<GraphXfer *>();
     EquivalenceSet eqs;
     if (!eqs.load_json(&ctx, ecc_path, false)) {

@@ -19,8 +19,9 @@ class SuperContext {
                GateType::h,           GateType::rz,          GateType::x,
                GateType::add};
     } else if (gate_set == "CliffordT") {
-      gates = {GateType::input_qubit, GateType::input_param, GateType::t,
-               GateType::tdg,         GateType::h,           GateType::x,
+      gates = {GateType::input_qubit, GateType::input_param, GateType::h,
+               GateType::x,           GateType::t,           GateType::tdg,
+               GateType::s,           GateType::sdg,         GateType::z,
                GateType::cx,          GateType::add};
     } else {
       std::cerr << "Invalid gate set." << std::endl;

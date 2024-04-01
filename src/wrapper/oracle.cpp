@@ -29,8 +29,60 @@ std::string optimize_(std::string circ_string, std::string cost_func,
     assert(false);
   }
   float init_cost = cost_function(graph.get());
-  auto newgraph =
-      graph->optimize(super_context->xfers, init_cost * 1.05, "barenco_tof_3",
-                      "", false, cost_function, timeout);
-  return newgraph->to_qasm(false, false);
+  auto start = std::chrono::steady_clock::now();
+  auto graph_after_greedy = graph->greedy_optimize_with_xfer(
+      super_context->xfers_greedy, false, cost_function);
+  auto end = std::chrono::steady_clock::now();
+  double remaining_time =
+      timeout -
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+              .count() /
+          1000.0;
+  if (remaining_time < 0.01) {
+    return graph_after_greedy->to_qasm(false, false);
+  } else {
+    auto graph_after_search = graph_after_greedy->optimize(
+        super_context->xfers, init_cost * 1.05, "barenco_tof_3", "", false,
+        cost_function, remaining_time);
+    return graph_after_search->to_qasm(false, false);
+  }
+}
+std::string clifford_decomposition_(std::string circ) {
+  auto param_info = ParamInfo(0);
+
+  Context src_ctx(std::vector<GateType>{GateType::h, GateType::ccz, GateType::x,
+                                        GateType::cx, GateType::add,
+                                        GateType::input_qubit,
+                                        GateType::input_param},
+                  3, &param_info);
+  Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  3, &param_info);
+
+  auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+
+  auto graph = Graph::from_qasm_str(&src_ctx, circ);
+
+  std::shared_ptr<Graph> newGraph;
+
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
+
+  newGraph = graph->toffoli_flip_greedy(GateType::rz, xfer_pair.first,
+                                        xfer_pair.second);
+  return newGraph->to_qasm(false, false);
+}
+
+std::string rotation_merging_(std::string circ_string)
+
+{
+  auto param_info = ParamInfo(0);
+  Context src_ctx(std::vector<GateType>{GateType::h, GateType::x, GateType::rz,
+                                        GateType::add, GateType::cx,
+                                        GateType::input_qubit,
+                                        GateType::input_param},
+                  3, &param_info);
+
+  auto graph = Graph::from_qasm_str(&src_ctx, circ_string);
+  graph->rotation_merging(GateType::rz);
+  return graph->to_qasm(false, false);
 }

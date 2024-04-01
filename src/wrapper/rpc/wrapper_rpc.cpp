@@ -7,20 +7,28 @@
 using namespace quartz;
 
 int main(int argc, char **argv) {
-  if (argc != 7) {
+  if (argc != 6) {
     std::cerr << "Usage: " << argv[0]
-              << " <port> <gateset> <eccfile> <cost> <timeout> <nqubits>\n";
+              << " <port> <optimization_gateset> <eccfile> <cost> "
+                 "<timeout>\n";
     return 1;
   }
   int port = atoi(argv[1]);
+  std::string optimization_gateset = argv[2];
+  std::string eccfile = argv[3];
+  std::string cost = argv[4];
   float timeout = atof(argv[5]);
-  int nqubits = atoi(argv[6]);
   rpc::server srv(port);
-  auto supercontext = get_context_(argv[2], 1, argv[3]);
-  std::cout << "Server started on port " << port << std::endl;
-  srv.bind("optimize", [supercontext, timeout, argv](std::string my_circ) {
-    return optimize_(my_circ, argv[4], timeout, supercontext);
+  auto supercontext = get_context_(optimization_gateset, 1, eccfile);
+  srv.bind("optimize", [supercontext, timeout, cost](std::string my_circ) {
+    return optimize_(my_circ, cost, timeout, supercontext);
   });
+  srv.bind("rotation_merging",
+           [](std::string my_circ) { return rotation_merging_(my_circ); });
+  srv.bind("clifford_decomposition", [](std::string my_circ) {
+    return clifford_decomposition_(my_circ);
+  });
+  std::cout << "Server started on port " << port << std::endl;
   srv.run();
 
   return 0;

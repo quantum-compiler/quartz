@@ -1555,6 +1555,64 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 std::shared_ptr<Graph>
+Graph::greedy_optimize_with_xfer(const std::vector<GraphXfer *> &xfers,
+                                 bool print_message,
+                                 std::function<float(Graph *)> cost_function) {
+  if (cost_function == nullptr) {
+    cost_function = [](Graph *graph) { return graph->total_cost(); };
+  }
+
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+
+  auto original_cost = cost_function(this);
+
+  // Get xfers that strictly reduce the cost from the ECC set
+
+  if (print_message) {
+    std::cout << "greedy_optimize(): Number of xfers that reduce cost: "
+              << xfers.size() << std::endl;
+  }
+
+  std::shared_ptr<Graph> optimized_graph = std::make_shared<Graph>(*this);
+  bool optimized_in_this_iteration;
+  std::vector<Op> all_nodes;
+  optimized_graph->topology_order_ops(all_nodes);
+  do {
+    optimized_in_this_iteration = false;
+    for (auto xfer : xfers) {
+      bool optimized_this_xfer;
+      do {
+        optimized_this_xfer = false;
+        for (auto const &node : all_nodes) {
+          auto new_graph = optimized_graph->apply_xfer(
+              xfer, node, context->has_parameterized_gate());
+          if (new_graph) {
+            optimized_graph.swap(new_graph);
+            // Update the wires after applying a transformation.
+            all_nodes.clear();
+            optimized_graph->topology_order_ops(all_nodes);
+            optimized_this_xfer = true;
+            optimized_in_this_iteration = true;
+            // Since |all_nodes| has changed, we cannot continue this loop.
+            break;
+          }
+        }
+      } while (optimized_this_xfer);
+    }
+  } while (optimized_in_this_iteration);
+
+  auto optimized_cost = cost_function(optimized_graph.get());
+
+  if (print_message) {
+    std::cout << "greedy_optimize(): cost optimized from " << original_cost
+              << " to " << optimized_cost << std::endl;
+  }
+
+  return optimized_graph;
+}
+
+std::shared_ptr<Graph>
 Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
                        bool print_message,
                        std::function<float(Graph *)> cost_function) {
@@ -2046,9 +2104,6 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          // std::cout << "Timeout. Program terminated. Best cost is " <<
-          // best_cost
-          //           << std::endl;
           return best_graph;
         }
         if (new_graph == nullptr)

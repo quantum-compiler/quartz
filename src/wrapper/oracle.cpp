@@ -52,8 +52,9 @@ std::string clifford_decomposition_(std::string circ) {
 
   Context src_ctx(std::vector<GateType>{GateType::h, GateType::ccz, GateType::x,
                                         GateType::cx, GateType::add,
-                                        GateType::input_qubit,
-                                        GateType::input_param},
+                                        GateType::s, GateType::sdg, GateType::t,
+                                        GateType::tdg, GateType::input_qubit,
+                                        GateType::input_param, GateType::rz},
                   3, &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param},

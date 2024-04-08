@@ -1558,6 +1558,8 @@ std::shared_ptr<Graph>
 Graph::greedy_optimize_with_xfer(const std::vector<GraphXfer *> &xfers,
                                  bool print_message,
                                  std::function<float(Graph *)> cost_function) {
+  // std::cout << "Number of xfers:" << xfers.size() << std::endl;
+
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1566,7 +1568,7 @@ Graph::greedy_optimize_with_xfer(const std::vector<GraphXfer *> &xfers,
   // Load equivalent dags from file
 
   auto original_cost = cost_function(this);
-
+  auto current_cost = original_cost;
   // Get xfers that strictly reduce the cost from the ECC set
 
   if (print_message) {
@@ -1587,7 +1589,13 @@ Graph::greedy_optimize_with_xfer(const std::vector<GraphXfer *> &xfers,
         for (auto const &node : all_nodes) {
           auto new_graph = optimized_graph->apply_xfer(
               xfer, node, context->has_parameterized_gate());
-          if (new_graph) {
+          if (!new_graph) {
+            continue;
+          }
+          auto new_cost = cost_function(new_graph.get());
+          if (new_cost < current_cost) {
+            current_cost = cost_function(new_graph.get());
+
             optimized_graph.swap(new_graph);
             // Update the wires after applying a transformation.
             all_nodes.clear();
@@ -1619,7 +1627,6 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
-
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {

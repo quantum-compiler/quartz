@@ -10,28 +10,46 @@ std::shared_ptr<SuperContext> get_context_(const std::string gate_set,
 }
 
 std::string optimize_(std::string circ_string, std::string cost_func,
-                      float timeout, std::shared_ptr<SuperContext> super_context
+                      std::string timeout_type, float timeout_value,
+                      std::shared_ptr<SuperContext> super_context
 
 ) {
   auto graph = Graph::from_qasm_str(&super_context->ctx, circ_string);
 
   std::function<int(Graph *)> cost_function;
+  std::vector<quartz::GraphXfer *> greedy_xfers;
   if (cost_func == "Gate") {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
+    greedy_xfers = super_context->xfers_greedy_gate;
   } else if (cost_func == "Depth") {
     cost_function = [](Graph *graph) { return graph->circuit_depth(); };
+    greedy_xfers = super_context->xfers;
+
   } else if (cost_func == "Mixed") {
     cost_function = [](Graph *graph) {
       return graph->circuit_depth() + 0.1 * graph->total_cost();
     };
+    greedy_xfers = super_context->xfers;
+
   } else {
     std::cout << "Invalid cost function." << std::endl;
     assert(false);
   }
+  float timeout = 0;
+  if (timeout_type == "PerSegment") {
+    timeout = timeout_value;
+  } else if (timeout_type == "PerGate") {
+    timeout = timeout_value * graph->total_cost();
+  } else {
+    std::cout << "Invalid timeout type." << std::endl;
+    assert(false);
+  }
+
   float init_cost = cost_function(graph.get());
   auto start = std::chrono::steady_clock::now();
-  auto graph_after_greedy = graph->greedy_optimize_with_xfer(
-      super_context->xfers_greedy, false, cost_function);
+  auto graph_after_greedy =
+      graph->greedy_optimize_with_xfer(greedy_xfers, false, cost_function);
+
   auto end = std::chrono::steady_clock::now();
   double remaining_time =
       timeout -

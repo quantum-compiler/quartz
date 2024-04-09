@@ -27,7 +27,7 @@ std::string optimize_(std::string circ_string, std::string cost_func,
 
   } else if (cost_func == "Mixed") {
     cost_function = [](Graph *graph) {
-      return graph->circuit_depth() + 0.1 * graph->total_cost();
+      return 10 * graph->circuit_depth() + graph->total_cost();
     };
     greedy_xfers = super_context->xfers;
 

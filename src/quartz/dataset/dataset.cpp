@@ -161,6 +161,13 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
   return num_removed;
 }
 
+void Dataset::sort() {
+  for (auto &it : dataset) {
+    std::sort(it.second.begin(), it.second.end(),
+              UniquePtrCircuitSeqComparator());
+  }
+}
+
 bool Dataset::insert(Context *ctx, std::unique_ptr<CircuitSeq> dag) {
   const auto hash_value = dag->hash(ctx);
   bool ret = dataset.count(hash_value) == 0;

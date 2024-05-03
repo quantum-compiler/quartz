@@ -36,6 +36,15 @@ class CircuitSeq {
    * @return True iff two circuit sequences are fully equivalent.
    */
   [[nodiscard]] bool fully_equivalent(Context *ctx, CircuitSeq &other);
+  /**
+   * Compare two circuit sequences first by the qubit count (smaller is true),
+   * then by the gate count (smaller is true), then by the gate sequence.
+   * If |kUseRowRepresentationToCompare| is true, compare the gates on qubit 0
+   * first, then qubit 1, ...
+   * @param other The other circuit sequence to compare with.
+   * @return True iff this circuit sequence is strictly less than the other
+   * circuit sequence.
+   */
   [[nodiscard]] bool less_than(const CircuitSeq &other) const;
 
   /**

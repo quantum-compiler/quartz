@@ -17,6 +17,7 @@ using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 namespace quartz {
 const ParamType PI = std::acos((ParamType)-1);
+
 // Constants for CircuitSeq::hash()
 constexpr double kCircuitSeqHashMaxError = 1e-15;
 constexpr bool kFingerprintInvariantUnderPhaseShift = true;
@@ -29,6 +30,8 @@ static_assert(!(kFingerprintInvariantUnderPhaseShift &&
 constexpr PhaseShiftIdType kNoPhaseShift = -1;
 constexpr bool kCheckPhaseShiftOfPiOver4 = true;
 constexpr int kCheckPhaseShiftOfPiOver4Index = 10000;  // not used now
+
+constexpr bool kUseRowRepresentationToCompare = true;
 
 constexpr int kDefaultQASMParamPrecision = 15;
 

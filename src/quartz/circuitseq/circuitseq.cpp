@@ -9,6 +9,7 @@
 #include <cassert>
 #include <charconv>
 #include <fstream>
+#include <optional>
 #include <queue>
 #include <unordered_set>
 #include <utility>
@@ -107,32 +108,38 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
       // Compare all gates on qubit i.
       auto this_ptr = wires[i].get();
       auto other_ptr = other.wires[i].get();
+      std::optional<bool> compare_outcome = std::nullopt;
       while (this_ptr != outputs[i]) {
         if (other_ptr == other.outputs[i]) {
           // This circuit sequence has more gates on qubit i,
-          // so the next gate in the row representation is smaller than
-          // the other circuit.
-          return true;
+          // so this circuit is greater.
+          return false;
         }
         assert(this_ptr->output_gates->size() == 1);
         assert(other_ptr->output_gates->size() == 1);
         auto this_gate = this_ptr->output_gates[0];
         auto other_gate = other_ptr->output_gates[0];
-        if (this_gate->gate->tp != other_gate->gate->tp) {
-          return this_gate->gate->tp < other_gate->gate->tp;
-        }
-        assert(this_gate->input_wires.size() == other_gate->input_wires.size());
-        assert(this_gate->output_wires.size() ==
-               other_gate->output_wires.size());
-        for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
-          if (this_gate->input_wires[j]->is_qubit() !=
-              other_gate->input_wires[j]->is_qubit()) {
-            return this_gate->input_wires[j]->is_qubit();
-          }
-          if (this_gate->input_wires[j]->index !=
-              other_gate->input_wires[j]->index) {
-            return this_gate->input_wires[j]->index <
-                   other_gate->input_wires[j]->index;
+        if (!compare_outcome.has_value()) {
+          if (this_gate->gate->tp != other_gate->gate->tp) {
+            compare_outcome = this_gate->gate->tp < other_gate->gate->tp;
+          } else {
+            assert(this_gate->input_wires.size() ==
+                   other_gate->input_wires.size());
+            assert(this_gate->output_wires.size() ==
+                   other_gate->output_wires.size());
+            for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+              if (this_gate->input_wires[j]->is_qubit() !=
+                  other_gate->input_wires[j]->is_qubit()) {
+                compare_outcome = this_gate->input_wires[j]->is_qubit();
+                break;
+              }
+              if (this_gate->input_wires[j]->index !=
+                  other_gate->input_wires[j]->index) {
+                compare_outcome = this_gate->input_wires[j]->index <
+                                  other_gate->input_wires[j]->index;
+                break;
+              }
+            }
           }
         }
         // No need to compare output wires for quantum gates.
@@ -156,8 +163,14 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
         assert(found_output_wire);
       }
       if (other_ptr != other.outputs[i]) {
-        // The other circuit sequence has more gates on qubit i.
-        return false;
+        // The other circuit sequence has more gates on qubit i,
+        // so this circuit is less.
+        return true;
+      }
+      // Two circuit sequences have the same number of gates on qubit i.
+      // Compare the contents.
+      if (compare_outcome.has_value()) {
+        return compare_outcome.value();
       }
     }
   } else {
@@ -165,7 +178,8 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
       if (gates[i]->gate->tp != other.gates[i]->gate->tp) {
         return gates[i]->gate->tp < other.gates[i]->gate->tp;
       }
-      assert(gates[i]->input_wires.size() == other.gates[i]->input_wires.size());
+      assert(gates[i]->input_wires.size() ==
+             other.gates[i]->input_wires.size());
       assert(gates[i]->output_wires.size() ==
              other.gates[i]->output_wires.size());
       for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {

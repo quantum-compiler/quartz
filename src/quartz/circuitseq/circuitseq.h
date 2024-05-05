@@ -37,10 +37,10 @@ class CircuitSeq {
    */
   [[nodiscard]] bool fully_equivalent(Context *ctx, CircuitSeq &other);
   /**
-   * Compare two circuit sequences first by the qubit count (smaller is true),
-   * then by the gate count (smaller is true), then by the gate sequence.
+   * Compare two circuit sequences first by the qubit count (fewer is less),
+   * then by the gate count (fewer is less), then by the gate sequence.
    * If |kUseRowRepresentationToCompare| is true, compare the gates on qubit 0
-   * first, then qubit 1, ...
+   * first (fewer is less, then compare by the content), then qubit 1, ...
    * @param other The other circuit sequence to compare with.
    * @return True iff this circuit sequence is strictly less than the other
    * circuit sequence.

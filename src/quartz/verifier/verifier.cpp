@@ -21,30 +21,66 @@ bool Verifier::redundant(Context *ctx, CircuitSeq *dag) {
   if (!dag->is_canonical_representation()) {
     return true;
   }
-  assert(!kUseRowRepresentationToCompare);  // not implemented otherwise
-  // We have already known that DropLast(circuitseq) is a representative.
-  // Check if canonicalize(DropFirst(circuitseq)) is a representative.
-  auto dropfirst = std::make_unique<CircuitSeq>(*dag);
-  dropfirst->remove_first_quantum_gate();
-  CircuitSeqHashType hash_value = dropfirst->hash(ctx);
-  // XXX: here we treat any CircuitSeq with hash values differ no more than 1
-  // with any representative as equivalent.
-  for (const auto &hash_value_offset : {0, 1, -1}) {
-    CircuitSeq *rep = nullptr;
-    if (ctx->get_possible_representative(hash_value + hash_value_offset, rep)) {
-      assert(rep);
-      if (!dropfirst->fully_equivalent(*rep)) {
-        // |dropfirst| already exists and is not the
-        // representative. So the whole |circuitseq| is redundant.
+  if (kUseRowRepresentationToCompare) {
+    // We have already known that DropLast(circuitseq) is a representative.
+    // Check if canonicalize(DropFirst(circuitseq)) is a representative.
+    auto first_gates = dag->first_quantum_gate_positions();
+    for (auto &gate_position : first_gates) {
+      auto dropfirst = std::make_unique<CircuitSeq>(*dag);
+      dropfirst->remove_gate(gate_position);
+      CircuitSeqHashType hash_value = dropfirst->hash(ctx);
+      // XXX: here we treat any CircuitSeq with hash values differ no more than
+      // 1 with any representative as equivalent.
+      bool found = false;
+      for (const auto &hash_value_offset : {0, 1, -1}) {
+        CircuitSeq *rep = nullptr;
+        if (ctx->get_possible_representative(hash_value + hash_value_offset,
+                                             rep)) {
+          assert(rep);
+          if (!dropfirst->topologically_equivalent(*rep)) {
+            // |dropfirst| already exists and is not the
+            // representative. So the whole |circuitseq| is redundant.
+            return true;
+          } else {
+            // |dropfirst| already exists and is the representative.
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        // |dropfirst| is not found and therefore is not a representative.
         return true;
-      } else {
-        // |dropfirst| already exists and is the representative.
-        return false;
       }
     }
+    // All |dropfirst|s are representatives.
+    return false;
+  } else {
+    // We have already known that DropLast(circuitseq) is a representative.
+    // Check if canonicalize(DropFirst(circuitseq)) is a representative.
+    auto dropfirst = std::make_unique<CircuitSeq>(*dag);
+    dropfirst->remove_first_quantum_gate();
+    CircuitSeqHashType hash_value = dropfirst->hash(ctx);
+    // XXX: here we treat any CircuitSeq with hash values differ no more than 1
+    // with any representative as equivalent.
+    for (const auto &hash_value_offset : {0, 1, -1}) {
+      CircuitSeq *rep = nullptr;
+      if (ctx->get_possible_representative(hash_value + hash_value_offset,
+                                           rep)) {
+        assert(rep);
+        if (!dropfirst->fully_equivalent(*rep)) {
+          // |dropfirst| already exists and is not the
+          // representative. So the whole |circuitseq| is redundant.
+          return true;
+        } else {
+          // |dropfirst| already exists and is the representative.
+          return false;
+        }
+      }
+    }
+    // |dropfirst| is not found and therefore is not a representative.
+    return true;
   }
-  // |dropfirst| is not found and therefore is not a representative.
-  return true;
 }
 
 bool Verifier::redundant(Context *ctx, const EquivalenceSet *eqs,

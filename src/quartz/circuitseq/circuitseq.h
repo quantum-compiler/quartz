@@ -29,6 +29,14 @@ class CircuitSeq {
    */
   [[nodiscard]] bool fully_equivalent(const CircuitSeq &other) const;
   /**
+   * Compare if two circuits are topologically equivalent.
+   * X(Q0) X(Q1) and X(Q1) X(Q0) are topologically equivalent but not
+   * fully equivalent.
+   * @param other The other circuit sequence to be compared.
+   * @return True iff two circuit sequences are topologically equivalent.
+   */
+  [[nodiscard]] bool topologically_equivalent(const CircuitSeq &other) const;
+  /**
    * Compute the hash value and compare if two circuit sequences are fully
    * equivalent including the hash value.
    * @param ctx The context to compute the hash value.
@@ -99,7 +107,13 @@ class CircuitSeq {
 
   /**
    * Remove a quantum gate.
-   * @param circuit_gate the gate to be removed.
+   * @param gate_position The position of the gate to be removed (0-indexed).
+   * @return True iff the removal is successful.
+   */
+  bool remove_gate(int gate_position);
+  /**
+   * Remove a quantum gate.
+   * @param circuit_gate The gate to be removed.
    * @return True iff the removal is successful.
    */
   bool remove_gate(CircuitGate *circuit_gate);
@@ -281,11 +295,23 @@ class CircuitSeq {
    */
   std::unique_ptr<CircuitSeq> get_ccz_to_cx_rz(Context *ctx) const;
 
-  // Returns quantum gates which do not topologically depend on any other
-  // quantum gates.
+  /**
+   * Returns quantum gates which do not topologically depend on any other
+   * quantum gates.
+   * @return The pointers to the first quantum gates.
+   */
   [[nodiscard]] std::vector<CircuitGate *> first_quantum_gates() const;
-  // Returns quantum gates which can appear at last in some topological
-  // order of the CircuitSeq.
+  /**
+   * Returns quantum gates which do not topologically depend on any other
+   * quantum gates.
+   * @return The positions (0-indexed) of the first quantum gates.
+   */
+  [[nodiscard]] std::vector<int> first_quantum_gate_positions() const;
+  /**
+   * Returns quantum gates which can appear at last in some topological
+   * order of the CircuitSeq.
+   * @return The pointers to the last quantum gates.
+   */
   [[nodiscard]] std::vector<CircuitGate *> last_quantum_gates() const;
 
   static bool same_gate(const CircuitSeq &seq1, int index1,

@@ -86,6 +86,78 @@ bool CircuitSeq::fully_equivalent(const CircuitSeq &other) const {
   return true;
 }
 
+bool CircuitSeq::topologically_equivalent(const CircuitSeq &other) const {
+  if (this == &other) {
+    return true;
+  }
+  if (num_qubits != other.num_qubits) {
+    return false;
+  }
+  if (wires.size() != other.wires.size() ||
+      gates.size() != other.gates.size()) {
+    return false;
+  }
+  // Mapping from this circuit to the other circuit
+  std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
+  std::queue<CircuitWire *> wires_to_search;
+  std::unordered_map<CircuitGate *, int> gate_remaining_in_degree;
+  for (int i = 0; i < num_qubits; i++) {
+    wires_mapping[wires[i].get()] = other.wires[i].get();
+    wires_to_search.push(wires[i].get());
+  }
+  // Topological sort on this circuit
+  while (!wires_to_search.empty()) {
+    auto this_wire = wires_to_search.front();
+    auto other_wire = wires_mapping[this_wire];
+    assert(other_wire);
+    wires_to_search.pop();
+    if (this_wire->output_gates.size() != other_wire->output_gates.size()) {
+      return false;
+    }
+    for (int i = 0; i < (int)this_wire->output_gates.size(); i++) {
+      auto this_gate = this_wire->output_gates[i];
+      if (gate_remaining_in_degree.count(this_gate) == 0) {
+        // A new gate
+        gate_remaining_in_degree[this_gate] = this_gate->gate->get_num_qubits();
+      }
+      if (!--gate_remaining_in_degree[this_gate]) {
+        // Check if this gate is the same as the other gate
+        auto other_gate = other_wire->output_gates[i];
+        if (this_gate->gate->tp != other_gate->gate->tp) {
+          return false;
+        }
+        if (this_gate->input_wires.size() != other_gate->input_wires.size() ||
+            this_gate->output_wires.size() != other_gate->output_wires.size()) {
+          return false;
+        }
+        for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+          if (this_gate->input_wires[j]->is_qubit()) {
+            // The input wire must have been mapped.
+            assert(wires_mapping.count(this_gate->input_wires[j]) != 0);
+            if (wires_mapping[this_gate->input_wires[j]] !=
+                other_gate->input_wires[j]) {
+              return false;
+            }
+          } else {
+            // parameters should not be mapped
+            if (other_gate->input_wires[j] != this_gate->input_wires[j]) {
+              return false;
+            }
+          }
+        }
+        // Map output wires
+        for (int j = 0; j < (int)this_gate->output_wires.size(); j++) {
+          assert(wires_mapping.count(this_gate->output_wires[j]) == 0);
+          wires_mapping[this_gate->output_wires[j]] =
+              other_gate->output_wires[j];
+          wires_to_search.push(this_gate->output_wires[j]);
+        }
+      }
+    }
+  }
+  return true;  // equivalent
+}
+
 bool CircuitSeq::fully_equivalent(Context *ctx, CircuitSeq &other) {
   if (hash(ctx) != other.hash(ctx)) {
     return false;
@@ -378,6 +450,20 @@ bool CircuitSeq::remove_last_gate() {
   // Remove the circuit_gate.
   gates.pop_back();
 
+  hash_value_valid_ = false;
+  return true;
+}
+
+bool CircuitSeq::remove_gate(int gate_position) {
+  if (gate_position < 0 || gate_position >= (int)gates.size()) {
+    return false;
+  }
+  CircuitGate *circuit_gate = gates[gate_position].get();
+  auto *gate = circuit_gate->gate;
+  assert(gate->is_quantum_gate());
+  remove_quantum_gate_from_graph(circuit_gate);
+  // Remove the gate.
+  gates.erase(gates.begin() + gate_position);
   hash_value_valid_ = false;
   return true;
 }
@@ -1474,6 +1560,28 @@ std::vector<CircuitGate *> CircuitSeq::first_quantum_gates() const {
     if (depend_on_other_gates.find(circuit_gate.get()) ==
         depend_on_other_gates.end()) {
       result.push_back(circuit_gate.get());
+    }
+    for (const auto &output_wire : circuit_gate->output_wires) {
+      for (const auto &output_gate : output_wire->output_gates) {
+        depend_on_other_gates.insert(output_gate);
+      }
+    }
+  }
+  return result;
+}
+
+std::vector<int> CircuitSeq::first_quantum_gate_positions() const {
+  std::vector<int> result;
+  std::unordered_set<CircuitGate *> depend_on_other_gates;
+  depend_on_other_gates.reserve(gates.size());
+  for (int i = 0; i < (int)gates.size(); i++) {
+    CircuitGate *circuit_gate = gates[i].get();
+    if (circuit_gate->gate->is_parameter_gate()) {
+      continue;
+    }
+    if (depend_on_other_gates.find(circuit_gate) ==
+        depend_on_other_gates.end()) {
+      result.push_back(i);
     }
     for (const auto &output_wire : circuit_gate->output_wires) {
       for (const auto &output_gate : output_wire->output_gates) {

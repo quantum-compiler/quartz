@@ -71,8 +71,9 @@ bool Generator::generate(
       }
       std::string command_string =
           std::string("python ") + quartz_root_path.string() +
-          "/src/python/verifier/verify_equivalences.py "
-          "tmp_before_verify.json tmp_after_verify.json";
+          "/src/python/verifier/verify_equivalences.py " +
+          quartz_root_path.string() + "/tmp_before_verify.json " +
+          quartz_root_path.string() + "/tmp_after_verify.json";
       system(command_string.c_str());
       if (record_verification_time) {
         auto end = std::chrono::steady_clock::now();

@@ -24,20 +24,21 @@ int main() {
   // gen_ecc_set({GateType::u1, GateType::u2, GateType::u3, GateType::cx,
   //              GateType::add},
   //             "IBM_4_3_", true, 3, 4, 4);
-  // for (int n = 2; n <= 4; n++) {
-  //   for (int q = 3; q <= 3; q++) {
-  //     std::string file_prefix = "Nam_";
-  //     file_prefix += std::to_string(n);
-  //     file_prefix += "_";
-  //     file_prefix += std::to_string(q);
-  //     file_prefix += "_";
-  //     gen_ecc_set(
-  //         {GateType::rz, GateType::h, GateType::cx, GateType::x,
-  //         GateType::add}, file_prefix, true, true, q, 2, n);
-  //   }
-  // }
   gen_ecc_set({GateType::t, GateType::tdg, GateType::h, GateType::x,
                GateType::cx, GateType::add},
               "eccset/Clifford_T_5_3_", true, false, 3, 0, 5);
+
+  for (int n = 2; n <= 4; n++) {
+    for (int q = 3; q <= 3; q++) {
+      std::string file_prefix = "eccset/Nam_";
+      file_prefix += std::to_string(n);
+      file_prefix += "_";
+      file_prefix += std::to_string(q);
+      file_prefix += "_";
+      gen_ecc_set(
+          {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
+          file_prefix, true, true, q, 2, n);
+    }
+  }
   return 0;
 }

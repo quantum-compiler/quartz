@@ -15,6 +15,6 @@ int main() {
   //   test_optimization(&ctx, "circuit/example-circuits/voqc_fig5.qasm",
   //                     "cmake-build-debug/bfs_verified.json");
   test_optimization(&ctx, "circuit/example-circuits/barenco_tof_3.qasm",
-                    "bfs_verified_simplified.json",
-                    false /*use_simulated_annealing*/);
+                    "Nam_3_3_complete_ECC_set.json",
+                    /*timeout=*/10, "logs/barenco_tof_3_");
 }

@@ -208,12 +208,14 @@ class Graph {
    * @param equiv_file_name The ECC set file name.
    * @param print_message To output the log to the screen or not.
    * @param cost_function The cost function.
+   * @param store_all_steps_file_prefix If not empty, store each circuit
+   * transformation step in a file with the corresponding file prefix.
    * @return The optimized circuit.
    */
-  std::shared_ptr<Graph>
-  greedy_optimize(Context *ctx, const std::string &equiv_file_name,
-                  bool print_message,
-                  std::function<float(Graph *)> cost_function = nullptr);
+  std::shared_ptr<Graph> greedy_optimize(
+      Context *ctx, const std::string &equiv_file_name, bool print_message,
+      std::function<float(Graph *)> cost_function = nullptr,
+      const std::string &store_all_steps_file_prefix = std::string());
   std::shared_ptr<Graph>
   optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,
@@ -223,7 +225,7 @@ class Graph {
                   int timeout = 86400 /*1 day*/);
 
   /**
-   * Optimize this circuit.
+   * Optimize this circuit with a greedy phase at the beginning.
    * @param ctx The context variable.
    * @param equiv_file_name The ECC set file name.
    * @param circuit_name The circuit name shown in the log.
@@ -232,7 +234,9 @@ class Graph {
    * file name.
    * @param cost_function The cost function for the search.
    * @param cost_upper_bound The maximum cost of the circuits to be searched.
-   * @param timeout Timeout in seconds.
+   * @param timeout Timeout in seconds, for the search phase.
+   * @param store_all_steps_file_prefix If not empty, store each circuit
+   * transformation step in a file with the corresponding file prefix.
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
@@ -240,9 +244,10 @@ class Graph {
            const std::string &circuit_name, bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
            double cost_upper_bound = -1 /*default = current cost * 1.05*/,
-           double timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/,
+           const std::string &store_all_steps_file_prefix = std::string());
   /**
-   * Optimize this circuit.
+   * Optimize this circuit without a greedy phase.
    * @param xfers The circuit transformations.
    * @param cost_upper_bound The maximum cost of the circuits to be searched.
    * @param circuit_name The circuit name shown in the log.
@@ -251,6 +256,11 @@ class Graph {
    * @param print_message To output the log or not.
    * @param cost_function The cost function for the search.
    * @param timeout Timeout in seconds.
+   * @param store_all_steps_file_prefix If not empty, store each circuit
+   * transformation step in a file with the corresponding file prefix.
+   * @param continue_storing_all_steps If true, there was a greedy phase
+   * before calling this function with the same |store_all_steps_file_prefix|.
+   * We should continue the numbering in this case.
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
@@ -258,12 +268,14 @@ class Graph {
            const std::string &circuit_name, const std::string &log_file_name,
            bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
-           double timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/,
+           const std::string &store_all_steps_file_prefix = std::string(),
+           bool continue_storing_all_steps = false);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  std::string to_qasm(bool print_result = false, bool print_id = false) const;
+  std::string to_qasm(bool print_result = false, bool print_guid = false) const;
   void to_qasm(const std::string &save_filename, bool print_result,
-               bool print_id) const;
+               bool print_guid) const;
   template <class _CharT, class _Traits>
   static std::shared_ptr<Graph>
   _from_qasm_stream(Context *ctx,

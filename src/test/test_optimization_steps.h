@@ -27,9 +27,10 @@ void test_optimization(
   std::cout << graph.total_cost() << " gates in circuit before optimizing."
             << std::endl;
   auto start = std::chrono::steady_clock::now();
-  auto new_graph = graph.optimize(
-      ctx, equivalent_file_name, file_name, /*print_message=*/
-      true, /*cost_function=*/nullptr, /*cost_upper_bound=*/-1, timeout, store_all_steps_file_prefix);
+  auto new_graph =
+      graph.optimize(ctx, equivalent_file_name, file_name, /*print_message=*/
+                     true, /*cost_function=*/nullptr, /*cost_upper_bound=*/-1,
+                     timeout, store_all_steps_file_prefix);
   auto end = std::chrono::steady_clock::now();
   std::cout << "After optimizing graph in "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(

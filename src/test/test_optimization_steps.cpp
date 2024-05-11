@@ -20,7 +20,10 @@ int main() {
     std::filesystem::create_directory(quartz_root_path / "logs");
   }
   test_optimization(
-      &ctx, quartz_root_path / "circuit/example-circuits/barenco_tof_3.qasm",
-      quartz_root_path / "eccset/Clifford_T_5_3_complete_ECC_set.json",
-      /*timeout=*/10, quartz_root_path / "logs/barenco_tof_3_");
+      &ctx,
+      (quartz_root_path / "circuit/example-circuits/barenco_tof_3.qasm")
+          .string(),
+      (quartz_root_path / "eccset/Clifford_T_5_3_complete_ECC_set.json")
+          .string(),
+      /*timeout=*/10, (quartz_root_path / "logs/barenco_tof_3_").string());
 }

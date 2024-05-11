@@ -1654,6 +1654,7 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
   if (!store_all_steps_file_prefix.empty()) {
     // Store the number of steps.
     std::ofstream fout(store_all_steps_file_prefix + ".txt");
+    assert(fout.is_open());
     fout << step_count << std::endl;
     fout.close();
   }
@@ -1968,14 +1969,12 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
   if (cost_upper_bound == -1) {
     cost_upper_bound = total_cost() * 1.05;
   }
-  auto log_file_name =
-      equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
-      circuit_name + ".log";
   auto preprocessed_graph =
-      greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
+      greedy_optimize(ctx, equiv_file_name, print_message, cost_function,
+                      store_all_steps_file_prefix);
   return preprocessed_graph->optimize(
-      xfers, cost_upper_bound, circuit_name, log_file_name, print_message,
-      cost_function, timeout, store_all_steps_file_prefix,
+      xfers, cost_upper_bound, circuit_name, /*log_file_name=*/"",
+      print_message, cost_function, timeout, store_all_steps_file_prefix,
       /*continue_storing_all_steps=*/true);
 }
 
@@ -2006,6 +2005,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   if (print_message) {
     if (!log_file_name.empty()) {
       fout = fopen(log_file_name.c_str(), "w");
+      assert(fout);
     } else {
       fout = stdout;
     }
@@ -2017,6 +2017,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   if (!store_all_steps_file_prefix.empty()) {
     if (continue_storing_all_steps) {
       std::ifstream fin(store_all_steps_file_prefix + ".txt");
+      assert(fin.is_open());
       fin >> step_count;
       fin.close();
     } else {
@@ -2070,6 +2071,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     }
   };
 
+  bool hit_timeout = false;
   while (!candidates.empty()) {
     auto graph = candidates.top();
     candidates.pop();
@@ -2088,7 +2090,8 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
             timeout) {
           std::cout << "Timeout. Program terminated. Best cost is " << best_cost
                     << std::endl;
-          return best_graph;
+          hit_timeout = true;
+          break;
         }
         if (new_graph == nullptr)
           continue;
@@ -2114,6 +2117,12 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
           best_graph = new_graph;
         }
       }
+      if (hit_timeout) {
+        break;
+      }
+    }
+    if (hit_timeout) {
+      break;
     }
 
     auto end = std::chrono::steady_clock::now();

@@ -187,8 +187,8 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
           // so this circuit is greater.
           return false;
         }
-        assert(this_ptr->output_gates->size() == 1);
-        assert(other_ptr->output_gates->size() == 1);
+        assert(this_ptr->output_gates.size() == 1);
+        assert(other_ptr->output_gates.size() == 1);
         auto this_gate = this_ptr->output_gates[0];
         auto other_gate = other_ptr->output_gates[0];
         if (!compare_outcome.has_value()) {

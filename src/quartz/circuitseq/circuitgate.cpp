@@ -307,4 +307,79 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   return result;
 }
 
+bool CircuitGate::equivalent(
+    const CircuitGate *this_gate, const CircuitGate *other_gate,
+    std::unordered_map<CircuitWire *, CircuitWire *> &wires_mapping,
+    bool update_mapping, std::queue<CircuitWire *> *wires_to_search,
+    bool backward) {
+  if (this_gate->gate->tp != other_gate->gate->tp) {
+    return false;
+  }
+  if (this_gate->input_wires.size() != other_gate->input_wires.size() ||
+      this_gate->output_wires.size() != other_gate->output_wires.size()) {
+    return false;
+  }
+  if (backward) {
+    for (int j = 0; j < (int)this_gate->output_wires.size(); j++) {
+      assert(this_gate->output_wires[j]->is_qubit());
+      // The output wire must have been mapped.
+      assert(wires_mapping.count(this_gate->output_wires[j]) != 0);
+      if (wires_mapping[this_gate->output_wires[j]] !=
+          other_gate->output_wires[j]) {
+        return false;
+      }
+    }
+    if (update_mapping) {
+      // Map input wires
+      for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+        assert(wires_mapping.count(this_gate->input_wires[j]) == 0);
+        wires_mapping[this_gate->input_wires[j]] = other_gate->input_wires[j];
+        wires_to_search->push(this_gate->input_wires[j]);
+      }
+    } else {
+      // Verify mapping
+      for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+        if (wires_mapping[this_gate->input_wires[j]] !=
+            other_gate->input_wires[j]) {
+          return false;
+        }
+      }
+    }
+  } else {
+    for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+      if (this_gate->input_wires[j]->is_qubit()) {
+        // The input wire must have been mapped.
+        assert(wires_mapping.count(this_gate->input_wires[j]) != 0);
+        if (wires_mapping[this_gate->input_wires[j]] !=
+            other_gate->input_wires[j]) {
+          return false;
+        }
+      } else {
+        // parameters should not be mapped
+        if (other_gate->input_wires[j] != this_gate->input_wires[j]) {
+          return false;
+        }
+      }
+    }
+    if (update_mapping) {
+      // Map output wires
+      for (int j = 0; j < (int)this_gate->output_wires.size(); j++) {
+        assert(wires_mapping.count(this_gate->output_wires[j]) == 0);
+        wires_mapping[this_gate->output_wires[j]] = other_gate->output_wires[j];
+        wires_to_search->push(this_gate->output_wires[j]);
+      }
+    } else {
+      // Verify mapping
+      for (int j = 0; j < (int)this_gate->output_wires.size(); j++) {
+        if (wires_mapping[this_gate->output_wires[j]] !=
+            other_gate->output_wires[j]) {
+          return false;
+        }
+      }
+    }
+  }
+  // Equivalent
+  return true;
+}
+
 }  // namespace quartz

@@ -106,17 +106,23 @@ class CircuitSeq {
   bool remove_last_gate();
 
   /**
-   * Remove a quantum gate.
+   * Remove a quantum gate in O(|get_num_gates()| - |gate_position|).
    * @param gate_position The position of the gate to be removed (0-indexed).
    * @return True iff the removal is successful.
    */
   bool remove_gate(int gate_position);
   /**
-   * Remove a quantum gate.
+   * Remove a quantum gate in O(|get_num_gates()|).
    * @param circuit_gate The gate to be removed.
    * @return True iff the removal is successful.
    */
   bool remove_gate(CircuitGate *circuit_gate);
+  /**
+   * Remove a quantum gate in O(|get_num_gates()| - |gate_position|).
+   * @param circuit_gate The gate to be removed.
+   * @return True iff the removal is successful.
+   */
+  bool remove_gate_near_end(CircuitGate *circuit_gate);
   /**
    * Remove the first quantum gate (if there is one).
    * @return True iff the removal is successful.
@@ -279,6 +285,14 @@ class CircuitSeq {
   get_permuted_seq(const std::vector<int> &qubit_permutation,
                    const std::vector<int> &input_param_permutation,
                    Context *ctx) const;
+  /**
+   * Get a circuit with |start_gates| and all gates topologically after them.
+   * @param start_gates The first gates at each qubit to include in the
+   * circuit to return.
+   */
+  [[nodiscard]] std::unique_ptr<CircuitSeq>
+  get_suffix_seq(const std::unordered_set<CircuitGate *> &start_gates,
+                 Context *ctx) const;
 
   /**
    * Get a circuit which replaces RZ gates with T, Tdg, S, Sdg, and Z gates.
@@ -307,6 +321,14 @@ class CircuitSeq {
    * @return The positions (0-indexed) of the first quantum gates.
    */
   [[nodiscard]] std::vector<int> first_quantum_gate_positions() const;
+  /**
+   * Check if a quantum gate can appear at last in some topological
+   * order of the CircuitSeq.
+   * @param circuit_gate The pointer to a quantum gate in the circuit.
+   * @return True iff the gate can appear at last in some topological
+   * order of the CircuitSeq.
+   */
+  [[nodiscard]] bool is_one_of_last_gates(CircuitGate *circuit_gate) const;
   /**
    * Returns quantum gates which can appear at last in some topological
    * order of the CircuitSeq.

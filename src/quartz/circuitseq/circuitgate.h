@@ -4,6 +4,8 @@
 #include "../utils/utils.h"
 
 #include <istream>
+#include <queue>
+#include <unordered_map>
 #include <vector>
 
 namespace quartz {
@@ -47,6 +49,34 @@ class CircuitGate {
                         std::vector<int> &output_params, Gate *&gate);
   [[nodiscard]] std::string to_qasm_style_string(Context *ctx,
                                                  int param_precision) const;
+
+  /**
+   * Check if two gates in two circuits are equivalent given a mapping of
+   * circuit wires.
+   * @param this_gate A gate in the first circuit.
+   * @param other_gate A gate in the second circuit.
+   * @param wires_mapping A mapping from the wires in the first circuit to the
+   * wires in the second circuit.
+   * @param update_mapping If true, map the output wires, and push the output
+   * wires in the first circuit to the queue;
+   * if false, also check if the output wires are already correctly mapped
+   * (only return true if the gates are equivalent and the output wires are
+   * correctly mapped).
+   * @param wires_to_search When |update_mapping| is true and the two gates
+   * are equivalent under the wires mapping, store the new wires to search in
+   * the topological sort procedure. Otherwise, this parameter has no effect.
+   * When |update_mapping| is false, this parameter can be nullptr.
+   * @param backward If true, the topological sort is performed from the end
+   * of the circuit to the beginning. Only the output wires instead of the
+   * input wires are compared when |update_mapping| is true.
+   * @return True iff the two gates are equivalent under the wires mapping.
+   */
+  static bool equivalent(
+      const CircuitGate *this_gate, const CircuitGate *other_gate,
+      std::unordered_map<CircuitWire *, CircuitWire *> &wires_mapping,
+      bool update_mapping,
+      std::queue<CircuitWire *> *wires_to_search,
+      bool backward = false);
 
   std::vector<CircuitWire *> input_wires;  // Include parameters!
   std::vector<CircuitWire *> output_wires;

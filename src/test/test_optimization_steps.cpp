@@ -1,6 +1,7 @@
 #include "test_optimization_steps.h"
 
 #include "quartz/gate/gate_utils.h"
+#include "quartz/verifier/verifier.h"
 
 #include <filesystem>
 #include <iostream>
@@ -26,4 +27,14 @@ int main() {
       (quartz_root_path / "eccset/Clifford_T_5_3_complete_ECC_set.json")
           .string(),
       /*timeout=*/10, (quartz_root_path / "logs/barenco_tof_3_").string());
+  Verifier verifier;
+  bool verified = verifier.verify_transformation_steps(
+      &ctx, (quartz_root_path / "logs/barenco_tof_3_").string(),
+      /*verbose=*/true);
+  if (verified) {
+    std::cout << "Add transformations are verified." << std::endl;
+  } else {
+    std::cout << "Some transformation is not verified." << std::endl;
+  }
+  return 0;
 }

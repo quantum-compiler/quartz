@@ -2,6 +2,7 @@ include_directories(${CMAKE_INCLUDE_PATH})
 include_directories("..")
 
 link_directories("../..")
+include_directories(~/lib/usr/local/include)
 
 file(GLOB_RECURSE WRAPPER_RPC "rpc/wrapper_rpc.cpp")
 file(GLOB_RECURSE TEST_RPC "rpc/test_rpc.cpp")

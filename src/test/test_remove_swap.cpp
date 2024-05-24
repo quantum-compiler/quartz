@@ -5,15 +5,17 @@
 
 using namespace quartz;
 void remove_swap_for_nwq(Context *ctx) {
-  std::vector<std::string> circuit_names = {"bv", "hhl", "ising", "qsvm",
-                                            "vqc"};
+  std::vector<std::string> circuit_names = {"ising", "qsvm", "vqc"};
 
   std::filesystem::path this_file_path(__FILE__);
-  auto circuit_folder =
-      this_file_path.parent_path().parent_path().parent_path().append(
-          "circuit");
+  auto circuit_folder = this_file_path.parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .append("circuit");
   std::vector<int> num_qubits;
-  for (int i = 28; i <= 34; i++) {
+  for (int i = 28; i <= 38; i++) {
     num_qubits.push_back(i);
   }
   num_qubits.push_back(42);
@@ -68,14 +70,17 @@ int main() {
                                             "wstate"};
 
   std::filesystem::path this_file_path(__FILE__);
-  auto circuit_folder =
-      this_file_path.parent_path().parent_path().parent_path().append(
-          "circuit");
+  auto circuit_folder = this_file_path.parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .parent_path()
+                            .append("circuit");
   std::vector<int> num_qubits;
-  for (int i = 28; i <= 34; i++) {
+  for (int i = 28; i <= 38; i++) {
     num_qubits.push_back(i);
   }
-  num_qubits.push_back(42);
+  // num_qubits.push_back(42);
   for (int num_q : num_qubits) {
     std::cout << num_q << " qubits:" << std::endl;
     for (const auto &circuit : circuit_names) {
@@ -92,6 +97,6 @@ int main() {
                                   "_no_swap.qasm");
     }
   }
-  // remove_swap_for_nwq(&ctx);
+  remove_swap_for_nwq(&ctx);
   return 0;
 }

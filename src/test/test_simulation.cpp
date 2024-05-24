@@ -121,25 +121,31 @@ int num_iterations_by_heuristics(CircuitSeq *seq, int num_local_qubits,
   return num_iterations;
 }
 
-int main() {
+int main(int argc, const char **argv) {
   auto start = std::chrono::steady_clock::now();
   init_python_interpreter();
   PythonInterpreter interpreter;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
                GateType::cx, GateType::cz, GateType::cp, GateType::swap,
-               GateType::rz, GateType::ccz});
+               GateType::rz, GateType::ccz, GateType::p});
   std::vector<std::string> circuit_names = {
       "nam-benchmarks/adder_8.qasm"
       // "nam-benchmarks/csla_mux_3.qasm"
       // "realamprandom"
       // "QASMBench/ising_n34.qasm"
   };
+  if (argc > 1) {
+    circuit_names[0] = argv[1];
+  }
   // 24 total qubits, 20 local qubits
   std::vector<int> num_qubits = {24};
-  std::vector<int> num_local_qubits;
-  for (int i = 20; i <= 20; i++) {
-    num_local_qubits.push_back(i);
+  std::vector<int> num_local_qubits = {20};
+  if (argc > 2) {
+    num_qubits[0] = std::stoi(argv[2]);
+  }
+  if (argc > 3) {
+    num_local_qubits[0] = std::stoi(argv[3]);
   }
   quartz::KernelCost kernel_cost(
       /*fusion_kernel_costs=*/
@@ -155,6 +161,10 @@ int main() {
       },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   // FILE *fout = fopen("result.txt", "w");
+  std::string cache_file_name_prefix = "tmp";
+  if (argc > 3) {
+    cache_file_name_prefix = argv[4];
+  }
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
@@ -162,8 +172,8 @@ int main() {
            &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
                      "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
                      ".qasm");*/
-      auto seq = CircuitSeq::from_qasm_file(&ctx, std::string("../circuit/") +
-                                                      circuit);
+      auto seq = CircuitSeq::from_qasm_file(
+          &ctx, std::string("../../../circuit/") + circuit);
 
       // Repeat the entire circuit for kNumRepeat times.
       constexpr int kNumRepeat = 0;
@@ -185,19 +195,19 @@ int main() {
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        auto schedules =
-            get_schedules_with_ilp(*seq, local_q, std::min(2, num_q - local_q),
-                                   kernel_cost, &ctx, &interpreter,
-                                   /*attach_single_qubit_gates=*/true,
-                                   /*max_num_dp_states=*/500, "tmp");
-        for (auto &schedule : schedules) {
+        auto schedules = get_schedules_with_ilp(
+            *seq, local_q, std::min(2, num_q - local_q), kernel_cost, &ctx,
+            &interpreter,
+            /*attach_single_qubit_gates=*/true,
+            /*max_num_dp_states=*/500, cache_file_name_prefix);
+        /*for (auto &schedule : schedules) {
           schedule.print_kernel_info();
           // schedule.print_kernel_schedule();
         }
         bool ok = verify_schedule(&ctx, *seq, schedules);  // may take 1h
         if (ok) {
           std::cout << "Schedule verified." << std::endl;
-        }
+        }*/
       }
       // fprintf(fout, "\n");
     }

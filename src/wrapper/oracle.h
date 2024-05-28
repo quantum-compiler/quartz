@@ -25,6 +25,12 @@ class SuperContext {
                GateType::x,           GateType::t,           GateType::tdg,
                GateType::s,           GateType::sdg,         GateType::z,
                GateType::cx,          GateType::add};
+    } else if (gate_set == "Nam_B") {
+      gates = {
+          GateType::input_qubit, GateType::input_param, GateType::cx,
+          GateType::h,           GateType::rz,          GateType::x,
+          GateType::add,         GateType::b1,          GateType::b2,
+      };
     } else {
       std::cerr << "Invalid gate set." << std::endl;
       assert(false);

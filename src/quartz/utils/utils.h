@@ -31,7 +31,7 @@ constexpr PhaseShiftIdType kNoPhaseShift = -1;
 constexpr bool kCheckPhaseShiftOfPiOver4 = true;
 constexpr int kCheckPhaseShiftOfPiOver4Index = 10000;  // not used now
 
-constexpr bool kUseRowRepresentationToCompare = true;
+constexpr bool kUseRowRepresentationToCompare = false;
 
 constexpr int kDefaultQASMParamPrecision = 15;
 

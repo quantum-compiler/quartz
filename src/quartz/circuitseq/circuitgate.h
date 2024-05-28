@@ -71,12 +71,11 @@ class CircuitGate {
    * input wires are compared when |update_mapping| is true.
    * @return True iff the two gates are equivalent under the wires mapping.
    */
-  static bool equivalent(
-      const CircuitGate *this_gate, const CircuitGate *other_gate,
-      std::unordered_map<CircuitWire *, CircuitWire *> &wires_mapping,
-      bool update_mapping,
-      std::queue<CircuitWire *> *wires_to_search,
-      bool backward = false);
+  static bool
+  equivalent(const CircuitGate *this_gate, const CircuitGate *other_gate,
+             std::unordered_map<CircuitWire *, CircuitWire *> &wires_mapping,
+             bool update_mapping, std::queue<CircuitWire *> *wires_to_search,
+             bool backward = false);
 
   std::vector<CircuitWire *> input_wires;  // Include parameters!
   std::vector<CircuitWire *> output_wires;

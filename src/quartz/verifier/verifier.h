@@ -28,8 +28,7 @@ class Verifier {
    * equivalent.
    */
   bool equivalent(Context *ctx, const CircuitSeq *circuit1,
-                  const CircuitSeq *circuit2,
-                  bool verbose = false);
+                  const CircuitSeq *circuit2, bool verbose = false);
   // On-the-fly equivalence checking while generating circuits
   bool equivalent_on_the_fly(Context *ctx, CircuitSeq *circuit1,
                              CircuitSeq *circuit2);

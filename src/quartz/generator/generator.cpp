@@ -10,10 +10,6 @@ bool Generator::generate(
     bool invoke_python_verifier, EquivalenceSet *equiv_set,
     bool unique_parameters, bool verbose,
     std::chrono::steady_clock::duration *record_verification_time) {
-  std::filesystem::path this_file_path(__FILE__);
-  auto quartz_root_path =
-      this_file_path.parent_path().parent_path().parent_path().parent_path();
-
   auto empty_dag = std::make_unique<CircuitSeq>(num_qubits);
   empty_dag->hash(ctx_);  // generate other hash values
   std::vector<CircuitSeq *> dags_to_search(1, empty_dag.get());
@@ -61,7 +57,7 @@ bool Generator::generate(
       if (num_gates == max_num_quantum_gates) {
         break;
       }
-      bool ret = dataset->save_json(ctx_, quartz_root_path.string() +
+      bool ret = dataset->save_json(ctx_, kQuartzRootPath.string() +
                                               "/tmp_before_verify.json");
       assert(ret);
 
@@ -70,10 +66,10 @@ bool Generator::generate(
         start = std::chrono::steady_clock::now();
       }
       std::string command_string =
-          std::string("python ") + quartz_root_path.string() +
+          std::string("python ") + kQuartzRootPath.string() +
           "/src/python/verifier/verify_equivalences.py " +
-          quartz_root_path.string() + "/tmp_before_verify.json " +
-          quartz_root_path.string() + "/tmp_after_verify.json";
+          kQuartzRootPath.string() + "/tmp_before_verify.json " +
+          kQuartzRootPath.string() + "/tmp_after_verify.json";
       system(command_string.c_str());
       if (record_verification_time) {
         auto end = std::chrono::steady_clock::now();
@@ -82,7 +78,7 @@ bool Generator::generate(
 
       dags_to_search.clear();
       ret = equiv_set->load_json(
-          ctx_, quartz_root_path.string() + "/tmp_after_verify.json",
+          ctx_, kQuartzRootPath.string() + "/tmp_after_verify.json",
           /*from_verifier=*/true, &dags_to_search);
       assert(ret);
       for (auto &dag : dags_to_search) {

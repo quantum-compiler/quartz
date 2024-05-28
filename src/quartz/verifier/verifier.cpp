@@ -1,5 +1,6 @@
 #include "verifier.h"
 
+#include "quartz/dataset/dataset.h"
 #include "quartz/utils/utils.h"
 
 #include <algorithm>
@@ -37,7 +38,7 @@ bool Verifier::verify_transformation_steps(Context *ctx,
     }
   }
   if (verbose) {
-    std::cout << step_count - 1 << " transformations verified." << std::endl;
+    std::cout << step_count << " transformations verified." << std::endl;
   }
   return true;
 }
@@ -45,6 +46,9 @@ bool Verifier::verify_transformation_steps(Context *ctx,
 bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
                           const CircuitSeq *circuit2, bool verbose) {
   if (circuit1->get_num_qubits() != circuit2->get_num_qubits()) {
+    if (verbose) {
+      std::cout << "Not equivalent: different numbers of qubits." << std::endl;
+    }
     return false;
   }
   const int num_qubits = circuit1->get_num_qubits();
@@ -127,6 +131,9 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
 
   if (leftover_gates_start1.empty() && leftover_gates_start2.empty()) {
     // The two circuits are equivalent.
+    if (verbose) {
+      std::cout << "Equivalent: same circuit." << std::endl;
+    }
     return true;
   }
 
@@ -191,8 +198,41 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
     std::cout << c1->to_string(/*line_number=*/true) << std::endl;
     std::cout << c2->to_string(/*line_number=*/true) << std::endl;
   }
-  // TODO
-  return true;
+
+  Dataset dataset;
+  bool ret = dataset.insert(ctx, std::move(c1));
+  assert(ret);
+  ret = dataset.insert_to_nearby_set_if_exists(ctx, std::move(c2));
+  if (ret) {
+    // no nearby set
+    if (verbose) {
+      std::cout << "Not equivalent: different hash values." << std::endl;
+    }
+    return false;  // hash value not equal or adjacent
+  }
+  ret = dataset.save_json(ctx,
+                          kQuartzRootPath.string() + "/tmp_before_verify.json");
+  assert(ret);
+  std::string command_string =
+      std::string("python ") + kQuartzRootPath.string() +
+      "/src/python/verifier/verify_equivalences.py " +
+      kQuartzRootPath.string() + "/tmp_before_verify.json " +
+      kQuartzRootPath.string() + "/tmp_after_verify.json";
+  system(command_string.c_str());
+  EquivalenceSet equiv_set;
+  ret = equiv_set.load_json(ctx,
+                            kQuartzRootPath.string() + "/tmp_after_verify.json",
+                            /*from_verifier=*/true, nullptr);
+  assert(ret);
+  if (equiv_set.num_equivalence_classes() == 1) {
+    return true;  // equivalent
+  } else {
+    if (verbose) {
+      std::cout << "Not equivalent: Z3 cannot prove they are equivalent."
+                << std::endl;
+    }
+    return false;  // not equivalent
+  }
 }
 
 bool Verifier::equivalent_on_the_fly(Context *ctx, CircuitSeq *circuit1,

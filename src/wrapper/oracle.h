@@ -29,7 +29,7 @@ class SuperContext {
       gates = {
           GateType::input_qubit, GateType::input_param, GateType::cx,
           GateType::h,           GateType::rz,          GateType::x,
-          GateType::add,         GateType::b1,          GateType::b2,
+          GateType::add,         GateType::b2,
       };
     } else {
       std::cerr << "Invalid gate set." << std::endl;

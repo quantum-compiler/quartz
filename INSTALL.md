@@ -6,10 +6,17 @@ Quartz can be built from source code using the following instructions.
 
 ### Prerequisites
 
-* `apt install build-essential` (not required for Windows)
-* CMAKE 3.16 or higher: `apt install cmake` or https://cmake.org/download/
-* conda: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
+* `apt install build-essential` (Linux/Unix)
+* CMAKE 3.16 or higher: `apt install cmake` (Linux/Unix) or `brew install cmake` (MacOS) or https://cmake.org/download/ (Windows)
+* conda:
+  * MacOS: 
+  ```
+  brew install anaconda
+  /opt/homebrew/anaconda3/bin/conda init zsh  # Please use your shell name and the directory you installed Anaconda
+  ```
+  * Other OS: Follow the instructions on https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
 * Cython 3.0 or higher (We will install it with Python later by `conda`)
+* OpenMP (We will install it later by `conda` or Homebrew)
 
 #### Additional Prerequisites for Windows:
 
@@ -28,6 +35,7 @@ cd quartz
 ```shell
 conda env create --name quartz --file env.yml
 conda activate quartz
+conda install openmp  # on MacOS, please run "brew install libomp" instead
 ```
 
 3. Build the Quartz runtime library (optional with CLion, see [below](INSTALL.md#clion-integration-optional)). This step differs a little bit between Windows and other OS.

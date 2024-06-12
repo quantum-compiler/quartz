@@ -4,6 +4,7 @@ project(Quartz)
 SET(CMAKE_BUILD_TYPE "Release")
 
 # python
+set(Python_FIND_VIRTUALENV FIRST)
 if (MSVC)
     # Could not find the "Development" component on Windows. Using the following commands
     # to get Python_INCLUDE_DIRS and Python_LIBRARY_DIRS.
@@ -97,7 +98,7 @@ add_library(quartz_runtime SHARED ${QUARTZ_SRCS})
 
 target_compile_features(quartz_runtime PUBLIC cxx_std_17)
 
-target_link_libraries(quartz_runtime ${QUARTZ_LINK_LIBS})
+target_link_libraries(quartz_runtime PUBLIC ${QUARTZ_LINK_LIBS})
 
 target_include_directories(quartz_runtime
         PUBLIC ${PROJECT_SOURCE_DIR}/src)
@@ -109,7 +110,7 @@ if (NOT_LINUX)
         message("build on macOS, link openmp lib with compiler clang")
         include_directories(/usr/local/include)
         SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
-        find_library(OPENMP_LIB libomp.dylib /usr/local/lib)
+        find_library(OPENMP_LIB libomp.dylib PATHS /usr/local/lib /usr/local/opt/libomp/lib /opt/homebrew/opt/libomp/lib)
         target_link_libraries(quartz_runtime LINK_PUBLIC ${OPENMP_LIB})
     endif()
 else()

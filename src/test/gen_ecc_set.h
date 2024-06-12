@@ -15,10 +15,6 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
                  bool generate_representative_set, int num_qubits,
                  int num_input_parameters, int max_num_quantum_gates) {
-  std::filesystem::path this_file_path(__FILE__);
-  auto quartz_root_path =
-      this_file_path.parent_path().parent_path().parent_path();
-
   ParamInfo param_info(/*num_input_symbolic_params=*/num_input_parameters);
   Context ctx(supported_gates, num_qubits, &param_info);
   Generator gen(&ctx);
@@ -58,7 +54,7 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
     dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
 
     auto start2 = std::chrono::steady_clock::now();
-    system(("python " + quartz_root_path.string() +
+    system(("python " + kQuartzRootPath.string() +
             "/src/python/verifier/verify_equivalences.py " + file_prefix +
             "pruning_unverified.json " + file_prefix + "pruning.json")
                .c_str());

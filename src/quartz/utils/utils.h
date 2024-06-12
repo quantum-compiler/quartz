@@ -1,6 +1,8 @@
 #pragma once
 
 #include <complex>
+#include <filesystem>
+
 using ParamType = double;
 #ifdef USE_ARBLIB
 #include "arb_complex.h"
@@ -34,6 +36,13 @@ constexpr int kCheckPhaseShiftOfPiOver4Index = 10000;  // not used now
 constexpr bool kUseRowRepresentationToCompare = false;
 
 constexpr int kDefaultQASMParamPrecision = 15;
+
+const std::filesystem::path kQuartzRootPath =
+    std::filesystem::canonical(__FILE__)
+        .parent_path()
+        .parent_path()
+        .parent_path()
+        .parent_path();
 
 struct PairHash {
  public:

@@ -3,6 +3,8 @@
 #include "quartz/context/context.h"
 #include "quartz/generator/generator.h"
 
+#include <filesystem>
+
 namespace quartz {
 void gen_ecc_set(const std::vector<GateType> &supported_gates,
                  const std::string &file_prefix, bool unique_parameters,
@@ -52,7 +54,8 @@ void gen_ecc_set(const std::vector<GateType> &supported_gates,
     dataset1.save_json(&ctx, file_prefix + "pruning_unverified.json");
 
     auto start2 = std::chrono::steady_clock::now();
-    system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
+    system(("python " + kQuartzRootPath.string() +
+            "/src/python/verifier/verify_equivalences.py " + file_prefix +
             "pruning_unverified.json " + file_prefix + "pruning.json")
                .c_str());
     auto end2 = std::chrono::steady_clock::now();

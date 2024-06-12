@@ -1623,7 +1623,8 @@ Graph::greedy_optimize_with_xfer(const std::vector<GraphXfer *> &xfers,
 std::shared_ptr<Graph>
 Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
                        bool print_message,
-                       std::function<float(Graph *)> cost_function) {
+                       std::function<float(Graph *)> cost_function,
+                       const std::string &store_all_steps_file_prefix) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1672,6 +1673,11 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
   bool optimized_in_this_iteration;
   std::vector<Op> all_nodes;
   optimized_graph->topology_order_ops(all_nodes);
+  int step_count = 0;
+  if (!store_all_steps_file_prefix.empty()) {
+    to_qasm(store_all_steps_file_prefix + "0.qasm", /*print_result=*/false,
+            /*print_guid=*/false);
+  }
   do {
     optimized_in_this_iteration = false;
     for (auto xfer : xfers) {
@@ -1688,6 +1694,13 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
             optimized_graph->topology_order_ops(all_nodes);
             optimized_this_xfer = true;
             optimized_in_this_iteration = true;
+            if (!store_all_steps_file_prefix.empty()) {
+              step_count++;
+              optimized_graph->to_qasm(store_all_steps_file_prefix +
+                                           std::to_string(step_count) + ".qasm",
+                                       /*print_result=*/false,
+                                       /*print_guid=*/false);
+            }
             // Since |all_nodes| has changed, we cannot continue this loop.
             break;
           }
@@ -1701,6 +1714,14 @@ Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
   if (print_message) {
     std::cout << "greedy_optimize(): cost optimized from " << original_cost
               << " to " << optimized_cost << std::endl;
+  }
+
+  if (!store_all_steps_file_prefix.empty()) {
+    // Store the number of steps.
+    std::ofstream fout(store_all_steps_file_prefix + ".txt");
+    assert(fout.is_open());
+    fout << step_count << std::endl;
+    fout.close();
   }
 
   return optimized_graph;
@@ -1966,7 +1987,8 @@ std::shared_ptr<Graph>
 Graph::optimize(Context *ctx, const std::string &equiv_file_name,
                 const std::string &circuit_name, bool print_message,
                 std::function<float(Graph *)> cost_function,
-                double cost_upper_bound, double timeout) {
+                double cost_upper_bound, double timeout,
+                const std::string &store_all_steps_file_prefix) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -2012,24 +2034,22 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
   if (cost_upper_bound == -1) {
     cost_upper_bound = total_cost() * 1.05;
   }
-  auto log_file_name =
-      equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
-      circuit_name + ".log";
   auto preprocessed_graph =
-      greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
-  //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
-  //   circuit_name,
-  //                                       log_file_name, print_message,
-  //                                       cost_function, timeout);
-  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name, "",
-                                      print_message, cost_function, timeout);
+      greedy_optimize(ctx, equiv_file_name, print_message, cost_function,
+                      store_all_steps_file_prefix);
+  return preprocessed_graph->optimize(
+      xfers, cost_upper_bound, circuit_name, /*log_file_name=*/"",
+      print_message, cost_function, timeout, store_all_steps_file_prefix,
+      /*continue_storing_all_steps=*/true);
 }
 
 std::shared_ptr<Graph>
 Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                 const std::string &circuit_name,
                 const std::string &log_file_name, bool print_message,
-                std::function<float(Graph *)> cost_function, double timeout) {
+                std::function<float(Graph *)> cost_function, double timeout,
+                const std::string &store_all_steps_file_prefix,
+                bool continue_storing_all_steps) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -2050,8 +2070,24 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   if (print_message) {
     if (!log_file_name.empty()) {
       fout = fopen(log_file_name.c_str(), "w");
+      assert(fout);
     } else {
       fout = stdout;
+    }
+  }
+
+  // Information necessary to store each step
+  std::unordered_map<Graph *, std::shared_ptr<Graph>> previous_graph;
+  int step_count = 0;
+  if (!store_all_steps_file_prefix.empty()) {
+    if (continue_storing_all_steps) {
+      std::ifstream fin(store_all_steps_file_prefix + ".txt");
+      assert(fin.is_open());
+      fin >> step_count;
+      fin.close();
+    } else {
+      to_qasm(store_all_steps_file_prefix + "0.qasm", /*print_result=*/false,
+              /*print_guid=*/false);
     }
   }
 
@@ -2074,6 +2110,11 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
       cost_count[cost_function(candidate.get())]++;
       if (new_candidates.size() < kShrinkToNumCandidates) {
         new_candidates.push(candidate);
+      } else {
+        if (!store_all_steps_file_prefix.empty()) {
+          // no need to record history of removed graphs
+          previous_graph.erase(candidate.get());
+        }
       }
       candidates.pop();
     }
@@ -2095,6 +2136,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     }
   };
 
+  bool hit_timeout = false;
   while (!candidates.empty()) {
     auto graph = candidates.top();
     candidates.pop();
@@ -2111,7 +2153,10 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          return best_graph;
+          std::cout << "Timeout. Program terminated. Best cost is " << best_cost
+                    << std::endl;
+          hit_timeout = true;
+          break;
         }
         if (new_graph == nullptr)
           continue;
@@ -2120,33 +2165,66 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
         auto new_cost = cost_function(new_graph.get());
         if (new_cost > cost_upper_bound)
           continue;
-        if (hashmap.find(new_hash) == hashmap.end()) {
-          hashmap.insert(new_hash);
-          candidates.push(new_graph);
-          if (candidates.size() > kMaxNumCandidates) {
-            shrink_candidates();
-          }
-          if (new_cost < best_cost) {
-            best_cost = new_cost;
-            best_graph = new_graph;
-          }
-        } else
+        if (hashmap.find(new_hash) != hashmap.end()) {
           continue;
+        }
+        hashmap.insert(new_hash);
+        candidates.push(new_graph);
+        if (!store_all_steps_file_prefix.empty()) {
+          // record history
+          previous_graph[new_graph.get()] = graph;
+        }
+        if (candidates.size() > kMaxNumCandidates) {
+          shrink_candidates();
+        }
+        if (new_cost < best_cost) {
+          best_cost = new_cost;
+          best_graph = new_graph;
+        }
       }
+      if (hit_timeout) {
+        break;
+      }
+    }
+    if (hit_timeout) {
+      break;
     }
 
     auto end = std::chrono::steady_clock::now();
     if (print_message) {
-      fprintf(fout,
-              "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f seconds.\n",
-              circuit_name.c_str(), best_cost, candidates.size(),
-              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                      .count() /
-                  1000.0);
+      fprintf(
+          fout,
+          "[%s] Best cost: %f\tcandidate number: %zu\tafter %.3f seconds.\n",
+          circuit_name.c_str(), best_cost, candidates.size(),
+          (double)std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                        start)
+                  .count() /
+              1000.0);
       fflush(fout);
     }
   }
+
+  if (!store_all_steps_file_prefix.empty()) {
+    std::vector<Graph *> steps(1, best_graph.get());
+    while (previous_graph.count(steps.back()) > 0) {
+      // there is a previous graph
+      steps.push_back(previous_graph[steps.back()].get());
+    }
+    // no need to save the initial graph again
+    for (int i = (int)steps.size() - 2; i >= 0; i--) {
+      step_count++;
+      steps[i]->to_qasm(store_all_steps_file_prefix +
+                            std::to_string(step_count) + ".qasm",
+                        /*print_result=*/false,
+                        /*print_guid=*/false);
+    }
+
+    // Store the number of steps.
+    std::ofstream fout_step(store_all_steps_file_prefix + ".txt");
+    fout_step << step_count << std::endl;
+    fout_step.close();
+  }
+
   return best_graph;
 }
 

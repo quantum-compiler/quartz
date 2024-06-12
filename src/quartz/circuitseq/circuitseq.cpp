@@ -9,6 +9,7 @@
 #include <cassert>
 #include <charconv>
 #include <fstream>
+#include <optional>
 #include <queue>
 #include <unordered_set>
 #include <utility>
@@ -52,37 +53,64 @@ bool CircuitSeq::fully_equivalent(const CircuitSeq &other) const {
   }
   std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
   for (int i = 0; i < (int)wires.size(); i++) {
-    wires_mapping[other.wires[i].get()] = wires[i].get();
+    wires_mapping[wires[i].get()] = other.wires[i].get();
   }
   for (int i = 0; i < (int)gates.size(); i++) {
-    if (gates[i]->gate->tp != other.gates[i]->gate->tp) {
+    if (!CircuitGate::equivalent(gates[i].get(), other.gates[i].get(),
+                                 wires_mapping,
+                                 /*update_mapping=*/false, nullptr)) {
       return false;
-    }
-    if (gates[i]->input_wires.size() != other.gates[i]->input_wires.size() ||
-        gates[i]->output_wires.size() != other.gates[i]->output_wires.size()) {
-      return false;
-    }
-    for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
-      if (other.gates[i]->input_wires[j]->is_qubit()) {
-        if (wires_mapping[other.gates[i]->input_wires[j]] !=
-            gates[i]->input_wires[j]) {
-          return false;
-        }
-      } else {
-        // parameters should not be mapped
-        if (other.gates[i]->input_wires[j] != gates[i]->input_wires[j]) {
-          return false;
-        }
-      }
-    }
-    for (int j = 0; j < (int)gates[i]->output_wires.size(); j++) {
-      if (wires_mapping[other.gates[i]->output_wires[j]] !=
-          gates[i]->output_wires[j]) {
-        return false;
-      }
     }
   }
   return true;
+}
+
+bool CircuitSeq::topologically_equivalent(const CircuitSeq &other) const {
+  if (this == &other) {
+    return true;
+  }
+  if (num_qubits != other.num_qubits) {
+    return false;
+  }
+  if (wires.size() != other.wires.size() ||
+      gates.size() != other.gates.size()) {
+    return false;
+  }
+  // Mapping from this circuit to the other circuit
+  std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
+  std::queue<CircuitWire *> wires_to_search;
+  std::unordered_map<CircuitGate *, int> gate_remaining_in_degree;
+  for (int i = 0; i < num_qubits; i++) {
+    wires_mapping[wires[i].get()] = other.wires[i].get();
+    wires_to_search.push(wires[i].get());
+  }
+  // Topological sort on this circuit
+  while (!wires_to_search.empty()) {
+    auto this_wire = wires_to_search.front();
+    auto other_wire = wires_mapping[this_wire];
+    assert(other_wire);
+    wires_to_search.pop();
+    if (this_wire->output_gates.size() != other_wire->output_gates.size()) {
+      return false;
+    }
+    for (int i = 0; i < (int)this_wire->output_gates.size(); i++) {
+      auto this_gate = this_wire->output_gates[i];
+      if (gate_remaining_in_degree.count(this_gate) == 0) {
+        // A new gate
+        gate_remaining_in_degree[this_gate] = this_gate->gate->get_num_qubits();
+      }
+      if (!--gate_remaining_in_degree[this_gate]) {
+        // Check if this gate is the same as the other gate
+        auto other_gate = other_wire->output_gates[i];
+        if (!CircuitGate::equivalent(this_gate, other_gate, wires_mapping,
+                                     /*update_mapping=*/true,
+                                     &wires_to_search)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;  // equivalent
 }
 
 bool CircuitSeq::fully_equivalent(Context *ctx, CircuitSeq &other) {
@@ -102,33 +130,106 @@ bool CircuitSeq::less_than(const CircuitSeq &other) const {
   if (get_num_gates() != other.get_num_gates()) {
     return get_num_gates() < other.get_num_gates();
   }
-  for (int i = 0; i < (int)gates.size(); i++) {
-    if (gates[i]->gate->tp != other.gates[i]->gate->tp) {
-      return gates[i]->gate->tp < other.gates[i]->gate->tp;
+  if (kUseRowRepresentationToCompare) {
+    for (int i = 0; i < num_qubits; i++) {
+      // Compare all gates on qubit i.
+      auto this_ptr = wires[i].get();
+      auto other_ptr = other.wires[i].get();
+      std::optional<bool> compare_outcome = std::nullopt;
+      while (this_ptr != outputs[i]) {
+        if (other_ptr == other.outputs[i]) {
+          // This circuit sequence has more gates on qubit i,
+          // so this circuit is greater.
+          return false;
+        }
+        assert(this_ptr->output_gates.size() == 1);
+        assert(other_ptr->output_gates.size() == 1);
+        auto this_gate = this_ptr->output_gates[0];
+        auto other_gate = other_ptr->output_gates[0];
+        if (!compare_outcome.has_value()) {
+          if (this_gate->gate->tp != other_gate->gate->tp) {
+            compare_outcome = this_gate->gate->tp < other_gate->gate->tp;
+          } else {
+            assert(this_gate->input_wires.size() ==
+                   other_gate->input_wires.size());
+            assert(this_gate->output_wires.size() ==
+                   other_gate->output_wires.size());
+            for (int j = 0; j < (int)this_gate->input_wires.size(); j++) {
+              if (this_gate->input_wires[j]->is_qubit() !=
+                  other_gate->input_wires[j]->is_qubit()) {
+                compare_outcome = this_gate->input_wires[j]->is_qubit();
+                break;
+              }
+              if (this_gate->input_wires[j]->index !=
+                  other_gate->input_wires[j]->index) {
+                compare_outcome = this_gate->input_wires[j]->index <
+                                  other_gate->input_wires[j]->index;
+                break;
+              }
+            }
+          }
+        }
+        // No need to compare output wires for quantum gates.
+        bool found_output_wire = false;
+        for (auto &output_wire : this_gate->output_wires) {
+          if (output_wire->index == i) {
+            found_output_wire = true;
+            this_ptr = output_wire;
+            break;
+          }
+        }
+        assert(found_output_wire);
+        found_output_wire = false;
+        for (auto &output_wire : other_gate->output_wires) {
+          if (output_wire->index == i) {
+            found_output_wire = true;
+            other_ptr = output_wire;
+            break;
+          }
+        }
+        assert(found_output_wire);
+      }
+      if (other_ptr != other.outputs[i]) {
+        // The other circuit sequence has more gates on qubit i,
+        // so this circuit is less.
+        return true;
+      }
+      // Two circuit sequences have the same number of gates on qubit i.
+      // Compare the contents.
+      if (compare_outcome.has_value()) {
+        return compare_outcome.value();
+      }
     }
-    assert(gates[i]->input_wires.size() == other.gates[i]->input_wires.size());
-    assert(gates[i]->output_wires.size() ==
-           other.gates[i]->output_wires.size());
-    for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
-      if (gates[i]->input_wires[j]->is_qubit() !=
-          other.gates[i]->input_wires[j]->is_qubit()) {
-        return gates[i]->input_wires[j]->is_qubit();
+  } else {
+    for (int i = 0; i < (int)gates.size(); i++) {
+      if (gates[i]->gate->tp != other.gates[i]->gate->tp) {
+        return gates[i]->gate->tp < other.gates[i]->gate->tp;
       }
-      if (gates[i]->input_wires[j]->index !=
-          other.gates[i]->input_wires[j]->index) {
-        return gates[i]->input_wires[j]->index <
-               other.gates[i]->input_wires[j]->index;
+      assert(gates[i]->input_wires.size() ==
+             other.gates[i]->input_wires.size());
+      assert(gates[i]->output_wires.size() ==
+             other.gates[i]->output_wires.size());
+      for (int j = 0; j < (int)gates[i]->input_wires.size(); j++) {
+        if (gates[i]->input_wires[j]->is_qubit() !=
+            other.gates[i]->input_wires[j]->is_qubit()) {
+          return gates[i]->input_wires[j]->is_qubit();
+        }
+        if (gates[i]->input_wires[j]->index !=
+            other.gates[i]->input_wires[j]->index) {
+          return gates[i]->input_wires[j]->index <
+                 other.gates[i]->input_wires[j]->index;
+        }
       }
-    }
-    for (int j = 0; j < (int)gates[i]->output_wires.size(); j++) {
-      if (gates[i]->output_wires[j]->is_qubit() !=
-          other.gates[i]->output_wires[j]->is_qubit()) {
-        return gates[i]->output_wires[j]->is_qubit();
-      }
-      if (gates[i]->output_wires[j]->index !=
-          other.gates[i]->output_wires[j]->index) {
-        return gates[i]->output_wires[j]->index <
-               other.gates[i]->output_wires[j]->index;
+      for (int j = 0; j < (int)gates[i]->output_wires.size(); j++) {
+        if (gates[i]->output_wires[j]->is_qubit() !=
+            other.gates[i]->output_wires[j]->is_qubit()) {
+          return gates[i]->output_wires[j]->is_qubit();
+        }
+        if (gates[i]->output_wires[j]->index !=
+            other.gates[i]->output_wires[j]->index) {
+          return gates[i]->output_wires[j]->index <
+                 other.gates[i]->output_wires[j]->index;
+        }
       }
     }
   }
@@ -308,6 +409,20 @@ bool CircuitSeq::remove_last_gate() {
   return true;
 }
 
+bool CircuitSeq::remove_gate(int gate_position) {
+  if (gate_position < 0 || gate_position >= (int)gates.size()) {
+    return false;
+  }
+  CircuitGate *circuit_gate = gates[gate_position].get();
+  auto *gate = circuit_gate->gate;
+  assert(gate->is_quantum_gate());
+  remove_quantum_gate_from_graph(circuit_gate);
+  // Remove the gate.
+  gates.erase(gates.begin() + gate_position);
+  hash_value_valid_ = false;
+  return true;
+}
+
 bool CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
   auto gate_pos = std::find_if(
       gates.begin(), gates.end(),
@@ -322,6 +437,16 @@ bool CircuitSeq::remove_gate(CircuitGate *circuit_gate) {
   gates.erase(gate_pos);
   hash_value_valid_ = false;
   return true;
+}
+
+bool CircuitSeq::remove_gate_near_end(CircuitGate *circuit_gate) {
+  auto gate_pos = std::find_if(
+      gates.rbegin(), gates.rend(),
+      [&](std::unique_ptr<CircuitGate> &p) { return p.get() == circuit_gate; });
+  if (gate_pos == gates.rend()) {
+    return false;
+  }
+  return remove_gate((int)(gates.rend() - gate_pos) - 1);
 }
 
 bool CircuitSeq::remove_first_quantum_gate() {
@@ -1147,6 +1272,35 @@ CircuitSeq::get_permuted_seq(const std::vector<int> &qubit_permutation,
   return result;
 }
 
+std::unique_ptr<CircuitSeq>
+CircuitSeq::get_suffix_seq(const std::unordered_set<CircuitGate *> &start_gates,
+                           Context *ctx) const {
+  // For topological sort
+  std::unordered_map<CircuitGate *, int> gate_remaining_in_degree;
+  for (auto &gate : start_gates) {
+    gate_remaining_in_degree[gate] = 0;  // ready to include
+  }
+  auto result = std::make_unique<CircuitSeq>(get_num_qubits());
+  // The result should be a subsequence of this circuit
+  for (auto &gate : gates) {
+    if (gate_remaining_in_degree.count(gate.get()) > 0 &&
+        gate_remaining_in_degree[gate.get()] <= 0) {
+      result->add_gate(gate.get(), ctx);
+      for (auto &output_wire : gate->output_wires) {
+        for (auto &output_gate : output_wire->output_gates) {
+          // For topological sort
+          if (gate_remaining_in_degree.count(output_gate) == 0) {
+            gate_remaining_in_degree[output_gate] =
+                output_gate->gate->get_num_qubits();
+          }
+          gate_remaining_in_degree[output_gate]--;
+        }
+      }
+    }
+  }
+  return result;
+}
+
 void CircuitSeq::clone_from(const CircuitSeq &other,
                             const std::vector<int> &qubit_permutation,
                             const std::vector<int> &param_permutation,
@@ -1410,20 +1564,44 @@ std::vector<CircuitGate *> CircuitSeq::first_quantum_gates() const {
   return result;
 }
 
+std::vector<int> CircuitSeq::first_quantum_gate_positions() const {
+  std::vector<int> result;
+  std::unordered_set<CircuitGate *> depend_on_other_gates;
+  depend_on_other_gates.reserve(gates.size());
+  for (int i = 0; i < (int)gates.size(); i++) {
+    CircuitGate *circuit_gate = gates[i].get();
+    if (circuit_gate->gate->is_parameter_gate()) {
+      continue;
+    }
+    if (depend_on_other_gates.find(circuit_gate) ==
+        depend_on_other_gates.end()) {
+      result.push_back(i);
+    }
+    for (const auto &output_wire : circuit_gate->output_wires) {
+      for (const auto &output_gate : output_wire->output_gates) {
+        depend_on_other_gates.insert(output_gate);
+      }
+    }
+  }
+  return result;
+}
+
+bool CircuitSeq::is_one_of_last_gates(CircuitGate *circuit_gate) const {
+  for (const auto &output_wire : circuit_gate->output_wires) {
+    if (outputs[output_wire->index] != output_wire) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::vector<CircuitGate *> CircuitSeq::last_quantum_gates() const {
   std::vector<CircuitGate *> result;
   for (const auto &circuit_gate : gates) {
     if (circuit_gate->gate->is_parameter_gate()) {
       continue;
     }
-    bool all_output = true;
-    for (const auto &output_wire : circuit_gate->output_wires) {
-      if (outputs[output_wire->index] != output_wire) {
-        all_output = false;
-        break;
-      }
-    }
-    if (all_output) {
+    if (is_one_of_last_gates(circuit_gate.get())) {
       result.push_back(circuit_gate.get());
     }
   }

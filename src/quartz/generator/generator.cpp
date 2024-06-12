@@ -1,6 +1,7 @@
 #include "generator.h"
 
 #include <cassert>
+#include <filesystem>
 
 namespace quartz {
 
@@ -56,24 +57,29 @@ bool Generator::generate(
       if (num_gates == max_num_quantum_gates) {
         break;
       }
-      bool ret = dataset->save_json(ctx_, "tmp_before_verify.json");
+      bool ret = dataset->save_json(ctx_, kQuartzRootPath.string() +
+                                              "/tmp_before_verify.json");
       assert(ret);
 
       decltype(std::chrono::steady_clock::now()) start;
       if (record_verification_time) {
         start = std::chrono::steady_clock::now();
       }
-      // Assume working directory is cmake-build-debug/ here.
-      system("python src/python/verifier/verify_equivalences.py "
-             "tmp_before_verify.json tmp_after_verify.json");
+      std::string command_string =
+          std::string("python ") + kQuartzRootPath.string() +
+          "/src/python/verifier/verify_equivalences.py " +
+          kQuartzRootPath.string() + "/tmp_before_verify.json " +
+          kQuartzRootPath.string() + "/tmp_after_verify.json";
+      system(command_string.c_str());
       if (record_verification_time) {
         auto end = std::chrono::steady_clock::now();
         *record_verification_time += end - start;
       }
 
       dags_to_search.clear();
-      ret = equiv_set->load_json(ctx_, "tmp_after_verify.json",
-                                 /*from_verifier=*/true, &dags_to_search);
+      ret = equiv_set->load_json(
+          ctx_, kQuartzRootPath.string() + "/tmp_after_verify.json",
+          /*from_verifier=*/true, &dags_to_search);
       assert(ret);
       for (auto &dag : dags_to_search) {
         auto new_dag = std::make_unique<CircuitSeq>(*dag);

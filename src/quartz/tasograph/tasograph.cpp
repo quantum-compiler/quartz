@@ -1467,12 +1467,6 @@ Graph::_from_qasm_stream(Context *ctx,
           }
           if (negative)
             p = -p;
-          while (p < 0) {
-            p += 2 * PI;
-          }
-          while (p >= 2 * PI) {
-            p -= 2 * PI;
-          }
           auto src_op = graph->add_parameter(p);
           int src_idx = 0;
           auto dst_op = op;

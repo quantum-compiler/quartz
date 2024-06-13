@@ -1,6 +1,7 @@
 #pragma once
 
 #include "add.h"
+#include "b2.h"
 #include "ccx.h"
 #include "ccz.h"
 #include "ch.h"

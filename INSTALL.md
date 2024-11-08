@@ -36,7 +36,7 @@ cd quartz
 2. Set up the environment (including Python, Cython, OpenMP) by conda.
 
 ```shell
-conda env create --name quartz --file env.yml
+conda env create --name quartz --file env.yml  # on MacOS with Apple Silicon, please prepend "CONDA_SUBDIR=osx-arm64" to the beginning of this command if you installed Anaconda with a default x86_64 target architecture
 conda activate quartz
 conda install openmp  # on MacOS, please run "brew install libomp" instead
 ```
@@ -50,11 +50,11 @@ conda install openmp  # on MacOS, please run "brew install libomp" instead
 mkdir build
 cd build
 cmake .. # see notes below
-make install
+make install  # on MacOS, if you updated your system recently and find that the C++ standard libraries are missing, please consider re-installing your development tools
 ```
 
 Note that line 3 in the example will have the runtime library and include files installed into the default
-path `/usr/local/`. To modify the install path, you can set the path explicitly in line 3, for example:
+path `/usr/local/`. To modify the installation path, you can set the path explicitly in line 3, for example:
 
 ```shell
 cmake -D CMAKE_INSTALL_PREFIX:PATH=~/opt/ ..
@@ -129,7 +129,7 @@ to `~/.bashrc`.
 
 ### CLion Settings
 
-- Settings -> Build, Execution, Deployment -> Toolchains -> add "Visual Studio"
+- (Windows) Settings -> Build, Execution, Deployment -> Toolchains -> add "Visual Studio"
     - Toolset: select the folder where Visual Studio is installed.
     - Architecture: select `amd64`.
     - (Windows) Add environment -> From file -> Environment file: `(path\to\quartz)\scripts\setup_environment.bat`
@@ -142,6 +142,9 @@ to `~/.bashrc`.
 
 - `test_optimize | Debug-Visual Studio` -> Edit Configurations... -> Working Directory -> fill in `(path\to\quartz)`
 - Click "Run 'test_optimize'" (Shift + F10)
+
+### Troubleshooting
+- If the Python modules you have installed in the quartz conda environment are missing, please consider replacing all instances of `"python "` in the code with the Python executable path in the quartz conda environment.
 
 ## Visual Studio Integration (Optional) (only for Windows)
 

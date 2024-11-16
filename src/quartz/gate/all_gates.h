@@ -13,6 +13,7 @@
 #include "h.h"
 #include "input_param.h"
 #include "input_qubit.h"
+#include "mult.h"
 #include "neg.h"
 #include "p.h"
 #include "pdg.h"

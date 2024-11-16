@@ -19,6 +19,51 @@ def neg(a):
     return cos_a, -sin_a
 
 
+def mult(x, y):
+    # In this special case, both the lhs and the rhs are numbers.
+    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+        return x * y
+
+    # To apply trigonmetric angle formulas, one side must be a number.
+    # Without loss of generality, the left-hand side will be a number.
+    assert isinstance(x, (int, float)) or isinstance(y, (int, float))
+    if isinstance(y, (int, float)):
+        x, y = y, x
+
+    # The only angle formulas expressible in NLRA are integer multiples of angles.
+    # This ensures that the left-hand side is in fact an integer.
+    if isinstance(x, float):
+        assert x.is_integer()
+        x = int(x)
+
+    # Moves negative signs from the left-hand side to the right-hand side.
+    if x < 0:
+        x = -x
+        y = neg(y)
+
+    # Base Cases.
+    if x == 0:
+        return 1, 0
+    elif x == 1:
+        return y
+    # Triple-angle formula.
+    elif x % 3 == 0:
+        cos_y, sin_y = mult(x // 3, y)
+        cos_z = 4 * cos_y * cos_y * cos_y - 3 * cos_y
+        sin_z = 3 * sin_y - 4 * sin_y * sin_y * sin_y
+        return cos_z, sin_z
+    # Double-angle formula.
+    elif x % 2 == 0:
+        cos_y, sin_y = mult(x // 2, y)
+        cos_z = cos_y * cos_y - sin_y * sin_y
+        sin_z = 2 * cos_y * sin_y
+        return cos_z, sin_z
+    # Otherwise, use the sum formula to decrease x by 1.
+    else:
+        z = mult(x - 1, y)
+        return add(y, z)
+
+
 # quantum gates
 
 

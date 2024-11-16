@@ -30,8 +30,10 @@ def mult(x, y):
     if isinstance(y, (int, float)):
         x, y = y, x
 
-    # The only angle formulas expressible in NLRA are integer multiples of angles.
-    # This ensures that the left-hand side is in fact an integer.
+    # This block ensures that the lhs is not only a number, but also an integer.
+    # This is because angle-reducing formula only exist for integer multipliers.
+    # Of course, other formulas exist, such as the half-angle formula.
+    # However, this formula is not determined (for arbitrary a) by (cos_a, sin_a) alone.
     if isinstance(x, float):
         assert x.is_integer()
         x = int(x)

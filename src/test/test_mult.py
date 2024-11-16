@@ -4,6 +4,7 @@ sys.path.append("..")
 
 from src.python.verifier.gates import *
 
+
 def approx_eq(a, b):
     assert len(a) == 2
     assert len(b) == 2
@@ -12,6 +13,7 @@ def approx_eq(a, b):
 
     err = max(abs(cos_a - cos_b), abs(sin_a - sin_b))
     return err < 0.0000000000001
+
 
 def mult_test(expected, n, a):
     actual = mult(n, a)
@@ -27,11 +29,13 @@ def test_positive(a):
         mult_test(expected, n, a)
         expected = add(a, expected)
 
+
 def test_negative(a):
     expected = neg(a)
     for n in range(-1, -41, -1):
         mult_test(expected, n, a)
         expected = add(neg(a), expected)
+
 
 def test_floats(a):
     n = 5
@@ -43,11 +47,13 @@ def test_floats(a):
     assert actual == swapped
     assert actual == expected
 
+
 def test_numbers():
     assert mult(2, 3.0) == 6.0
     assert mult(3.0, 2) == 6.0
     assert mult(3, 4) == 12
     assert mult(3.0, 0.1) == 0.3
+
 
 if __name__ == '__main__':
     v = 1 / math.sqrt(2)

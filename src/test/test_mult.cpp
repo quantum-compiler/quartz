@@ -13,7 +13,8 @@ int main() {
   auto p0 = ctx.get_new_param_id(2.0);
   auto p1 = ctx.get_new_param_id(3.0);
   auto p2 = ctx.get_new_param_id(6.0);
-  auto p3 = ctx.get_new_param_expression_id({p0, p1}, ctx.get_gate(GateType::mult));
+  auto p3 =
+      ctx.get_new_param_expression_id({p0, p1}, ctx.get_gate(GateType::mult));
 
   CircuitSeq dag1(1);
   dag1.add_gate({0}, {p2}, ctx.get_gate(GateType::rx), &ctx);

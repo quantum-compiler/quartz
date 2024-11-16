@@ -24,7 +24,7 @@ def mult(x, y):
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         return x * y
 
-    # To apply trigonmetric angle formulas, one side must be a number.
+    # To apply trigonometric angle formulas, one side must be a number.
     # Without loss of generality, the left-hand side will be a number.
     assert isinstance(x, (int, float)) or isinstance(y, (int, float))
     if isinstance(y, (int, float)):

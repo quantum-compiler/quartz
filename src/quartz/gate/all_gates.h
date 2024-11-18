@@ -17,6 +17,7 @@
 #include "neg.h"
 #include "p.h"
 #include "pdg.h"
+#include "pi.h"
 #include "rx.h"
 #include "rx1.h"
 #include "rx3.h"

@@ -2,6 +2,22 @@ import math
 
 import z3
 
+# helper methods
+
+
+def half(a):
+    # Unchecked Assertion: a is defined as (cos(x), sin(x)) for x in [0, 2pi].
+    assert len(a) == 2
+    cos_a, sin_a = a
+
+    sin_sgn = 1
+    cos_sgn = z3.If(sin_a >= 0, 1, -1)
+    
+    cos_half_a = cos_sgn * z3.Sqrt((1 + cos_a) / 2)
+    sin_half_a = sin_sgn * z3.Sqrt((1 - cos_a) / 2)
+    return cos_half_a, sin_half_a
+
+
 # parameter gates
 
 
@@ -64,6 +80,44 @@ def mult(x, y):
     else:
         z = mult(x - 1, y)
         return add(y, z)
+
+
+def pi(n):
+    # This function handles fractions of pi with integer denominators.
+    assert isinstance(n, (int, float))
+    if isinstance(n, float):
+        assert n.is_integer()
+        n = int(n)
+
+    # Negative Multiples of Pi.
+    if n < 0:
+        return neg(pi(-n))
+    # Exactly Pi.
+    if n == 1:
+        return -1, 0
+    # Half-Angle Formula.
+    elif n % 2 == 0:
+        return half(pi(n // 2))
+    # Some Fermat Prime Denominators.
+    #
+    # This extends to other Fermat primes, according to the Gauss-Wantzel theorem.
+    # However, there are conjectured to be only five Fermat primes.
+    # The remaining Fermat primes are (17, 257, 65537).
+    # The equations are horrendous, and probably not useful in practice.
+    # If necessary, they could be implemented (at least for n = 17).
+    elif n == 3:
+        cos_a = 1 / 2
+        sin_a = z3.Sqrt(3) / 2
+        return cos_a, sin_a
+    elif n == 5:
+        cos_a = (z3.Sqrt(5) + 1) / 4
+        sin_a = z3.Sqrt(2) * z3.Sqrt(5 - z3.Sqrt(5)) / 4
+        return cos_a, sin_a
+    elif n == 15:
+        return add(mult(2, pi(5)), neg(pi(3)))
+
+    # An Unhandled Case.
+    assert False
 
 
 # quantum gates

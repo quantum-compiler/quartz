@@ -23,4 +23,7 @@ int main() {
   auto c1 = dag1.to_qasm_style_string(&ctx);
   auto c2 = dag2.to_qasm_style_string(&ctx);
   assert(c1 == c2);
+
+  // Working directory is cmake-build-debug/ here.
+  system("python ../src/test/test_pi.py");
 }

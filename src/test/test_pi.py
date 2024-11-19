@@ -1,4 +1,5 @@
 import sys
+
 import z3
 
 sys.path.append("..")
@@ -13,7 +14,7 @@ def check_pi(n, cos_b, sin_b):
     ctx.add(cos_a == cos_b)
     ctx.add(sin_a == sin_b)
     assert ctx.check() == z3.sat
-    
+
 
 def test_1_1_1():
     cos_b = -1

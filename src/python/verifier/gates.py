@@ -12,7 +12,7 @@ def half(a):
 
     sin_sgn = 1
     cos_sgn = z3.If(sin_a >= 0, 1, -1)
-    
+
     cos_half_a = cos_sgn * z3.Sqrt((1 + cos_a) / 2)
     sin_half_a = sin_sgn * z3.Sqrt((1 - cos_a) / 2)
     return cos_half_a, sin_half_a

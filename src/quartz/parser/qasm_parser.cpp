@@ -66,66 +66,85 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
+int ParamParser::parse_deg(bool negative, ParamType p) {
+  if (negative) {
+    p = -p;
+  }
+
+  if (deg_parameters.count(p) == 0) {
+    int param_id = ctx_->get_new_param_id(p);
+    deg_parameters[p] = param_id;
+  }
+
+  return deg_parameters[p];
+}
+
+int ParamParser::parse_rad(bool negative, ParamType num, ParamType denom) {
+  return parse_deg(negative, num * PI / denom);
+}
+
 int ParamParser::parse(std::string &token) {
-  // Currently only support the format of
-  // pi*0.123,
-  // 0.123*pi,
-  // 0.123*pi/2,
-  // 0.123
-  // pi
-  // pi/2
-  // 0.123/(2*pi)
-  ParamType p = 0.0;
+  // Determines if angle is negative or positive.
   bool negative = token[0] == '-';
-  if (negative)
+  if (negative) {
     token = token.substr(1);
+  }
+
+  // Currently only support the format of:
+  //  pi*0.123,
+  //  0.123*pi,
+  //  0.123*pi/2,
+  //  0.123
+  //  pi
+  //  pi/2
+  //  0.123/(2*pi)
   if (token.find("pi") == 0) {
     if (token == "pi") {
-      // pi
-      p = PI;
+      // Case: pi
+      return parse_rad(negative, 1.0, 1.0);
     } else {
+      // Cases: pi*0.123 or pi/2
       auto d = token.substr(3, std::string::npos);
       if (token[2] == '*') {
-        // pi*0.123
-        p = std::stod(d) * PI;
+        // Case: pi*0.123
+        return parse_rad(negative, std::stod(d), 1.0);
       } else if (token[2] == '/') {
-        // pi/2
-        p = PI / std::stod(d);
+        // Case: pi/2
+        return parse_rad(negative, 1.0, std::stod(d));
       } else {
-        std::cerr << "Unsupported parameter format: " << token
-                  << std::endl;
+        std::cerr << "Unsupported parameter format: " << token << std::endl;
         assert(false);
       }
     }
   } else if (token.find("pi") != std::string::npos) {
     if (token.find('(') != std::string::npos) {
+      // Case: 0.123/(2*pi)
       assert(token.find('/') != std::string::npos);
-      auto left_parenthesis_pos = token.find('(');
-      // 0.123/(2*pi)
-      p = std::stod(token.substr(0, token.find('/'))) / PI;
-      p /= std::stod(
-          token.substr(left_parenthesis_pos + 1,
-                        token.find('*') - left_parenthesis_pos - 1));
+      auto lparen_pos = token.find('(');
+      auto mult_pos = token.find('*');
+
+      ParamType p = std::stod(token.substr(0, token.find('/')));
+      p /= PI;
+      p /= std::stod(token.substr(lparen_pos + 1, mult_pos - lparen_pos - 1));
+      return parse_deg(negative, p);
     } else {
-      // 0.123*pi
+      // Case: 0.123*pi or 0.123*pi/2
       auto d = token.substr(0, token.find('*'));
-      p = std::stod(d) * PI;
+      ParamType num = std::stod(d);
+      ParamType denom = 1.0;
       if (token.find('/') != std::string::npos) {
-        // 0.123*pi/2
-        p = p / std::stod(token.substr(token.find('/') + 1));
+        // Case: 0.123*pi/2
+        denom = std::stod(token.substr(token.find('/') + 1));
       }
+      return parse_rad(negative, num, denom);
     }
   } else {
-    // 0.123
-    p = std::stod(token);
+    // Case: 0.123
+    return parse_deg(negative, std::stod(token));
   }
-  if (negative)
-    p = -p;
-  if (parameters.count(p) == 0) {
-    int param_id = ctx_->get_new_param_id(p);
-    parameters[p] = param_id;
-  }
-  return parameters[p];
+
+  // This line should be unreachable.
+  assert(false);
 }
 
 }  // namespace quartz

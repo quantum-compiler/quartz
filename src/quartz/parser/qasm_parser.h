@@ -31,8 +31,11 @@ class ParamParser {
     int parse(std::string &token);
 
   private:
+    int parse_deg(bool negative, ParamType p);
+    int parse_rad(bool negative, ParamType num, ParamType denom);
+
     Context *ctx_;
-    std::unordered_map<ParamType, int> parameters;
+    std::unordered_map<ParamType, int> deg_parameters;
 };
 
 class QASMParser {

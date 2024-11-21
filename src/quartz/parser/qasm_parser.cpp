@@ -71,16 +71,46 @@ int ParamParser::parse_deg(bool negative, ParamType p) {
     p = -p;
   }
 
-  if (deg_parameters.count(p) == 0) {
+  if (deg_params_.count(p) == 0) {
     int param_id = ctx_->get_new_param_id(p);
-    deg_parameters[p] = param_id;
+    deg_params_[p] = param_id;
   }
 
-  return deg_parameters[p];
+  return deg_params_[p];
 }
 
 int ParamParser::parse_rad(bool negative, ParamType num, ParamType denom) {
-  return parse_deg(negative, num * PI / denom);
+  // If pi is not symbolic, then falls back to constants.
+  if (!symbolic_pi_) {
+    return parse_deg(negative, num * PI / denom);
+  }
+
+  // Handles negative coefficients.
+  if (negative) {
+    num = -num;
+  }
+
+  // Constructs the pi expression, if it does not already exist.
+  if (rad_params_[num].count(denom) == 0) {
+    // Creates fraction of pi.
+    int p1 = ctx_->get_new_param_id(denom);
+    int p2 = ctx_->get_new_param_expression_id({p1}, ctx_->get_gate(GateType::pi));
+
+    // Scales the fraction of pi when the numerator is not equal to 1.
+    int expr;
+    if (num != 1.0) {
+      int p3 = ctx_->get_new_param_id(denom);
+      expr = ctx_->get_new_param_expression_id({p3, p2}, ctx_->get_gate(GateType::mult));
+    } else {
+      expr = p2;
+    }
+
+    // Caches the expression for reuse.
+    rad_params_[num][denom] = expr;
+  }
+
+  // Retrieves expression.
+  return rad_params_[num][denom];
 }
 
 int ParamParser::parse(std::string &token) {

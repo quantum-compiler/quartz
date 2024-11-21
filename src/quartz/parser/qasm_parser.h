@@ -26,7 +26,7 @@ std::string strip(const std::string &input);
 
 class ParamParser {
   public:
-    ParamParser(Context *ctx) : ctx_(ctx) {}
+    ParamParser(Context *ctx, bool symbolic_pi) : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
 
     int parse(std::string &token);
 
@@ -35,12 +35,14 @@ class ParamParser {
     int parse_rad(bool negative, ParamType num, ParamType denom);
 
     Context *ctx_;
-    std::unordered_map<ParamType, int> deg_parameters;
+    std::unordered_map<ParamType, int> deg_params_;
+    std::unordered_map<ParamType, std::unordered_map<ParamType, int>> rad_params_;
+    bool symbolic_pi_;
 };
 
 class QASMParser {
  public:
-  QASMParser(Context *ctx) : ctx_(ctx) {}
+  QASMParser(Context *ctx) : ctx_(ctx), symbolic_pi_(false) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
@@ -63,8 +65,13 @@ class QASMParser {
     return res;
   }
 
+  void use_symbolic_pi(bool v) {
+    symbolic_pi_ = v;
+  }
+
  private:
   Context *ctx_;
+  bool symbolic_pi_;
 };
 
 // We cannot put this template function implementation in a .cpp file.
@@ -74,7 +81,7 @@ bool QASMParser::load_qasm_stream(
   seq = nullptr;
   std::string line;
   GateType gate_type;
-  ParamParser pparser(ctx_);
+  ParamParser pparser(ctx_, symbolic_pi_);
   // At the beginning, |index_offset| stores the mapping from qreg names to
   // their sizes. After creating the CircuitSeq object, |index_offset| stores
   // the mapping from qreg names to the qubit index offset. The qregs are

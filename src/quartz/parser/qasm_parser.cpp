@@ -66,7 +66,8 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-int ParamParser::parse_deg(bool negative, ParamType p) {
+// Handles constant parameters given as literal decimal expressions.
+int ParamParser::parse_number(bool negative, ParamType p) {
   if (negative) {
     p = -p;
   }
@@ -79,10 +80,11 @@ int ParamParser::parse_deg(bool negative, ParamType p) {
   return deg_params_[p];
 }
 
-int ParamParser::parse_rad(bool negative, ParamType num, ParamType denom) {
+// Handles constant parameters of the form: num * pi / denom.
+int ParamParser::parse_pi_expr(bool negative, ParamType num, ParamType denom) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
-    return parse_deg(negative, num * PI / denom);
+    return parse_number(negative, num * PI / denom);
   }
 
   // Handles negative coefficients.
@@ -133,16 +135,16 @@ int ParamParser::parse(std::string &token) {
   if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
-      return parse_rad(negative, 1.0, 1.0);
+      return parse_pi_expr(negative, 1.0, 1.0);
     } else {
       // Cases: pi*0.123 or pi/2
       auto d = token.substr(3, std::string::npos);
       if (token[2] == '*') {
         // Case: pi*0.123
-        return parse_rad(negative, std::stod(d), 1.0);
+        return parse_pi_expr(negative, std::stod(d), 1.0);
       } else if (token[2] == '/') {
         // Case: pi/2
-        return parse_rad(negative, 1.0, std::stod(d));
+        return parse_pi_expr(negative, 1.0, std::stod(d));
       } else {
         std::cerr << "Unsupported parameter format: " << token << std::endl;
         assert(false);
@@ -158,7 +160,7 @@ int ParamParser::parse(std::string &token) {
       ParamType p = std::stod(token.substr(0, token.find('/')));
       p /= PI;
       p /= std::stod(token.substr(lparen_pos + 1, mult_pos - lparen_pos - 1));
-      return parse_deg(negative, p);
+      return parse_number(negative, p);
     } else {
       // Case: 0.123*pi or 0.123*pi/2
       auto d = token.substr(0, token.find('*'));
@@ -168,11 +170,11 @@ int ParamParser::parse(std::string &token) {
         // Case: 0.123*pi/2
         denom = std::stod(token.substr(token.find('/') + 1));
       }
-      return parse_rad(negative, num, denom);
+      return parse_pi_expr(negative, num, denom);
     }
   } else {
     // Case: 0.123
-    return parse_deg(negative, std::stod(token));
+    return parse_number(negative, std::stod(token));
   }
 
   // This line should be unreachable.

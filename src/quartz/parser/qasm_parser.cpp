@@ -94,13 +94,15 @@ int ParamParser::parse_rad(bool negative, ParamType num, ParamType denom) {
   if (rad_params_[num].count(denom) == 0) {
     // Creates fraction of pi.
     int p1 = ctx_->get_new_param_id(denom);
-    int p2 = ctx_->get_new_param_expression_id({p1}, ctx_->get_gate(GateType::pi));
+    int p2 =
+        ctx_->get_new_param_expression_id({p1}, ctx_->get_gate(GateType::pi));
 
     // Scales the fraction of pi when the numerator is not equal to 1.
     int expr;
     if (num != 1.0) {
       int p3 = ctx_->get_new_param_id(denom);
-      expr = ctx_->get_new_param_expression_id({p3, p2}, ctx_->get_gate(GateType::mult));
+      expr = ctx_->get_new_param_expression_id({p3, p2},
+                                               ctx_->get_gate(GateType::mult));
     } else {
       expr = p2;
     }

@@ -25,19 +25,20 @@ bool is_gate_string(const std::string &token, GateType &type);
 std::string strip(const std::string &input);
 
 class ParamParser {
-  public:
-    ParamParser(Context *ctx, bool symbolic_pi) : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
+ public:
+  ParamParser(Context *ctx, bool symbolic_pi)
+      : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
 
-    int parse(std::string &token);
+  int parse(std::string &token);
 
-  private:
-    int parse_deg(bool negative, ParamType p);
-    int parse_rad(bool negative, ParamType num, ParamType denom);
+ private:
+  int parse_deg(bool negative, ParamType p);
+  int parse_rad(bool negative, ParamType num, ParamType denom);
 
-    Context *ctx_;
-    std::unordered_map<ParamType, int> deg_params_;
-    std::unordered_map<ParamType, std::unordered_map<ParamType, int>> rad_params_;
-    bool symbolic_pi_;
+  Context *ctx_;
+  std::unordered_map<ParamType, int> deg_params_;
+  std::unordered_map<ParamType, std::unordered_map<ParamType, int>> rad_params_;
+  bool symbolic_pi_;
 };
 
 class QASMParser {
@@ -65,9 +66,7 @@ class QASMParser {
     return res;
   }
 
-  void use_symbolic_pi(bool v) {
-    symbolic_pi_ = v;
-  }
+  void use_symbolic_pi(bool v) { symbolic_pi_ = v; }
 
  private:
   Context *ctx_;

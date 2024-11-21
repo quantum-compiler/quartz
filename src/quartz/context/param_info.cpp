@@ -5,8 +5,11 @@
 namespace quartz {
 
 bool is_symbolic_constant(Gate *op) {
-  if (op->tp == GateType::pi) return true;
-  else return false;
+  bool rv = false;
+  if (op->tp == GateType::pi) {
+    rv = true;
+  }
+  return rv;
 }
 
 ParamInfo::ParamInfo(int num_input_symbolic_params) {

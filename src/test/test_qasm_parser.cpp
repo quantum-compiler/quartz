@@ -17,8 +17,9 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
 
 int main() {
   ParamInfo param_info(0);
-  Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx, GateType::mult,
-               GateType::pi}, 2, &param_info);
+  Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx,
+               GateType::mult, GateType::pi},
+              2, &param_info);
 
   QASMParser parser(&ctx);
 

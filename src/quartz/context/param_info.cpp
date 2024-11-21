@@ -4,6 +4,11 @@
 
 namespace quartz {
 
+bool is_symbolic_constant(Gate *op) {
+  if (op->tp == GateType::pi) return true;
+  else return false;
+}
+
 ParamInfo::ParamInfo(int num_input_symbolic_params) {
   gen_random_parameters(num_input_symbolic_params);
   for (int i = 0; i < num_input_symbolic_params; i++) {
@@ -69,7 +74,7 @@ int ParamInfo::get_new_param_id() {
 
 int ParamInfo::get_new_param_expression_id(
     const std::vector<int> &parameter_indices, Gate *op) {
-  bool is_symbolic = false;
+  bool is_symbolic = is_symbolic_constant(op);
   for (auto &input_id : parameter_indices) {
     assert(input_id >= 0 && input_id < (int)is_parameter_symbolic_.size());
     if (param_is_symbolic(input_id)) {

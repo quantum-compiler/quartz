@@ -137,7 +137,7 @@ CircuitWire *ParamInfo::get_param_wire(int id) const {
 
 std::vector<ParamType>
 ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
-  // Creates a parameterl list, assuming that all symbolic parameters come first.
+  // Creates a param list, assuming that all symbolic params are defined first.
   auto result = input_parameters;
   result.resize(is_parameter_symbolic_.size());
   // Populates constant parameters.

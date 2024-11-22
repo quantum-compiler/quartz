@@ -137,8 +137,16 @@ CircuitWire *ParamInfo::get_param_wire(int id) const {
 
 std::vector<ParamType>
 ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
+  // Creates a parameterl list, assuming that all symbolic parameters come first.
   auto result = input_parameters;
   result.resize(is_parameter_symbolic_.size());
+  // Populates constant parameters.
+  for (int i = 0; i < result.size(); ++i) {
+    if (!is_parameter_symbolic_[i]) {
+      result[i] = parameter_values_[i];
+    }
+  }
+  // Populates expression parameters.
   for (auto &expr : parameter_expressions_) {
     std::vector<ParamType> params;
     for (const auto &input_wire : expr->input_wires) {
@@ -148,6 +156,7 @@ ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
     const auto &output_wire = expr->output_wires[0];
     result[output_wire->index] = expr->gate->compute(params);
   }
+  // Returns populated list.
   return result;
 }
 

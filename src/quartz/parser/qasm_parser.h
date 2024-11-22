@@ -36,8 +36,8 @@ class ParamParser {
   int parse_pi_expr(bool negative, ParamType num, ParamType denom);
 
   Context *ctx_;
-  std::unordered_map<ParamType, int> deg_params_;
-  std::unordered_map<ParamType, std::unordered_map<ParamType, int>> rad_params_;
+  std::unordered_map<ParamType, int> number_params_;
+  std::unordered_map<ParamType, std::unordered_map<ParamType, int>> pi_params_;
   bool symbolic_pi_;
 };
 

@@ -72,49 +72,48 @@ int ParamParser::parse_number(bool negative, ParamType p) {
     p = -p;
   }
 
-  if (deg_params_.count(p) == 0) {
+  if (number_params_.count(p) == 0) {
     int param_id = ctx_->get_new_param_id(p);
-    deg_params_[p] = param_id;
+    number_params_[p] = param_id;
   }
 
-  return deg_params_[p];
+  return number_params_[p];
 }
 
-// Handles constant parameters of the form: num * pi / denom.
-int ParamParser::parse_pi_expr(bool negative, ParamType num, ParamType denom) {
+// Handles constant parameters of the form: n * pi / d.
+int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
-    return parse_number(negative, num * PI / denom);
+    return parse_number(negative, n * PI / d);
   }
 
   // Handles negative coefficients.
   if (negative) {
-    num = -num;
+    n = -n;
   }
 
   // Constructs the pi expression, if it does not already exist.
-  if (rad_params_[num].count(denom) == 0) {
-    // Creates fraction of pi.
-    int p1 = ctx_->get_new_param_id(denom);
-    int p2 =
-        ctx_->get_new_param_expression_id({p1}, ctx_->get_gate(GateType::pi));
-
-    // Scales the fraction of pi when the numerator is not equal to 1.
-    int expr;
-    if (num != 1.0) {
-      int p3 = ctx_->get_new_param_id(denom);
-      expr = ctx_->get_new_param_expression_id({p3, p2},
-                                               ctx_->get_gate(GateType::mult));
-    } else {
-      expr = p2;
+  if (pi_params_[n].count(d) == 0) {
+    // Checks if fraction of pi already exists.
+    // If (n == 1) then this will cache the final expression.
+    if (pi_params_[1].count(d) == 0) {
+      int id = parse_number(false, d);
+      auto gate = ctx_->get_gate(GateType::pi);
+      pi_params_[1][d] = ctx_->get_new_param_expression_id({id}, gate);
     }
 
-    // Caches the expression for reuse.
-    rad_params_[num][denom] = expr;
+    // Scales the fraction of pi when the numerator is not equal to 1.
+    // If (n != 1), then this will cache the final expression.
+    if (n != 1) {
+      int nid = parse_number(false, n);
+      int pid = pi_params_[1][d];
+      auto gate = ctx_->get_gate(GateType::mult);
+      pi_params_[n][d] = ctx_->get_new_param_expression_id({nid, pid}, gate);
+    }
   }
 
   // Retrieves expression.
-  return rad_params_[num][denom];
+  return pi_params_[n][d];
 }
 
 int ParamParser::parse(std::string &token) {

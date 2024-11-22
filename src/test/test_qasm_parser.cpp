@@ -41,11 +41,27 @@ int main() {
   parser.use_symbolic_pi(false);
   parser.load_qasm_str(str, seq2);
 
-  std::string out1 = seq1->to_qasm_style_string(&ctx);
-  std::string out2 = seq2->to_qasm_style_string(&ctx);
+  if (ctx.get_num_parameters() != 11) {
+    // Expected caching.
+    // - Constants: 1, 2, 3, pi, 3*pi, pi/3, 2*pi/3
+    // - Symbols: pi/1, 3*pi, pi/3, 2*pi/3
+    std::cout << "Failed to cache all intermediate values." << std::endl;
+    assert(false);
+  }
 
-  std::cout << out1 << std::endl;
-  assert(out1 == out2);
+  auto mat1 = seq1->get_matrix(&ctx);
+  auto mat2 = seq2->get_matrix(&ctx);
+
+  assert(mat1.size() == mat2.size());
+  for (int i = 0; i < mat1.size(); ++i) {
+    assert(mat1[i].size() == mat2[i].size());
+    for (int j = 0; j < mat1[i].size(); ++j) {
+      if (mat1[i][j] != mat2[i][j]) {
+        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
+        assert(false);
+      }
+    }
+  }
 
   if (!has_exprs(ctx, seq1)) {
     std::cout << "Parser did not use symbolic pi values." << std::endl;

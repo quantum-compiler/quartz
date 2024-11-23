@@ -10,6 +10,11 @@
 
 namespace quartz {
 
+/**
+ * Determines if a constant expression should be treated as a symbolic value.
+ */
+bool is_symbolic_constant(Gate *op);
+
 class ParamInfo {
  public:
   /**

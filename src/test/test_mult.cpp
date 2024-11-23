@@ -24,7 +24,10 @@ int main() {
 
   auto c1 = dag1.to_qasm_style_string(&ctx);
   auto c2 = dag2.to_qasm_style_string(&ctx);
-  assert(c1 == c2);
+  if (c1 != c2) {
+    std::cout << "Failed to evaluate mult gate." << std::endl;
+    assert(false);
+  }
 
   // Working directory is cmake-build-debug/ here.
   system("python ../src/test/test_mult.py");

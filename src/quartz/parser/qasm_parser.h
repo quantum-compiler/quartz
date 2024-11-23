@@ -24,9 +24,26 @@ bool is_gate_string(const std::string &token, GateType &type);
 
 std::string strip(const std::string &input);
 
+class ParamParser {
+ public:
+  ParamParser(Context *ctx, bool symbolic_pi)
+      : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
+
+  int parse(std::string &token);
+
+ private:
+  int parse_number(bool negative, ParamType p);
+  int parse_pi_expr(bool negative, ParamType num, ParamType denom);
+
+  Context *ctx_;
+  std::unordered_map<ParamType, int> number_params_;
+  std::unordered_map<ParamType, std::unordered_map<ParamType, int>> pi_params_;
+  bool symbolic_pi_;
+};
+
 class QASMParser {
  public:
-  QASMParser(Context *ctx) : ctx_(ctx) {}
+  QASMParser(Context *ctx) : ctx_(ctx), symbolic_pi_(false) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
@@ -49,8 +66,11 @@ class QASMParser {
     return res;
   }
 
+  void use_symbolic_pi(bool v) { symbolic_pi_ = v; }
+
  private:
   Context *ctx_;
+  bool symbolic_pi_;
 };
 
 // We cannot put this template function implementation in a .cpp file.
@@ -60,12 +80,12 @@ bool QASMParser::load_qasm_stream(
   seq = nullptr;
   std::string line;
   GateType gate_type;
+  ParamParser pparser(ctx_, symbolic_pi_);
   // At the beginning, |index_offset| stores the mapping from qreg names to
   // their sizes. After creating the CircuitSeq object, |index_offset| stores
   // the mapping from qreg names to the qubit index offset. The qregs are
   // ordered alphabetically.
   std::map<std::string, int> index_offset;
-  std::unordered_map<ParamType, int> parameters;
   bool in_general_controlled_gate_block = false;
   std::vector<bool> general_control_flipped_qubits;
   int num_flipped_qubits;
@@ -164,65 +184,7 @@ bool QASMParser::load_qasm_stream(
         assert(ss.good());
         std::string token;
         ss >> token;
-        // Currently only support the format of
-        // pi*0.123,
-        // 0.123*pi,
-        // 0.123*pi/2,
-        // 0.123
-        // pi
-        // pi/2
-        // 0.123/(2*pi)
-        ParamType p = 0.0;
-        bool negative = token[0] == '-';
-        if (negative)
-          token = token.substr(1);
-        if (token.find("pi") == 0) {
-          if (token == "pi") {
-            // pi
-            p = PI;
-          } else {
-            auto d = token.substr(3, std::string::npos);
-            if (token[2] == '*') {
-              // pi*0.123
-              p = std::stod(d) * PI;
-            } else if (token[2] == '/') {
-              // pi/2
-              p = PI / std::stod(d);
-            } else {
-              std::cerr << "Unsupported parameter format: " << token
-                        << std::endl;
-              assert(false);
-            }
-          }
-        } else if (token.find("pi") != std::string::npos) {
-          if (token.find('(') != std::string::npos) {
-            assert(token.find('/') != std::string::npos);
-            auto left_parenthesis_pos = token.find('(');
-            // 0.123/(2*pi)
-            p = std::stod(token.substr(0, token.find('/'))) / PI;
-            p /= std::stod(
-                token.substr(left_parenthesis_pos + 1,
-                             token.find('*') - left_parenthesis_pos - 1));
-          } else {
-            // 0.123*pi
-            auto d = token.substr(0, token.find('*'));
-            p = std::stod(d) * PI;
-            if (token.find('/') != std::string::npos) {
-              // 0.123*pi/2
-              p = p / std::stod(token.substr(token.find('/') + 1));
-            }
-          }
-        } else {
-          // 0.123
-          p = std::stod(token);
-        }
-        if (negative)
-          p = -p;
-        if (parameters.count(p) == 0) {
-          int param_id = ctx_->get_new_param_id(p);
-          parameters[p] = param_id;
-        }
-        param_indices[i] = parameters[p];
+        param_indices[i] = pparser.parse(token);
       }
       for (int i = 0; i < num_qubits; ++i) {
         assert(ss.good());

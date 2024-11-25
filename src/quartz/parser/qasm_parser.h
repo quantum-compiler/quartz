@@ -62,11 +62,17 @@ class QubitParser {
  public:
   QubitParser() : finalized_(false) {}
 
-  // This method adds the name of a qubit array to the registry of qubit arrays
+  // This method adds the name of a qreg array to the registry of qubit arrays
   // and their length. The method expects a token 'name[len]' from a statement
   // of the form 'qreg name[len];', and requires that finalize has not yet been
   // called. If the method is successful, then true is returned.
-  bool parse_decl(std::stringstream &ss);
+  bool parse_qasm2_decl(std::stringstream &ss);
+
+  // This method adds the name of a qubit array to the registry of qubit arrays
+  // and their length. The method expects a token '[len] name' from a statement
+  // of the form 'qubit[len] name;', and requires that finalize has not yet
+  // been called. If the method is successful, then true is returned.
+  bool parse_qasm3_decl(std::stringstream &ss);
 
   // This method determines the global qubit index for a qreg array access. The
   // method expects the token 'name[idx]', and requires that finalize has been
@@ -81,6 +87,11 @@ class QubitParser {
   int finalize();
 
  private:
+  // Implementation details for parse_qasm2_decl and parse_qasm3_decl. This
+  // method takes the name and length of the declaration, along with the
+  // resulting state of the stringstream.
+  bool add_decl(std::stringstream &ss, std::string &name, std::string &lstr);
+
   bool finalized_;
 
   // At the beginning, |index_offset| stores the mapping from qreg names to
@@ -160,6 +171,8 @@ bool QASMParser::load_qasm_stream(
       line.replace(comment_position, newline_position - comment_position, "");
       comment_position = line.find("//", comment_position);
     }
+    // Adds spaces before square brackets to support OpenQASM 3 declarations.
+    find_and_replace_all(line, "[", " [");
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space
@@ -192,7 +205,11 @@ bool QASMParser::load_qasm_stream(
     } else if (command == "creg") {
       continue;  // ignore this line
     } else if (command == "qreg") {
-      if (!qubit_parser.parse_decl(ss)) {
+      if (!qubit_parser.parse_qasm2_decl(ss)) {
+        return false;
+      }
+    } else if (command == "qubit") {
+      if (!qubit_parser.parse_qasm3_decl(ss)) {
         return false;
       }
     } else if (is_gate_string(command, gate_type)) {

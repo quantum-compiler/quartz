@@ -84,7 +84,7 @@ void test_symbolic_exprs() {
   }
 }
 
-void test_qubits() {
+void test_qasm2_qubits() {
   ParamInfo param_info(0);
   Context ctx({GateType::cx}, 5, &param_info);
 
@@ -92,7 +92,7 @@ void test_qubits() {
 
   std::string str = "OPENQASM 2.0;\n"
                     "include \"qelib1.inc\";\n"
-                    "qreg q[2];\n"
+                    "qreg q[2]   ;\n"
                     "qreg r[3];\n"
                     "cx q[0], q[1];\n"
                     "cx q[0], r[0];\n"
@@ -112,9 +112,41 @@ void test_qubits() {
   }
 }
 
+void test_qasm3_qubits() {
+  ParamInfo param_info(0);
+  Context ctx({GateType::cx}, 5, &param_info);
+
+  QASMParser parser(&ctx);
+
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qubit[2] q;\n"
+                    "qubit  [3] r   ;\n"
+                    "qreg s    [2]   ;\n"
+                    "cx q[0], q[1];\n"
+                    "cx q[0], r[0];\n"
+                    "cx r[1], r[2];\n"
+                    "cx s[0], s[1];\n";
+
+  CircuitSeq *seq = nullptr;
+  bool res = parser.load_qasm_str(str, seq);
+  if (!res) {
+    std::cout << "Parsing failed with many qubit declarations." << std::endl;
+    assert(false);
+  }
+
+  int qnum = seq->get_num_qubits();
+  if (qnum != 7) {
+    std::cout << "Unexpected qubit total: " << qnum << "." << std::endl;
+    assert(false);
+  }
+}
+
 int main() {
   std::cout << "[Symbolic Expression Tests]" << std::endl;
   test_symbolic_exprs();
-  std::cout << "[Qubit Parsing Tests]" << std::endl;
-  test_qubits();
+  std::cout << "[OpenQASM 2 Parsing Tests]" << std::endl;
+  test_qasm2_qubits();
+  std::cout << "[OpenQASM 3 Parsing Tests]" << std::endl;
+  test_qasm3_qubits();
 }

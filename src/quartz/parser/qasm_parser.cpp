@@ -184,31 +184,63 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   return -1;
 }
 
-bool QubitParser::parse_decl(std::stringstream &ss) {
+bool QubitParser::parse_qasm2_decl(std::stringstream &ss) {
+  std::string name;
+  std::string len_str;
+  getline(ss, name, '[');
+  getline(ss, len_str, ' ');
+  return add_decl(ss, name, len_str);
+}
+
+bool QubitParser::parse_qasm3_decl(std::stringstream &ss) {
+  std::string name;
+  std::string len_str;
+  getline(ss, len_str, ']');
+  getline(ss, name);
+  return add_decl(ss, name, len_str);
+}
+
+bool QubitParser::add_decl(
+    std::stringstream &ss, std::string &name, std::string &lstr) {
   // Ensures qreg parsing is allowed.
   if (finalized_) {
-    std::cerr << "Can only create qreg before finalization." << std::endl;
+    std::cerr << "Can only create qubit before finalization." << std::endl;
     assert(false);
     return false;
   }
-  
-  // Extracts variable name and checks uniqueness.
-  std::string name;
-  getline(ss, name, '[');
+
+  // Ensures this is the end of the line.
+  if (!ss.eof()) {
+    std::string tmp;
+    getline(ss, tmp);
+    tmp = strip(tmp);
+    if (tmp != "") {
+      std::cerr << "Unexpected tokens after qubit declaration." << std::endl;
+      assert(false);
+      return false;
+    }
+  }
+
+  // Ensures the name is unique.
   name = strip(name);
   if (index_offset.count(name) > 0) {
-    std::cerr << "Each qreg must have a unique name." << std::endl;
+    std::cerr << "Each qubit must have a unique name: " << name << std::endl;
     assert(false);
     return false;
   }
 
-  // Extracts qubit count.
-  std::string len;
-  getline(ss, len, ' ');
-  index_offset[name] = string_to_number(len);
+  // Ensures the index is valid.
+  lstr = strip(lstr);
+  int len = string_to_number(lstr);
+  if (len == -1) {
+    std::cerr << "Invalid qubit length: " << len << std::endl;
+    assert(false);
+    return false;
+  }
 
-  // Should be at the end of the line.
-  return (!ss.good());
+  // Updates the index.
+  index_offset[name] = len;
+  return true;
 }
 
 int QubitParser::parse_access(std::stringstream &ss) {

@@ -15,7 +15,7 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
   return false;
 }
 
-int main() {
+void test_symbolic_exprs() {
   ParamInfo param_info(0);
   Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx,
                GateType::mult, GateType::pi},
@@ -35,17 +35,27 @@ int main() {
 
   CircuitSeq *seq1 = nullptr;
   parser.use_symbolic_pi(true);
-  parser.load_qasm_str(str, seq1);
+  bool res1 = parser.load_qasm_str(str, seq1);
+  if (!res1) {
+    std::cout << "Parsing failed with symbolic pi." << std::endl;
+    assert(false);
+  }
 
   CircuitSeq *seq2 = nullptr;
   parser.use_symbolic_pi(false);
-  parser.load_qasm_str(str, seq2);
+  bool res2 = parser.load_qasm_str(str, seq2);
+  if (!res2) {
+    std::cout << "Parsing failed with constant pi." << std::endl;
+    assert(false);
+  }
 
-  if (ctx.get_num_parameters() != 11) {
+  int pnum = ctx.get_num_parameters();
+  if (pnum != 11) {
     // Expected caching.
     // - Constants: 1, 2, 3, pi, 3*pi, pi/3, 2*pi/3
     // - Symbols: pi/1, 3*pi, pi/3, 2*pi/3
     std::cout << "Failed to cache all intermediate values." << std::endl;
+    std::cout << "Number of parameters: " << pnum << std::endl;
     assert(false);
   }
 
@@ -72,4 +82,39 @@ int main() {
     std::cout << "Parser failed to disable symbolic pi values." << std::endl;
     assert(false);
   }
+}
+
+void test_qubits() {
+  ParamInfo param_info(0);
+  Context ctx({GateType::cx}, 5, &param_info);
+
+  QASMParser parser(&ctx);
+
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qreg q[2];\n"
+                    "qreg r[3];\n"
+                    "cx q[0], q[1];\n"
+                    "cx q[0], r[0];\n"
+                    "cx r[1], r[2];\n";
+
+  CircuitSeq *seq = nullptr;
+  bool res = parser.load_qasm_str(str, seq);
+  if (!res) {
+    std::cout << "Parsing failed with many qubit declarations." << std::endl;
+    assert(false);
+  }
+
+  int qnum = seq->get_num_qubits();
+  if (qnum != 5) {
+    std::cout << "Unexpected qubit total: " << qnum << "." << std::endl;
+    assert(false);
+  }
+}
+
+int main() {
+  std::cout << "[Symbolic Expression Tests]" << std::endl;
+  test_symbolic_exprs();
+  std::cout << "[Qubit Parsing Tests]" << std::endl;
+  test_qubits();
 }

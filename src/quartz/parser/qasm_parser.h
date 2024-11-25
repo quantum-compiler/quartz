@@ -9,30 +9,46 @@
 #include <map>
 
 namespace quartz {
+
+// Replaces (in-place) all instances of tofind in data with toreplace.
 void find_and_replace_all(std::string &data, const std::string &tofind,
                           const std::string &toreplace);
 
+// Replaces (in-place) the first instance of tofind in data with toreplace.
 void find_and_replace_first(std::string &data, const std::string &tofind,
                             const std::string &toreplace);
 
+// Replaces (in-place) the last instance of tofind in data with toreplace.
 void find_and_replace_last(std::string &data, const std::string &tofind,
                            const std::string &toreplace);
 
+// Converts a string to a non-negative integer value. Requires that input is a
+// valid non-negative integer consisting only of digits from 0 to 9.
 int string_to_number(const std::string &input);
 
+// If token is the name of a gate, then sets type to the gate type and returns
+// true. Otherwise, false is returned.
 bool is_gate_string(const std::string &token, GateType &type);
 
+// Removes all trailing and leading spaces from input. The input remains
+// unchanged and a new string is returned.
 std::string strip(const std::string &input);
 
+// Helper class to parse the parameter passed to a parameterized gate.
 class ParamParser {
  public:
   ParamParser(Context *ctx, bool symbolic_pi)
       : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
 
-  int parse(std::string &token);
+  // Takes as input a parameter expression. Returns a parameter identifier in
+  // the current content which corresponds to this expression.
+  int parse_expr(std::stringstream &token);
 
  private:
+  // Handles constant parameters given as literal decimal expressions.
   int parse_number(bool negative, ParamType p);
+
+  // Handles constant parameters of the form: n * pi / d.
   int parse_pi_expr(bool negative, ParamType num, ParamType denom);
 
   Context *ctx_;
@@ -41,6 +57,40 @@ class ParamParser {
   bool symbolic_pi_;
 };
 
+//
+class QubitParser {
+ public:
+  QubitParser() : finalized_(false) {}
+
+  // This method adds the name of a qubit array to the registry of qubit arrays
+  // and their length. The method expects a token 'name[len]' from a statement
+  // of the form 'qreg name[len];', and requires that finalize has not yet been
+  // called. If the method is successful, then true is returned.
+  bool parse_decl(std::stringstream &ss);
+
+  // This method determines the global qubit index for a qreg array access. The
+  // method expects the token 'name[idx]', and requires that finalize has been
+  // called. If finalize has not been called, or the token is invalid, or the
+  // token cannot be resolved, then -1 is returned.
+  int parse_access(std::stringstream &ss);
+
+  // In CircuitSeq, qubits are modelled as a single global array. Calling this
+  // method indicates that no more qreg arrays will be declared, and allows for
+  // the mapping from qreg arrays to qubit indices to be finalized. After this
+  // methodi s called, all calls to declare_qreg will fail.
+  int finalize();
+
+ private:
+  bool finalized_;
+
+  // At the beginning, |index_offset| stores the mapping from qreg names to
+  // their sizes. After creating the CircuitSeq object, |index_offset| stores
+  // the mapping from qreg names to the qubit index offset. The qregs are
+  // ordered alphabetically.
+  std::map<std::string, int> index_offset;
+};
+
+// Parser from OpenQASM files to CircuitSeq objects.
 class QASMParser {
  public:
   QASMParser(Context *ctx) : ctx_(ctx), symbolic_pi_(false) {}
@@ -77,19 +127,19 @@ class QASMParser {
 template <class _CharT, class _Traits>
 bool QASMParser::load_qasm_stream(
     std::basic_istream<_CharT, _Traits> &qasm_stream, CircuitSeq *&seq) {
+  // Results and sub-parsers.
   seq = nullptr;
-  std::string line;
-  GateType gate_type;
-  ParamParser pparser(ctx_, symbolic_pi_);
-  // At the beginning, |index_offset| stores the mapping from qreg names to
-  // their sizes. After creating the CircuitSeq object, |index_offset| stores
-  // the mapping from qreg names to the qubit index offset. The qregs are
-  // ordered alphabetically.
-  std::map<std::string, int> index_offset;
+  ParamParser param_parser(ctx_, symbolic_pi_);
+  QubitParser qubit_parser;
+
+  // Generalized control data.
   bool in_general_controlled_gate_block = false;
   std::vector<bool> general_control_flipped_qubits;
   int num_flipped_qubits;
 
+  // Parse each line of the file.
+  std::string line;
+  GateType gate_type;
   while (std::getline(qasm_stream, line, ';')) {
     if (line.find("//ctrl") != std::string::npos) {
       // Quartz's specific comment to enter a general control gate block
@@ -142,34 +192,17 @@ bool QASMParser::load_qasm_stream(
     } else if (command == "creg") {
       continue;  // ignore this line
     } else if (command == "qreg") {
-      std::string name;
-      getline(ss, name, '[');
-      name = strip(name);
-      if (seq != nullptr) {
-        std::cerr << "We only support creating qregs before all quantum gates."
-                  << std::endl;
+      if (!qubit_parser.parse_decl(ss)) {
         return false;
       }
-      std::string token;
-      getline(ss, token, ' ');
-      int num_qubits = string_to_number(token);
-      // No two qregs have the same name.
-      assert(index_offset.count(name) == 0);
-      index_offset[name] = num_qubits;
-      assert(!ss.good());
     } else if (is_gate_string(command, gate_type)) {
+      // End the phase of creating qregs.
       if (seq == nullptr) {
-        // End the phase of creating qregs.
-        // Compute the total number of qubits, and let |index_offset| stores
-        // the mapping from qreg names to the qubit index offset.
-        int num_qubits = 0;
-        for (auto &qreg : index_offset) {
-          int new_num_qubits = num_qubits + qreg.second;
-          qreg.second = num_qubits;
-          num_qubits = new_num_qubits;
-        }
+        int num_qubits = qubit_parser.finalize();
         seq = new CircuitSeq(num_qubits);
       }
+
+      // Gate parsing.
       Gate *gate = ctx_->get_gate(gate_type);
       if (!gate) {
         std::cerr << "Unsupported gate in current context: " << command
@@ -182,28 +215,21 @@ bool QASMParser::load_qasm_stream(
       std::vector<int> param_indices(num_params);
       for (int i = 0; i < num_params; ++i) {
         assert(ss.good());
-        std::string token;
-        ss >> token;
-        param_indices[i] = pparser.parse(token);
+        int index = param_parser.parse_expr(ss);
+        if (index == -1) {
+          return false;
+        }
+        param_indices[i] = index;
       }
       for (int i = 0; i < num_qubits; ++i) {
         assert(ss.good());
-        std::string token;
-        std::string name;
-        getline(ss, name, '[');
-        name = strip(name);
-        ss >> token;
-        int index = string_to_number(token);
-        if (index_offset.count(name) == 0) {
-          std::cerr << "Unknown qreg: " << name << std::endl;
-          return false;
-        }
+        int index = qubit_parser.parse_access(ss);
         if (index == -1) {
-          std::cerr << "Unknown qubit index: " << token << std::endl;
           return false;
         }
-        qubit_indices[i] = index_offset[name] + index;
+        qubit_indices[i] = index;
       }
+
       if (in_general_controlled_gate_block) {
         if (gate_type == GateType::x) {
           // Flip a qubit.

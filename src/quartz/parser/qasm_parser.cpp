@@ -66,7 +66,6 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-// Handles constant parameters given as literal decimal expressions.
 int ParamParser::parse_number(bool negative, ParamType p) {
   if (negative) {
     p = -p;
@@ -80,7 +79,6 @@ int ParamParser::parse_number(bool negative, ParamType p) {
   return number_params_[p];
 }
 
-// Handles constant parameters of the form: n * pi / d.
 int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
@@ -116,9 +114,13 @@ int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
   return pi_params_[n][d];
 }
 
-int ParamParser::parse(std::string &token) {
+int ParamParser::parse_expr(std::stringstream &ss) {
+  // Extracts the parameter expression from the string stream.
+  std::string token;
+  ss >> token;
+
   // Determines if angle is negative or positive.
-  bool negative = token[0] == '-';
+  bool negative = (token[0] == '-');
   if (negative) {
     token = token.substr(1);
   }
@@ -177,7 +179,120 @@ int ParamParser::parse(std::string &token) {
   }
 
   // This line should be unreachable.
+  std::cerr << "Unknown parameter value expression: " << token << std::endl;
   assert(false);
+  return -1;
+}
+
+bool QubitParser::parse_qasm2_decl(std::stringstream &ss) {
+  std::string name;
+  std::string len_str;
+  getline(ss, name, '[');
+  getline(ss, len_str, ' ');
+  return add_decl(ss, name, len_str);
+}
+
+bool QubitParser::parse_qasm3_decl(std::stringstream &ss) {
+  std::string name;
+  std::string len_str;
+  getline(ss, len_str, ']');
+  getline(ss, name);
+  return add_decl(ss, name, len_str);
+}
+
+bool QubitParser::add_decl(std::stringstream &ss, std::string &name,
+                           std::string &lstr) {
+  // Ensures qreg parsing is allowed.
+  if (finalized_) {
+    std::cerr << "Can only create qubit before finalization." << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Ensures this is the end of the line.
+  if (!ss.eof()) {
+    std::string tmp;
+    getline(ss, tmp);
+    tmp = strip(tmp);
+    if (tmp != "") {
+      std::cerr << "Unexpected tokens after qubit declaration." << std::endl;
+      assert(false);
+      return false;
+    }
+  }
+
+  // Ensures the name is unique.
+  name = strip(name);
+  if (index_offset.count(name) > 0) {
+    std::cerr << "Each qubit must have a unique name: " << name << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Ensures the index is valid.
+  lstr = strip(lstr);
+  int len = string_to_number(lstr);
+  if (len == -1) {
+    std::cerr << "Invalid qubit length: " << len << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Updates the index.
+  index_offset[name] = len;
+  return true;
+}
+
+int QubitParser::parse_access(std::stringstream &ss) {
+  // Ensures access parsing is allowed.
+  if (!finalized_) {
+    std::cerr << "Can only access qubits after finalization." << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Gets qreg array name.
+  std::string name;
+  getline(ss, name, '[');
+  name = strip(name);
+  if (index_offset.count(name) == 0) {
+    std::cerr << "Unknown qreg: " << name << std::endl;
+    assert(false);
+    return -1;
+  }
+
+  // Gets qreg array index.
+  std::string token;
+  ss >> token;
+  int index = string_to_number(token);
+  if (index == -1) {
+    std::cerr << "Unknown qubit index: " << token << std::endl;
+    assert(false);
+    return -1;
+  }
+
+  // Computes the global qubit index.
+  int offset = index_offset[name];
+  return offset + index;
+}
+
+int QubitParser::finalize() {
+  // Ensures finalization can only happen once.
+  if (finalized_) {
+    std::cerr << "Can only finalize qreg lookup once." << std::endl;
+    assert(false);
+    return false;
+  }
+  finalized_ = true;
+
+  // Computes qubit indinces and totals.
+  int num_qubits = 0;
+  for (auto &qreg : index_offset) {
+    int new_num_qubits = num_qubits + qreg.second;
+    qreg.second = num_qubits;
+    num_qubits = new_num_qubits;
+  }
+  return num_qubits;
 }
 
 }  // namespace quartz

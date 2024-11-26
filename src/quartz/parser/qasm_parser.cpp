@@ -114,6 +114,50 @@ int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
   return pi_params_[n][d];
 }
 
+bool ParamParser::parse_array_decl(std::stringstream &ss) {
+  // The first two tokens the stream should be '[angle len]'. Recall that the
+  // comma between angle and len has been replacedby a space.
+  std::string type;
+  ss >> type;
+  type = strip(type);
+  if (type != "[angle") {
+    if (type.size() > 1) {
+      type = type.substr(1);
+    }
+    std::cerr << "Unexpected array type: " << type << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Next, it is possible to retrieve the length of the array.
+  std::string lstr;
+  ss >> lstr;
+  int len = string_to_number(lstr);
+  if (len == -1) {
+    std::cerr << "Invalid parameter array length: " << len << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // The rest of the line should be the name of the array.
+  std::string name;
+  getline(ss, name);
+  name = strip(name);
+
+  // Ensures that the name is unique.
+  if (symb_params_.count(name) > 0) {
+    std::cerr << "Each param must have a unique name: " << name << std::endl;
+    assert(false);
+    return false;
+  }
+
+  // Allocates a symbolic parameter for each element of the array.
+  for (int i = 0; i < len; ++i) {
+    symb_params_[name][i] = ctx_->get_new_param_id();
+  }
+  return true;
+}
+
 int ParamParser::parse_expr(std::stringstream &ss) {
   // Extracts the parameter expression from the string stream.
   std::string token;

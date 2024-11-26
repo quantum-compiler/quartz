@@ -200,8 +200,8 @@ bool QubitParser::parse_qasm3_decl(std::stringstream &ss) {
   return add_decl(ss, name, len_str);
 }
 
-bool QubitParser::add_decl(
-    std::stringstream &ss, std::string &name, std::string &lstr) {
+bool QubitParser::add_decl(std::stringstream &ss, std::string &name,
+                           std::string &lstr) {
   // Ensures qreg parsing is allowed.
   if (finalized_) {
     std::cerr << "Can only create qubit before finalization." << std::endl;

@@ -34,21 +34,48 @@ bool is_gate_string(const std::string &token, GateType &type);
 // unchanged and a new string is returned.
 std::string strip(const std::string &input);
 
-// Helper class to parse the parameter passed to a parameterized gate.
+/**
+ * Helper class to parse symbolic parameter declarations, and the parameters
+ * passed to parameterized gates.
+ */
 class ParamParser {
  public:
   ParamParser(Context *ctx, bool symbolic_pi)
       : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
 
-  // Takes as input a parameter expression. Returns a parameter identifier in
-  // the current content which corresponds to this expression.
+  /**
+   * Parses a stream which is known to contain a parameter expression.
+   * Supported formats are as followed, where n and m are decimal literals:
+   * - pi*n
+   * - n*pi
+   * - n*pi/m
+   * - n
+   * - pi/m
+   * - n/(m*pi)
+   * @param token the string stream which contains the parameter expression.
+   * @returns the parameter id for this expression in the current context.
+   */
   int parse_expr(std::stringstream &token);
 
  private:
+  /**
+   * Implementation details for parse_expr when the expression is a constant
+   * literal value or of the form n/(m*pi).
+   * @param negative if true, then the parameter should be negative.
+   * @param p the literal value as a floating-point value.
+   * @return the parameter id for this expression in the current context.
+   */
   // Handles constant parameters given as literal decimal expressions.
   int parse_number(bool negative, ParamType p);
 
-  // Handles constant parameters of the form: n * pi / d.
+  /**
+   * Implementation details for parse_expr when the expression is of the form
+   * pi*n, n*pi, n*pi/m, or pi/m
+   * @param negative if true, then the parameter should be negative.
+   * @param num either the value of n, or 1 if it is not in the format.
+   * @param denom either the value of m, or 1 if it is not in the format.
+   * @return the parameter id for this expression in the current context.
+   */
   int parse_pi_expr(bool negative, ParamType num, ParamType denom);
 
   Context *ctx_;
@@ -57,47 +84,79 @@ class ParamParser {
   bool symbolic_pi_;
 };
 
-//
+/**
+ * Helper class to parse qubit array declarations, and references to the cells
+ * of these arrays.
+ */
 class QubitParser {
  public:
   QubitParser() : finalized_(false) {}
 
-  // This method adds the name of a qreg array to the registry of qubit arrays
-  // and their length. The method expects a token 'name[len]' from a statement
-  // of the form 'qreg name[len];', and requires that finalize has not yet been
-  // called. If the method is successful, then true is returned.
+  /**
+   * Adds a qreg declaration to the registry of qubit array declarations. This
+   * entry will associate the name of the variable to the length of the array,
+   * as specified by a token 'name[len] from a statement 'qreg name[len];'.
+   * @param ss a string stream containing the token.
+   * @return true if and only if the declaration is parsed successfully.
+   * @warning requires that finalize() has not yet been called.
+   */
   bool parse_qasm2_decl(std::stringstream &ss);
 
-  // This method adds the name of a qubit array to the registry of qubit arrays
-  // and their length. The method expects a token '[len] name' from a statement
-  // of the form 'qubit[len] name;', and requires that finalize has not yet
-  // been called. If the method is successful, then true is returned.
+  /**
+   * Adds a qubit declaration to the registry of qubit array declarations. This
+   * entry will associate the name of the variable to the length of the array,
+   * as specified by a token '[len] name from a statement 'qubit[len] name;'.
+   * @param ss a string stream containing the token.
+   * @return true if and only if the declaration is parsed successfully.
+   * @warning requires that finalize() has not yet been called.
+   */
   bool parse_qasm3_decl(std::stringstream &ss);
 
-  // This method determines the global qubit index for a qreg array access. The
-  // method expects the token 'name[idx]', and requires that finalize has been
-  // called. If finalize has not been called, or the token is invalid, or the
-  // token cannot be resolved, then -1 is returned.
+  /**
+   * Determines the global qubit index for a qubit array access. This method
+   * expects that the token is given in the form 'name[idx]', and that the
+   * input stream may contain addition tokens after this refeerence.
+   * @param ss a string stream containing the token.
+   * @return the global qubit index for the reference, or -1 on failure.
+   * @warning requires that finalize() has already been called.
+   */
   int parse_access(std::stringstream &ss);
 
-  // In CircuitSeq, qubits are modelled as a single global array. Calling this
-  // method indicates that no more qreg arrays will be declared, and allows for
-  // the mapping from qreg arrays to qubit indices to be finalized. After this
-  // methodi s called, all calls to declare_qreg will fail.
+  /**
+   * In CircuitSeq, qubits are modelled as a single global array. Calling this
+   * method indicates that no more qreg arrays will be declared, and allows for
+   * the mapping from qreg arrays to qubit indices to be finalized.
+   * @return the total number of qubits in the global qubit array.
+   * @warning After this method is called, all calls to parse_qasm2_decl and
+   *   parse_qasm3_decl will fail.
+   */
   int finalize();
 
  private:
-  // Implementation details for parse_qasm2_decl and parse_qasm3_decl. This
-  // method takes the name and length of the declaration, along with the
-  // resulting state of the stringstream.
+  /**
+   * Implementation details for parse_qasm2_decl and parse_qasm3_decl. This
+   * method takes the name and length as strings, so that it is agnostic to
+   * the syntax of OpenQASM 2 and OpenQASM 3.
+   * @param ss the string stream from which the name are length are obtained.
+   * @param name the name of the qubit array.
+   * @param lstr the length of the qubit array, as a string.
+   * @return the total number of qubits in the global qubit array.
+   */
   bool add_decl(std::stringstream &ss, std::string &name, std::string &lstr);
 
+  /**
+   * When this flag, no more qubit declarations are allowed, and it is possible
+   * to map qubit references to global array indices.
+   * @see QubitParser::index_offset
+   */
   bool finalized_;
 
-  // At the beginning, |index_offset| stores the mapping from qreg names to
-  // their sizes. After creating the CircuitSeq object, |index_offset| stores
-  // the mapping from qreg names to the qubit index offset. The qregs are
-  // ordered alphabetically.
+  /**
+   * At the beginning, |index_offset| stores the mapping from qreg names to
+   * their sizes. After creating the CircuitSeq object, |index_offset| stores
+   * the mapping from qreg names to the qubit index offset. The qregs are
+   * ordered alphabetically.
+   */
   std::map<std::string, int> index_offset;
 };
 

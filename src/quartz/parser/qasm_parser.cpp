@@ -120,7 +120,7 @@ bool ParamParser::parse_array_decl(std::stringstream &ss) {
   std::string type;
   ss >> type;
   type = strip(type);
-  if (type != "[angle") {
+  if (type != "[angle" && type != "[float") {
     if (type.size() > 1) {
       type = type.substr(1);
     }

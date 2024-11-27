@@ -310,7 +310,17 @@ bool QASMParser::load_qasm_stream(
       if (!qubit_parser.parse_qasm3_decl(ss)) {
         return false;
       }
-    } else if (command == "array") {
+    } else if (command == "input") {
+      // This should be an array.
+      std::string type;
+      ss >> type;
+      if (type != "array") {
+        std::cout << "Unexpected input variable type: " << type << std::endl;
+        assert(false);
+        return false;
+      }
+
+      // Parses the parameter array.
       if (!param_parser.parse_array_decl(ss)) {
         return false;
       }

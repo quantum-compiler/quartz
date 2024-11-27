@@ -148,7 +148,7 @@ void test_qasm3_qubits() {
 
 void test_param_parsing() {
   ParamInfo param_info(0);
-  Context ctx({GateType::cx}, 2, &param_info);
+  Context ctx({GateType::cx, GateType::rx}, 2, &param_info);
 
   QASMParser parser(&ctx);
 
@@ -157,7 +157,11 @@ void test_param_parsing() {
                     "qubit[2] q;\n"
                     "array[angle,2] ps;\n"
                     "array[angle,3] params;\n"
-                    "cx q[0], q[1];\n";
+                    "cx q[0], q[1];\n"
+                    "rx(ps[0]) q[0];\n"
+                    "rx(ps[1]) q[1];\n"
+                    "rx(params[0]) q[0];\n"
+                    "rx(params[1]) q[1];\n";
 
   CircuitSeq *seq1 = nullptr;
   bool res1 = parser.load_qasm_str(str, seq1);
@@ -170,6 +174,12 @@ void test_param_parsing() {
   int pnum = ctx.get_num_parameters();
   if (pnum != 5) {
     std::cout << "Unexpected parameter total: " << pnum << "." << std::endl;
+    assert(false);
+  }
+
+  int input_num = seq1->get_input_param_indices(&ctx).size();
+  if (input_num != 4) {
+    std::cout << "Unexpected input count: " << input_num << "." << std::endl;
     assert(false);
   }
 }

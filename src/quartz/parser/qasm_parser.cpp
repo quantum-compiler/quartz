@@ -177,7 +177,35 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   //  pi
   //  pi/2
   //  0.123/(2*pi)
-  if (token.find("pi") == 0) {
+  //  name[i]
+  if (token.find("[") != std::string::npos) {
+    // Case: name[i]
+    // This case should come first, in case name contains the substring 'pi'.
+    assert(token.find("]") != std::string::npos);
+    
+    // Extracts the name and index.
+    int lbrack_pos = token.find('[');
+    int rbrack_pos = token.find(']');
+    std::string name = token.substr(0, lbrack_pos);
+    std::string istr = token.substr(lbrack_pos + 1, rbrack_pos);
+
+    // Determines the reference index.
+    int idx = string_to_number(istr);
+    if (idx == -1) {
+      std::cerr << "Invalid parameter reference index: " << istr << std::endl;
+      assert(false);
+      return false;
+    }
+
+    // Attempts to look up the symbolic parameter identifier.
+    if (symb_params_[name].count(idx) == 0) {
+      std::cerr << "Invalid parameter referene: " << token << std::endl;
+      assert(false);
+      return false;
+    }
+    return symb_params_[name][idx];
+  }
+  else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
       return parse_pi_expr(negative, 1.0, 1.0);

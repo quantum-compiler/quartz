@@ -54,13 +54,15 @@ class ParamParser {
 
   /**
    * Parses a stream which is known to contain a parameter expression.
-   * Supported formats are as followed, where n and m are decimal literals:
+   * Supported formats are as followed, where n and m are decimal literals, i
+   * is an integer literal, and name is a string:
    * - pi*n
    * - n*pi
    * - n*pi/m
    * - n
    * - pi/m
    * - n/(m*pi)
+   * - name[i]
    * @param token the string stream which contains the parameter expression.
    * @returns the parameter id for this expression in the current context.
    */
@@ -266,7 +268,9 @@ bool QASMParser::load_qasm_stream(
       comment_position = line.find("//", comment_position);
     }
     // Adds spaces before square brackets to support OpenQASM 3 declarations.
-    find_and_replace_all(line, "[", " [");
+    // The spaces should not apply to the parameters passed to rotation gates.
+    find_and_replace_all(line, "array[", "array [");
+    find_and_replace_all(line, "qubit[", "qubit [");
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space

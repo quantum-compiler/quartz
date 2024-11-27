@@ -42,7 +42,7 @@ class ParamParser {
  public:
   ParamParser(Context *ctx, bool symbolic_pi)
       : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
-  
+
   /**
    * Adds an angle array declaration to the registry of symbolic parameters.
    * This entry will associate each cell of the array, as specified by a token

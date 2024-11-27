@@ -182,7 +182,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
     // Case: name[i]
     // This case should come first, in case name contains the substring 'pi'.
     assert(token.find("]") != std::string::npos);
-    
+
     // Extracts the name and index.
     int lbrack_pos = token.find('[');
     int rbrack_pos = token.find(']');
@@ -204,8 +204,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
       return false;
     }
     return symb_params_[name][idx];
-  }
-  else if (token.find("pi") == 0) {
+  } else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
       return parse_pi_expr(negative, 1.0, 1.0);

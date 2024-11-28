@@ -39,6 +39,7 @@ void test_symbolic_exprs() {
   if (!res1) {
     std::cout << "Parsing failed with symbolic pi." << std::endl;
     assert(false);
+    return;
   }
 
   CircuitSeq *seq2 = nullptr;
@@ -47,6 +48,7 @@ void test_symbolic_exprs() {
   if (!res2) {
     std::cout << "Parsing failed with constant pi." << std::endl;
     assert(false);
+    return;
   }
 
   int pnum = ctx.get_num_parameters();
@@ -103,6 +105,7 @@ void test_qasm2_qubits() {
   if (!res) {
     std::cout << "Parsing failed with many qubit declarations." << std::endl;
     assert(false);
+    return;
   }
 
   int qnum = seq->get_num_qubits();
@@ -114,7 +117,7 @@ void test_qasm2_qubits() {
 
 void test_qasm3_qubits() {
   ParamInfo param_info(0);
-  Context ctx({GateType::cx}, 5, &param_info);
+  Context ctx({GateType::cx}, 7, &param_info);
 
   QASMParser parser(&ctx);
 
@@ -133,11 +136,50 @@ void test_qasm3_qubits() {
   if (!res) {
     std::cout << "Parsing failed with many qubit declarations." << std::endl;
     assert(false);
+    return;
   }
 
   int qnum = seq->get_num_qubits();
   if (qnum != 7) {
     std::cout << "Unexpected qubit total: " << qnum << "." << std::endl;
+    assert(false);
+  }
+}
+
+void test_param_parsing() {
+  ParamInfo param_info(0);
+  Context ctx({GateType::cx, GateType::rx}, 2, &param_info);
+
+  QASMParser parser(&ctx);
+
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qubit[2] q;\n"
+                    "input array[angle,2] ps;\n"
+                    "input array[float,3] params;\n"
+                    "cx q[0], q[1];\n"
+                    "rx(ps[0]) q[0];\n"
+                    "rx(ps[1]) q[1];\n"
+                    "rx(params[0]) q[0];\n"
+                    "rx(params[1]) q[1];\n";
+
+  CircuitSeq *seq1 = nullptr;
+  bool res1 = parser.load_qasm_str(str, seq1);
+  if (!res1) {
+    std::cout << "Parsing failed with parameter variables." << std::endl;
+    assert(false);
+    return;
+  }
+
+  int pnum = ctx.get_num_parameters();
+  if (pnum != 5) {
+    std::cout << "Unexpected parameter total: " << pnum << "." << std::endl;
+    assert(false);
+  }
+
+  int input_num = seq1->get_input_param_indices(&ctx).size();
+  if (input_num != 4) {
+    std::cout << "Unexpected input count: " << input_num << "." << std::endl;
     assert(false);
   }
 }
@@ -149,4 +191,6 @@ int main() {
   test_qasm2_qubits();
   std::cout << "[OpenQASM 3 Parsing Tests]" << std::endl;
   test_qasm3_qubits();
+  std::cout << "[Sybmolic Parameter Parsing Tests]" << std::endl;
+  test_param_parsing();
 }

@@ -44,16 +44,27 @@ class ParamParser {
       : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
 
   /**
+   * Adds an angle array declaration to the registry of symbolic parameters.
+   * This entry will associate each cell of the array, as specified by a token
+   * `[array,len] name`, with a unique symbolic parameter.
+   * @param ss a string stream containing the token.
+   * @return true if and only if the declaration is parsed successfully.
+   */
+  bool parse_array_decl(std::stringstream &ss);
+
+  /**
    * Parses a stream which is known to contain a parameter expression.
-   * Supported formats are as followed, where n and m are decimal literals:
+   * Supported formats are as follows, where n and m are decimal literals, i
+   * is an integer literal, and name is a string:
    * - pi*n
    * - n*pi
    * - n*pi/m
    * - n
    * - pi/m
    * - n/(m*pi)
+   * - name[i]
    * @param token the string stream which contains the parameter expression.
-   * @returns the parameter id for this expression in the current context.
+   * @return the parameter id for this expression in the current context.
    */
   int parse_expr(std::stringstream &token);
 
@@ -78,9 +89,35 @@ class ParamParser {
    */
   int parse_pi_expr(bool negative, ParamType num, ParamType denom);
 
+  /**
+   * The context against which, all symbolic parameters are initialized, and
+   * all expressions are evaluated.
+   */
   Context *ctx_;
+
+  /**
+   * Maps parameter values to constant identifiers in the context of ctx_.
+   */
   std::unordered_map<ParamType, int> number_params_;
+
+  /**
+   * Maps a pair (n, m) to the identifier of a symbolic expression, in the
+   * context of ctx_, which corresponds to n*pi/m.
+   * @see symbolic_pi_
+   */
   std::unordered_map<ParamType, std::unordered_map<ParamType, int>> pi_params_;
+
+  /**
+   * Maps a parameter array name and index to the identifier of a symbolic
+   * parameter, in the context of ctx_, which corresponds to the reference.
+   */
+  std::unordered_map<std::string, std::unordered_map<int, int>> symb_params_;
+
+  /**
+   * If true, then rational multiples of pi are evaluated exactly as symbolic
+   * values. For example, 3*pi/2 becomes mult(3, pi(2)). If false, then 3*pi/2
+   * is evaluated and stored as a floating-point constant.
+   */
   bool symbolic_pi_;
 };
 
@@ -231,7 +268,9 @@ bool QASMParser::load_qasm_stream(
       comment_position = line.find("//", comment_position);
     }
     // Adds spaces before square brackets to support OpenQASM 3 declarations.
-    find_and_replace_all(line, "[", " [");
+    // The spaces should not apply to the parameters passed to rotation gates.
+    find_and_replace_all(line, "array[", "array [");
+    find_and_replace_all(line, "qubit[", "qubit [");
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space
@@ -269,6 +308,20 @@ bool QASMParser::load_qasm_stream(
       }
     } else if (command == "qubit") {
       if (!qubit_parser.parse_qasm3_decl(ss)) {
+        return false;
+      }
+    } else if (command == "input") {
+      // This should be an array.
+      std::string type;
+      ss >> type;
+      if (type != "array") {
+        std::cout << "Unexpected input variable type: " << type << std::endl;
+        assert(false);
+        return false;
+      }
+
+      // Parses the parameter array.
+      if (!param_parser.parse_array_decl(ss)) {
         return false;
       }
     } else if (is_gate_string(command, gate_type)) {

@@ -115,8 +115,8 @@ int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
 }
 
 bool ParamParser::parse_array_decl(std::stringstream &ss) {
-  // The first two tokens the stream should be '[angle len]'. Recall that the
-  // comma between angle and len has been replacedby a space.
+  // The first two tokens of the stream should be '[angle len]'. Recall that the
+  // comma between angle and len has been replaced by a space.
   std::string type;
   ss >> type;
   type = strip(type);

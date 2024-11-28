@@ -199,7 +199,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
 
     // Attempts to look up the symbolic parameter identifier.
     if (symb_params_[name].count(idx) == 0) {
-      std::cerr << "Invalid parameter referene: " << token << std::endl;
+      std::cerr << "Invalid parameter reference: " << token << std::endl;
       assert(false);
       return false;
     }

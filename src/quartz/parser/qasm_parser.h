@@ -54,7 +54,7 @@ class ParamParser {
 
   /**
    * Parses a stream which is known to contain a parameter expression.
-   * Supported formats are as followed, where n and m are decimal literals, i
+   * Supported formats are as follows, where n and m are decimal literals, i
    * is an integer literal, and name is a string:
    * - pi*n
    * - n*pi

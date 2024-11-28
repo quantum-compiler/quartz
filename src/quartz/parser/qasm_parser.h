@@ -64,7 +64,7 @@ class ParamParser {
    * - n/(m*pi)
    * - name[i]
    * @param token the string stream which contains the parameter expression.
-   * @returns the parameter id for this expression in the current context.
+   * @return the parameter id for this expression in the current context.
    */
   int parse_expr(std::stringstream &token);
 

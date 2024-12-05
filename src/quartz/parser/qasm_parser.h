@@ -141,7 +141,7 @@ class ParamParser {
    * are new. When parsing subsequent files, it is expected that all parameter
    * variables were defined in the original file.
    */
-   bool first_file_;
+  bool first_file_;
 };
 
 /**

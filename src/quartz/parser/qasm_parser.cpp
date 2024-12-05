@@ -157,8 +157,7 @@ bool ParamParser::parse_array_decl(std::stringstream &ss) {
     for (int i = 0; i < len; ++i) {
       symb_params_[name][i] = ctx_->get_new_param_id();
     }
-  }
-  else {
+  } else {
     // Check that the parameter is declared and of the correct size.
     if (symb_params_[name].size() != len) {
       std::cerr << "Parameter size misalignment: " << name << std::endl;

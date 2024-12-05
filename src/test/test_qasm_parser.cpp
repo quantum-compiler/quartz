@@ -152,35 +152,74 @@ void test_param_parsing() {
 
   QASMParser parser(&ctx);
 
-  std::string str = "OPENQASM 2.0;\n"
-                    "include \"qelib1.inc\";\n"
-                    "qubit[2] q;\n"
-                    "input array[angle,2] ps;\n"
-                    "input array[float,3] params;\n"
-                    "cx q[0], q[1];\n"
-                    "rx(ps[0]) q[0];\n"
-                    "rx(ps[1]) q[1];\n"
-                    "rx(params[0]) q[0];\n"
-                    "rx(params[1]) q[1];\n";
+  // Tests parsing a first file.
+  std::string str1 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[2] q;\n"
+                     "input array[angle,2] ps;\n"
+                     "input array[float,3] params;\n"
+                     "cx q[0], q[1];\n"
+                     "rx(ps[0]) q[0];\n"
+                     "rx(ps[1]) q[1];\n"
+                     "rx(params[0]) q[0];\n"
+                     "rx(params[1]) q[1];\n";
 
   CircuitSeq *seq1 = nullptr;
-  bool res1 = parser.load_qasm_str(str, seq1);
+  bool res1 = parser.load_qasm_str(str1, seq1);
   if (!res1) {
     std::cout << "Parsing failed with parameter variables." << std::endl;
     assert(false);
     return;
   }
 
-  int pnum = ctx.get_num_parameters();
-  if (pnum != 5) {
-    std::cout << "Unexpected parameter total: " << pnum << "." << std::endl;
+  int pnum1 = ctx.get_num_parameters();
+  if (pnum1 != 5) {
+    std::cout << "Unexpected parameter total: " << pnum1 << "." << std::endl;
     assert(false);
   }
 
-  int input_num = seq1->get_input_param_indices(&ctx).size();
-  if (input_num != 4) {
-    std::cout << "Unexpected input count: " << input_num << "." << std::endl;
+  int input_num1 = seq1->get_input_param_indices(&ctx).size();
+  if (input_num1 != 4) {
+    std::cout << "Unexpected input count: " << input_num1 << "." << std::endl;
     assert(false);
+  }
+
+  // Tests parsing a second file.
+  std::string str2 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[5] q;\n"
+                     "input array[angle,2] ps;\n"
+                     "cx q[0], q[1];\n"
+                     "rx(ps[0]) q[0];\n"
+                     "rx(ps[1]) q[1];\n";
+
+  CircuitSeq *seq2 = nullptr;
+  bool res2 = parser.load_qasm_str(str2, seq2);
+  if (!res2) {
+    std::cout << "Parsing failed with parameter variables." << std::endl;
+    assert(false);
+    return;
+  }
+
+  int pnum2 = ctx.get_num_parameters();
+  if (pnum2 != 5) {
+    std::cout << "Unexpected parameter total: " << pnum2 << "." << std::endl;
+    assert(false);
+  }
+
+  int input_num2 = seq2->get_input_param_indices(&ctx).size();
+  if (input_num2 != 2) {
+    std::cout << "Unexpected input count: " << input_num2 << "." << std::endl;
+    assert(false);
+  }
+
+  // Checks that parameters were reused.
+  auto all_indices = seq1->get_input_param_indices(&ctx);
+  for (auto j : seq2->get_input_param_indices(&ctx)) {
+    if (std::count(all_indices.begin(), all_indices.end(), j) == 0) {
+      std::cout << "Unexpected parameter: " << j << "." << std::endl;
+      assert(false);
+    }
   }
 }
 

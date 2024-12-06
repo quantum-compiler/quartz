@@ -40,8 +40,8 @@ std::string strip(const std::string &input);
  */
 class ParamParser {
  public:
-  ParamParser(Context *ctx, bool symbolic_pi)
-      : ctx_(ctx), symbolic_pi_(symbolic_pi) {}
+  ParamParser(Context *ctx)
+      : ctx_(ctx), symbolic_pi_(false), first_file_(true) {}
 
   /**
    * Adds an angle array declaration to the registry of symbolic parameters.
@@ -67,6 +67,21 @@ class ParamParser {
    * @return the parameter id for this expression in the current context.
    */
   int parse_expr(std::stringstream &token);
+
+  /**
+   * Calling this function allows for symbolic pi values to be enabled or
+   * disabled. When symbolic pi values are enabled, each constant pi/n will be
+   * replaced by the symbolic expression pi(n).
+   * @param v if true, then symbolic pi values will be enabled.
+   */
+  void use_symbolic_pi(bool v) { symbolic_pi_ = v; }
+
+  /**
+   * Calling this function indicates that a file has been entirely parsed. In
+   * particular, after the first file is parsed, only the names and indices of
+   * existing symbolic variables may be used.
+   */
+  void end_file() { first_file_ = false; }
 
  private:
   /**
@@ -119,6 +134,14 @@ class ParamParser {
    * is evaluated and stored as a floating-point constant.
    */
   bool symbolic_pi_;
+
+  /**
+   * If true, then this parameter parser has already parsed an OpenQASM 3 file.
+   * When parsing the first file, it is expected that all parameter variables
+   * are new. When parsing subsequent files, it is expected that all parameter
+   * variables were defined in the original file.
+   */
+  bool first_file_;
 };
 
 /**
@@ -200,7 +223,7 @@ class QubitParser {
 // Parser from OpenQASM files to CircuitSeq objects.
 class QASMParser {
  public:
-  QASMParser(Context *ctx) : ctx_(ctx), symbolic_pi_(false) {}
+  QASMParser(Context *ctx) : ctx_(ctx), param_parser_(ctx) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
@@ -223,11 +246,11 @@ class QASMParser {
     return res;
   }
 
-  void use_symbolic_pi(bool v) { symbolic_pi_ = v; }
+  void use_symbolic_pi(bool v) { param_parser_.use_symbolic_pi(v); }
 
  private:
   Context *ctx_;
-  bool symbolic_pi_;
+  ParamParser param_parser_;
 };
 
 // We cannot put this template function implementation in a .cpp file.
@@ -236,7 +259,6 @@ bool QASMParser::load_qasm_stream(
     std::basic_istream<_CharT, _Traits> &qasm_stream, CircuitSeq *&seq) {
   // Results and sub-parsers.
   seq = nullptr;
-  ParamParser param_parser(ctx_, symbolic_pi_);
   QubitParser qubit_parser;
 
   // Generalized control data.
@@ -321,7 +343,7 @@ bool QASMParser::load_qasm_stream(
       }
 
       // Parses the parameter array.
-      if (!param_parser.parse_array_decl(ss)) {
+      if (!param_parser_.parse_array_decl(ss)) {
         return false;
       }
     } else if (is_gate_string(command, gate_type)) {
@@ -344,7 +366,7 @@ bool QASMParser::load_qasm_stream(
       std::vector<int> param_indices(num_params);
       for (int i = 0; i < num_params; ++i) {
         assert(ss.good());
-        int index = param_parser.parse_expr(ss);
+        int index = param_parser_.parse_expr(ss);
         if (index == -1) {
           return false;
         }
@@ -405,6 +427,9 @@ bool QASMParser::load_qasm_stream(
       assert(false);
     }
   }
+
+  // Successfully parsed file.
+  param_parser_.end_file();
   return true;
 }
 

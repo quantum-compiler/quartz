@@ -144,16 +144,26 @@ bool ParamParser::parse_array_decl(std::stringstream &ss) {
   getline(ss, name);
   name = strip(name);
 
-  // Ensures that the name is unique.
-  if (symb_params_.count(name) > 0) {
-    std::cerr << "Each param must have a unique name: " << name << std::endl;
-    assert(false);
-    return false;
-  }
+  // Determines whether the parameter is being declared or reused.
+  if (first_file_) {
+    // Ensures that the name is unique.
+    if (symb_params_.count(name) > 0) {
+      std::cerr << "Each param must have a unique name: " << name << std::endl;
+      assert(false);
+      return false;
+    }
 
-  // Allocates a symbolic parameter for each element of the array.
-  for (int i = 0; i < len; ++i) {
-    symb_params_[name][i] = ctx_->get_new_param_id();
+    // Allocates a symbolic parameter for each element of the array.
+    for (int i = 0; i < len; ++i) {
+      symb_params_[name][i] = ctx_->get_new_param_id();
+    }
+  } else {
+    // Check that the parameter is declared and of the correct size.
+    if (symb_params_[name].size() != len) {
+      std::cerr << "Parameter size misalignment: " << name << std::endl;
+      assert(false);
+      return false;
+    }
   }
   return true;
 }

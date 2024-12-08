@@ -173,12 +173,70 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   std::string token;
   ss >> token;
 
-  // Determines if angle is negative or positive.
-  bool negative = (token[0] == '-');
-  if (negative) {
+  // Determines if the first term is negative.
+  bool neg_prefix = (token != "" && token[0] == '-');
+  if (neg_prefix) {
     token = token.substr(1);
   }
-  return parse_term(negative, token);
+
+  // Ensures that the string is token is non-empty.
+  if (token == "") {
+    std::cerr << "Unexpected end-of-line while parsing expr." << std::endl;
+    assert(false);
+    return -1;
+  }
+
+  // Parses all (+) and (-) deliminators, starting from right-to-left.
+  // Along the way, all terms will be parsed, and converted to parameters.
+  // The param_expr_id for a running sum of all terms is given by id.
+  int id = -1;
+  while (token != "") {
+    // Determines where the expression splits into terms, when applicable.
+    // The right-most (last) deliminator will identify the next term to parse.
+    size_t pos = token.find_last_of("+-");
+
+    // Determines which case this corresponds to.
+    int tid;
+    if (pos == std::string::npos) {
+      // Case: t, -t
+      tid = parse_term(neg_prefix, token);
+      token = "";
+    } else if (pos > 0) {
+      // Case: t+e, t-e
+      bool is_minus = (token[pos] == '-');
+
+      // Splits the token at the deliminator.
+      auto term = token.substr(pos + 1);
+      token = token.substr(0, pos);
+
+      // Parses the right-hand side as a token.
+      // The substraction is absorbed by this term as a negative sign.
+      tid = parse_term(is_minus, term);
+    } else {
+      std::cerr << "Unexpected (+) or (-) at index 0: " << token << std::endl;
+      assert(false);
+      return -1;
+    }
+
+    // Adds the new term to the expression, if this is not the right-most term.
+    if (id != -1) {
+      if (sum_params_[tid].count(id) == 0) {
+        auto g = ctx_->get_gate(GateType::add);
+        sum_params_[tid][id] = ctx_->get_new_param_expression_id({tid, id}, g);
+      }
+      id = sum_params_[tid][id];
+    } else {
+      id = tid;
+    }
+
+    // Ensures that the new term was created successfully.
+    if (id == -1) {
+      std::cerr << "Unexpected error: failed to construct sum." << std::endl;
+      assert(false);
+      return -1;
+    }
+  }
+  return id;
 }
 
 int ParamParser::parse_term(bool negative, std::string token) {

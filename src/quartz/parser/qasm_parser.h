@@ -53,9 +53,15 @@ class ParamParser {
   bool parse_array_decl(std::stringstream &ss);
 
   /**
-   * Parses a stream which is known to contain a parameter expression. The
-   * following formats are supported, where n and m are decimal literals, i is
-   * an integer literal, and name is a string:
+   * Parses a stream which is known to contain a parameter expression. Each
+   * parameter expression consists of one or more terms composed together as
+   * follows, where t is a term and e is an expression:
+   *    | t
+   *    | -t
+   *    | e+t
+   *    | e-t
+   * For each term t, the following formats are supported, where n and m are
+   * decimal literals, i is an integer literal, and name is a string:
    *    | pi*n
    *    | n*pi
    *    | n*pi/m
@@ -143,6 +149,13 @@ class ParamParser {
    * parameter, in the context of ctx_, which corresponds to the reference.
    */
   std::unordered_map<std::string, std::unordered_map<int, int>> symb_params_;
+
+  /**
+   * Maps a pair of parameter identifiers, to the the identifier of a symbolic
+   * parameter, in the context of ctx_, which corresponds to sum of their
+   * corresponding parameters.
+   */
+  std::unordered_map<int, std::unordered_map<int, int>> sum_params_;
 
   /**
    * If true, then rational multiples of pi are evaluated exactly as symbolic

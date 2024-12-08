@@ -65,7 +65,7 @@ void test_symbolic_exprs() {
   auto mat2 = seq2->get_matrix(&ctx);
 
   assert(mat1.size() == mat2.size());
-  for (int i = 0; i < mat1.size(); ++i) {
+  for (size_t i = 0; i < mat1.size(); ++i) {
     assert(mat1[i].size() == mat2[i].size());
     for (int j = 0; j < mat1[i].size(); ++j) {
       if (mat1[i][j] != mat2[i][j]) {
@@ -223,6 +223,67 @@ void test_param_parsing() {
   }
 }
 
+void test_sum_parsing() {
+  ParamInfo param_info(0);
+  Context ctx({GateType::rx, GateType::mult, GateType::add, GateType::pi}, 2,
+              &param_info);
+
+  QASMParser parser(&ctx);
+  parser.use_symbolic_pi(true);
+
+  std::string str1 = "OPENQASM 2.0;\n"
+                     "include \"qelib1.inc\";\n"
+                     "qubit[1] q;\n"
+                     "rx(pi/5) q[1];\n"
+                     "rx(3*pi/2) q[1];\n"
+                     "rx(-0.32) q[1];\n";
+
+  CircuitSeq *seq1 = nullptr;
+  bool res1 = parser.load_qasm_str(str1, seq1);
+  if (!res1) {
+    std::cout << "Unexpected parsing failure." << std::endl;
+    assert(false);
+    return;
+  }
+
+  std::string str2 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[1] q;\n"
+                     "rx(pi/5+3*pi/2-0.32) q[1];\n";
+
+  CircuitSeq *seq2 = nullptr;
+  bool res2 = parser.load_qasm_str(str2, seq2);
+  if (!res2) {
+    std::cout << "Parsing failed with sums of terms." << std::endl;
+    assert(false);
+    return;
+  }
+
+  int pnum = ctx.get_num_parameters();
+  if (pnum != 9) {
+    // Expected caching.
+    // - Terms: 2, 3, 5, pi/2, pi/5, 3*pi/2, -0.32
+    // - Exprs: 3*pi.2-0.32, pi/5+3*pi/2-0.32
+    std::cout << "Failed to cache all intermediate values." << std::endl;
+    std::cout << "Number of parameters: " << pnum << std::endl;
+    assert(false);
+  }
+
+  auto mat1 = seq1->get_matrix(&ctx);
+  auto mat2 = seq2->get_matrix(&ctx);
+
+  assert(mat1.size() == mat2.size());
+  for (size_t i = 0; i < mat1.size(); ++i) {
+    assert(mat1[i].size() == mat2[i].size());
+    for (int j = 0; j < mat1[i].size(); ++j) {
+      if (mat1[i][j] != mat2[i][j]) {
+        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
+        assert(false);
+      }
+    }
+  }
+}
+
 int main() {
   std::cout << "[Symbolic Expression Tests]" << std::endl;
   test_symbolic_exprs();
@@ -232,4 +293,6 @@ int main() {
   test_qasm3_qubits();
   std::cout << "[Sybmolic Parameter Parsing Tests]" << std::endl;
   test_param_parsing();
+  std::cout << "[Sybmolic Summation Parsing Tests]" << std::endl;
+  test_sum_parsing();
 }

@@ -79,7 +79,7 @@ int ParamParser::parse_number(bool negative, ParamType p) {
   return number_params_[p];
 }
 
-int ParamParser::parse_pi_expr(bool negative, ParamType n, ParamType d) {
+int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
     return parse_number(negative, n * PI / d);
@@ -178,16 +178,11 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   if (negative) {
     token = token.substr(1);
   }
+  return parse_term(negative, token);
+}
 
-  // Currently only support the format of:
-  //  pi*0.123,
-  //  0.123*pi,
-  //  0.123*pi/2,
-  //  0.123
-  //  pi
-  //  pi/2
-  //  0.123/(2*pi)
-  //  name[i]
+int ParamParser::parse_term(bool negative, std::string token) {
+  // Identifies the format case matching this token.
   if (token.find("[") != std::string::npos) {
     // Case: name[i]
     // This case should come first, in case name contains the substring 'pi'.
@@ -217,16 +212,16 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   } else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
-      return parse_pi_expr(negative, 1.0, 1.0);
+      return parse_pi_term(negative, 1.0, 1.0);
     } else {
       // Cases: pi*0.123 or pi/2
       auto d = token.substr(3, std::string::npos);
       if (token[2] == '*') {
         // Case: pi*0.123
-        return parse_pi_expr(negative, std::stod(d), 1.0);
+        return parse_pi_term(negative, std::stod(d), 1.0);
       } else if (token[2] == '/') {
         // Case: pi/2
-        return parse_pi_expr(negative, 1.0, std::stod(d));
+        return parse_pi_term(negative, 1.0, std::stod(d));
       } else {
         std::cerr << "Unsupported parameter format: " << token << std::endl;
         assert(false);
@@ -252,7 +247,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
         // Case: 0.123*pi/2
         denom = std::stod(token.substr(token.find('/') + 1));
       }
-      return parse_pi_expr(negative, num, denom);
+      return parse_pi_term(negative, num, denom);
     }
   } else {
     // Case: 0.123

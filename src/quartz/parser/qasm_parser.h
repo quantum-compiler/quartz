@@ -53,16 +53,22 @@ class ParamParser {
   bool parse_array_decl(std::stringstream &ss);
 
   /**
-   * Parses a stream which is known to contain a parameter expression.
-   * Supported formats are as follows, where n and m are decimal literals, i
-   * is an integer literal, and name is a string:
-   * - pi*n
-   * - n*pi
-   * - n*pi/m
-   * - n
-   * - pi/m
-   * - n/(m*pi)
-   * - name[i]
+   * Parses a stream which is known to contain a parameter expression. Each
+   * parameter expression consists of one or more terms composed together as
+   * follows, where t is a term and e is an expression:
+   *    | t
+   *    | -t
+   *    | e+t
+   *    | e-t
+   * For each term t, the following formats are supported, where n and m are
+   * decimal literals, i is an integer literal, and name is a string:
+   *    | pi*n
+   *    | n*pi
+   *    | n*pi/m
+   *    | n
+   *    | pi/m
+   *    | n/(m*pi)
+   *    | name[i]
    * @param token the string stream which contains the parameter expression.
    * @return the parameter id for this expression in the current context.
    */
@@ -85,24 +91,40 @@ class ParamParser {
 
  private:
   /**
-   * Implementation details for parse_expr when the expression is a constant
-   * literal value or of the form n/(m*pi).
+   * Implementation details for each term in parse_expr. The supported formats
+   * for terms are as follows, where n and m are decimal literals, i is an
+   * integer literal, and name is a string:
+   *    | pi*n
+   *    | n*pi
+   *    | n*pi/m
+   *    | n
+   *    | pi/m
+   *    | n/(m*pi)
+   *    | name[i]
+   * @param negative if true, then the parameter should be negative.
+   * @param token the string which contains the parameter expression.
+   * @return the parameter id for this term in the current context.
+   */
+  int parse_term(bool negative, std::string token);
+
+  /**
+   * Implementation details for parse_term when the term is a constant literal
+   * value or of the form n/(m*pi).
    * @param negative if true, then the parameter should be negative.
    * @param p the literal value as a floating-point value.
    * @return the parameter id for this expression in the current context.
    */
-  // Handles constant parameters given as literal decimal expressions.
   int parse_number(bool negative, ParamType p);
 
   /**
-   * Implementation details for parse_expr when the expression is of the form
-   * pi*n, n*pi, n*pi/m, or pi/m
+   * Implementation details for parse_term when the term is of the form pi*n,
+   * n*pi, n*pi/m, or pi/m.
    * @param negative if true, then the parameter should be negative.
    * @param num either the value of n, or 1 if it is not in the format.
    * @param denom either the value of m, or 1 if it is not in the format.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_pi_expr(bool negative, ParamType num, ParamType denom);
+  int parse_pi_term(bool negative, ParamType num, ParamType denom);
 
   /**
    * The context against which, all symbolic parameters are initialized, and
@@ -127,6 +149,13 @@ class ParamParser {
    * parameter, in the context of ctx_, which corresponds to the reference.
    */
   std::unordered_map<std::string, std::unordered_map<int, int>> symb_params_;
+
+  /**
+   * Maps a pair of parameter identifiers, to the the identifier of a symbolic
+   * parameter, in the context of ctx_, which corresponds to sum of their
+   * corresponding parameters.
+   */
+  std::unordered_map<int, std::unordered_map<int, int>> sum_params_;
 
   /**
    * If true, then rational multiples of pi are evaluated exactly as symbolic

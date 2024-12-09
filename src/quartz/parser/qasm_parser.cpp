@@ -179,7 +179,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
     token = token.substr(1);
   }
 
-  // Ensures that the string is token is non-empty.
+  // Ensures that the string token is non-empty.
   if (token == "") {
     std::cerr << "Unexpected end-of-line while parsing expr." << std::endl;
     assert(false);

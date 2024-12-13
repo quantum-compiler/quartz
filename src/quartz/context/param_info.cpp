@@ -68,6 +68,8 @@ int ParamInfo::get_new_param_id(const ParamType &param) {
 int ParamInfo::get_new_param_id() {
   int id = (int)is_parameter_symbolic_.size();
   is_parameter_symbolic_.push_back(true);
+  // Make sure to generate a random parameter for each symbolic parameter.
+  gen_random_parameters(id + 1);
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;
   wire->index = id;

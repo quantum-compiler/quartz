@@ -26,6 +26,7 @@ class U3Gate : public Gate {
     }
     return cached_matrices[theta][phi][lambda].get();
   }
+  bool is_param_halved(int i) const override { return i == 0; }
   std::unordered_map<
       float, std::unordered_map<
                  float, std::unordered_map<float, std::unique_ptr<Matrix<2>>>>>

@@ -244,6 +244,10 @@ bool Context::param_is_expression(int id) const {
   return param_info_->param_is_expression(id);
 }
 
+bool Context::param_is_halved(int id) const {
+  return param_info_->param_is_halved(id);
+}
+
 CircuitWire *Context::get_param_wire(int id) const {
   return param_info_->get_param_wire(id);
 }

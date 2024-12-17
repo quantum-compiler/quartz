@@ -76,6 +76,7 @@ class ParamInfo {
   [[nodiscard]] bool param_is_symbolic(int id) const;
   [[nodiscard]] bool param_has_value(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
+  [[nodiscard]] bool param_is_halved(int id) const;
 
   [[nodiscard]] CircuitWire *get_param_wire(int id) const;
 

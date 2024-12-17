@@ -140,6 +140,11 @@ bool ParamInfo::param_is_expression(int id) const {
          !parameter_wires_[id]->input_gates.empty();
 }
 
+bool ParamInfo::param_is_halved(int id) const {
+  return id >= 0 && id < (int)is_parameter_halved_.size() &&
+         is_parameter_halved_[id];
+}
+
 CircuitWire *ParamInfo::get_param_wire(int id) const {
   if (id >= 0 && id < (int)parameter_wires_.size()) {
     return parameter_wires_[id].get();

@@ -6,7 +6,7 @@
 using namespace quartz;
 
 int main() {
-  ParamInfo param_info(/*num_input_symbolic_params=*/3);
+  ParamInfo param_info(/*num_input_symbolic_params=*/3, false);
   Context ctx({GateType::x, GateType::y, GateType::cx, GateType::h}, 3,
               &param_info);
   Generator gen(&ctx);

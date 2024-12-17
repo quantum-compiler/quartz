@@ -7,7 +7,7 @@
 using namespace quartz;
 
 int main() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx, GateType::mult}, 1, &param_info);
 
   auto p0 = ctx.get_new_param_id(2.0);

@@ -163,6 +163,7 @@ class Context {
   bool insert_gate(GateType tp);
 
   size_t global_unique_id;
+  bool is_halved_;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::unordered_map<
       GateType, std::unordered_map<std::vector<bool>, std::unique_ptr<Gate>>>

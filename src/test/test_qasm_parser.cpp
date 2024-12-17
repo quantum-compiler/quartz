@@ -16,7 +16,7 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
 }
 
 void test_symbolic_exprs() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx,
                GateType::mult, GateType::pi},
               2, &param_info);
@@ -87,7 +87,7 @@ void test_symbolic_exprs() {
 }
 
 void test_qasm2_qubits() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx}, 5, &param_info);
 
   QASMParser parser(&ctx);
@@ -116,7 +116,7 @@ void test_qasm2_qubits() {
 }
 
 void test_qasm3_qubits() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx}, 7, &param_info);
 
   QASMParser parser(&ctx);
@@ -147,7 +147,7 @@ void test_qasm3_qubits() {
 }
 
 void test_param_parsing() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx, GateType::rx}, 2, &param_info);
 
   QASMParser parser(&ctx);
@@ -224,7 +224,7 @@ void test_param_parsing() {
 }
 
 void test_sum_parsing() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx, GateType::mult, GateType::add, GateType::pi}, 2,
               &param_info);
 

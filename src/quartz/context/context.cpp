@@ -27,10 +27,11 @@ Context::Context(const std::vector<GateType> &supported_gates,
   }
 
   // Precomputes whether any of the gates use halved parameters.
-  is_halved_ = false;
+  may_use_halved_params_ = false;
   for (const auto &g : gates_) {
     for (int i = 0; i < g.second->get_num_parameters(); ++i) {
-      is_halved_ || = g.second->is_param_halved(i);
+      bool is_halved = g.second->is_param_halved(i);
+      may_use_halved_params_ = may_use_halved_params_ || is_halved;
     }
   }
 }
@@ -216,7 +217,7 @@ int Context::get_new_param_id(const ParamType &param) {
 }
 
 int Context::get_new_param_id() {
-  return param_info_->get_new_param_id(is_halved_);
+  return param_info_->get_new_param_id(may_use_halved_params_);
 }
 
 int Context::get_new_param_expression_id(

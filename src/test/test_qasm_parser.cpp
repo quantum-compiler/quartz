@@ -350,7 +350,7 @@ int main() {
   test_qasm3_qubits();
   std::cout << "[Sybmolic Parameter Parsing Tests]" << std::endl;
   test_param_parsing();
-  std::cout << "[Sybmolic Summation Parsing Tests]" << std::endl;
+  std::cout << "[Symbolic Summation Parsing Tests]" << std::endl;
   test_sum_parsing();
   std::cout << "[Halved Symbolic Parameters]" << std::endl;
   test_halved_param_ids();

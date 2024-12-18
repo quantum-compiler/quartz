@@ -30,7 +30,7 @@ Context::Context(const std::vector<GateType> &supported_gates,
   is_halved_ = false;
   for (const auto &g : gates_) {
     for (int i = 0; i < g.second->get_num_parameters(); ++i) {
-      is_halved_ ||= g.second->is_param_halved(i);
+      is_halved_ || = g.second->is_param_halved(i);
     }
   }
 }

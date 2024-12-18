@@ -56,6 +56,7 @@ std::vector<ParamType> ParamInfo::get_all_input_param_values() const {
 
 int ParamInfo::get_new_param_id(const ParamType &param) {
   int id = (int)is_parameter_symbolic_.size();
+  assert(id == (int)is_parameter_halved_.size());
   is_parameter_symbolic_.push_back(false);
   is_parameter_halved_.push_back(false);
   auto wire = std::make_unique<CircuitWire>();

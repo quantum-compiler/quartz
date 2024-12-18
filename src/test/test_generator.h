@@ -11,7 +11,7 @@ void test_generator(const std::vector<GateType> &support_gates, int num_qubits,
                     int max_num_input_parameters, int max_num_gates,
                     bool verbose, const std::string &save_file_name,
                     bool count_minimal_representations = false) {
-  ParamInfo param_info(/*num_input_symbolic_params=*/max_num_input_parameters);
+  ParamInfo param_info(max_num_input_parameters, false);
   Context ctx(support_gates, num_qubits, &param_info);
   Generator generator(&ctx);
   Dataset dataset;

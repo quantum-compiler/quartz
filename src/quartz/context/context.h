@@ -100,6 +100,7 @@ class Context {
   [[nodiscard]] bool param_is_symbolic(int id) const;
   [[nodiscard]] bool param_has_value(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
+  [[nodiscard]] bool param_is_halved(int id) const;
 
   [[nodiscard]] CircuitWire *get_param_wire(int id) const;
 
@@ -163,6 +164,7 @@ class Context {
   bool insert_gate(GateType tp);
 
   size_t global_unique_id;
+  bool may_use_halved_params_;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::unordered_map<
       GateType, std::unordered_map<std::vector<bool>, std::unique_ptr<Gate>>>

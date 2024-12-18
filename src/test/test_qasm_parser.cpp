@@ -16,7 +16,7 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
 }
 
 void test_symbolic_exprs() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx,
                GateType::mult, GateType::pi},
               2, &param_info);
@@ -87,7 +87,7 @@ void test_symbolic_exprs() {
 }
 
 void test_qasm2_qubits() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx}, 5, &param_info);
 
   QASMParser parser(&ctx);
@@ -116,7 +116,7 @@ void test_qasm2_qubits() {
 }
 
 void test_qasm3_qubits() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx}, 7, &param_info);
 
   QASMParser parser(&ctx);
@@ -147,7 +147,7 @@ void test_qasm3_qubits() {
 }
 
 void test_param_parsing() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::cx, GateType::rx}, 2, &param_info);
 
   QASMParser parser(&ctx);
@@ -224,7 +224,7 @@ void test_param_parsing() {
 }
 
 void test_sum_parsing() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx, GateType::mult, GateType::add, GateType::pi}, 2,
               &param_info);
 
@@ -284,6 +284,63 @@ void test_sum_parsing() {
   }
 }
 
+bool test_halved_param_context(Context &ctx, bool is_halved) {
+  auto g = ctx.get_gate(GateType::neg);
+
+  auto param_id = ctx.get_new_param_id();
+  auto const_id = ctx.get_new_param_id(0.5);
+  auto exprs_id = ctx.get_new_param_expression_id({param_id}, g);
+
+  if (ctx.param_is_halved(param_id) != is_halved) {
+    std::cout << "is_param_halved returned wrong val for symb." << std::endl;
+    return false;
+  }
+
+  if (ctx.param_is_halved(const_id)) {
+    std::cout << "is_param_halved returned wrong val for const." << std::endl;
+    return false;
+  }
+
+  if (ctx.param_is_halved(exprs_id)) {
+    std::cout << "is_param_halved returned wrong val for expr." << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+void test_halved_param_ids() {
+  // Default parameters constructed by ParamInfo.
+  ParamInfo param_info_1(4, false);
+  if (param_info_1.param_is_halved(2)) {
+    std::cout << "ParamInfo(4,false): param_is_halved(2) == true" << std::endl;
+    assert(false);
+  }
+
+  // Halved parameters constructed by ParamInfo.
+  ParamInfo param_info_2(4, true);
+  if (!param_info_2.param_is_halved(2)) {
+    std::cout << "ParamInfo(4,true): param_is_halved(2) == false" << std::endl;
+    assert(false);
+  }
+
+  // Default parameters constructed by a Context.
+  ParamInfo param_info_3;
+  Context ctx_3({GateType::x, GateType::ry, GateType::neg}, 2, &param_info_3);
+  if (!test_halved_param_context(ctx_3, true)) {
+    std::cout << "Context failed to handle halved param gate." << std::endl;
+    assert(false);
+  }
+
+  // Halved parameters constructed by a Context.
+  ParamInfo param_info_4;
+  Context ctx_4({GateType::x, GateType::y, GateType::neg}, 2, &param_info_4);
+  if (!test_halved_param_context(ctx_4, false)) {
+    std::cout << "Context failed to handle standard gates." << std::endl;
+    assert(false);
+  }
+}
+
 int main() {
   std::cout << "[Symbolic Expression Tests]" << std::endl;
   test_symbolic_exprs();
@@ -293,6 +350,8 @@ int main() {
   test_qasm3_qubits();
   std::cout << "[Sybmolic Parameter Parsing Tests]" << std::endl;
   test_param_parsing();
-  std::cout << "[Sybmolic Summation Parsing Tests]" << std::endl;
+  std::cout << "[Symbolic Summation Parsing Tests]" << std::endl;
   test_sum_parsing();
+  std::cout << "[Halved Symbolic Parameters]" << std::endl;
+  test_halved_param_ids();
 }

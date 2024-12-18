@@ -15,6 +15,7 @@ Context::Context(const std::vector<GateType> &supported_gates,
                  ParamInfo *param_info)
     : global_unique_id(16384), supported_gates_(supported_gates),
       param_info_(param_info) {
+  // Precomputes the supported gates.
   gates_.reserve(supported_gates.size());
   for (const auto &gate : supported_gates) {
     insert_gate(gate);
@@ -22,6 +23,16 @@ Context::Context(const std::vector<GateType> &supported_gates,
       supported_parameter_ops_.emplace_back(gate);
     } else {
       supported_quantum_gates_.emplace_back(gate);
+    }
+  }
+
+  // Precomputes whether any of the gates use halved parameters.
+  may_use_halved_params_ = false;
+  for (const auto &g : gates_) {
+    for (int i = 0; i < g.second->get_num_parameters(); ++i) {
+      if (g.second->is_param_halved(i)) {
+        may_use_halved_params_ = true;
+      }
     }
   }
 }
@@ -206,7 +217,9 @@ int Context::get_new_param_id(const ParamType &param) {
   return param_info_->get_new_param_id(param);
 }
 
-int Context::get_new_param_id() { return param_info_->get_new_param_id(); }
+int Context::get_new_param_id() {
+  return param_info_->get_new_param_id(may_use_halved_params_);
+}
 
 int Context::get_new_param_expression_id(
     const std::vector<int> &parameter_indices, Gate *op) {
@@ -231,6 +244,10 @@ bool Context::param_has_value(int id) const {
 
 bool Context::param_is_expression(int id) const {
   return param_info_->param_is_expression(id);
+}
+
+bool Context::param_is_halved(int id) const {
+  return param_info_->param_is_halved(id);
 }
 
 CircuitWire *Context::get_param_wire(int id) const {

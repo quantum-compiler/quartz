@@ -44,6 +44,8 @@ bool Gate::is_sparse() const { return false; }
 
 bool Gate::is_diagonal() const { return false; }
 
+bool Gate::is_param_halved(int i) const { return false; }
+
 int Gate::get_num_control_qubits() const { return 0; }
 
 std::vector<bool> Gate::get_control_state() const {

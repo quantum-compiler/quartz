@@ -41,6 +41,13 @@ class Gate {
    */
   [[nodiscard]] virtual bool is_diagonal() const;
   /**
+   * @param i the index of the parameter to check
+   * @return True if this gate is parameterized and parameter i has a period of
+   * 4*pi as opposed to 2*pi (e.g., rx, ry, rz).
+   * Default value is false.
+   */
+  [[nodiscard]] virtual bool is_param_halved(int i) const;
+  /**
    * @return The number of control qubits for controlled gates; or 0 if it is
    * not a controlled gate.
    * Default value is 0.

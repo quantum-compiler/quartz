@@ -7,7 +7,7 @@
 using namespace quartz;
 
 int main() {
-  ParamInfo param_info(0);
+  ParamInfo param_info;
   Context ctx({GateType::rx}, 2, &param_info);
 
   QASMParser parser(&ctx);

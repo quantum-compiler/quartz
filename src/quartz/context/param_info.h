@@ -20,11 +20,11 @@ class ParamInfo {
   /**
    * Default constructor: initialize 0 parameters.
    */
-  ParamInfo() : ParamInfo(0) {}
+  ParamInfo() : ParamInfo(0, false) {}
   /**
    * Initialize |num_input_symbolic_params| input symbolic parameters.
    */
-  explicit ParamInfo(int num_input_symbolic_params);
+  explicit ParamInfo(int num_input_symbolic_params, bool is_halved);
 
   /**
    * Generate random values for random testing for input symbolic parameters.
@@ -58,9 +58,10 @@ class ParamInfo {
   int get_new_param_id(const ParamType &param);
   /**
    * Create a new symbolic parameter.
+   * @param is_halved If true, then used by a gate with period 4*pi.
    * @return The index of the new symbolic parameter.
    */
-  int get_new_param_id();
+  int get_new_param_id(bool is_halved);
   /**
    * Create a new parameter expression. If all input parameters are concrete,
    * compute the result directly instead of creating the expression.
@@ -75,6 +76,7 @@ class ParamInfo {
   [[nodiscard]] bool param_is_symbolic(int id) const;
   [[nodiscard]] bool param_has_value(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
+  [[nodiscard]] bool param_is_halved(int id) const;
 
   [[nodiscard]] CircuitWire *get_param_wire(int id) const;
 
@@ -101,6 +103,7 @@ class ParamInfo {
   std::vector<ParamType> parameter_values_;
   std::vector<std::unique_ptr<CircuitWire>> parameter_wires_;
   std::vector<bool> is_parameter_symbolic_;
+  std::vector<bool> is_parameter_halved_;
   // A holder for parameter expressions.
   std::vector<std::unique_ptr<CircuitGate>> parameter_expressions_;
 

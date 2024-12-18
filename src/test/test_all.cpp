@@ -11,7 +11,7 @@ using namespace quartz;
 
 int main() {
   std::cout << "Hello, World!" << std::endl;
-  ParamInfo param_info(/*num_input_symbolic_params=*/2);
+  ParamInfo param_info(/*num_input_symbolic_params=*/2, false);
   Context ctx({GateType::x, GateType::y, GateType::add, GateType::neg,
                GateType::u2, GateType::u3, GateType::cx},
               2, &param_info);

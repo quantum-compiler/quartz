@@ -12,10 +12,10 @@ bool is_symbolic_constant(Gate *op) {
   return rv;
 }
 
-ParamInfo::ParamInfo(int num_input_symbolic_params) {
+ParamInfo::ParamInfo(int num_input_symbolic_params, bool is_halved) {
   gen_random_parameters(num_input_symbolic_params);
   for (int i = 0; i < num_input_symbolic_params; i++) {
-    get_new_param_id();
+    get_new_param_id(is_halved);
   }
 }
 
@@ -56,7 +56,9 @@ std::vector<ParamType> ParamInfo::get_all_input_param_values() const {
 
 int ParamInfo::get_new_param_id(const ParamType &param) {
   int id = (int)is_parameter_symbolic_.size();
+  assert(id == (int)is_parameter_halved_.size());
   is_parameter_symbolic_.push_back(false);
+  is_parameter_halved_.push_back(false);
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;
   wire->index = id;
@@ -65,9 +67,10 @@ int ParamInfo::get_new_param_id(const ParamType &param) {
   return id;
 }
 
-int ParamInfo::get_new_param_id() {
+int ParamInfo::get_new_param_id(bool is_halved) {
   int id = (int)is_parameter_symbolic_.size();
   is_parameter_symbolic_.push_back(true);
+  is_parameter_halved_.push_back(is_halved);
   // Make sure to generate a random parameter for each symbolic parameter.
   gen_random_parameters(id + 1);
   auto wire = std::make_unique<CircuitWire>();
@@ -98,6 +101,7 @@ int ParamInfo::get_new_param_expression_id(
   }
   int id = (int)is_parameter_symbolic_.size();
   is_parameter_symbolic_.push_back(true);
+  is_parameter_halved_.push_back(false);
   auto circuit_gate = std::make_unique<CircuitGate>();
   circuit_gate->gate = op;
   for (auto &input_id : parameter_indices) {
@@ -135,6 +139,11 @@ bool ParamInfo::param_has_value(int id) const {
 bool ParamInfo::param_is_expression(int id) const {
   return id >= 0 && id < (int)parameter_wires_.size() &&
          !parameter_wires_[id]->input_gates.empty();
+}
+
+bool ParamInfo::param_is_halved(int id) const {
+  return id >= 0 && id < (int)is_parameter_halved_.size() &&
+         is_parameter_halved_[id];
 }
 
 CircuitWire *ParamInfo::get_param_wire(int id) const {

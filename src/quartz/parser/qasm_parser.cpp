@@ -168,7 +168,7 @@ bool ParamParser::parse_array_decl(std::stringstream &ss) {
   return true;
 }
 
-int ParamParser::parse_expr(std::stringstream &ss) {
+int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
   // Extracts the parameter expression from the string stream.
   std::string token;
   ss >> token;
@@ -199,7 +199,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
     int tid;
     if (pos == std::string::npos) {
       // Case: t, -t
-      tid = parse_term(neg_prefix, token);
+      tid = parse_term(neg_prefix, token, is_halved);
       token = "";
     } else if (pos > 0) {
       // Case: t+e, t-e
@@ -211,7 +211,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
 
       // Parses the right-hand side as a token.
       // The substraction is absorbed by this term as a negative sign.
-      tid = parse_term(is_minus, term);
+      tid = parse_term(is_minus, term, is_halved);
     } else {
       std::cerr << "Unexpected (+) or (-) at index 0: " << token << std::endl;
       assert(false);
@@ -239,7 +239,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   return id;
 }
 
-int ParamParser::parse_term(bool negative, std::string token) {
+int ParamParser::parse_term(bool negative, std::string token, bool is_halved) {
   // Identifies the format case matching this token.
   if (token.find("[") != std::string::npos) {
     // Case: name[i]
@@ -257,16 +257,48 @@ int ParamParser::parse_term(bool negative, std::string token) {
     if (idx == -1) {
       std::cerr << "Invalid parameter reference index: " << istr << std::endl;
       assert(false);
-      return false;
+      return -1;
     }
 
     // Attempts to look up the symbolic parameter identifier.
     if (symb_params_[name].count(idx) == 0) {
       std::cerr << "Invalid parameter reference: " << token << std::endl;
       assert(false);
-      return false;
+      return -1;
     }
-    return symb_params_[name][idx];
+    int param = symb_params_[name][idx];
+
+    // Ensures that halved parameter requirements are obeyed.
+    if (is_halved) {
+      if (!ctx_->param_is_halved(param)) {
+        std::cerr << "Halved gate requires halved parameters." << std::endl;
+        assert(false);
+        return -1;
+      }
+    }
+
+    // Rescales halved parameters for gates which are not halved.
+    if (!is_halved) {
+      if (ctx_->param_is_halved(param)) {
+        if (sum_params_[param].count(param) == 0) {
+          auto add = ctx_->get_gate(GateType::add);
+          int dbl_id = ctx_->get_new_param_expression_id({param, param}, add);
+          sum_params_[param][param] = dbl_id;
+        }
+        param = sum_params_[param][param];
+      }
+    }
+
+    // Handles negative parameters.
+    if (negative) {
+      if (negative_symb_params.count(param) == 0) {
+        auto neg = ctx_->get_gate(GateType::neg);
+        int neg_id = ctx_->get_new_param_expression_id({param}, neg);
+        negative_symb_params[param] = neg_id;
+      }
+      param = negative_symb_params[param];
+    }
+    return param;
   } else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
@@ -382,7 +414,7 @@ int QubitParser::parse_access(std::stringstream &ss) {
   if (!finalized_) {
     std::cerr << "Can only access qubits after finalization." << std::endl;
     assert(false);
-    return false;
+    return -1;
   }
 
   // Gets qreg array name.
@@ -415,7 +447,7 @@ int QubitParser::finalize() {
   if (finalized_) {
     std::cerr << "Can only finalize qreg lookup once." << std::endl;
     assert(false);
-    return false;
+    return -1;
   }
   finalized_ = true;
 

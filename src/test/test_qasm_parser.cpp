@@ -15,6 +15,9 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
   return false;
 }
 
+//
+// Tests for use_symbolic_pi.
+//
 void test_symbolic_exprs() {
   ParamInfo param_info;
   Context ctx({GateType::rx, GateType::ry, GateType::rz, GateType::cx,
@@ -86,6 +89,9 @@ void test_symbolic_exprs() {
   }
 }
 
+//
+// Regression tests for qubit parsing in OpenQASM 2.
+//
 void test_qasm2_qubits() {
   ParamInfo param_info;
   Context ctx({GateType::cx}, 5, &param_info);
@@ -115,6 +121,9 @@ void test_qasm2_qubits() {
   }
 }
 
+//
+// Tests for qubit parsing in OpenQASM 3.
+//
 void test_qasm3_qubits() {
   ParamInfo param_info;
   Context ctx({GateType::cx}, 7, &param_info);
@@ -146,6 +155,9 @@ void test_qasm3_qubits() {
   }
 }
 
+//
+// Test for OpenQASM 3 input parameter variable parsing.
+//
 void test_param_parsing() {
   ParamInfo param_info;
   Context ctx({GateType::cx, GateType::rx}, 2, &param_info);
@@ -223,6 +235,9 @@ void test_param_parsing() {
   }
 }
 
+//
+// Test for parsing sums used within parameter expressions.
+//
 void test_sum_parsing() {
   ParamInfo param_info;
   Context ctx({GateType::rx, GateType::mult, GateType::add, GateType::pi}, 2,
@@ -284,6 +299,9 @@ void test_sum_parsing() {
   }
 }
 
+//
+// Tests for identifying halved parameter expressions.
+//
 bool test_halved_param_context(Context &ctx, bool is_halved) {
   auto g = ctx.get_gate(GateType::neg);
 
@@ -309,22 +327,31 @@ bool test_halved_param_context(Context &ctx, bool is_halved) {
   return true;
 }
 
+//
+// Tests for mixing halved parameter gates with standard parameter gates.
+//
 void test_halved_param_ids() {
+  //
   // Default parameters constructed by ParamInfo.
+  //
   ParamInfo param_info_1(4, false);
   if (param_info_1.param_is_halved(2)) {
     std::cout << "ParamInfo(4,false): param_is_halved(2) == true" << std::endl;
     assert(false);
   }
 
+  //
   // Halved parameters constructed by ParamInfo.
+  //
   ParamInfo param_info_2(4, true);
   if (!param_info_2.param_is_halved(2)) {
     std::cout << "ParamInfo(4,true): param_is_halved(2) == false" << std::endl;
     assert(false);
   }
 
+  //
   // Default parameters constructed by a Context.
+  //
   ParamInfo param_info_3;
   Context ctx_3({GateType::x, GateType::ry, GateType::neg}, 2, &param_info_3);
   if (!test_halved_param_context(ctx_3, true)) {
@@ -332,12 +359,72 @@ void test_halved_param_ids() {
     assert(false);
   }
 
+  //
   // Halved parameters constructed by a Context.
+  //
   ParamInfo param_info_4;
   Context ctx_4({GateType::x, GateType::y, GateType::neg}, 2, &param_info_4);
   if (!test_halved_param_context(ctx_4, false)) {
     std::cout << "Context failed to handle standard gates." << std::endl;
     assert(false);
+  }
+
+  //
+  // Halved parameters work when parsing a circuit.
+  //
+  ParamInfo param_info_5;
+  Context ctx_5({GateType::p, GateType::rz, GateType::add, GateType::neg,
+                 GateType::x, GateType::mult, GateType::pi},
+                &param_info_5);
+
+  QASMParser parser_5(&ctx_5);
+
+  // Implements [[exp(i*2*theta), 1] [0, 1]] with halved parameter theta.
+  std::string str1 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[1] q;\n"
+                     "input array[angle,1] ps;\n"
+                     "rz(ps[0]+ps[0]) q[0];\n"
+                     "p(-ps[0]) q[0];\n";
+
+  CircuitSeq *seq1 = nullptr;
+  bool res1 = parser_5.load_qasm_str(str1, seq1);
+  if (!res1) {
+    std::cout << "Unexpected parsing failure." << std::endl;
+    assert(false);
+    return;
+  }
+
+  // Implements [[exp(i*2*theta), 1] [0, 1]] after reparameterization.
+  std::string str2 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[1] q;\n"
+                     "input array[angle,1] ps;\n"
+                     "x q[0];\n"
+                     "p(-ps[0]) q[0];\n"
+                     "x q[0];\n";
+
+  CircuitSeq *seq2 = nullptr;
+  bool res2 = parser_5.load_qasm_str(str2, seq2);
+  if (!res2) {
+    std::cout << "Unexpected parsing failure." << std::endl;
+    assert(false);
+    return;
+  }
+
+  auto mat1 = seq1->get_matrix(&ctx_5);
+  auto mat2 = seq2->get_matrix(&ctx_5);
+
+  assert(mat1.size() == mat2.size());
+  for (size_t i = 0; i < mat1.size(); ++i) {
+    assert(mat1[i].size() == mat2[i].size());
+    for (int j = 0; j < mat1[i].size(); ++j) {
+      if (mat1[i][j] != mat2[i][j]) {
+        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
+        std::cout << mat1[i][j] << " != " << mat2[i][j] << std::endl;
+        assert(false);
+      }
+    }
   }
 }
 

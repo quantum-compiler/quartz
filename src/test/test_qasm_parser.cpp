@@ -15,6 +15,22 @@ bool has_exprs(Context &ctx, CircuitSeq *seq) {
   return false;
 }
 
+bool eq_mats(std::vector<Vector> lhs, std::vector<Vector> rhs, float err) {
+  assert(lhs.size() == rhs.size());
+  for (size_t i = 0; i < lhs.size(); ++i) {
+    assert(lhs[i].size() == rhs[i].size());
+    for (int j = 0; j < lhs[i].size(); ++j) {
+      auto diff = abs(lhs[i][j] - rhs[i][j]);
+      if (diff > err) {
+        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
+        std::cout << lhs[i][j] << " != " << rhs[i][j] << std::endl;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 //
 // Tests for use_symbolic_pi.
 //
@@ -64,18 +80,8 @@ void test_symbolic_exprs() {
     assert(false);
   }
 
-  auto mat1 = seq1->get_matrix(&ctx);
-  auto mat2 = seq2->get_matrix(&ctx);
-
-  assert(mat1.size() == mat2.size());
-  for (size_t i = 0; i < mat1.size(); ++i) {
-    assert(mat1[i].size() == mat2[i].size());
-    for (int j = 0; j < mat1[i].size(); ++j) {
-      if (mat1[i][j] != mat2[i][j]) {
-        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
-        assert(false);
-      }
-    }
+  if (eq_mats(seq1->get_matrix(&ctx), seq2->get_matrix(&ctx), 0)) {
+    assert(false);
   }
 
   if (!has_exprs(ctx, seq1)) {
@@ -370,7 +376,7 @@ void test_halved_param_ids() {
   }
 
   //
-  // Halved parameters work when parsing a circuit.
+  // Halved symbolic parameters work when parsing a circuit.
   //
   ParamInfo param_info_5;
   Context ctx_5({GateType::p, GateType::rz, GateType::add, GateType::neg,
@@ -388,9 +394,8 @@ void test_halved_param_ids() {
                      "p(-ps[0]) q[0];\n";
 
   CircuitSeq *seq1 = nullptr;
-  bool res1 = parser_5.load_qasm_str(str1, seq1);
-  if (!res1) {
-    std::cout << "Unexpected parsing failure." << std::endl;
+  if (!parser_5.load_qasm_str(str1, seq1)) {
+    std::cout << "Unexpected parsing failure (1)." << std::endl;
     assert(false);
     return;
   }
@@ -405,26 +410,59 @@ void test_halved_param_ids() {
                      "x q[0];\n";
 
   CircuitSeq *seq2 = nullptr;
-  bool res2 = parser_5.load_qasm_str(str2, seq2);
-  if (!res2) {
-    std::cout << "Unexpected parsing failure." << std::endl;
+  if (!parser_5.load_qasm_str(str2, seq2)) {
+    std::cout << "Unexpected parsing failure (2)." << std::endl;
     assert(false);
     return;
   }
 
-  auto mat1 = seq1->get_matrix(&ctx_5);
-  auto mat2 = seq2->get_matrix(&ctx_5);
+  if (!eq_mats(seq1->get_matrix(&ctx_5), seq2->get_matrix(&ctx_5), 0)) {
+    std::cout << "Disagreement on symbolic parameters." << std::endl;
+    assert(false);
+  }
 
-  assert(mat1.size() == mat2.size());
-  for (size_t i = 0; i < mat1.size(); ++i) {
-    assert(mat1[i].size() == mat2[i].size());
-    for (int j = 0; j < mat1[i].size(); ++j) {
-      if (mat1[i][j] != mat2[i][j]) {
-        std::cout << "Disagree at " << i << ", " << j << "." << std::endl;
-        std::cout << mat1[i][j] << " != " << mat2[i][j] << std::endl;
-        assert(false);
-      }
-    }
+  //
+  // Halved constant parameters work when parsing a circuit.
+  //
+  ParamInfo param_info_6;
+  Context ctx_6({GateType::x, GateType::s, GateType::rx, GateType::p,
+                 GateType::pi, GateType::add, GateType::neg, GateType::mult},
+                &param_info_6);
+
+  QASMParser parser_6(&ctx_6);
+  parser_6.use_symbolic_pi(true);
+
+  std::string str3 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[1] q;\n"
+                     "x q[0];\n";
+
+  CircuitSeq *seq3 = nullptr;
+  if (!parser_6.load_qasm_str(str3, seq3)) {
+    std::cout << "Unexpected parsing failure (3)." << std::endl;
+    assert(false);
+    return;
+  }
+
+  std::string str4 = "OPENQASM 3;\n"
+                     "include \"stdgates.inc\";\n"
+                     "qubit[1] q;\n"
+                     "rx(pi) q[0];\n"
+                     "s q[0];\n"
+                     "x q[0];\n"
+                     "p(pi/2) q[0];\n"
+                     "x q[0];\n";
+
+  CircuitSeq *seq4 = nullptr;
+  if (!parser_6.load_qasm_str(str4, seq4)) {
+    std::cout << "Unexpected parsing failure (4)." << std::endl;
+    assert(false);
+    return;
+  }
+
+  if (!eq_mats(seq3->get_matrix(&ctx_6), seq4->get_matrix(&ctx_6), 1e-16)) {
+    std::cout << "Disagreement on constant parameters." << std::endl;
+    assert(false);
   }
 }
 

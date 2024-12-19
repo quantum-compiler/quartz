@@ -114,9 +114,10 @@ class ParamParser {
    * value or of the form n/(m*pi).
    * @param negative if true, then the parameter should be negative.
    * @param p the literal value as a floating-point value.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_number(bool negative, ParamType p);
+  int parse_number(bool negative, ParamType p, bool is_halved);
 
   /**
    * Implementation details for parse_term when the term is of the form pi*n,
@@ -124,9 +125,11 @@ class ParamParser {
    * @param negative if true, then the parameter should be negative.
    * @param num either the value of n, or 1 if it is not in the format.
    * @param denom either the value of m, or 1 if it is not in the format.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_pi_term(bool negative, ParamType num, ParamType denom);
+  int parse_pi_term(bool negative, ParamType num, ParamType denom,
+                    bool is_halved);
 
   /**
    * The context against which, all symbolic parameters are initialized, and

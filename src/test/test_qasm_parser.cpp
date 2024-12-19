@@ -466,6 +466,39 @@ void test_halved_param_ids() {
   }
 }
 
+//
+// Tests to_qasm_style_string with mixed constants.
+//
+void test_printing_halved_params() {
+  ParamInfo param_info;
+  Context ctx({GateType::p, GateType::rx, GateType::add, GateType::neg,
+               GateType::pi},
+              &param_info);
+
+  QASMParser parser(&ctx);
+  parser.use_symbolic_pi(true);
+
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qreg q[1];\n"
+                    "rx(2) q[0];\n"
+                    "p(2) q[0];\n";
+
+  CircuitSeq *seq = nullptr;
+  if (!parser.load_qasm_str(str, seq)) {
+    std::cout << "Unexpected parsing failure." << std::endl;
+    assert(false);
+    return;
+  }
+
+  std::string act = seq->to_qasm_style_string(&ctx, 0.1);
+  if (act != str) {
+    std::cout << "to_qasm_style_string: failed to handle halved parameters."
+              << std::endl << act << std::endl;
+    assert(false);
+  }
+}
+
 int main() {
   std::cout << "[Symbolic Expression Tests]" << std::endl;
   test_symbolic_exprs();
@@ -479,4 +512,6 @@ int main() {
   test_sum_parsing();
   std::cout << "[Halved Symbolic Parameters]" << std::endl;
   test_halved_param_ids();
+  std::cout << "[Printing Halved Constant Parameters]" << std::endl;
+  test_printing_halved_params();
 }

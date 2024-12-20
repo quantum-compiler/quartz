@@ -130,8 +130,8 @@ int ParamParser::parse_symb_param(bool negative, std::string name, int i,
                                   bool is_halved) {
   // Attempts to look up the symbolic parameter identifier.
   if (symb_params_[name].count(i) == 0) {
-    std::cerr << "Invalid parameter reference: "
-              << name << "[" << i << "]" << std::endl;
+    std::cerr << "Invalid parameter reference: " << name << "[" << i << "]"
+              << std::endl;
     assert(false);
     return -1;
   }

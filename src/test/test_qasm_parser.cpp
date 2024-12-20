@@ -471,9 +471,9 @@ void test_halved_param_ids() {
 //
 void test_printing_halved_params() {
   ParamInfo param_info;
-  Context ctx({GateType::p, GateType::rx, GateType::add, GateType::neg,
-               GateType::pi},
-              &param_info);
+  Context ctx(
+      {GateType::p, GateType::rx, GateType::add, GateType::neg, GateType::pi},
+      &param_info);
 
   QASMParser parser(&ctx);
   parser.use_symbolic_pi(true);
@@ -494,7 +494,8 @@ void test_printing_halved_params() {
   std::string act = seq->to_qasm_style_string(&ctx, 0.1);
   if (act != str) {
     std::cout << "to_qasm_style_string: failed to handle halved parameters."
-              << std::endl << act << std::endl;
+              << std::endl
+              << act << std::endl;
     assert(false);
   }
 }

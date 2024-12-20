@@ -126,6 +126,50 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
   return pi_params_[n][d];
 }
 
+int ParamParser::parse_symb_param(bool negative, std::string name, int i,
+                                  bool is_halved) {
+  // Attempts to look up the symbolic parameter identifier.
+  if (symb_params_[name].count(i) == 0) {
+    std::cerr << "Invalid parameter reference: "
+              << name << "[" << i << "]" << std::endl;
+    assert(false);
+    return -1;
+  }
+  int param = symb_params_[name][i];
+
+  // Ensures that halved parameter requirements are obeyed.
+  if (is_halved) {
+    if (!ctx_->param_is_halved(param)) {
+      std::cerr << "Halved gate requires halved parameters." << std::endl;
+      assert(false);
+      return -1;
+    }
+  }
+
+  // Rescales halved parameters for gates which are not halved.
+  if (!is_halved) {
+    if (ctx_->param_is_halved(param)) {
+      if (sum_params_[param].count(param) == 0) {
+        auto add = ctx_->get_gate(GateType::add);
+        int dbl_id = ctx_->get_new_param_expression_id({param, param}, add);
+        sum_params_[param][param] = dbl_id;
+      }
+      param = sum_params_[param][param];
+    }
+  }
+
+  // Handles negative parameters.
+  if (negative) {
+    if (negative_symb_params.count(param) == 0) {
+      auto neg = ctx_->get_gate(GateType::neg);
+      int neg_id = ctx_->get_new_param_expression_id({param}, neg);
+      negative_symb_params[param] = neg_id;
+    }
+    param = negative_symb_params[param];
+  }
+  return param;
+}
+
 bool ParamParser::parse_array_decl(std::stringstream &ss) {
   // The first two tokens of the stream should be '[angle len]'. Recall that the
   // comma between angle and len has been replaced by a space.
@@ -267,50 +311,13 @@ int ParamParser::parse_term(bool negative, std::string token, bool is_halved) {
     // Determines the reference index.
     int idx = string_to_number(istr);
     if (idx == -1) {
-      std::cerr << "Invalid parameter reference index: " << istr << std::endl;
+      std::cerr << "Negative parameter reference index: " << istr << std::endl;
       assert(false);
       return -1;
     }
 
-    // Attempts to look up the symbolic parameter identifier.
-    if (symb_params_[name].count(idx) == 0) {
-      std::cerr << "Invalid parameter reference: " << token << std::endl;
-      assert(false);
-      return -1;
-    }
-    int param = symb_params_[name][idx];
-
-    // Ensures that halved parameter requirements are obeyed.
-    if (is_halved) {
-      if (!ctx_->param_is_halved(param)) {
-        std::cerr << "Halved gate requires halved parameters." << std::endl;
-        assert(false);
-        return -1;
-      }
-    }
-
-    // Rescales halved parameters for gates which are not halved.
-    if (!is_halved) {
-      if (ctx_->param_is_halved(param)) {
-        if (sum_params_[param].count(param) == 0) {
-          auto add = ctx_->get_gate(GateType::add);
-          int dbl_id = ctx_->get_new_param_expression_id({param, param}, add);
-          sum_params_[param][param] = dbl_id;
-        }
-        param = sum_params_[param][param];
-      }
-    }
-
-    // Handles negative parameters.
-    if (negative) {
-      if (negative_symb_params.count(param) == 0) {
-        auto neg = ctx_->get_gate(GateType::neg);
-        int neg_id = ctx_->get_new_param_expression_id({param}, neg);
-        negative_symb_params[param] = neg_id;
-      }
-      param = negative_symb_params[param];
-    }
-    return param;
+    // Resolves symbolic parameter.
+    return parse_symb_param(negative, name, idx, is_halved);
   } else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi

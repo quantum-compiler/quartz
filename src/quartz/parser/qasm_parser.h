@@ -132,6 +132,17 @@ class ParamParser {
                     bool is_halved);
 
   /**
+   * Implementation details for parse_term when the term is of the form either
+   * name[i] or -name[i].
+   * @param negative if true, then the parameter should be negative.
+   * @param name the name of symbolic parameter variable.
+   * @param i the index into the symbolic parameter variable.
+   * @param is_halved if true, then the parameter is used in a halved context.
+   * @return the parameter id for this expression in the current context.
+   */
+  int parse_symb_param(bool negative, std::string name, int i, bool is_halved);
+
+  /**
    * The context against which, all symbolic parameters are initialized, and
    * all expressions are evaluated.
    */

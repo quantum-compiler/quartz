@@ -475,8 +475,8 @@ def equivalent(
             for S in range(1 << num_qubits):
                 # Construct a vector with only the S-th place being 1
                 vec_S = [(int(i == S), 0) for i in range(1 << num_qubits)]
-                output_vec1_S = evaluate(dag1, vec_S, [])
-                output_vec2_S = evaluate(dag2, vec_S, [])
+                output_vec1_S = evaluate(dag1, vec_S, params)
+                output_vec2_S = evaluate(dag2, vec_S, params)
                 output_vec1 += output_vec1_S
                 output_vec2 += output_vec2_S
             result = search_phase_factor_to_check_equivalence(

@@ -70,9 +70,10 @@ class ParamParser {
    *    | n/(m*pi)
    *    | name[i]
    * @param token the string stream which contains the parameter expression.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_expr(std::stringstream &token);
+  int parse_expr(std::stringstream &token, bool is_halved);
 
   /**
    * Calling this function allows for symbolic pi values to be enabled or
@@ -103,18 +104,20 @@ class ParamParser {
    *    | name[i]
    * @param negative if true, then the parameter should be negative.
    * @param token the string which contains the parameter expression.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this term in the current context.
    */
-  int parse_term(bool negative, std::string token);
+  int parse_term(bool negative, std::string token, bool is_halved);
 
   /**
    * Implementation details for parse_term when the term is a constant literal
    * value or of the form n/(m*pi).
    * @param negative if true, then the parameter should be negative.
    * @param p the literal value as a floating-point value.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_number(bool negative, ParamType p);
+  int parse_number(bool negative, ParamType p, bool is_halved);
 
   /**
    * Implementation details for parse_term when the term is of the form pi*n,
@@ -122,9 +125,22 @@ class ParamParser {
    * @param negative if true, then the parameter should be negative.
    * @param num either the value of n, or 1 if it is not in the format.
    * @param denom either the value of m, or 1 if it is not in the format.
+   * @param is_halved if true, then the parameter is used in a halved context.
    * @return the parameter id for this expression in the current context.
    */
-  int parse_pi_term(bool negative, ParamType num, ParamType denom);
+  int parse_pi_term(bool negative, ParamType num, ParamType denom,
+                    bool is_halved);
+
+  /**
+   * Implementation details for parse_term when the term is of the form either
+   * name[i] or -name[i].
+   * @param negative if true, then the parameter should be negative.
+   * @param name the name of symbolic parameter variable.
+   * @param i the index into the symbolic parameter variable.
+   * @param is_halved if true, then the parameter is used in a halved context.
+   * @return the parameter id for this expression in the current context.
+   */
+  int parse_symb_param(bool negative, std::string name, int i, bool is_halved);
 
   /**
    * The context against which, all symbolic parameters are initialized, and
@@ -147,6 +163,8 @@ class ParamParser {
   /**
    * Maps a parameter array name and index to the identifier of a symbolic
    * parameter, in the context of ctx_, which corresponds to the reference.
+   * Note that if symb_params_[name][i] is populated then symb_params[name][-i]
+   * corresponds to the negation of symb_params_[name][i].
    */
   std::unordered_map<std::string, std::unordered_map<int, int>> symb_params_;
 
@@ -156,6 +174,12 @@ class ParamParser {
    * corresponding parameters.
    */
   std::unordered_map<int, std::unordered_map<int, int>> sum_params_;
+
+  /**
+   * Maps symbolic parameter identifiers (i.e., entries in symb_params_ and
+   * rescaled_halved_param_) to their negated values.
+   */
+  std::unordered_map<int, int> negative_symb_params;
 
   /**
    * If true, then rational multiples of pi are evaluated exactly as symbolic
@@ -395,7 +419,8 @@ bool QASMParser::load_qasm_stream(
       std::vector<int> param_indices(num_params);
       for (int i = 0; i < num_params; ++i) {
         assert(ss.good());
-        int index = param_parser_.parse_expr(ss);
+        bool is_halved = ctx_->get_gate(gate_type)->is_param_halved(i);
+        int index = param_parser_.parse_expr(ss, is_halved);
         if (index == -1) {
           return false;
         }

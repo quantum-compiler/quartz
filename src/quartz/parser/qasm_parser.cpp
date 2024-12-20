@@ -66,23 +66,30 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-int ParamParser::parse_number(bool negative, ParamType p) {
+int ParamParser::parse_number(bool negative, ParamType p, bool is_halved) {
+  // Handles negative constants.
   if (negative) {
     p = -p;
   }
 
+  // Handles halved parameters.
+  if (is_halved) {
+    p = p / 2;
+  }
+
+  // Constructs the constant parameter if it does not already exist.
   if (number_params_.count(p) == 0) {
     int param_id = ctx_->get_new_param_id(p);
     number_params_[p] = param_id;
   }
-
   return number_params_[p];
 }
 
-int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d) {
+int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
+                               bool is_halved) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
-    return parse_number(negative, n * PI / d);
+    return parse_number(negative, n * PI / d, is_halved);
   }
 
   // Handles negative coefficients.
@@ -90,12 +97,17 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d) {
     n = -n;
   }
 
+  // Handles halved parameters.
+  if (is_halved) {
+    d = d * 2;
+  }
+
   // Constructs the pi expression, if it does not already exist.
   if (pi_params_[n].count(d) == 0) {
     // Checks if fraction of pi already exists.
     // If (n == 1) then this will cache the final expression.
     if (pi_params_[1].count(d) == 0) {
-      int id = parse_number(false, d);
+      int id = parse_number(false, d, false);
       auto gate = ctx_->get_gate(GateType::pi);
       pi_params_[1][d] = ctx_->get_new_param_expression_id({id}, gate);
     }
@@ -103,7 +115,7 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d) {
     // Scales the fraction of pi when the numerator is not equal to 1.
     // If (n != 1), then this will cache the final expression.
     if (n != 1) {
-      int nid = parse_number(false, n);
+      int nid = parse_number(false, n, false);
       int pid = pi_params_[1][d];
       auto gate = ctx_->get_gate(GateType::mult);
       pi_params_[n][d] = ctx_->get_new_param_expression_id({nid, pid}, gate);
@@ -112,6 +124,50 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d) {
 
   // Retrieves expression.
   return pi_params_[n][d];
+}
+
+int ParamParser::parse_symb_param(bool negative, std::string name, int i,
+                                  bool is_halved) {
+  // Attempts to look up the symbolic parameter identifier.
+  if (symb_params_[name].count(i) == 0) {
+    std::cerr << "Invalid parameter reference: " << name << "[" << i << "]"
+              << std::endl;
+    assert(false);
+    return -1;
+  }
+  int param = symb_params_[name][i];
+
+  // Ensures that halved parameter requirements are obeyed.
+  if (is_halved) {
+    if (!ctx_->param_is_halved(param)) {
+      std::cerr << "Halved gate requires halved parameters." << std::endl;
+      assert(false);
+      return -1;
+    }
+  }
+
+  // Rescales halved parameters for gates which are not halved.
+  if (!is_halved) {
+    if (ctx_->param_is_halved(param)) {
+      if (sum_params_[param].count(param) == 0) {
+        auto add = ctx_->get_gate(GateType::add);
+        int dbl_id = ctx_->get_new_param_expression_id({param, param}, add);
+        sum_params_[param][param] = dbl_id;
+      }
+      param = sum_params_[param][param];
+    }
+  }
+
+  // Handles negative parameters.
+  if (negative) {
+    if (negative_symb_params.count(param) == 0) {
+      auto neg = ctx_->get_gate(GateType::neg);
+      int neg_id = ctx_->get_new_param_expression_id({param}, neg);
+      negative_symb_params[param] = neg_id;
+    }
+    param = negative_symb_params[param];
+  }
+  return param;
 }
 
 bool ParamParser::parse_array_decl(std::stringstream &ss) {
@@ -168,7 +224,7 @@ bool ParamParser::parse_array_decl(std::stringstream &ss) {
   return true;
 }
 
-int ParamParser::parse_expr(std::stringstream &ss) {
+int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
   // Extracts the parameter expression from the string stream.
   std::string token;
   ss >> token;
@@ -199,7 +255,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
     int tid;
     if (pos == std::string::npos) {
       // Case: t, -t
-      tid = parse_term(neg_prefix, token);
+      tid = parse_term(neg_prefix, token, is_halved);
       token = "";
     } else if (pos > 0) {
       // Case: t+e, t-e
@@ -211,7 +267,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
 
       // Parses the right-hand side as a token.
       // The substraction is absorbed by this term as a negative sign.
-      tid = parse_term(is_minus, term);
+      tid = parse_term(is_minus, term, is_halved);
     } else {
       std::cerr << "Unexpected (+) or (-) at index 0: " << token << std::endl;
       assert(false);
@@ -239,7 +295,7 @@ int ParamParser::parse_expr(std::stringstream &ss) {
   return id;
 }
 
-int ParamParser::parse_term(bool negative, std::string token) {
+int ParamParser::parse_term(bool negative, std::string token, bool is_halved) {
   // Identifies the format case matching this token.
   if (token.find("[") != std::string::npos) {
     // Case: name[i]
@@ -255,31 +311,26 @@ int ParamParser::parse_term(bool negative, std::string token) {
     // Determines the reference index.
     int idx = string_to_number(istr);
     if (idx == -1) {
-      std::cerr << "Invalid parameter reference index: " << istr << std::endl;
+      std::cerr << "Negative parameter reference index: " << istr << std::endl;
       assert(false);
-      return false;
+      return -1;
     }
 
-    // Attempts to look up the symbolic parameter identifier.
-    if (symb_params_[name].count(idx) == 0) {
-      std::cerr << "Invalid parameter reference: " << token << std::endl;
-      assert(false);
-      return false;
-    }
-    return symb_params_[name][idx];
+    // Resolves symbolic parameter.
+    return parse_symb_param(negative, name, idx, is_halved);
   } else if (token.find("pi") == 0) {
     if (token == "pi") {
       // Case: pi
-      return parse_pi_term(negative, 1.0, 1.0);
+      return parse_pi_term(negative, 1.0, 1.0, is_halved);
     } else {
       // Cases: pi*0.123 or pi/2
       auto d = token.substr(3, std::string::npos);
       if (token[2] == '*') {
         // Case: pi*0.123
-        return parse_pi_term(negative, std::stod(d), 1.0);
+        return parse_pi_term(negative, std::stod(d), 1.0, is_halved);
       } else if (token[2] == '/') {
         // Case: pi/2
-        return parse_pi_term(negative, 1.0, std::stod(d));
+        return parse_pi_term(negative, 1.0, std::stod(d), is_halved);
       } else {
         std::cerr << "Unsupported parameter format: " << token << std::endl;
         assert(false);
@@ -295,7 +346,7 @@ int ParamParser::parse_term(bool negative, std::string token) {
       ParamType p = std::stod(token.substr(0, token.find('/')));
       p /= PI;
       p /= std::stod(token.substr(lparen_pos + 1, mult_pos - lparen_pos - 1));
-      return parse_number(negative, p);
+      return parse_number(negative, p, is_halved);
     } else {
       // Case: 0.123*pi or 0.123*pi/2
       auto d = token.substr(0, token.find('*'));
@@ -305,11 +356,11 @@ int ParamParser::parse_term(bool negative, std::string token) {
         // Case: 0.123*pi/2
         denom = std::stod(token.substr(token.find('/') + 1));
       }
-      return parse_pi_term(negative, num, denom);
+      return parse_pi_term(negative, num, denom, is_halved);
     }
   } else {
     // Case: 0.123
-    return parse_number(negative, std::stod(token));
+    return parse_number(negative, std::stod(token), is_halved);
   }
 
   // This line should be unreachable.
@@ -382,7 +433,7 @@ int QubitParser::parse_access(std::stringstream &ss) {
   if (!finalized_) {
     std::cerr << "Can only access qubits after finalization." << std::endl;
     assert(false);
-    return false;
+    return -1;
   }
 
   // Gets qreg array name.
@@ -415,7 +466,7 @@ int QubitParser::finalize() {
   if (finalized_) {
     std::cerr << "Can only finalize qreg lookup once." << std::endl;
     assert(false);
-    return false;
+    return -1;
   }
   finalized_ = true;
 

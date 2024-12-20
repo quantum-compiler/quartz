@@ -234,6 +234,8 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
                                               int param_precision) const {
   assert(gate->is_quantum_gate());
   std::string result;
+
+  // Prints entry to control block, if gate is controlled.
   if (gate->get_num_control_qubits() > 0) {
     auto control_state = gate->get_control_state();
     if (!std::all_of(control_state.begin(), control_state.end(),
@@ -249,27 +251,39 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     }
   }
 
+  // Prints gate name.
   auto gate_name = gate_type_name(gate->tp);
   std::transform(gate_name.begin(), gate_name.end(), gate_name.begin(),
                  [](unsigned char c) { return std::tolower(c); });
   result += gate_name;
+
+  // Prints parameters.
   if (gate->get_num_parameters() > 0) {
     int num_remaining_parameters = gate->get_num_parameters();
+    int curr_param_index = 0;
     result += "(";
     for (auto input_wire : input_wires) {
       if (input_wire->is_parameter()) {
+        // Ensures the wire is valid.
         assert(ctx->param_has_value(input_wire->index));
+
+        // Determines the parameter value with respect to reparameterization.
         std::ostringstream out;
         out.precision(param_precision);
         const auto &param_value = ctx->get_param_value(input_wire->index);
         if (param_value == 0) {
           // optimization: if a parameter is 0, do not output that many digits
           out << "0";
+        } else if (gate->is_param_halved(curr_param_index)) {
+          out << std::fixed << 2 * param_value;
         } else {
           out << std::fixed << param_value;
         }
         result += std::move(out).str();
+
+        // Prepares for printing the next parameter.
         num_remaining_parameters--;
+        curr_param_index++;
         if (num_remaining_parameters != 0) {
           result += ",";
         }
@@ -277,6 +291,8 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     }
     result += ")";
   }
+
+  // Prints target qubits.
   result += " ";
   bool first_qubit = true;
   for (auto input_wire : input_wires) {
@@ -291,6 +307,7 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   }
   result += ";\n";
 
+  // Prints exit from control block, if gate is controlled.
   if (gate->get_num_control_qubits() > 0) {
     auto control_state = gate->get_control_state();
     if (!std::all_of(control_state.begin(), control_state.end(),

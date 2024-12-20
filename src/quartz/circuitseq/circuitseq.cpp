@@ -994,11 +994,22 @@ CircuitSeq::from_qasm_style_string(Context *ctx, const std::string &str) {
 
 std::string CircuitSeq::to_qasm_style_string(Context *ctx,
                                              int param_precision) const {
+  // Checks if parameters are in use.
+  for (auto param : get_input_param_indices(ctx)) {
+    if (ctx->param_is_symbolic(param)) {
+      std::cerr << "to_qasm_style_string only supports consts." << std::endl;
+      break;
+    }
+  }
+
+  // Generates header.
   std::string result = "OPENQASM 2.0;\n"
                        "include \"qelib1.inc\";\n"
                        "qreg q[";
   result += std::to_string(get_num_qubits());
   result += "];\n";
+
+  // Populates gate list.
   for (auto &gate : gates) {
     result += gate->to_qasm_style_string(ctx, param_precision);
   }

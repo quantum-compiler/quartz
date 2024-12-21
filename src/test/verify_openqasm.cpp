@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     return -1;
   }
   if (!add_circ(parser, ctx, data, argv[2])) {
-    std::cerr << "Failed to parse the first circuit." << std::endl;
+    std::cerr << "Failed to parse the second circuit." << std::endl;
     return -1;
   }
 
@@ -66,7 +66,13 @@ int main(int argc, char **argv) {
   }
 
   // Command-line arguments for the equivalence checker.
-  std::string script = "../src/python/verifier/verify_equivalences.py";
+  std::filesystem::path this_file_path(__FILE__);
+  auto verifier_path = this_file_path.parent_path()
+                           .parent_path()
+                           .append("python")
+                           .append("verifier")
+                           .append("verify_equivalences.py");
+  std::string script = verifier_path.string();
   std::string arglst = tmpfile + " " + outfile + " " + "True True True True";
 
   // Applies the equivalence checker to the json file.

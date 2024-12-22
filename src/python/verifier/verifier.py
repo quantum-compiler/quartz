@@ -712,11 +712,11 @@ def find_equivalences(
                 num_different_dags_with_same_hash[hashtag] = len(output_dict_)
 
     hashtags_in_more_equivalences = set()
+    more_equivalences = []
+    equivalent_called_2 = 0
+    num_equivalences_under_phase_shift = 0
+    possible_num_equivalences_under_phase_shift = 0
     if check_equivalence_with_different_hash:
-        more_equivalences = []
-        equivalent_called_2 = 0
-        num_equivalences_under_phase_shift = 0
-        possible_num_equivalences_under_phase_shift = 0
         print("Start checking equivalence with different hash...")
         for hashtag, dags in output_dict.items():
             from collections import defaultdict
@@ -847,12 +847,12 @@ def find_equivalences(
                         )
         output_dict = [more_equivalences, output_dict]
         if print_basic_info:
-            print(
-                f"Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences"
-                f" with different hash,"
-                f" including {num_equivalences_under_phase_shift} out of"
-                f" {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift."
-            )
+            print(f"End checking equivalence with different hash."
+                  f" Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences"
+                  f" with different hash,"
+                  f" including {num_equivalences_under_phase_shift} out of"
+                  f" {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift."
+                  )
     else:
         # Add a placeholder here
         output_dict = [[], output_dict]
@@ -866,10 +866,15 @@ def find_equivalences(
     t_end = time.monotonic()
     if print_basic_info:
         print(
-            f"{total_equivalence_found} equivalences found in {t_end - t_start} seconds"
-            f" (solver invoked {equivalent_called} times for {num_dags} DAGs"
+            f"{total_equivalence_found + len(more_equivalences)} equivalences"
+            f"{f' (including {len(more_equivalences)} with different hash values)' if len(more_equivalences) > 0 else ''}"
+            f" found in {t_end - t_start} seconds"
+            f" (solver invoked {equivalent_called + equivalent_called_2} times"
+            f"{f' (including {equivalent_called_2} times for circuits with different hash values)' if equivalent_called_2 > 0 else ''}"
+            f" for {num_dags} circuits"
             f" with {num_hashtags} different hash values and {num_potential_equivalences} potential equivalences),"
-            f" output {len(output_dict[1])} equivalence classes."
+            f" output {len(output_dict[1])} equivalence classes"
+            f"{f' (will be merged into {len(output_dict[1]) - len(more_equivalences)} equivalence classes after dealing with equivalent equivalence classes with different hash values)' if len(more_equivalences) > 0 else ''}."
         )
     t_start = time.monotonic()
     dump_json(output_dict, output_file)

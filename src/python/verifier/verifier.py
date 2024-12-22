@@ -847,12 +847,13 @@ def find_equivalences(
                         )
         output_dict = [more_equivalences, output_dict]
         if print_basic_info:
-            print(f"End checking equivalence with different hash."
-                  f" Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences"
-                  f" with different hash,"
-                  f" including {num_equivalences_under_phase_shift} out of"
-                  f" {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift."
-                  )
+            print(
+                f"End checking equivalence with different hash."
+                f" Solver invoked {equivalent_called_2} times to find {len(more_equivalences)} equivalences"
+                f" with different hash,"
+                f" including {num_equivalences_under_phase_shift} out of"
+                f" {possible_num_equivalences_under_phase_shift} possible equivalences under phase shift."
+            )
     else:
         # Add a placeholder here
         output_dict = [[], output_dict]

@@ -25,7 +25,7 @@ bool equal_to_2k_pi(double d);
 
 class Op {
  public:
-  Op(void);
+  Op();
   Op(size_t _guid, Gate *_ptr) : guid(_guid), ptr(_ptr) {}
   inline bool operator==(const Op &b) const {
     if (guid != b.guid)
@@ -146,13 +146,13 @@ class PosCompare {
 
 class Tensor {
  public:
-  Tensor(void);
+  Tensor();
   int idx;
   Op op;
 };
 
 struct Edge {
-  Edge(void);
+  Edge();
   Edge(const Op &_srcOp, const Op &_dstOp, int _srcIdx, int _dstIdx);
   Op srcOp, dstOp;
   int srcIdx, dstIdx;
@@ -177,21 +177,22 @@ class OpX;
 
 class Graph {
  public:
-  Graph(Context *ctx);
+  explicit Graph(Context *ctx);
   Graph(Context *ctx, const CircuitSeq *seq);
   Graph(const Graph &graph);
   [[nodiscard]] std::unique_ptr<CircuitSeq> to_circuit_sequence() const;
   void _construct_pos_2_logical_qubit();
   void add_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx);
-  bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx, int dstIdx) const;
+  [[nodiscard]] bool has_edge(const Op &srcOp, const Op &dstOp, int srcIdx,
+                              int dstIdx) const;
   Op add_qubit(int qubit_idx);
-  Op add_parameter(const ParamType p);
+  Op add_parameter(const ParamType &p);
   Op new_gate(GateType gt);
-  bool has_loop() const;
+  [[nodiscard]] bool has_loop() const;
   size_t hash();
-  bool equal(const Graph &other) const;
+  [[nodiscard]] bool equal(const Graph &other) const;
   bool check_correctness();
-  int specific_gate_count(GateType gate_type) const;
+  [[nodiscard]] int specific_gate_count(GateType gate_type) const;
   [[nodiscard]] float total_cost() const;
   [[nodiscard]] int gate_count() const;
   [[nodiscard]] int circuit_depth() const;
@@ -273,7 +274,8 @@ class Graph {
            bool continue_storing_all_steps = false);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  std::string to_qasm(bool print_result = false, bool print_guid = false) const;
+  [[nodiscard]] std::string to_qasm(bool print_result = false,
+                                    bool print_guid = false) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_guid) const;
   template <class _CharT, class _Traits>
@@ -283,10 +285,10 @@ class Graph {
   static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
                                                const std::string &filename);
   static std::shared_ptr<Graph> from_qasm_str(Context *ctx,
-                                              const std::string qasm_str);
+                                              const std::string &qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
-  size_t get_num_qubits() const;
+  [[nodiscard]] size_t get_num_qubits() const;
   void print_qubit_ops();
   std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
                                              GraphXfer *xfer,
@@ -298,9 +300,9 @@ class Graph {
   toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                               GraphXfer *inverse_xfer,
                               std::vector<int> instruction);
-  std::vector<size_t> appliable_xfers(Op op,
-                                      const std::vector<GraphXfer *> &) const;
-  std::vector<size_t>
+  [[nodiscard]] std::vector<size_t>
+  appliable_xfers(Op op, const std::vector<GraphXfer *> &) const;
+  [[nodiscard]] std::vector<size_t>
   appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,
@@ -318,16 +320,16 @@ class Graph {
   std::shared_ptr<Graph> ccz_flip_greedy_rz();
   std::shared_ptr<Graph> ccz_flip_greedy_u1();
   bool _loop_check_after_matching(GraphXfer *xfer) const;
-  std::shared_ptr<Graph>
+  [[nodiscard]] std::shared_ptr<Graph>
   subgraph(const std::unordered_set<Op, OpHash> &ops) const;
-  std::vector<std::shared_ptr<Graph>>
+  [[nodiscard]] std::vector<std::shared_ptr<Graph>>
   topology_partition(const int partition_gate_count) const;
   /**
    * Return the parameter value if the Op is a constant parameter,
    * or return 0 otherwise.
    */
-  ParamType get_param_value(const Op &op) const;
-  bool param_has_value(const Op &op) const;
+  [[nodiscard]] ParamType get_param_value(const Op &op) const;
+  [[nodiscard]] bool param_has_value(const Op &op) const;
 
  private:
   void replace_node(Op oldOp, Op newOp);
@@ -344,11 +346,23 @@ class Graph {
   bool moveable(GateType tp);
   bool move_forward(Pos &pos, bool left);
   bool merge_2_rotation_op(Op op_0, Op op_1);
-  // The common core part of the API xfer_appliable, apply_xfer, and
-  // apply_xfer_and_track_node. Matches the src dag of xfer to the local dag
-  // in the circuit whose topological-order root is op. If failed, it
-  // automatically unmaps the matched nodes. Otherwise, the caller should
-  // unmap the matched nodes after their work is done.
+  /**
+   * The common core part of the API xfer_applicable, apply_xfer, and
+   * apply_xfer_and_track_node. Matches the src dag of xfer to the local dag
+   * in the circuit whose topological-order root is op. If failed, it
+   * automatically unmaps the matched nodes. Otherwise, the caller should
+   * unmap the matched nodes after their work is done.
+   * Because the src dag is connected, this function traverses the src dag
+   * and try to match the local dag in a connected way (not necessarily in
+   * topological order). For example, the pattern H(q0) H(q1) CX(q0, q1)
+   * may be matched in the order
+   * H(q0) (match qubit 0) -> CX(q0, q1) (match qubit 1) <- H(q1).
+   * @param xfer The xfer with a src dag and a target dag.
+   * @param op The node to begin with in the local dag.
+   * @param matched_opx_op_pairs_dq A deque to store matched nodes from
+   * the src dag to the local dag.
+   * @return If the match is successful.
+   */
   bool _pattern_matching(
       GraphXfer *xfer, Op op,
       std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const;

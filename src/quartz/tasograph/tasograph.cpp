@@ -287,7 +287,7 @@ Op Graph::add_qubit(int qubit_idx) {
   return op;
 }
 
-Op Graph::add_parameter(const ParamType p) {
+Op Graph::add_parameter(const ParamType &p) {
   Gate *gate = context->get_gate(GateType::input_param);
   auto guid = context->next_global_unique_id();
   Op op(guid, gate);
@@ -1537,7 +1537,7 @@ std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
 }
 
 std::shared_ptr<Graph> Graph::from_qasm_str(Context *ctx,
-                                            const std::string qasm_str) {
+                                            const std::string &qasm_str) {
   std::stringstream sstream(qasm_str);
   return _from_qasm_stream(ctx, sstream);
 }
@@ -2396,7 +2396,7 @@ bool Graph::_pattern_matching(
     }
   }
   if (!fail) {
-    // Check qubit consistancy
+    // Check qubit consistency
     std::set<int> qubits;
     for (auto it = xfer->mappedInputs.cbegin(); it != xfer->mappedInputs.cend();
          ++it) {

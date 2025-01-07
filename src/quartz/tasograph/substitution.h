@@ -4,10 +4,10 @@
 #include "../context/rule_parser.h"
 #include "../gate/gate_utils.h"
 #include "../parser/qasm_parser.h"
-#include "assert.h"
 #include "quartz/circuitseq/circuitseq.h"
 #include "tasograph.h"
 
+#include <cassert>
 #include <ostream>
 #include <queue>
 
@@ -16,9 +16,11 @@ namespace quartz {
 class OpX;
 class GraphXfer;
 
+/**
+ * A TensorX represents an input/output edge.
+ */
 struct TensorX {
-  // A TensorX represnet an output edge
-  TensorX(void) : op(NULL), idx(0) {}
+  TensorX() : op(NULL), idx(0) {}
   TensorX(OpX *_op, int _idx) : op(_op), idx(_idx) {}
   Tensor to_edge(const GraphXfer *xfer) const;
   OpX *op;  // The op that outputs this tensor
@@ -48,6 +50,9 @@ class TensorXHash {
   }
 };
 
+/**
+ * An OpX represents a node in the graph.
+ */
 class OpX {
  public:
   OpX(const OpX &_op);
@@ -66,7 +71,7 @@ class GraphCompare {
   GraphCompare() {
     cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
-  GraphCompare(const std::function<float(Graph *)> &cost_function)
+  explicit GraphCompare(const std::function<float(Graph *)> &cost_function)
       : cost_function_(cost_function) {}
   bool operator()(const std::shared_ptr<Graph> &lhs,
                   const std::shared_ptr<Graph> &rhs) {
@@ -83,7 +88,7 @@ class GraphXfer {
   GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
             const CircuitSeq *src_graph, const CircuitSeq *dst_graph);
   bool src_graph_connected(CircuitSeq *src_graph);
-  TensorX new_tensor(void);
+  TensorX new_tensor();
   bool is_input_qubit(const OpX *opx, int idx) const;
   bool is_input_parameter(const OpX *opx, int idx) const;
   bool is_symbolic_input_parameter(const OpX *opx, int idx) const;
@@ -101,9 +106,9 @@ class GraphXfer {
   bool create_new_operator(const OpX *opx, Op &op);
   int num_src_op();
   int num_dst_op();
-  std::string to_str(std::vector<OpX *> const &v) const;
-  std::string src_str() const;
-  std::string dst_str() const;
+  [[nodiscard]] std::string to_str(std::vector<OpX *> const &v) const;
+  [[nodiscard]] std::string src_str() const;
+  [[nodiscard]] std::string dst_str() const;
   // TODO: not implemented
   //   std::string to_qasm(std::vector<OpX *> const &v) const;
 

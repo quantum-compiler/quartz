@@ -371,9 +371,19 @@ std::string Context::param_info_to_json() const {
   return result;
 }
 
-void Context::load_param_info_from_json(std::istream &fin) {
+bool Context::load_param_info_from_json(std::istream &fin) {
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
-  fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
+  if (fin.eof()) {
+    return false;
+  }
+  char ch;
+  fin >> ch;
+  while (ch != '[' && ch != ']') {
+    fin >> ch;
+  }
+  if (ch == ']') {
+    return false;
+  }
   int num_params;
   fin >> num_params;
   param_info_->is_parameter_symbolic_.clear();
@@ -384,7 +394,6 @@ void Context::load_param_info_from_json(std::istream &fin) {
   param_info_->parameter_values_.reserve(num_params);
   param_info_->parameter_expressions_.clear();
   for (int i = 0; i < num_params; i++) {
-    char ch;
     fin >> ch;
     while (ch != '[' && ch != '\"' && ch != '-' && !std::isdigit(ch) &&
            ch != ']') {
@@ -415,8 +424,7 @@ void Context::load_param_info_from_json(std::istream &fin) {
     }
   }
   fin.ignore(std::numeric_limits<std::streamsize>::max(), ',');
-  bool ret = read_json_style_vector(fin, param_info_->random_parameters_);
-  assert(ret);
+  return read_json_style_vector(fin, param_info_->random_parameters_);
 }
 
 ParamInfo *Context::get_param_info() const { return param_info_; }

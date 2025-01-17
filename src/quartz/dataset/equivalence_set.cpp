@@ -209,7 +209,14 @@ bool EquivalenceSet::load_json(Context *ctx, const std::string &file_name,
       equiv_edges;
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
   if (!from_verifier) {
-    ctx->load_param_info_from_json(fin);
+    if (!ctx->load_param_info_from_json(fin)) {
+      std::cerr << "Wrong ECC Set format for file " << file_name
+                << ". Please check if the ECC Set is generated in v0.2.0 or "
+                   "later, and if the from_verifier tag is configured "
+                   "correctly when calling EquivalenceSet::load_json()."
+                << std::endl;
+      return false;
+    }
   } else {
     fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
     while (true) {

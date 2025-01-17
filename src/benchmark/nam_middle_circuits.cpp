@@ -8,7 +8,8 @@
 
 using namespace quartz;
 
-static const std::string ecc_set_prefix = "Nam_6_3_";
+static const std::string ecc_set_prefix =
+    kQuartzRootPath.string() + "/eccset/Nam_6_3_";
 static const std::string ecc_set_name =
     ecc_set_prefix + "complete_ECC_set.json";
 

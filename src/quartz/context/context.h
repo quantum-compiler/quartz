@@ -148,8 +148,9 @@ class Context {
    * Load parameter information from a Json stream
    * (clear all existing parameters).
    * @param fin The input stream.
+   * @return If loaded successfully.
    */
-  void load_param_info_from_json(std::istream &fin);
+  bool load_param_info_from_json(std::istream &fin);
 
   /**
    * Return the pointer to the ParamInfo object.

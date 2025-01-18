@@ -564,6 +564,7 @@ def find_equivalences_helper(
                 parameters_for_fingerprint,
                 do_not_invoke_smt_solver,
                 check_phase_shift_in_smt_solver,
+                None,
                 timeout,
             ):
                 current_tag = hashtag + "_" + str(i)
@@ -661,6 +662,7 @@ def find_equivalences(
                         parameters_for_fingerprint,
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
+                        None,
                         timeout,
                     ):
                         current_tag = hashtag + "_" + str(i)

@@ -43,7 +43,5 @@ if __name__ == "__main__":
         check_phase_shift_in_smt_solver=(
             False if len(sys.argv) <= 7 else ast.literal_eval(sys.argv[7])
         ),
-        timeout=(
-            30000 if len(sys.argv) <= 8 else ast.literal_eval(sys.argv[8])
-        )
+        timeout=(30000 if len(sys.argv) <= 8 else ast.literal_eval(sys.argv[8])),
     )

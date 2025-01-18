@@ -95,6 +95,12 @@ def pi(n):
     # Exactly Pi.
     if n == 1:
         return -1, 0
+    elif n == 2:
+        return 0, 1
+    elif n == 4:
+        cos_a = z3.Sqrt(2) / 2
+        sin_a = z3.Sqrt(2) / 2
+        return cos_a, sin_a
     # Half-Angle Formula.
     elif n % 2 == 0:
         return half(pi(n // 2))

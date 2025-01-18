@@ -235,6 +235,7 @@ def search_phase_factor_to_check_equivalence(
     current_param_id,
     current_phase_factor_symbolic,
     current_phase_factor_for_fingerprint,
+    timeout
 ):
     if current_param_id == num_parameters:
         # Search for constants
@@ -266,6 +267,7 @@ def search_phase_factor_to_check_equivalence(
                 current_param_id + 1,
                 new_phase_factor_symbolic,
                 new_phase_factor_for_fingerprint,
+                timeout
             ):
                 return True
         return False
@@ -318,7 +320,7 @@ def search_phase_factor_to_check_equivalence(
         solver.add(equations)
         output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
         solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
-        solver.set("timeout", 30000)  # timeout after 30s
+        solver.set("timeout", timeout)  # timeout in milliseconds
         result = solver.check()
         if result != z3.unsat:
             print(
@@ -384,6 +386,7 @@ def search_phase_factor_to_check_equivalence(
             current_param_id + 1,
             new_phase_factor_symbolic,
             new_phase_factor_for_fingerprint,
+            timeout
         ):
             return True
     return False
@@ -398,6 +401,7 @@ def equivalent(
     do_not_invoke_smt_solver=False,
     check_phase_shift_in_smt_solver=False,
     phase_shift_id=None,
+    timeout=30000  # timeout for each z3 invocation in 30s
 ):
     dag1_meta = dag1[0]
     dag2_meta = dag2[0]
@@ -462,6 +466,7 @@ def equivalent(
                 current_param_id=0,
                 current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
                 current_phase_factor_for_fingerprint=0,
+                timeout=timeout
             )
             if not result:
                 print(
@@ -493,6 +498,7 @@ def equivalent(
                 current_param_id=0,
                 current_phase_factor_symbolic=(z3.RealVal(1), z3.RealVal(0)),
                 current_phase_factor_for_fingerprint=0,
+                timeout=timeout
             )
             if not result:
                 print(
@@ -529,6 +535,7 @@ def find_equivalences_helper(
     check_phase_shift_in_smt_solver,
     verbose,
     do_not_invoke_smt_solver,
+    timeout
 ):
     output_dict = {}
     equivalent_called = 0
@@ -557,6 +564,7 @@ def find_equivalences_helper(
                 parameters_for_fingerprint,
                 do_not_invoke_smt_solver,
                 check_phase_shift_in_smt_solver,
+                timeout
             ):
                 current_tag = hashtag + "_" + str(i)
                 assert current_tag in output_dict.keys()
@@ -608,6 +616,7 @@ def find_equivalences(
     check_equivalence_with_different_hash=True,
     check_phase_shift_in_smt_solver=False,
     do_not_invoke_smt_solver=False,
+    timeout=30000  # timeout for each z3 invocation in 30s
 ):
     input_file_data = load_json(input_file)
     data = input_file_data[1]
@@ -652,6 +661,7 @@ def find_equivalences(
                         parameters_for_fingerprint,
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
+                        timeout
                     ):
                         current_tag = hashtag + "_" + str(i)
                         assert current_tag in output_dict.keys()
@@ -701,6 +711,7 @@ def find_equivalences(
                         check_phase_shift_in_smt_solver,
                         verbose,
                         do_not_invoke_smt_solver,
+                        timeout
                     )
                     for hashtag, dags in data.items()
                     if len(dags) > 1
@@ -787,6 +798,7 @@ def find_equivalences(
                         do_not_invoke_smt_solver,
                         check_phase_shift_in_smt_solver,
                         None,
+                        timeout
                     ):
                         equivalence_verified = True
                 if not equivalence_verified:
@@ -824,6 +836,7 @@ def find_equivalences(
                                 do_not_invoke_smt_solver,
                                 check_phase_shift_in_smt_solver,
                                 phase_shift_id,
+                                timeout
                             ):
                                 equivalence_verified = True
                                 num_equivalences_under_phase_shift += 1

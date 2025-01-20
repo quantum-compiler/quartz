@@ -6,7 +6,7 @@ Quartz uses a cost-based search algorithm to explore the space and discovers hig
 ## PLDI 2022 Artifact
 
 If you would like to compare with the Quartz version published in PLDI 2022, please go to https://github.com/quantum-compiler/quartz-artifact.
-Note that the format of ECC sets has changed since then (after v0.2.0).
+Note that the format of ECC sets has been changed since then (after v0.2.0).
 
 ## Install Quartz
 
@@ -171,6 +171,17 @@ Explanation for some of the parameters:
 - `target_rotation`: The target rotation used if you enable rotation merging in search.
 - `circuit_name`: The name of the circuit, which will be printed with the intermediate result.
 - `timeout`: Timeout for optimization in seconds.
+
+## Verify circuit equivalence
+
+You can also use Quartz's verifier independently by calling `python src/python/verifier/verify_equivalences.py` with a Json file containing a batch of circuits to be verified,
+or (after installation) compile and run the following executable to verify the equivalence of two individual circuits `circuit1.qasm` and `circuit2.qasm`:
+```shell
+cd build
+make verify_openqasm
+./verify_openqasm circuit1.qasm circuit2.qasm [tmpdir]
+```
+If `[tmpdir]` is given, the temporary files during verification will be put into this directory.
 
 ## Repository Organization
 

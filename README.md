@@ -6,6 +6,7 @@ Quartz uses a cost-based search algorithm to explore the space and discovers hig
 ## PLDI 2022 Artifact
 
 If you would like to compare with the Quartz version published in PLDI 2022, please go to https://github.com/quantum-compiler/quartz-artifact.
+Note that the format of ECC sets has changed since then (after v0.2.0).
 
 ## Install Quartz
 
@@ -59,13 +60,15 @@ cx q[14], q[13];
 cx q[21], q[20];
 ```
 
-We do not support parameterized gates currently.
+For gates with symbolic parameters, we have experimental OpenQASM 3 support (to be documented soon).
 
 To input a circuit in `qasm` file, you should first create a `Context` object, providing the gate set you use in your input file as argument as below:
 
 ``` cpp
+ParamInfo param_info;
 Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                GateType::input_qubit, GateType::input_param});
+                GateType::input_qubit, GateType::input_param},
+                &param_info);
 ```
 
 After that, you need a `QASMParser` object to parse the input `qasm` file. You can construct it as below:
@@ -96,10 +99,13 @@ If the input gate set is different from your target gate set, you should conside
 To shift the context, you should create three `Context` objects, one for input, one for target, and one for their union as below:
 
 ``` cpp
+ParamInfo param_info;
 Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                GateType::input_qubit, GateType::input_param});
+                GateType::input_qubit, GateType::input_param},
+                &param_info);
 Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                GateType::cx, GateType::input_qubit, GateType::input_param});
+                GateType::cx, GateType::input_qubit, GateType::input_param},
+                &param_info);
 auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 ```
 
@@ -125,7 +131,7 @@ std::shared_ptr<Graph> optimize(Context *ctx,
                                 bool print_message,
                                 std::function<float(Graph *)> cost_function = nullptr,
                                 double cost_upper_bound = -1 /*default = current cost * 1.05*/,
-                                int timeout = 3600 /*1 hour*/);
+                                double timeout = 3600 /*1 hour*/);
 ```
 
 Explanation for some of the parameters:
@@ -147,7 +153,7 @@ auto graph_optimized = graph->optimize(&context,
                                        /*timeout=*/10);
 ```
 
-You can also use the deprecated API for now:
+You can also use the deprecated API for now (not recommended):
 ``` cpp
 Graph::optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
                        const std::string &equiv_file_name, bool use_simulated_annealing,

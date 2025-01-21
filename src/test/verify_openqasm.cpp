@@ -39,11 +39,16 @@ int main(int argc, char **argv) {
   // Processes command-line arguments.
   std::string tmpfile = "tmp.json";
   std::string outfile = "res.json";
-  if (argc < 3 || argc > 4) {
-    std::cerr << "Usage: " << argv[0] << " circ1 circ2 [tmpdir]" << std::endl;
+  std::string timeout = "30000";
+  if (argc < 3 || argc > 5) {
+    std::cerr << "Usage: " << argv[0] << " circ1 circ2 [timeout] [tmpdir]" << std::endl;
     return -1;
-  } else if (argc == 4) {
-    std::string dir = argv[3];
+  }
+  if (argc >= 4) {
+    timeout = argv[3];
+  }
+  if (argc >= 5) {
+    std::string dir = argv[4];
     tmpfile = dir + "/" + tmpfile;
     outfile = dir + "/" + outfile;
   }
@@ -73,7 +78,7 @@ int main(int argc, char **argv) {
                            .append("verifier")
                            .append("verify_equivalences.py");
   std::string script = verifier_path.string();
-  std::string arglst = tmpfile + " " + outfile + " " + "True True True True";
+  std::string arglst = tmpfile + " " + outfile + " True True True True False " + timeout;
 
   // Applies the equivalence checker to the json file.
   std::string command = "python " + script + " " + arglst;

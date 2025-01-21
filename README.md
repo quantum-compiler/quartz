@@ -179,8 +179,9 @@ or (after installation) compile and run the following executable to verify the e
 ```shell
 cd build
 make verify_openqasm
-./verify_openqasm circuit1.qasm circuit2.qasm [tmpdir]
+./verify_openqasm circuit1.qasm circuit2.qasm [timeout] [tmpdir]
 ```
+If `[timeout]` is given, then the value (in ms) will be used as a timeout for all Z3 queries.
 If `[tmpdir]` is given, the temporary files during verification will be put into this directory.
 
 ## Repository Organization

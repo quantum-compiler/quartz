@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   std::string timeout = "30000";
   if (argc < 3 || argc > 5) {
     std::cerr << "Usage: " << argv[0] << " circ1 circ2 [timeout] [tmpdir]"
-	      << std::endl;
+              << std::endl;
     return -1;
   }
   if (argc >= 4) {

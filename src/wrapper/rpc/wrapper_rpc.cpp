@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   std::string eccfile = argv[3];
   std::string cost = argv[4];
   std::string timeout_type = argv[5];
-  float timeout_value = atof(argv[6]);
+  float timeout_value = atof(argv[6]) / 1000;
   rpc::server srv(port);
 
   auto supercontext = get_context_(optimization_gateset, 1, eccfile);

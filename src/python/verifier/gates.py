@@ -2,6 +2,20 @@ import math
 
 import z3
 
+# helper constants
+
+sqrt2 = z3.Real("sqrt2")
+sqrt3 = z3.Real("sqrt3")
+sqrt5 = z3.Real("sqrt5")
+five_minus_sqrt5 = z3.Real("five_minus_sqrt5")
+kConstantEquations = [
+    sqrt2 * sqrt2 == 2,
+    sqrt3 * sqrt3 == 3,
+    sqrt5 * sqrt5 == 5,
+    five_minus_sqrt5 * five_minus_sqrt5 == 5 - sqrt5,
+]
+
+
 # helper methods
 
 
@@ -82,7 +96,7 @@ def mult(x, y):
         return add(y, z)
 
 
-def pi(n):
+def pi(n, use_z3=True):
     # This function handles fractions of pi with integer denominators.
     assert isinstance(n, (int, float))
     if isinstance(n, float):
@@ -98,9 +112,10 @@ def pi(n):
     elif n == 2:
         return 0, 1
     elif n == 4:
-        cos_a = z3.Sqrt(2) / 2
-        sin_a = z3.Sqrt(2) / 2
-        return cos_a, sin_a
+        if use_z3:
+            return sqrt2 / 2, sqrt2 / 2
+        else:
+            return math.sqrt(2) / 2, math.sqrt(2) / 2
     # Half-Angle Formula.
     elif n % 2 == 0:
         return half(pi(n // 2))
@@ -112,12 +127,20 @@ def pi(n):
     # The equations are horrendous, and probably not useful in practice.
     # If necessary, they could be implemented (at least for n = 17).
     elif n == 3:
-        cos_a = 1 / 2
-        sin_a = z3.Sqrt(3) / 2
+        if use_z3:
+            cos_a = 1 / 2
+            sin_a = sqrt3 / 2
+        else:
+            cos_a = 1 / 2
+            sin_a = math.sqrt(3) / 2
         return cos_a, sin_a
     elif n == 5:
-        cos_a = (z3.Sqrt(5) + 1) / 4
-        sin_a = z3.Sqrt(2) * z3.Sqrt(5 - z3.Sqrt(5)) / 4
+        if use_z3:
+            cos_a = (sqrt5 + 1) / 4
+            sin_a = sqrt2 * five_minus_sqrt5 / 4
+        else:
+            cos_a = (math.sqrt(5) + 1) / 4
+            sin_a = math.sqrt(2) * math.sqrt(5 - math.sqrt(5)) / 4
         return cos_a, sin_a
     elif n == 15:
         return add(mult(2, pi(5)), neg(pi(3)))
@@ -169,12 +192,12 @@ def u2(phi, l, use_z3=True):
     cos_l, sin_l = l
     if use_z3:
         return [
-            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2) * cos_l, -1 / z3.Sqrt(2) * sin_l)],
+            [(1 / sqrt2, 0), (-1 / sqrt2 * cos_l, -1 / sqrt2 * sin_l)],
             [
-                (1 / z3.Sqrt(2) * cos_phi, 1 / z3.Sqrt(2) * sin_phi),
+                (1 / sqrt2 * cos_phi, 1 / sqrt2 * sin_phi),
                 (
-                    1 / z3.Sqrt(2) * (cos_l * cos_phi - sin_l * sin_phi),
-                    1 / z3.Sqrt(2) * (sin_phi * cos_l + sin_l * cos_phi),
+                    1 / sqrt2 * (cos_l * cos_phi - sin_l * sin_phi),
+                    1 / sqrt2 * (sin_phi * cos_l + sin_l * cos_phi),
                 ),
             ],
         ]
@@ -236,8 +259,8 @@ def cp(phi, use_z3=True):
 def h(use_z3=True):
     if use_z3:
         return [
-            [(1 / z3.Sqrt(2), 0), (1 / z3.Sqrt(2), 0)],
-            [(1 / z3.Sqrt(2), 0), (-1 / z3.Sqrt(2), 0)],
+            [(1 / sqrt2, 0), (1 / sqrt2, 0)],
+            [(1 / sqrt2, 0), (-1 / sqrt2, 0)],
         ]
     else:
         return [
@@ -256,14 +279,14 @@ def sdg(use_z3=True):
 
 def t(use_z3=True):
     if use_z3:
-        return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, z3.Sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (sqrt2 / 2, sqrt2 / 2)]]
     else:
         return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, math.sqrt(2) / 2)]]
 
 
 def tdg(use_z3=True):
     if use_z3:
-        return [[(1, 0), (0, 0)], [(0, 0), (z3.Sqrt(2) / 2, -z3.Sqrt(2) / 2)]]
+        return [[(1, 0), (0, 0)], [(0, 0), (sqrt2 / 2, -sqrt2 / 2)]]
     else:
         return [[(1, 0), (0, 0)], [(0, 0), (math.sqrt(2) / 2, -math.sqrt(2) / 2)]]
 
@@ -287,26 +310,26 @@ def pdg(phi, use_z3=True):
 def rx1(use_z3=True):
     if use_z3:
         return [
-            [(z3.Sqrt(2) / 2, 0), (0, -z3.Sqrt(2) / 2)],
-            [(0, -z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)],
+            [(sqrt2 / 2, 0), (0, -sqrt2 / 2)],
+            [(0, -sqrt2 / 2), (sqrt2 / 2, 0)],
         ]
     else:
         return [
-            [(math.Sqrt(2) / 2, 0), (0, -math.Sqrt(2) / 2)],
-            [(0, -math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)],
+            [(math.sqrt(2) / 2, 0), (0, -math.sqrt(2) / 2)],
+            [(0, -math.sqrt(2) / 2), (math.sqrt(2) / 2, 0)],
         ]
 
 
 def rx3(use_z3=True):
     if use_z3:
         return [
-            [(z3.Sqrt(2) / 2, 0), (0, z3.Sqrt(2) / 2)],
-            [(0, z3.Sqrt(2) / 2), (z3.Sqrt(2) / 2, 0)],
+            [(sqrt2 / 2, 0), (0, sqrt2 / 2)],
+            [(0, sqrt2 / 2), (sqrt2 / 2, 0)],
         ]
     else:
         return [
-            [(math.Sqrt(2) / 2, 0), (0, math.Sqrt(2) / 2)],
-            [(0, math.Sqrt(2) / 2), (math.Sqrt(2) / 2, 0)],
+            [(math.sqrt(2) / 2, 0), (0, math.sqrt(2) / 2)],
+            [(0, math.sqrt(2) / 2), (math.sqrt(2) / 2, 0)],
         ]
 
 
@@ -322,8 +345,8 @@ def cz(use_z3=True):
 def ry1(use_z3=True):
     if use_z3:
         return [
-            [(z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
-            [(z3.Sqrt(2) / 2, 0), (z3.Sqrt(2) / 2, 0)],
+            [(sqrt2 / 2, 0), (-sqrt2 / 2, 0)],
+            [(sqrt2 / 2, 0), (sqrt2 / 2, 0)],
         ]
     else:
         return [
@@ -335,8 +358,8 @@ def ry1(use_z3=True):
 def ry3(use_z3=True):
     if use_z3:
         return [
-            [(-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
-            [(z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(-sqrt2 / 2, 0), (-sqrt2 / 2, 0)],
+            [(sqrt2 / 2, 0), (-sqrt2 / 2, 0)],
         ]
     else:
         return [
@@ -348,10 +371,10 @@ def ry3(use_z3=True):
 def rxx1(use_z3=True):
     if use_z3:
         return [
-            [(z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
-            [(0, 0), (z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
-            [(0, 0), (-z3.Sqrt(2) / 2, 0), (z3.Sqrt(2) / 2, 0), (0, 0)],
-            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (z3.Sqrt(2) / 2, 0)],
+            [(sqrt2 / 2, 0), (0, 0), (0, 0), (-sqrt2 / 2, 0)],
+            [(0, 0), (sqrt2 / 2, 0), (-sqrt2 / 2, 0), (0, 0)],
+            [(0, 0), (-sqrt2 / 2, 0), (sqrt2 / 2, 0), (0, 0)],
+            [(-sqrt2 / 2, 0), (0, 0), (0, 0), (sqrt2 / 2, 0)],
         ]
     else:
         return [
@@ -365,10 +388,10 @@ def rxx1(use_z3=True):
 def rxx3(use_z3=True):
     if use_z3:
         return [
-            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
-            [(0, 0), (-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
-            [(0, 0), (-z3.Sqrt(2) / 2, 0), (-z3.Sqrt(2) / 2, 0), (0, 0)],
-            [(-z3.Sqrt(2) / 2, 0), (0, 0), (0, 0), (-z3.Sqrt(2) / 2, 0)],
+            [(-sqrt2 / 2, 0), (0, 0), (0, 0), (-sqrt2 / 2, 0)],
+            [(0, 0), (-sqrt2 / 2, 0), (-sqrt2 / 2, 0), (0, 0)],
+            [(0, 0), (-sqrt2 / 2, 0), (-sqrt2 / 2, 0), (0, 0)],
+            [(-sqrt2 / 2, 0), (0, 0), (0, 0), (-sqrt2 / 2, 0)],
         ]
     else:
         return [

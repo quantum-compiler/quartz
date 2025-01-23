@@ -13,8 +13,8 @@ import os
 import sys
 
 import z3
-from gates import add, compute, get_matrix, neg  # for searching phase factors
 from gates import kConstantEquations  # for constant square roots
+from gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))

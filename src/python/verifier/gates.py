@@ -7,12 +7,12 @@ import z3
 sqrt2 = z3.Real("sqrt2")
 sqrt3 = z3.Real("sqrt3")
 sqrt5 = z3.Real("sqrt5")
-five_minus_sqrt5 = z3.Real("five_minus_sqrt5")
+sqrt_of_5_minus_sqrt5 = z3.Real("sqrt_of_5_minus_sqrt5")
 kConstantEquations = [
     sqrt2 * sqrt2 == 2,
     sqrt3 * sqrt3 == 3,
     sqrt5 * sqrt5 == 5,
-    five_minus_sqrt5 * five_minus_sqrt5 == 5 - sqrt5,
+    sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
 ]
 
 
@@ -137,7 +137,7 @@ def pi(n, use_z3=True):
     elif n == 5:
         if use_z3:
             cos_a = (sqrt5 + 1) / 4
-            sin_a = sqrt2 * five_minus_sqrt5 / 4
+            sin_a = sqrt2 * sqrt_of_5_minus_sqrt5 / 4
         else:
             cos_a = (math.sqrt(5) + 1) / 4
             sin_a = math.sqrt(2) * math.sqrt(5 - math.sqrt(5)) / 4

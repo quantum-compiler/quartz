@@ -13,6 +13,7 @@ import os
 import sys
 
 import z3
+from gates import kConstantEquations  # for constant square roots
 from gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -317,9 +318,13 @@ def search_phase_factor_to_check_equivalence(
         # Found a possible phase factor
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         solver = z3.Solver()
+        # solver = z3.Tactic('qfnra-nlsat').solver()
+        solver.add(kConstantEquations)
         solver.add(equations)
         output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
-        solver.add(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
+        solver.add(
+            z3.simplify(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
+        )
         solver.set("timeout", timeout)  # timeout in milliseconds
         result = solver.check()
         if result != z3.unsat:
@@ -411,6 +416,7 @@ def equivalent(
             return False
 
     solver = z3.Solver()
+    solver.add(kConstantEquations)
     num_qubits = dag1_meta[meta_index_num_qubits]
     equation_list = copy.deepcopy(
         equation_list_for_params

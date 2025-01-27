@@ -25,7 +25,7 @@ Regetti quantum processors). Quartz works in two steps. First, for a given gate
 set, the Quartz circuit generator and circuit equivalence verifier can
 automatically generate and verify possible circuit transformations, represented
 as an equivalent circuit class (ECC) set. Second, Quartz's circuit optimizer
-takes a quantum circuit and an ECC set as inputs and use cost-based backtracking
+takes a quantum circuit and an ECC set as inputs and uses cost-based backtracking
 search to discover a super-optimized quantum circuit.
 
 ### Generate and verify an ECC set
@@ -100,7 +100,7 @@ Similarly, all parameter arrays and qubit arrays should come before gates.
 
 To input a circuit in `qasm` file, you should first create a `Context` object
 with a `ParamInfo` object, providing the gate set you use in your input file as
-argument as below:
+the argument as below:
 
 ``` cpp
 ParamInfo param_info;
@@ -120,7 +120,7 @@ By default, gates like `rz(pi/2)` are not symbolic. If you want to make them
 symbolic, please toggle this option:
 
 ```c++
-parser.use_symbolic_pi(true);
+qasm_parser.use_symbolic_pi(true);
 ```
 
 Now you can use the `QASMParser` object to load the circuit from the `qasm` file
@@ -173,7 +173,7 @@ RuleParser rules(
         "x q0 = rx q0 pi;"});
 ```
 
-As shown in the example above, the grammar for the rules are simple. Also, if a
+As shown in the example above, the grammar for the rules is simple. Also, if a
 gate in the input gate set already appears in the target set, you don't have to
 provide a rule for it.
 
@@ -203,7 +203,7 @@ Explanation for the parameters:
 - `cost_upper_bound`: Maximum circuit cost to be searched during optimization.
 - `timeout`: Timeout for optimization in seconds.
 - `store_all_steps_file_prefix`: Experimental, to store all optimization steps
-  in files. Default is to not store.
+  in files. The default is not to store.
 
 Usage example:
 

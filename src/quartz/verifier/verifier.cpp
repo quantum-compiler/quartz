@@ -108,7 +108,9 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
       // CircuitGate::equivalent())
       if (!CircuitGate::equivalent(gate1, gate2, wires_mapping,
                                    /*update_mapping=*/true, &wires_to_search)) {
-        // If not matched, block each qubit of both gates
+        // If not matched, block each qubit of gate1.
+        // Note that we should not block qubits of gate2 because it's not
+        // on the frontier.
         for (auto &input_wire : gate1->input_wires) {
           if (input_wire->is_qubit()) {
             qubit_blocked[input_wire->index] = true;
@@ -121,9 +123,6 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
           }
         }
         leftover_gates_start1.insert(gate1);
-        for (auto &output_wire : gate2->output_wires) {
-          qubit_blocked[output_wire->index] = true;
-        }
         leftover_gates_start2.insert(gate2);
       }
     }

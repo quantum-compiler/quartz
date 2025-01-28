@@ -253,7 +253,6 @@ int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
     while (pos != std::string::npos && pos > 0) {
       if (token[pos - 1] == '*') {
         // Case: t*-e (negative sign), ignored here
-        std::cout << pos << std::endl;
         pos = token.find_last_of("+-", pos - 1);
       }
     }

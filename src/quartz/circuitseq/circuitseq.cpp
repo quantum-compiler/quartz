@@ -1286,25 +1286,21 @@ CircuitSeq::get_permuted_seq(const std::vector<int> &qubit_permutation,
 std::unique_ptr<CircuitSeq>
 CircuitSeq::get_suffix_seq(const std::unordered_set<CircuitGate *> &start_gates,
                            Context *ctx) const {
-  // For topological sort
-  std::unordered_map<CircuitGate *, int> gate_remaining_in_degree;
-  for (auto &gate : start_gates) {
-    gate_remaining_in_degree[gate] = 0;  // ready to include
-  }
+  // Note: we should not do a topological sort because it is possible that
+  // |start_gates| does not touch all qubits.
+  // For example, start gates can be T(Q1) when the circuit is
+  // T(Q1) T(Q3) CX(Q1, Q3) CX(Q0, Q2) CX(Q0, Q1),
+  // in which case the suffix sequence is T(Q1) CX(Q1, Q3) CX(Q0, Q1).
+  std::unordered_set<CircuitGate *> visited_gates = start_gates;
   auto result = std::make_unique<CircuitSeq>(get_num_qubits());
-  // The result should be a subsequence of this circuit
+  // The result should be a subsequence of this circuit.
+  // Note that |gates| is a topological order
   for (auto &gate : gates) {
-    if (gate_remaining_in_degree.count(gate.get()) > 0 &&
-        gate_remaining_in_degree[gate.get()] <= 0) {
+    if (visited_gates.count(gate.get()) > 0) {
       result->add_gate(gate.get(), ctx);
       for (auto &output_wire : gate->output_wires) {
         for (auto &output_gate : output_wire->output_gates) {
-          // For topological sort
-          if (gate_remaining_in_degree.count(output_gate) == 0) {
-            gate_remaining_in_degree[output_gate] =
-                output_gate->gate->get_num_qubits();
-          }
-          gate_remaining_in_degree[output_gate]--;
+          visited_gates.insert(output_gate);
         }
       }
     }

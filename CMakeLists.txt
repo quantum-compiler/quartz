@@ -97,7 +97,7 @@ else ()
     endif ()
 endif ()
 
-add_library(quartz_runtime STATIC ${QUARTZ_SRCS})
+add_library(quartz_runtime SHARED ${QUARTZ_SRCS})
 
 target_compile_features(quartz_runtime PUBLIC cxx_std_17)
 

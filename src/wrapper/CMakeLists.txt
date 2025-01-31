@@ -8,7 +8,7 @@ file(GLOB_RECURSE TEST_RPC "rpc/test_rpc.cpp")
 file(GLOB_RECURSE TEST_ORACLE "test_oracle.cpp")
 file(GLOB_RECURSE ORACLE "oracle.cpp")
 
-add_library(oracle STATIC ${ORACLE})
+add_library(oracle SHARED ${ORACLE})
 target_link_libraries(oracle quartz_runtime)
 
 add_executable(wrapper_rpc ${WRAPPER_RPC})

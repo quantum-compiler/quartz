@@ -24,6 +24,12 @@ target_link_libraries(test_rpc quartz_runtime)
 target_link_libraries(test_oracle oracle)
 target_link_libraries(test_oracle quartz_runtime)
 
+cmake_path(SET LIBRPC_PATH "$ENV{LIBRPC_PATH}")
+cmake_path(GET LIBRPC_PATH PARENT_PATH LIBRPC_PARENT_PATH)
+cmake_path(GET LIBRPC_PARENT_PATH PARENT_PATH LIBRPC_PARENT_PARENT_PATH)
+cmake_path(SET LIBRPC_INCLUDE_DIR "${LIBRPC_PARENT_PARENT_PATH}/include")
+include_directories(${LIBRPC_INCLUDE_DIR})
+
 add_library(librpc STATIC IMPORTED)
 set_property(TARGET librpc PROPERTY IMPORTED_LOCATION $ENV{LIBRPC_PATH})
 target_link_libraries(wrapper_rpc librpc)

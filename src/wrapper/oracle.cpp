@@ -23,13 +23,13 @@ std::string optimize_(std::string circ_string, std::string cost_func,
     greedy_xfers = super_context->xfers_greedy_gate;
   } else if (cost_func == "Depth") {
     cost_function = [](Graph *graph) { return graph->circuit_depth(); };
-    greedy_xfers = super_context->xfers;
+    greedy_xfers = super_context->xfers_greedy_gate;
 
   } else if (cost_func == "Mixed") {
     cost_function = [](Graph *graph) {
       return 10 * graph->circuit_depth() + graph->total_cost();
     };
-    greedy_xfers = super_context->xfers;
+    greedy_xfers = super_context->xfers_greedy_gate;
 
   } else {
     std::cout << "Invalid cost function." << std::endl;

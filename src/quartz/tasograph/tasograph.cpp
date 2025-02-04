@@ -986,7 +986,7 @@ void Graph::rotation_merging(GateType target_rotation) {
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);
       assert(param_idx.find(it.first) != param_idx.end());
-      assert(context->param_has_value(param_idx[it.first]));
+      assert(context->param_is_const(param_idx[it.first]));
     }
   }
 
@@ -2890,7 +2890,7 @@ ParamType Graph::get_param_value(const Op &op) const {
   if (idx == param_idx.end()) {
     return 0;  // not a parameter
   }
-  if (!context->param_has_value(idx->second)) {
+  if (!context->param_is_const(idx->second)) {
     return 0;  // not constant
   }
   return context->get_param_value(idx->second);
@@ -2901,7 +2901,7 @@ bool Graph::param_has_value(const Op &op) const {
   if (idx == param_idx.end()) {
     return false;  // not a parameter
   }
-  if (!context->param_has_value(idx->second)) {
+  if (!context->param_is_const(idx->second)) {
     return false;  // not constant
   }
   return true;

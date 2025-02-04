@@ -82,6 +82,12 @@ class Context {
    */
   int get_new_param_id(const ParamType &param);
   /**
+   * Create a new concrete (integer) parameter that can only be used in
+   * arithmetic expressions.
+   * @return The index of the new concrete parameter.
+   */
+  int get_new_arithmetic_param_id(const ParamType &param);
+  /**
    * Create a new symbolic parameter.
    * @return The index of the new symbolic parameter.
    */
@@ -98,7 +104,7 @@ class Context {
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] int get_num_input_symbolic_parameters() const;
   [[nodiscard]] bool param_is_symbolic(int id) const;
-  [[nodiscard]] bool param_has_value(int id) const;
+  [[nodiscard]] bool param_is_const(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
   [[nodiscard]] bool param_is_halved(int id) const;
 

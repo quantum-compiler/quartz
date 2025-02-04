@@ -66,7 +66,8 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-int ParamParser::parse_number(bool negative, ParamType p, bool is_arithmetic, bool is_halved) {
+int ParamParser::parse_number(bool negative, ParamType p, bool is_arithmetic,
+                              bool is_halved) {
   // Handles negative constants.
   if (negative) {
     p = -p;

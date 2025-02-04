@@ -402,10 +402,23 @@ bool Context::load_param_info_from_json(std::istream &fin) {
       assert(id == i);
     } else {
       // concrete parameter
-      fin.unget();
-      ParamType val;
-      fin >> val;
-      int id = get_new_param_id(val);
+      bool is_float = false;
+      std::string s;  // record the number string
+      while (ch != ',' && ch != ']') {
+        s += ch;
+        if (ch == '.' || ch == 'e' || ch == 'E') {
+          is_float = true;
+        }
+        fin >> ch;
+      }
+      fin.unget();  // put the ',' or ']' back
+      ParamType val = std::stod(s);
+      int id;
+      if (is_float) {
+        id = get_new_param_id(val);
+      } else {
+        id = get_new_arithmetic_param_id(val);
+      }
       assert(id == i);
     }
   }

@@ -1941,8 +1941,8 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
                   .count() /
               1000.0 >
           timeout) {
-        std::cout << "Timeout. Program terminated. Best cost is " << bestCost
-                  << std::endl;
+        // std::cout << "Timeout. Program terminated. Best cost is " << bestCost
+        //           << std::endl;
         bestGraph->constant_and_rotation_elimination();
         return bestGraph;
       }
@@ -2153,8 +2153,8 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          std::cout << "Timeout. Program terminated. Best cost is " << best_cost
-                    << std::endl;
+          // std::cout << "Timeout. Program terminated. Best cost is " << best_cost
+          //           << std::endl;
           hit_timeout = true;
           break;
         }

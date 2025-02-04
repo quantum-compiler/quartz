@@ -66,7 +66,8 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-int ParamParser::parse_number(bool negative, ParamType p, bool is_halved) {
+int ParamParser::parse_number(bool negative, ParamType p, bool is_arithmetic,
+                              bool is_halved) {
   // Handles negative constants.
   if (negative) {
     p = -p;
@@ -79,7 +80,12 @@ int ParamParser::parse_number(bool negative, ParamType p, bool is_halved) {
 
   // Constructs the constant parameter if it does not already exist.
   if (number_params_.count(p) == 0) {
-    int param_id = ctx_->get_new_param_id(p);
+    int param_id;
+    if (is_arithmetic) {
+      param_id = ctx_->get_new_arithmetic_param_id(p);
+    } else {
+      param_id = ctx_->get_new_param_id(p);
+    }
     number_params_[p] = param_id;
   }
   return number_params_[p];
@@ -89,7 +95,7 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
                                bool is_halved) {
   // If pi is not symbolic, then falls back to constants.
   if (!symbolic_pi_) {
-    return parse_number(negative, n * PI / d, is_halved);
+    return parse_number(negative, n * PI / d, false, is_halved);
   }
 
   // Handles negative coefficients.
@@ -107,7 +113,7 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
     // Checks if fraction of pi already exists.
     // If (n == 1) then this will cache the final expression.
     if (pi_params_[1].count(d) == 0) {
-      int id = parse_number(false, d, false);
+      int id = parse_number(false, d, true, false);
       auto gate = ctx_->get_gate(GateType::pi);
       pi_params_[1][d] = ctx_->get_new_param_expression_id({id}, gate);
     }
@@ -115,7 +121,7 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
     // Scales the fraction of pi when the numerator is not equal to 1.
     // If (n != 1), then this will cache the final expression.
     if (n != 1) {
-      int nid = parse_number(false, n, false);
+      int nid = parse_number(false, n, true, false);
       int pid = pi_params_[1][d];
       auto gate = ctx_->get_gate(GateType::mult);
       pi_params_[n][d] = ctx_->get_new_param_expression_id({nid, pid}, gate);
@@ -126,7 +132,7 @@ int ParamParser::parse_pi_term(bool negative, ParamType n, ParamType d,
   return pi_params_[n][d];
 }
 
-int ParamParser::parse_symb_param(bool negative, std::string name, int i,
+int ParamParser::parse_symb_param(bool negative, const std::string &name, int i,
                                   bool is_halved) {
   // Attempts to look up the symbolic parameter identifier.
   if (symb_params_[name].count(i) == 0) {
@@ -352,7 +358,7 @@ int ParamParser::parse_term(bool negative, std::string token, bool is_halved) {
       ParamType p = std::stod(token.substr(0, token.find('/')));
       p /= PI;
       p /= std::stod(token.substr(lparen_pos + 1, mult_pos - lparen_pos - 1));
-      return parse_number(negative, p, is_halved);
+      return parse_number(negative, p, false, is_halved);
     } else {
       // Case: 0.123*pi or 0.123*pi/2
       auto d = token.substr(0, token.find('*'));
@@ -366,7 +372,7 @@ int ParamParser::parse_term(bool negative, std::string token, bool is_halved) {
     }
   } else {
     // Case: 0.123
-    return parse_number(negative, std::stod(token), is_halved);
+    return parse_number(negative, std::stod(token), false, is_halved);
   }
 
   // This line should be unreachable.

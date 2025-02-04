@@ -601,7 +601,9 @@ def compute_params(param_info):
     for i in range(len(param_info)):
         if param_info[i] == "":  # symbolic
             params.append(symbolic_params.pop(0))
-        elif isinstance(param_info[i], (int, float)):  # concrete
+        elif isinstance(param_info[i], int):  # concrete parameter for calculation
+            params.append(param_info[i])
+        elif isinstance(param_info[i], float):  # concrete parameter to be directly used
             params.append((math.cos(param_info[i]), math.sin(param_info[i])))
         else:  # expression
             op = param_info[i][0]

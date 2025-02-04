@@ -996,7 +996,7 @@ std::string CircuitSeq::to_qasm_style_string(Context *ctx,
                                              int param_precision) const {
   // Checks if parameters are in use.
   for (auto param : get_input_param_indices(ctx)) {
-    if (ctx->param_is_symbolic(param)) {
+    if (!ctx->param_is_const(param)) {
       std::cerr << "to_qasm_style_string only supports consts." << std::endl;
       break;
     }

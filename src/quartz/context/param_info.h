@@ -15,6 +15,62 @@ namespace quartz {
  */
 bool is_symbolic_constant(Gate *op);
 
+/**
+ * The class a parameter belongs. See ParamClass::Value for each case.
+ */
+class ParamClass {
+ public:
+  enum Value : uint8_t {
+    symbolic,         // an input symbolic parameter like theta
+    symbolic_halved,  // an input symbolic parameter like theta/2, when loading
+                      // circuits the parameter is halved, i.e., if we input 1.2
+                      // we will store 0.6; when printing circuits the parameter
+                      // is doubled, i.e., if we store 0.6 we will print 1.2.
+                      // This is for gates with matrices including theta/2. See
+                      // also Gate::is_param_halved(int).
+    concrete_const,   // a concrete, floating-point parameter (with a value)
+                      // like 1.2, from the input OpenQASM file written by
+                      // QASMParser
+    symbolic_constexpr,  // an at-least-partially symbolic constant expression
+                         // like pi/2+1.2. Fully concrete constant expressions
+                         // like 1.2+0.1 are expanded directly to 1.3.
+    expression,          // an expression involving at least one input symbolic
+                         // parameter like theta*2+1.2
+    arithmetic_int,      // only used for arithmetic expressions but not quantum
+                         // gates, must be an integer like 2
+  };
+  ParamClass() = default;
+  constexpr ParamClass(Value v) : value_(v) {}
+  explicit operator bool() const = delete;
+  constexpr bool operator==(ParamClass a) const { return value_ == a.value_; }
+  constexpr bool operator!=(ParamClass a) const { return value_ != a.value_; }
+  /**
+   * @return True iff the parameter has a known constant value.
+   */
+  [[nodiscard]] constexpr bool is_const() const {
+    return value_ == concrete_const || value_ == symbolic_constexpr ||
+           value_ == arithmetic_int;
+  }
+  /**
+   * @return True iff the parameter is or contains anything symbolic
+   * (including pi).
+   */
+  [[nodiscard]] constexpr bool is_symbolic() const {
+    return value_ == symbolic || value_ == symbolic_halved ||
+           value_ == expression || value_ == symbolic_constexpr;
+  }
+  /**
+   * @return True iff the parameter is an input symbolic or concrete parameter.
+   */
+  [[nodiscard]] constexpr bool is_input() const {
+    return value_ == symbolic || value_ == symbolic_halved ||
+           value_ == concrete_const;
+  }
+
+ private:
+  Value value_;
+};
+
 class ParamInfo {
  public:
   /**
@@ -57,6 +113,12 @@ class ParamInfo {
    */
   int get_new_param_id(const ParamType &param);
   /**
+   * Create a new concrete (integer) parameter that can only be used in
+   * arithmetic expressions.
+   * @return The index of the new concrete parameter.
+   */
+  int get_new_arithmetic_param_id(const ParamType &param);
+  /**
    * Create a new symbolic parameter.
    * @param is_halved If true, then used by a gate with period 4*pi.
    * @return The index of the new symbolic parameter.
@@ -74,7 +136,7 @@ class ParamInfo {
   [[nodiscard]] int get_num_parameters() const;
   [[nodiscard]] int get_num_input_symbolic_parameters() const;
   [[nodiscard]] bool param_is_symbolic(int id) const;
-  [[nodiscard]] bool param_has_value(int id) const;
+  [[nodiscard]] bool param_is_const(int id) const;
   [[nodiscard]] bool param_is_expression(int id) const;
   [[nodiscard]] bool param_is_halved(int id) const;
 
@@ -95,13 +157,14 @@ class ParamInfo {
    */
   [[nodiscard]] std::vector<InputParamMaskType> get_param_masks() const;
 
-  // Each parameter can be either a concrete parameter (with a value),
-  // an input symbolic parameter, or a symbolic parameter expression.
-  // The concrete parameters are from the input QASM file,
-  // written by QASMParser.
-  // These three vectors should always have the same size.
+  [[nodiscard]] std::string to_json() const;
+
+  // These three vectors should always have the same size. Each entry represents
+  // a parameter.
   std::vector<ParamType> parameter_values_;
   std::vector<std::unique_ptr<CircuitWire>> parameter_wires_;
+  std::vector<ParamClass> parameter_class_;
+
   std::vector<bool> is_parameter_symbolic_;
   std::vector<bool> is_parameter_halved_;
   // A holder for parameter expressions.

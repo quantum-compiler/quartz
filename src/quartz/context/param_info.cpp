@@ -1,5 +1,7 @@
 #include "param_info.h"
 
+#include "quartz/utils/string_utils.h"
+
 #include <cassert>
 
 namespace quartz {
@@ -36,14 +38,15 @@ std::vector<ParamType> ParamInfo::get_all_generated_parameters() const {
 }
 
 ParamType ParamInfo::get_param_value(int id) const {
-  assert(id >= 0 && id < (int)parameter_values_.size());
-  assert(!is_parameter_symbolic_[id]);
+  assert(id >= 0 && id < (int)parameter_class_.size());
+  assert(parameter_class_[id].is_const());
   return parameter_values_[id];
 }
 
 void ParamInfo::set_param_value(int id, const ParamType &param) {
-  assert(id >= 0 && id < (int)is_parameter_symbolic_.size());
-  assert(!is_parameter_symbolic_[id]);
+  assert(id >= 0 && id < (int)parameter_class_.size());
+  assert(parameter_class_[id] == ParamClass::concrete_const ||
+         parameter_class_[id] == ParamClass::arithmetic_int);
   while (id >= (int)parameter_values_.size()) {
     parameter_values_.emplace_back();
   }
@@ -55,10 +58,22 @@ std::vector<ParamType> ParamInfo::get_all_input_param_values() const {
 }
 
 int ParamInfo::get_new_param_id(const ParamType &param) {
-  int id = (int)is_parameter_symbolic_.size();
-  assert(id == (int)is_parameter_halved_.size());
-  is_parameter_symbolic_.push_back(false);
-  is_parameter_halved_.push_back(false);
+  int id = (int)parameter_class_.size();
+  assert(id == (int)parameter_class_.size());
+  parameter_class_.emplace_back(ParamClass::concrete_const);
+  auto wire = std::make_unique<CircuitWire>();
+  wire->type = CircuitWire::input_param;
+  wire->index = id;
+  parameter_wires_.push_back(std::move(wire));
+  set_param_value(id, param);
+  return id;
+}
+
+int ParamInfo::get_new_arithmetic_param_id(const ParamType &param) {
+  int id = (int)parameter_class_.size();
+  assert(id == (int)parameter_class_.size());
+  assert((int)param == param);
+  parameter_class_.emplace_back(ParamClass::arithmetic_int);
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;
   wire->index = id;
@@ -68,9 +83,9 @@ int ParamInfo::get_new_param_id(const ParamType &param) {
 }
 
 int ParamInfo::get_new_param_id(bool is_halved) {
-  int id = (int)is_parameter_symbolic_.size();
-  is_parameter_symbolic_.push_back(true);
-  is_parameter_halved_.push_back(is_halved);
+  int id = (int)parameter_class_.size();
+  parameter_class_.emplace_back(is_halved ? ParamClass::symbolic_halved
+                                          : ParamClass::symbolic);
   // Make sure to generate a random parameter for each symbolic parameter.
   gen_random_parameters(id + 1);
   auto wire = std::make_unique<CircuitWire>();
@@ -83,10 +98,14 @@ int ParamInfo::get_new_param_id(bool is_halved) {
 int ParamInfo::get_new_param_expression_id(
     const std::vector<int> &parameter_indices, Gate *op) {
   bool is_symbolic = is_symbolic_constant(op);
+  bool is_const = true;
   for (auto &input_id : parameter_indices) {
-    assert(input_id >= 0 && input_id < (int)is_parameter_symbolic_.size());
-    if (param_is_symbolic(input_id)) {
+    assert(input_id >= 0 && input_id < (int)parameter_class_.size());
+    if (parameter_class_[input_id].is_symbolic()) {
       is_symbolic = true;
+    }
+    if (!parameter_class_[input_id].is_const()) {
+      is_const = false;
     }
   }
   if (!is_symbolic) {
@@ -99,9 +118,9 @@ int ParamInfo::get_new_param_expression_id(
     }
     return get_new_param_id(op->compute(input_params));
   }
-  int id = (int)is_parameter_symbolic_.size();
-  is_parameter_symbolic_.push_back(true);
-  is_parameter_halved_.push_back(false);
+  int id = (int)parameter_class_.size();
+  parameter_class_.emplace_back(is_const ? ParamClass::symbolic_constexpr
+                                         : ParamClass::expression);
   auto circuit_gate = std::make_unique<CircuitGate>();
   circuit_gate->gate = op;
   for (auto &input_id : parameter_indices) {
@@ -119,7 +138,7 @@ int ParamInfo::get_new_param_expression_id(
 }
 
 int ParamInfo::get_num_parameters() const {
-  return (int)is_parameter_symbolic_.size();
+  return (int)parameter_class_.size();
 }
 
 int ParamInfo::get_num_input_symbolic_parameters() const {
@@ -127,13 +146,13 @@ int ParamInfo::get_num_input_symbolic_parameters() const {
 }
 
 bool ParamInfo::param_is_symbolic(int id) const {
-  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
-         is_parameter_symbolic_[id];
+  return id >= 0 && id < (int)parameter_class_.size() &&
+         parameter_class_[id].is_symbolic();
 }
 
-bool ParamInfo::param_has_value(int id) const {
-  return id >= 0 && id < (int)is_parameter_symbolic_.size() &&
-         !is_parameter_symbolic_[id];
+bool ParamInfo::param_is_const(int id) const {
+  return id >= 0 && id < (int)parameter_class_.size() &&
+         parameter_class_[id].is_const();
 }
 
 bool ParamInfo::param_is_expression(int id) const {
@@ -142,8 +161,9 @@ bool ParamInfo::param_is_expression(int id) const {
 }
 
 bool ParamInfo::param_is_halved(int id) const {
-  return id >= 0 && id < (int)is_parameter_halved_.size() &&
-         is_parameter_halved_[id];
+  return id >= 0 && id < (int)parameter_class_.size() &&
+         parameter_class_[id] == ParamClass::symbolic_halved;
+  // TODO: halved parameter expressions
 }
 
 CircuitWire *ParamInfo::get_param_wire(int id) const {
@@ -158,10 +178,10 @@ std::vector<ParamType>
 ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
   // Creates a param list, assuming that all symbolic params are defined first.
   auto result = input_parameters;
-  result.resize(is_parameter_symbolic_.size());
+  result.resize(parameter_class_.size());
   // Populates constant parameters.
   for (int i = 0; i < result.size(); ++i) {
-    if (!is_parameter_symbolic_[i]) {
+    if (parameter_class_[i].is_const()) {
       result[i] = parameter_values_[i];
     }
   }
@@ -180,7 +200,7 @@ ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
 }
 
 std::vector<InputParamMaskType> ParamInfo::get_param_masks() const {
-  std::vector<InputParamMaskType> param_mask(is_parameter_symbolic_.size());
+  std::vector<InputParamMaskType> param_mask(parameter_class_.size());
   for (int i = 0; i < (int)param_mask.size(); i++) {
     if (!param_is_expression(i)) {
       param_mask[i] = ((InputParamMaskType)1) << i;
@@ -194,5 +214,36 @@ std::vector<InputParamMaskType> ParamInfo::get_param_masks() const {
     }
   }
   return param_mask;
+}
+
+std::string ParamInfo::to_json() const {
+  std::string result = "[";
+  result += "[";
+  result += std::to_string(parameter_class_.size());
+  for (int i = 0; i < (int)parameter_class_.size(); i++) {
+    result += ", ";
+    if (parameter_class_[i] == ParamClass::arithmetic_int) {
+      // arithmetic int
+      result += std::to_string((int)parameter_values_[i]);
+    } else if (parameter_class_[i].is_input()) {
+      if (parameter_class_[i].is_symbolic()) {
+        // input symbolic
+        result += "\"\"";
+        // TODO: halved parameter
+      } else {
+        // input concrete
+        result += to_string_with_precision(parameter_values_[i],
+                                           /*precision=*/17);
+      }
+    } else {
+      // expression
+      result += parameter_wires_[i]->input_gates[0]->to_json();
+    }
+  }
+  result += "], ";
+  result += to_json_style_string_with_precision(random_parameters_,
+                                                /*precision=*/17);
+  result += "]";
+  return result;
 }
 }  // namespace quartz

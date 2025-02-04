@@ -217,6 +217,10 @@ int Context::get_new_param_id(const ParamType &param) {
   return param_info_->get_new_param_id(param);
 }
 
+int Context::get_new_arithmetic_param_id(const ParamType &param) {
+  return param_info_->get_new_arithmetic_param_id(param);
+}
+
 int Context::get_new_param_id() {
   return param_info_->get_new_param_id(may_use_halved_params_);
 }
@@ -238,8 +242,8 @@ bool Context::param_is_symbolic(int id) const {
   return param_info_->param_is_symbolic(id);
 }
 
-bool Context::param_has_value(int id) const {
-  return param_info_->param_has_value(id);
+bool Context::param_is_const(int id) const {
+  return param_info_->param_is_const(id);
 }
 
 bool Context::param_is_expression(int id) const {
@@ -261,7 +265,7 @@ Context::compute_parameters(const std::vector<ParamType> &input_parameters) {
 
 std::vector<int> Context::get_param_permutation(
     const std::vector<int> &input_param_permutation) {
-  int num_parameters = (int)param_info_->is_parameter_symbolic_.size();
+  int num_parameters = (int)param_info_->parameter_class_.size();
   std::vector<int> result = input_param_permutation;
   result.resize(num_parameters, -1);  // fill with -1
   for (int i = (int)input_param_permutation.size(); i < num_parameters; i++) {
@@ -307,7 +311,7 @@ std::vector<int> Context::get_param_permutation(
 void Context::generate_parameter_expressions(
     int max_num_operators_per_expression) {
   assert(max_num_operators_per_expression == 1);
-  int num_input_parameters = (int)param_info_->is_parameter_symbolic_.size();
+  int num_input_parameters = (int)param_info_->parameter_class_.size();
   assert(num_input_parameters > 0);
   if (!param_info_->parameter_expressions_.empty()) {
     std::cerr << "Context::generate_parameter_expressions() called twice for a "
@@ -350,25 +354,7 @@ std::vector<InputParamMaskType> Context::get_param_masks() const {
 }
 
 std::string Context::param_info_to_json() const {
-  std::string result = "[";
-  result += "[";
-  result += std::to_string(param_info_->is_parameter_symbolic_.size());
-  for (int i = 0; i < (int)param_info_->is_parameter_symbolic_.size(); i++) {
-    result += ", ";
-    if (param_is_expression(i)) {
-      result += param_info_->parameter_wires_[i]->input_gates[0]->to_json();
-    } else if (param_info_->is_parameter_symbolic_[i]) {
-      result += "\"\"";
-    } else {
-      result += to_string_with_precision(param_info_->parameter_values_[i],
-                                         /*precision=*/17);
-    }
-  }
-  result += "], ";
-  result += to_json_style_string_with_precision(param_info_->random_parameters_,
-                                                /*precision=*/17);
-  result += "]";
-  return result;
+  return param_info_->to_json();
 }
 
 bool Context::load_param_info_from_json(std::istream &fin) {
@@ -386,8 +372,8 @@ bool Context::load_param_info_from_json(std::istream &fin) {
   }
   int num_params;
   fin >> num_params;
-  param_info_->is_parameter_symbolic_.clear();
-  param_info_->is_parameter_symbolic_.reserve(num_params);
+  param_info_->parameter_class_.clear();
+  param_info_->parameter_class_.reserve(num_params);
   param_info_->parameter_wires_.clear();
   param_info_->parameter_wires_.reserve(num_params);
   param_info_->parameter_values_.clear();
@@ -416,10 +402,23 @@ bool Context::load_param_info_from_json(std::istream &fin) {
       assert(id == i);
     } else {
       // concrete parameter
-      fin.unget();
-      ParamType val;
-      fin >> val;
-      int id = get_new_param_id(val);
+      bool is_float = false;
+      std::string s;  // record the number string
+      while (ch != ',' && ch != ']') {
+        s += ch;
+        if (ch == '.' || ch == 'e' || ch == 'E') {
+          is_float = true;
+        }
+        fin >> ch;
+      }
+      fin.unget();  // put the ',' or ']' back
+      ParamType val = std::stod(s);
+      int id;
+      if (is_float) {
+        id = get_new_param_id(val);
+      } else {
+        id = get_new_arithmetic_param_id(val);
+      }
       assert(id == i);
     }
   }

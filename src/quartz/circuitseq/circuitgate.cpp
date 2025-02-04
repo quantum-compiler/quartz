@@ -265,7 +265,7 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
     for (auto input_wire : input_wires) {
       if (input_wire->is_parameter()) {
         // Ensures the wire is valid.
-        assert(ctx->param_has_value(input_wire->index));
+        assert(ctx->param_is_const(input_wire->index));
 
         // Determines the parameter value with respect to reparameterization.
         std::ostringstream out;

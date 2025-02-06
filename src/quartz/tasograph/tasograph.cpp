@@ -1921,42 +1921,9 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
-
-  EquivalenceSet eqs;
-  // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
-    std::cout << "Failed to load equivalence file \"" << equiv_file_name
-              << "\"." << std::endl;
-    assert(false);
-  }
-
   // Get xfer from the equivalent set
-  auto eccs = eqs.get_all_equivalence_sets();
-  std::vector<GraphXfer *> xfers;
-  for (const auto &ecc : eccs) {
-    CircuitSeq *representative = ecc.front();
-    /*int representative_depth = representative->get_circuit_depth();
-    for (auto &circuit : ecc) {
-      int circuit_depth = circuit->get_circuit_depth();
-      if (circuit_depth < representative_depth) {
-        representative = circuit;
-        representative_depth = circuit_depth;
-      }
-    }*/
-    for (auto &circuit : ecc) {
-      if (circuit != representative) {
-        auto xfer =
-            GraphXfer::create_GraphXfer(ctx, circuit, representative, true);
-        if (xfer != nullptr) {
-          xfers.push_back(xfer);
-        }
-        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, true);
-        if (xfer != nullptr) {
-          xfers.push_back(xfer);
-        }
-      }
-    }
-  }
+  std::vector<GraphXfer *> xfers =
+      GraphXfer::get_all_xfers_from_ecc(ctx, equiv_file_name);
   if (print_message) {
     std::cout << "Number of xfers: " << xfers.size() << std::endl;
   }

@@ -130,6 +130,8 @@ class GraphXfer {
   ccz_cx_u1_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
   static std::pair<GraphXfer *, GraphXfer *>
   ccz_cx_t_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  static std::vector<GraphXfer *>
+  get_all_xfers_from_ecc(Context *ctx, const std::string &equiv_file_name);
 
  public:
   Context *src_ctx_;

@@ -66,6 +66,19 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
+ParamParser::ParamParser(Context *ctx)
+    : ctx_(ctx), symbolic_pi_(false), first_file_(true) {
+  // Initiate the constant parameter map from the context.
+  const auto &param_values =
+      ctx_->get_param_info()->get_all_input_param_values();
+  const auto &param_class = ctx_->get_param_info()->parameter_class_;
+  for (int i = 0; i < (int)param_class.size(); i++) {
+    if (param_class[i] == ParamClass::concrete_const) {
+      number_params_[param_values[i]] = i;
+    }
+  }
+}
+
 int ParamParser::parse_number(bool negative, ParamType p, bool is_arithmetic,
                               bool is_halved) {
   // Handles negative constants.

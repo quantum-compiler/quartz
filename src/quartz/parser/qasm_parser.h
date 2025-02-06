@@ -40,8 +40,7 @@ std::string strip(const std::string &input);
  */
 class ParamParser {
  public:
-  ParamParser(Context *ctx)
-      : ctx_(ctx), symbolic_pi_(false), first_file_(true) {}
+  ParamParser(Context *ctx);
 
   /**
    * Adds an angle array declaration to the registry of symbolic parameters.

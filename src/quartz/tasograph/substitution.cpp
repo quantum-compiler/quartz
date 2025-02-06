@@ -549,6 +549,46 @@ GraphXfer::ccz_cx_t_xfer(Context *src_ctx, Context *dst_ctx,
   return std::make_pair(xfer_0, xfer_1);
 }
 
+std::vector<GraphXfer *>
+GraphXfer::get_all_xfers_from_ecc(Context *ctx,
+                                  const std::string &equiv_file_name) {
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
+    std::cout << "Failed to load equivalence file \"" << equiv_file_name
+              << "\"." << std::endl;
+    assert(false);
+  }
+
+  auto eccs = eqs.get_all_equivalence_sets();
+  std::vector<GraphXfer *> xfers;
+  for (const auto &ecc : eccs) {
+    CircuitSeq *representative = ecc.front();
+    /*int representative_depth = representative->get_circuit_depth();
+    for (auto &circuit : ecc) {
+      int circuit_depth = circuit->get_circuit_depth();
+      if (circuit_depth < representative_depth) {
+        representative = circuit;
+        representative_depth = circuit_depth;
+      }
+    }*/
+    for (auto &circuit : ecc) {
+      if (circuit != representative) {
+        auto xfer =
+            GraphXfer::create_GraphXfer(ctx, circuit, representative, true);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+        xfer = GraphXfer::create_GraphXfer(ctx, representative, circuit, true);
+        if (xfer != nullptr) {
+          xfers.push_back(xfer);
+        }
+      }
+    }
+  }
+  return xfers;
+}
+
 GraphXfer::GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
                      const CircuitSeq *src_graph, const CircuitSeq *dst_graph)
     : src_ctx_(src_ctx), dst_ctx_(dst_ctx), union_ctx_(union_ctx), tensorId(0) {

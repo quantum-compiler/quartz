@@ -17,17 +17,19 @@ int main() {
   if (!std::filesystem::exists(kQuartzRootPath / "logs")) {
     std::filesystem::create_directory(kQuartzRootPath / "logs");
   }
+  auto xfers = GraphXfer::get_all_xfers_from_ecc(
+      &ctx, (kQuartzRootPath / "eccset/Clifford_T_5_3_complete_ECC_set.json")
+                .string());
   test_optimization(
       &ctx,
       (kQuartzRootPath / "circuit/example-circuits/barenco_tof_3.qasm")
           .string(),
-      (kQuartzRootPath / "eccset/Clifford_T_5_3_complete_ECC_set.json")
-          .string(),
+      xfers,
       /*timeout=*/12, (kQuartzRootPath / "logs/barenco_tof_3_").string());
   Verifier verifier;
   bool verified = verifier.verify_transformation_steps(
       &ctx, (kQuartzRootPath / "logs/barenco_tof_3_").string(),
-      /*verbose=*/true);
+      /*verbose=*/false);
   if (verified) {
     std::cout << "All transformations are verified." << std::endl;
   } else {

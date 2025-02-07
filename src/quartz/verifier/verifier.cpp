@@ -204,6 +204,10 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
     }
   }
   if (remaining_qubits < num_qubits) {
+    if (verbose) {
+      std::cout << "Reducing the number of qubits from " << num_qubits << " to "
+                << remaining_qubits << std::endl;
+    }
     c1 = c1->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
     c2 = c2->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
   }

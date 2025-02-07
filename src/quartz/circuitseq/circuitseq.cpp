@@ -1271,14 +1271,16 @@ bool CircuitSeq::to_canonical_representation(const Context *ctx) {
 std::unique_ptr<CircuitSeq>
 CircuitSeq::get_permuted_seq(const std::vector<int> &qubit_permutation,
                              const std::vector<int> &input_param_permutation,
-                             Context *ctx) const {
+                             Context *ctx, int result_num_qubits) const {
   auto result = std::make_unique<CircuitSeq>(0);
   if (input_param_permutation.empty()) {
-    result->clone_from(*this, qubit_permutation, input_param_permutation, ctx);
+    result->clone_from(*this, qubit_permutation, input_param_permutation, ctx,
+                       result_num_qubits);
   } else {
     auto all_param_permutation =
         ctx->get_param_permutation(input_param_permutation);
-    result->clone_from(*this, qubit_permutation, all_param_permutation, ctx);
+    result->clone_from(*this, qubit_permutation, all_param_permutation, ctx,
+                       result_num_qubits);
   }
   return result;
 }
@@ -1311,8 +1313,9 @@ CircuitSeq::get_suffix_seq(const std::unordered_set<CircuitGate *> &start_gates,
 void CircuitSeq::clone_from(const CircuitSeq &other,
                             const std::vector<int> &qubit_permutation,
                             const std::vector<int> &param_permutation,
-                            const Context *ctx) {
-  num_qubits = other.num_qubits;
+                            const Context *ctx, int result_num_qubits) {
+  num_qubits = (result_num_qubits == -1 ? other.num_qubits : result_num_qubits);
+  int num_qubits_difference = other.num_qubits - num_qubits;
   original_fingerprint_ = other.original_fingerprint_;
   std::unordered_map<CircuitWire *, CircuitWire *> wires_mapping;
   std::unordered_map<CircuitGate *, CircuitGate *> gates_mapping;
@@ -1337,6 +1340,7 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
     hash_value_valid_ = false;
   }
   if (qubit_permutation.empty()) {
+    assert(result_num_qubits == -1);
     for (int i = 0; i < (int)other.wires.size(); i++) {
       wires.emplace_back(std::make_unique<CircuitWire>(*(other.wires[i])));
       assert(wires[i].get() !=
@@ -1344,10 +1348,16 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       wires_mapping[other.wires[i].get()] = wires[i].get();
     }
   } else {
-    assert(qubit_permutation.size() == num_qubits);
-    wires.resize(other.wires.size());
-    for (int i = 0; i < num_qubits; i++) {
-      assert(qubit_permutation[i] >= 0 && qubit_permutation[i] < num_qubits);
+    assert(qubit_permutation.size() == other.num_qubits);
+    wires.resize(other.wires.size() - num_qubits_difference);
+    for (int i = 0; i < other.num_qubits; i++) {
+      if (result_num_qubits == -1) {
+        assert(qubit_permutation[i] >= 0 && qubit_permutation[i] < num_qubits);
+      } else {
+        if (qubit_permutation[i] < 0 || qubit_permutation[i] >= num_qubits) {
+          continue;
+        }
+      }
       wires[qubit_permutation[i]] =
           std::make_unique<CircuitWire>(*(other.wires[i]));
       wires[qubit_permutation[i]]->index =
@@ -1355,10 +1365,14 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       assert(wires[qubit_permutation[i]].get() != other.wires[i].get());
       wires_mapping[other.wires[i].get()] = wires[qubit_permutation[i]].get();
     }
-    for (int i = num_qubits; i < (int)other.wires.size(); i++) {
-      wires[i] = std::make_unique<CircuitWire>(*(other.wires[i]));
-      wires[i]->index = qubit_permutation[wires[i]->index];  // update index
-      wires_mapping[other.wires[i].get()] = wires[i].get();
+    for (int i = other.num_qubits; i < (int)other.wires.size(); i++) {
+      wires[i - num_qubits_difference] =
+          std::make_unique<CircuitWire>(*(other.wires[i]));
+      // update index
+      wires[i - num_qubits_difference]->index =
+          qubit_permutation[wires[i - num_qubits_difference]->index];
+      wires_mapping[other.wires[i].get()] =
+          wires[i - num_qubits_difference].get();
     }
   }
   if (!param_permutation.empty()) {
@@ -1392,8 +1406,19 @@ void CircuitSeq::clone_from(const CircuitSeq &other,
       wire = wires_mapping[wire];
     }
   }
-  for (auto &wire : other.outputs) {
-    outputs.emplace_back(wires_mapping[wire]);
+  if (qubit_permutation.empty()) {
+    for (auto &wire : other.outputs) {
+      outputs.emplace_back(wires_mapping[wire]);
+    }
+  } else {
+    outputs.resize(num_qubits);
+    for (auto &wire : other.outputs) {
+      if (wires_mapping.count(wire) > 0) {
+        assert(qubit_permutation[wire->index] >= 0 &&
+               qubit_permutation[wire->index] < num_qubits);
+        outputs[qubit_permutation[wire->index]] = wires_mapping[wire];
+      }
+    }
   }
 }
 

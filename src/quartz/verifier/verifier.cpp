@@ -192,6 +192,22 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
     }
   }
 
+  // Remove qubits with no gates to avoid creating 2^num_qubits variables in the
+  // verifier.
+  std::vector<int> qubit_permutation(num_qubits, -1);
+  int remaining_qubits = 0;
+  for (int i = 0; i < num_qubits; i++) {
+    if (c1->outputs[i] != c1->wires[i].get() ||
+        c2->outputs[i] != c2->wires[i].get()) {
+      // qubit used in at least one of the two circuits
+      qubit_permutation[i] = remaining_qubits++;
+    }
+  }
+  if (remaining_qubits < num_qubits) {
+    c1 = c1->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
+    c2 = c2->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
+  }
+
   if (verbose) {
     std::cout << "Checking Verifier::equivalent() on:" << std::endl;
     std::cout << c1->to_string(/*line_number=*/true) << std::endl;
@@ -216,7 +232,8 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
       std::string("python ") + kQuartzRootPath.string() +
       "/src/python/verifier/verify_equivalences.py " +
       kQuartzRootPath.string() + "/tmp_before_verify.json " +
-      kQuartzRootPath.string() + "/tmp_after_verify.json";
+      kQuartzRootPath.string() + "/tmp_after_verify.json" +
+      (verbose ? " True True" : "");
   system(command_string.c_str());
   EquivalenceSet equiv_set;
   ret = equiv_set.load_json(ctx,

@@ -272,19 +272,23 @@ class CircuitSeq {
   /**
    * Permute the qubits and input parameters.
    * @param qubit_permutation The qubit permutation. The size must be the
-   * same as the number of qubits.
+   * same as the number of qubits. When |result_num_qubits| is not -1,
+   * all qubits mapped to a number greater than or equal to |result_num_qubits|
+   * must be unused in any gates in this circuit.
    * @param input_param_permutation The input parameter permutation. If the size
    * is smaller than the total number of input parameters, this function only
    * permutes a prefix of input parameters corresponding to |param_permutation|.
    * @param ctx The context, only needed when |input_param_permutation| is not
    * empty. When |input_param_permutation| is empty, it is safe to pass in a
    * nullptr.
+   * @param result_num_qubits The number of qubits of the permuted circuit
+   * sequence. Default is -1, which means to copy from this circuit sequence.
    * @return The permuted circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
   get_permuted_seq(const std::vector<int> &qubit_permutation,
                    const std::vector<int> &input_param_permutation,
-                   Context *ctx) const;
+                   Context *ctx, int result_num_qubits = -1) const;
   /**
    * Get a circuit with |start_gates| and all gates topologically after them.
    * @param start_gates The first gates at each qubit to include in the
@@ -346,18 +350,25 @@ class CircuitSeq {
    * Clone the circuit from another circuit sequence.
    * @param other The source circuit sequence.
    * @param qubit_permutation The qubit permutation (optional).
-   * If not empty, the size must be the same as the number of qubits.
+   * If not empty, the size must be the same as the number of qubits of the
+   * other circuit sequence. When |result_num_qubits| is not -1, any unmapped
+   * qubits must be unused (i.e., there should be no gates on that qubit in
+   * the other circuit sequence). When |result_num_qubits| is -1, this parameter
+   * must be empty.
    * @param param_permutation The parameter permutation (optional).
    * If empty, |ctx| is not used and all parameters will be from the same
    * context as |other|.
    * @param ctx The context, only needed when |param_permutation| is not empty.
    * When |param_permutation| is empty, it is safe to pass in a nullptr.
+   * @param result_num_qubits The number of qubits of the permuted circuit
+   * sequence. Default is -1, which means to copy from the other (original)
+   * circuit sequence.
    * @return The permuted circuit sequence.
    */
   void clone_from(const CircuitSeq &other,
                   const std::vector<int> &qubit_permutation,
-                  const std::vector<int> &param_permutation,
-                  const Context *ctx);
+                  const std::vector<int> &param_permutation, const Context *ctx,
+                  int result_num_qubits = -1);
 
   /**
    * Remove a quantum gate from the graph, remove its output wires by default,
@@ -386,8 +397,10 @@ class CircuitSeq {
       std::vector<std::pair<CircuitSeqHashType, PhaseShiftIdType>> *other_hash);
 
  public:
+  // Invariant: wires[i] is the i-th qubit input
   std::vector<std::unique_ptr<CircuitWire>> wires;
   std::vector<std::unique_ptr<CircuitGate>> gates;
+  // Invariant: outputs[i] is the i-th qubit
   std::vector<CircuitWire *> outputs;
 
  private:

@@ -175,6 +175,13 @@ bool Dataset::insert(Context *ctx, std::unique_ptr<CircuitSeq> dag) {
   return ret;
 }
 
+bool Dataset::insert_with_hash(const CircuitSeqHashType &hash_value,
+                               std::unique_ptr<CircuitSeq> dag) {
+  bool ret = dataset.count(hash_value) == 0;
+  dataset[hash_value].push_back(std::move(dag));
+  return ret;
+}
+
 bool Dataset::insert_to_nearby_set_if_exists(Context *ctx,
                                              std::unique_ptr<CircuitSeq> dag) {
   const auto hash_value = dag->hash(ctx);

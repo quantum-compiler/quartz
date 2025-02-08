@@ -40,7 +40,18 @@ class Dataset {
   // Returns true iff the hash value is new to the |dataset|.
   bool insert(Context *ctx, std::unique_ptr<CircuitSeq> dag);
 
-  // Inserts the circuitseq to an existing set if the hash value plus or minus 1
+  /**
+   * Insert a CircuitSeq with a pre-defined hash value. This function is used
+   * when the hash value cannot be computed, and should NOT be used in Quartz's
+   * generator.
+   * @param hash_value The hash value to be inserted.
+   * @param dag The CircuitSeq to be inserted.
+   * @return True iff the hash value is new to the |dataset|.
+   */
+  bool insert_with_hash(const CircuitSeqHashType &hash_value,
+                        std::unique_ptr<CircuitSeq> dag);
+
+  // Inserts the CircuitSeq to an existing set if the hash value plus or minus 1
   // is found. Returns true iff there is no such existing set.
   bool insert_to_nearby_set_if_exists(Context *ctx,
                                       std::unique_ptr<CircuitSeq> dag);

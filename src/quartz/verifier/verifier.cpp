@@ -67,7 +67,7 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
   std::unordered_set<CircuitGate *> leftover_gates_start2;
   // (Partial) topological sort on circuit1
   while (!wires_to_search.empty()) {
-    auto wire1 = wires_to_search.front();
+    CircuitWire *wire1 = wires_to_search.front();
     assert(wires_mapping.count(wire1) > 0);
     auto wire2 = wires_mapping[wire1];
     wires_to_search.pop();
@@ -79,19 +79,31 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
                     [&qubit_blocked](CircuitWire *output_wire) {
                       return qubit_blocked[output_wire->index];
                     })) {
-      // Block qubits of potential unmatched gates
-      for (auto &gate : wire1->output_gates) {
-        for (auto &output_wire : gate->output_wires) {
-          qubit_blocked[output_wire->index] = true;
+      // Block qubits of potential unmatched gates.
+      for (auto &gate1 : wire1->output_gates) {
+        // Use a for loop because |wire1->output_gates| can be empty.
+        for (auto &input_wire : gate1->input_wires) {
+          qubit_blocked[input_wire->index] = true;
+          // If |wires_mapping| does not have |input_wire|, this means that
+          // the qubit is already blocked before, and |leftover_gates_start2|
+          // already had an earlier gate at this qubit.
+          if (wires_mapping.count(input_wire) > 0) {
+            // Note that this input wire might be not in the search queue now.
+            // We need to manually add the gate in circuit2 to the frontier.
+            for (auto &gate : wires_mapping[input_wire]->output_gates) {
+              leftover_gates_start2.insert(gate);
+            }
+          }
         }
         // Use std::unordered_set to deduplicate, similarly hereinafter
-        leftover_gates_start1.insert(gate);
+        leftover_gates_start1.insert(gate1);
       }
-      for (auto &gate : wire2->output_gates) {
-        for (auto &output_wire : gate->output_wires) {
+      for (auto &gate2 : wire2->output_gates) {
+        // Use a for loop because |wire2->output_gates| can be empty.
+        for (auto &output_wire : gate2->output_wires) {
           qubit_blocked[output_wire->index] = true;
         }
-        leftover_gates_start2.insert(gate);
+        leftover_gates_start2.insert(gate2);
       }
       continue;
     }
@@ -141,6 +153,20 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
   // We should have removed the same number of gates
   assert(circuit1->get_num_gates() - c1->get_num_gates() ==
          circuit2->get_num_gates() - c2->get_num_gates());
+  if (verbose) {
+    std::cout << "Removed " << circuit1->get_num_gates() - c1->get_num_gates()
+              << " prefix gates from circuit1 and "
+              << circuit2->get_num_gates() - c2->get_num_gates()
+              << " prefix gates from circuit2." << std::endl;
+    std::cout << "Leftover gates from circuit1:" << std::endl;
+    for (auto &gate : leftover_gates_start1) {
+      std::cout << gate->to_string() << std::endl;
+    }
+    std::cout << "Leftover gates from circuit2:" << std::endl;
+    for (auto &gate : leftover_gates_start2) {
+      std::cout << gate->to_string() << std::endl;
+    }
+  }
 
   // Remove common last gates
   while (true) {

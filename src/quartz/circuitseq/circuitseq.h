@@ -290,12 +290,13 @@ class CircuitSeq {
                    const std::vector<int> &input_param_permutation,
                    Context *ctx, int result_num_qubits = -1) const;
   /**
-   * Get a circuit with |start_gates| and all gates topologically after them.
-   * @param start_gates The first gates at each qubit to include in the
-   * circuit to return.
+   * Get a circuit with all gates after a frontier.
+   * @param frontier A vector of size the same as the number of qubits, storing
+   * the frontier of wires for each qubit.
+   * @return The suffix circuit sequence.
    */
   [[nodiscard]] std::unique_ptr<CircuitSeq>
-  get_suffix_seq(const std::unordered_set<CircuitGate *> &start_gates,
+  get_suffix_seq(const std::vector<CircuitWire *> &frontier,
                  Context *ctx) const;
 
   /**

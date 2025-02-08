@@ -40,6 +40,8 @@ int main() {
   auto xfers = GraphXfer::get_all_xfers_from_ecc(
       &ctx,
       (kQuartzRootPath / "eccset/Nam_6_3_complete_ECC_set.json").string());
+  int verified_count = 0;
+  int not_verified_count = 0;
   for (const auto &circuit : kCircuitNames) {
     freopen(((kQuartzRootPath / "benchmark-logs" / circuit).string() + ".log")
                 .c_str(),
@@ -57,9 +59,14 @@ int main() {
         /*verbose=*/false);
     if (verified) {
       std::cout << "All transformations are verified." << std::endl;
+      verified_count++;
     } else {
       std::cout << "Some transformation is not verified." << std::endl;
+      not_verified_count++;
+      std::cerr << circuit << " not verified." << std::endl;
     }
   }
+  std::cerr << verified_count << " cases verified, " << not_verified_count
+            << " cases not verified." << std::endl;
   return 0;
 }

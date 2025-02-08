@@ -21,9 +21,11 @@ void test_optimization(
     std::cerr << "Parser failed" << std::endl;
     return;
   }
-  ctx->gen_input_and_hashing_dis(dag->get_num_qubits());
+  // Do not generate (this is only for CircuitSeq::hash())
+  // because the number of qubits can be large.
+  // ctx->gen_input_and_hashing_dis(dag->get_num_qubits());
 
-  quartz::Graph graph(ctx, dag);
+  Graph graph(ctx, dag);
   std::cout << graph.total_cost() << " gates in circuit before optimizing."
             << std::endl;
   auto start = std::chrono::steady_clock::now();

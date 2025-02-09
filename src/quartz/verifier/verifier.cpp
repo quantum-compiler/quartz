@@ -63,8 +63,12 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
   }
   // Try to remove common first gates and record the frontier
   std::vector<bool> qubit_blocked(num_qubits, false);
-  std::unordered_set<CircuitGate *> leftover_gates_start1;
-  std::unordered_set<CircuitGate *> leftover_gates_start2;
+  std::vector<CircuitWire *> frontier1(num_qubits);
+  std::vector<CircuitWire *> frontier2(num_qubits);
+  for (int i = 0; i < num_qubits; i++) {
+    frontier1[i] = circuit1->wires[i].get();
+    frontier2[i] = circuit2->wires[i].get();
+  }
   // (Partial) topological sort on circuit1
   while (!wires_to_search.empty()) {
     CircuitWire *wire1 = wires_to_search.front();
@@ -81,29 +85,22 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
                     })) {
       // Block qubits of potential unmatched gates.
       for (auto &gate1 : wire1->output_gates) {
+        if (verbose) {
+          std::cout << "gate1 blocked: " << gate1->to_string() << std::endl;
+        }
         // Use a for loop because |wire1->output_gates| can be empty.
         for (auto &input_wire : gate1->input_wires) {
           qubit_blocked[input_wire->index] = true;
-          // If |wires_mapping| does not have |input_wire|, this means that
-          // the qubit is already blocked before, and |leftover_gates_start2|
-          // already had an earlier gate at this qubit.
-          if (wires_mapping.count(input_wire) > 0) {
-            // Note that this input wire might be not in the search queue now.
-            // We need to manually add the gate in circuit2 to the frontier.
-            for (auto &gate : wires_mapping[input_wire]->output_gates) {
-              leftover_gates_start2.insert(gate);
-            }
-          }
         }
-        // Use std::unordered_set to deduplicate, similarly hereinafter
-        leftover_gates_start1.insert(gate1);
       }
       for (auto &gate2 : wire2->output_gates) {
+        if (verbose) {
+          std::cout << "gate2 blocked: " << gate2->to_string() << std::endl;
+        }
         // Use a for loop because |wire2->output_gates| can be empty.
         for (auto &output_wire : gate2->output_wires) {
           qubit_blocked[output_wire->index] = true;
         }
-        leftover_gates_start2.insert(gate2);
       }
       continue;
     }
@@ -120,52 +117,65 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
       // CircuitGate::equivalent())
       if (!CircuitGate::equivalent(gate1, gate2, wires_mapping,
                                    /*update_mapping=*/true, &wires_to_search)) {
+        if (verbose) {
+          std::cout << "gate1 and gate2 not equivalent: " << gate1->to_string()
+                    << " " << gate2->to_string() << std::endl;
+        }
         // If not matched, block each qubit of gate1.
         // Note that we should not block qubits of gate2 because it's not
         // on the frontier.
         for (auto &input_wire : gate1->input_wires) {
           if (input_wire->is_qubit()) {
             qubit_blocked[input_wire->index] = true;
-            // Note that this input wire might be not in the search queue now.
-            // We need to manually add the gate in circuit2 to the frontier.
-            assert(wires_mapping.count(input_wire) > 0);
-            for (auto &gate : wires_mapping[input_wire]->output_gates) {
-              leftover_gates_start2.insert(gate);
-            }
           }
         }
-        leftover_gates_start1.insert(gate1);
-        leftover_gates_start2.insert(gate2);
+      } else {
+        for (auto &output_wire : gate1->output_wires) {
+          frontier1[output_wire->index] = output_wire;
+        }
+        for (auto &output_wire : gate2->output_wires) {
+          frontier2[output_wire->index] = output_wire;
+        }
       }
     }
   }
 
-  if (leftover_gates_start1.empty() && leftover_gates_start2.empty()) {
-    // The two circuits are equivalent.
-    if (verbose) {
-      std::cout << "Equivalent: same circuit." << std::endl;
-    }
-    return true;
-  }
-
-  auto c1 = circuit1->get_suffix_seq(leftover_gates_start1, ctx);
-  auto c2 = circuit2->get_suffix_seq(leftover_gates_start2, ctx);
-  // We should have removed the same number of gates
-  assert(circuit1->get_num_gates() - c1->get_num_gates() ==
-         circuit2->get_num_gates() - c2->get_num_gates());
+  auto c1 = circuit1->get_suffix_seq(frontier1, ctx);
+  auto c2 = circuit2->get_suffix_seq(frontier2, ctx);
   if (verbose) {
     std::cout << "Removed " << circuit1->get_num_gates() - c1->get_num_gates()
               << " prefix gates from circuit1 and "
               << circuit2->get_num_gates() - c2->get_num_gates()
               << " prefix gates from circuit2." << std::endl;
-    std::cout << "Leftover gates from circuit1:" << std::endl;
-    for (auto &gate : leftover_gates_start1) {
-      std::cout << gate->to_string() << std::endl;
+    std::cout << "Frontier of circuit1:" << std::endl;
+    for (auto &wire : frontier1) {
+      std::cout << "Q" << wire->index << ": ";
+      if (wire->output_gates.size() == 1) {
+        std::cout << wire->output_gates[0]->to_string() << std::endl;
+      } else {
+        std::cout << "(end)" << std::endl;
+      }
     }
-    std::cout << "Leftover gates from circuit2:" << std::endl;
-    for (auto &gate : leftover_gates_start2) {
-      std::cout << gate->to_string() << std::endl;
+    std::cout << "Frontier of circuit2:" << std::endl;
+    for (auto &wire : frontier2) {
+      std::cout << "Q" << wire->index << ": ";
+      if (wire->output_gates.size() == 1) {
+        std::cout << wire->output_gates[0]->to_string() << std::endl;
+      } else {
+        std::cout << "(end)" << std::endl;
+      }
     }
+  }
+  // We should have removed the same number of gates
+  assert(circuit1->get_num_gates() - c1->get_num_gates() ==
+         circuit2->get_num_gates() - c2->get_num_gates());
+
+  if (c1->get_num_gates() == 0 && c2->get_num_gates() == 0) {
+    // The two circuits are equivalent.
+    if (verbose) {
+      std::cout << "Equivalent: same circuit." << std::endl;
+    }
+    return true;
   }
 
   // Remove common last gates

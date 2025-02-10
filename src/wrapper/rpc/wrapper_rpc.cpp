@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   srv.bind("clifford_decomposition", [](std::string my_circ) {
     return clifford_decomposition_(my_circ);
   });
-  std::cout << "Server started on port " << port << std::endl;
+  // std::cout << "Server started on port " << port << std::endl;
   srv.run();
 
   return 0;

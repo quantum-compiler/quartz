@@ -290,9 +290,9 @@ class Graph {
                     const std::string &save_filename);
   [[nodiscard]] size_t get_num_qubits() const;
   void print_qubit_ops();
-  std::shared_ptr<Graph> toffoli_flip_greedy(GateType target_rotation,
-                                             GraphXfer *xfer,
-                                             GraphXfer *inverse_xfer);
+  std::shared_ptr<Graph> toffoli_flip_greedy(
+      GateType target_rotation, GraphXfer *xfer, GraphXfer *inverse_xfer,
+      const std::string &store_all_steps_file_prefix = std::string());
   void toffoli_flip_greedy_with_trace(GateType target_rotation, GraphXfer *xfer,
                                       GraphXfer *inverse_xfer,
                                       std::vector<int> &trace);

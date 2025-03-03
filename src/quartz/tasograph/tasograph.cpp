@@ -2149,9 +2149,16 @@ std::shared_ptr<Graph> Graph::ccz_flip_t(Context *ctx) {
   assert(false);  // Should never reach here
 }
 
-std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
-                                                  GraphXfer *xfer,
-                                                  GraphXfer *inverse_xfer) {
+std::shared_ptr<Graph>
+Graph::toffoli_flip_greedy(GateType target_rotation, GraphXfer *xfer,
+                           GraphXfer *inverse_xfer,
+                           const std::string &store_all_steps_file_prefix) {
+  int step_count = 0;
+  if (!store_all_steps_file_prefix.empty()) {
+    to_qasm(store_all_steps_file_prefix + "0.qasm",
+            /*print_result=*/false,
+            /*print_guid=*/false);
+  }
   std::shared_ptr<Graph> temp_graph(new Graph(*this));
   temp_graph->context = xfer->union_ctx_;
   while (true) {
@@ -2160,6 +2167,14 @@ std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
     if (new_graph_0.get() == nullptr) {
       assert(new_graph_1.get() == nullptr);
       temp_graph->context = xfer->dst_ctx_;
+      // Done.
+      if (!store_all_steps_file_prefix.empty()) {
+        // Store the number of steps.
+        std::ofstream fout(store_all_steps_file_prefix + ".txt");
+        assert(fout.is_open());
+        fout << step_count << std::endl;
+        fout.close();
+      }
       return temp_graph;
     }
     new_graph_0->rotation_merging(target_rotation);
@@ -2168,6 +2183,14 @@ std::shared_ptr<Graph> Graph::toffoli_flip_greedy(GateType target_rotation,
       temp_graph = new_graph_0;
     } else {
       temp_graph = new_graph_1;
+    }
+    // Decomposed one Toffoli gate. Store intermediate result if necessary.
+    if (!store_all_steps_file_prefix.empty()) {
+      step_count++;
+      temp_graph->to_qasm(store_all_steps_file_prefix +
+                              std::to_string(step_count) + ".qasm",
+                          /*print_result=*/false,
+                          /*print_guid=*/false);
     }
   }
   assert(false);  // Should never reach here

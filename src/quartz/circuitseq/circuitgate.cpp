@@ -125,7 +125,7 @@ std::vector<int> CircuitGate::get_non_insular_qubit_indices() const {
   return result;
 }
 
-std::string CircuitGate::to_string() const {
+std::string CircuitGate::to_string(Context *ctx) const {
   std::string result;
   if (output_wires.size() == 1) {
     result += output_wires[0]->to_string();
@@ -156,6 +156,13 @@ std::string CircuitGate::to_string() const {
   result += "(";
   for (int j = 0; j < (int)input_wires.size(); j++) {
     result += input_wires[j]->to_string();
+    if (input_wires[j]->is_parameter() && ctx != nullptr &&
+        ctx->param_is_const(input_wires[j]->index)) {
+      // If we know the value, also print it here
+      result += "[" +
+                std::to_string(ctx->get_param_value(input_wires[j]->index)) +
+                "]";
+    }
     if (j != (int)input_wires.size() - 1) {
       result += ", ";
     }

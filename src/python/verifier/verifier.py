@@ -69,7 +69,7 @@ def apply_matrix(vec, mat, qubit_indices):
     S = len(vec)
     n = len(mat)
     n0 = len(qubit_indices)
-    assert 1 <= n0 <= 2
+    assert 1 <= n0 <= 3
     assert (1 << n0) == n
     assert n <= S
     assert S % n == 0

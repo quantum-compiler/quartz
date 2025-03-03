@@ -29,7 +29,7 @@ class CircuitGate {
   [[nodiscard]] std::vector<int> get_insular_qubit_indices() const;
   // Get the "non-insular" qubit indices of the gate.
   [[nodiscard]] std::vector<int> get_non_insular_qubit_indices() const;
-  [[nodiscard]] std::string to_string() const;
+  [[nodiscard]] std::string to_string(Context *ctx = nullptr) const;
   [[nodiscard]] std::string to_json() const;
   /**
    * Extract the information to reconstruct a gate in a circuit from an input

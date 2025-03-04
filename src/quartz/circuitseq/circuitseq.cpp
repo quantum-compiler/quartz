@@ -822,7 +822,7 @@ void CircuitSeq::print(Context *ctx) const {
   }
 }
 
-std::string CircuitSeq::to_string(bool line_number) const {
+std::string CircuitSeq::to_string(bool line_number, Context *ctx) const {
   std::string result;
   result += "CircuitSeq {\n";
   const int num_gates = (int)gates.size();
@@ -836,7 +836,7 @@ std::string CircuitSeq::to_string(bool line_number) const {
     } else {
       result += "  ";
     }
-    result += gates[i]->to_string();
+    result += gates[i]->to_string(ctx);
     result += "\n";
   }
   result += "}\n";

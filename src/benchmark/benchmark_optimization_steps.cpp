@@ -17,10 +17,14 @@ const std::vector<std::string> kCircuitNames = {
     "gf2^9_mult",    "gf2^10_mult"};
 int main() {
   ParamInfo param_info;
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                   GateType::add, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::pi,
                GateType::mult, GateType::add},
               &param_info);
+  Context union_ctx = union_contexts(&src_ctx, &ctx);
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(
@@ -46,16 +50,16 @@ int main() {
     freopen(((kQuartzRootPath / "benchmark-logs" / circuit).string() + ".log")
                 .c_str(),
             "w", stdout);
-    test_optimization(&ctx,
-                      (kQuartzRootPath / "circuit/nam-benchmarks" /
-                       (circuit + ".qasm.toffoli_flip"))
-                          .string(),
-                      xfers,
-                      /*timeout=*/1,
-                      (kQuartzRootPath / "benchmark-logs" / circuit).string() +
-                          "_");
+    test_optimization(
+        &src_ctx, &ctx,
+        (kQuartzRootPath / "circuit/nam-benchmarks" / (circuit + ".qasm"))
+            .string(),
+        xfers,
+        /*timeout=*/1,
+        (kQuartzRootPath / "benchmark-logs" / circuit).string() + "_");
     bool verified = verifier.verify_transformation_steps(
-        &ctx, (kQuartzRootPath / "benchmark-logs" / circuit).string() + "_",
+        &union_ctx,
+        (kQuartzRootPath / "benchmark-logs" / circuit).string() + "_",
         /*verbose=*/false);
     if (verified) {
       std::cout << "All transformations are verified." << std::endl;

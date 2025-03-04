@@ -250,8 +250,8 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
 
   if (verbose) {
     std::cout << "Checking Verifier::equivalent() on:" << std::endl;
-    std::cout << c1->to_string(/*line_number=*/true) << std::endl;
-    std::cout << c2->to_string(/*line_number=*/true) << std::endl;
+    std::cout << c1->to_string(/*line_number=*/true, ctx) << std::endl;
+    std::cout << c2->to_string(/*line_number=*/true, ctx) << std::endl;
   }
 
   Dataset dataset;

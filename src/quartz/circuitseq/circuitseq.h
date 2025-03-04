@@ -189,7 +189,14 @@ class CircuitSeq {
   bool remove_unused_qubits(std::vector<int> unused_qubits);
 
   void print(Context *ctx) const;
-  [[nodiscard]] std::string to_string(bool line_number = false) const;
+  /**
+   * Returns a string that is easy to read.
+   * @param line_number Whether to show line numbers on the left.
+   * @param ctx If given, also try to output the concrete parameter values.
+   * @return A string of the circuit.
+   */
+  [[nodiscard]] std::string to_string(bool line_number = false,
+                                      Context *ctx = nullptr) const;
   [[nodiscard]] std::string to_json(bool keep_hash_value = true) const;
   static std::unique_ptr<CircuitSeq> read_json(Context *ctx, std::istream &fin);
   static std::unique_ptr<CircuitSeq>

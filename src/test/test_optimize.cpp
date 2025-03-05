@@ -4,7 +4,23 @@
 
 using namespace quartz;
 
-int main() {
+int main(int argc, char **argv) {
+  std::string input_fn =
+      kQuartzRootPath.string() + "/circuit/nam_circs/barenco_tof_3.qasm";
+  std::string circuit_name = "barenco_tof_3";
+  std::string output_fn;
+  std::string eqset_fn =
+      kQuartzRootPath.string() + "/eccset/Nam_3_3_complete_ECC_set.json";
+
+  if (argc >= 2) {
+    assert(argv[1] != nullptr);
+    input_fn = std::string(argv[1]);
+    if (argc >= 3) {
+      assert(argv[2] != nullptr);
+      circuit_name = std::string(argv[2]);
+    }
+  }
+
   ParamInfo param_info(/*num_input_symbolic_params=*/2, false);
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add},
@@ -12,40 +28,27 @@ int main() {
 
   EquivalenceSet eqs;
   // Load ECC set from file
-  if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
+  if (!eqs.load_json(&ctx, eqset_fn,
                      /*from_verifier=*/false)) {
     // generate ECC set
     gen_ecc_set(
         {GateType::rz, GateType::h, GateType::cx, GateType::x, GateType::add},
-        "Nam_3_3_", true, false, 3, 2, 3);
-    if (!eqs.load_json(&ctx, "Nam_3_3_complete_ECC_set.json",
+        kQuartzRootPath.string() + "/eccset/Nam_3_3_", true, false, 3, 2, 3);
+    if (!eqs.load_json(&ctx, eqset_fn,
                        /*from_verifier=*/false)) {
       std::cout << "Failed to load equivalence file." << std::endl;
       assert(false);
     }
   }
 
-  auto graph = Graph::from_qasm_file(
-      &ctx, "experiment/circs/nam_circs/barenco_tof_3.qasm");
+  auto graph = Graph::from_qasm_file(&ctx, input_fn);
   assert(graph);
 
   // Get xfer from the equivalent set
-  auto ecc = eqs.get_all_equivalence_sets();
-  std::vector<GraphXfer *> xfers;
-  for (const auto &eqcs : ecc) {
-    for (auto circ_0 : eqcs) {
-      for (auto circ_1 : eqcs) {
-        if (circ_0 != circ_1) {
-          auto xfer = GraphXfer::create_GraphXfer(&ctx, circ_0, circ_1, true);
-          if (xfer != nullptr) {
-            xfers.push_back(xfer);
-          }
-        }
-      }
-    }
-  }
+  std::vector<GraphXfer *> xfers =
+      GraphXfer::get_all_xfers_from_ecc(&ctx, eqset_fn);
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
-  graph->optimize(xfers, graph->gate_count() * 1.05, "barenco_tof_3", "", true);
+  graph->optimize(xfers, graph->gate_count() * 1.05, circuit_name, "", true);
   return 0;
 }

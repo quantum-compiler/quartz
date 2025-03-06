@@ -14,6 +14,18 @@ kConstantEquations = [
     sqrt5 * sqrt5 == 5,
     sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
 ]
+nonnegativity_solver = z3.Solver()
+nonnegativity_solver.add(
+    1.414 < sqrt2,
+    sqrt2 < 1.415,
+    1.732 < sqrt3,
+    sqrt3 < 1.733,
+    2.236 < sqrt5,
+    sqrt5 < 2.237,
+    1.662 < sqrt_of_5_minus_sqrt5,
+    sqrt_of_5_minus_sqrt5 < 1.663,
+)
+nonnegativity_solver.set("timeout", 10)  # timeout in milliseconds
 
 
 # helper methods
@@ -26,6 +38,18 @@ def half(a):
 
     sin_sgn = 1
     cos_sgn = z3.If(sin_a >= 0, 1, -1)
+    # Simplify the if-expression if possible
+    nonnegativity_solver.push()
+    nonnegativity_solver.add(sin_a < 0)
+    if nonnegativity_solver.check() == z3.unsat:  # must be non-negative
+        cos_sgn = 1
+    else:
+        nonnegativity_solver.pop()
+        nonnegativity_solver.push()
+        nonnegativity_solver.add(sin_a > 0)
+        if nonnegativity_solver.check() == z3.unsat:  # must be non-positive
+            cos_sgn = -1
+    nonnegativity_solver.pop()
 
     cos_half_a = cos_sgn * z3.Sqrt((1 + cos_a) / 2)
     sin_half_a = sin_sgn * z3.Sqrt((1 - cos_a) / 2)

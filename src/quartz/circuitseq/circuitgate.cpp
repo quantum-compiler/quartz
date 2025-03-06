@@ -159,9 +159,15 @@ std::string CircuitGate::to_string(Context *ctx) const {
     if (input_wires[j]->is_parameter() && ctx != nullptr &&
         ctx->param_is_const(input_wires[j]->index)) {
       // If we know the value, also print it here
-      result += "[" +
-                std::to_string(ctx->get_param_value(input_wires[j]->index)) +
-                "]";
+      std::string param_value;
+      if (ctx->param_is_symbolic(input_wires[j]->index)) {
+        param_value = ctx->get_param_symbolic_string(
+            input_wires[j]->index, /*precision=*/6, /*is_param_halved=*/false);
+      } else {
+        param_value =
+            std::to_string(ctx->get_param_value(input_wires[j]->index));
+      }
+      result += "[" + param_value + "]";
     }
     if (j != (int)input_wires.size() - 1) {
       result += ", ";
@@ -267,26 +273,32 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
   // Prints parameters.
   if (gate->get_num_parameters() > 0) {
     int num_remaining_parameters = gate->get_num_parameters();
-    int curr_param_index = 0;
+    int curr_param_index = 0;  // the index inside this gate
     result += "(";
     for (auto input_wire : input_wires) {
       if (input_wire->is_parameter()) {
         // Ensures the wire is valid.
         assert(ctx->param_is_const(input_wire->index));
 
-        // Determines the parameter value with respect to reparameterization.
-        std::ostringstream out;
-        out.precision(param_precision);
-        const auto &param_value = ctx->get_param_value(input_wire->index);
-        if (param_value == 0) {
-          // optimization: if a parameter is 0, do not output that many digits
-          out << "0";
-        } else if (gate->is_param_halved(curr_param_index)) {
-          out << std::fixed << 2 * param_value;
+        if (ctx->param_is_symbolic(input_wire->index)) {
+          result += ctx->get_param_symbolic_string(
+              input_wire->index, param_precision,
+              gate->is_param_halved(curr_param_index));
         } else {
-          out << std::fixed << param_value;
+          // Determines the parameter value with respect to reparameterization.
+          std::ostringstream out;
+          out.precision(param_precision);
+          const auto &param_value = ctx->get_param_value(input_wire->index);
+          if (param_value == 0) {
+            // optimization: if a parameter is 0, do not output that many digits
+            out << "0";
+          } else if (gate->is_param_halved(curr_param_index)) {
+            out << std::fixed << 2 * param_value;
+          } else {
+            out << std::fixed << param_value;
+          }
+          result += std::move(out).str();
         }
-        result += std::move(out).str();
 
         // Prepares for printing the next parameter.
         num_remaining_parameters--;

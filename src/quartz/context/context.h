@@ -67,6 +67,17 @@ class Context {
    */
   [[nodiscard]] ParamType get_param_value(int id) const;
   /**
+   * Get the value of a symbolic constant expression with respect to
+   * reparameterization.
+   * @param id The parameter expression id.
+   * @param precision The precision of concrete constant parameters in the
+   * returned string.
+   * @param is_param_halved If true, the returned string is multiplied by 2.
+   * @return The string for the symbolic constant expression.
+   */
+  [[nodiscard]] std::string
+  get_param_symbolic_string(int id, int precision, bool is_param_halved) const;
+  /**
    * Set the value of a concrete parameter.
    */
   void set_param_value(int id, const ParamType &param);

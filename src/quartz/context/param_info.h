@@ -98,6 +98,22 @@ class ParamInfo {
    */
   [[nodiscard]] ParamType get_param_value(int id) const;
   /**
+   * Get the value of a symbolic constant expression.
+   * @param id The expression id.
+   * @param precision The precision of concrete constant parameters in the
+   * returned string.
+   * @param operator_precedence The operator precedence from outside.
+   * If the inner precedence is strictly lower (in number) than the outer one,
+   * then we must add parentheses.
+   * 0: no need to add parentheses outside
+   * 1: add
+   * 2: mult, pi, neg  // expressions like PI/4*-3 are allowed
+   * @return The string for the symbolic constant expression.
+   */
+  [[nodiscard]] std::string
+  get_param_symbolic_string(int id, int precision,
+                            int operator_precedence) const;
+  /**
    * Set the value of a concrete parameter.
    */
   void set_param_value(int id, const ParamType &param);

@@ -52,6 +52,52 @@ ParamType ParamInfo::get_param_value(int id) const {
   return parameter_values_[id];
 }
 
+std::string
+ParamInfo::get_param_symbolic_string(int id, int precision,
+                                     int operator_precedence) const {
+  assert(id >= 0 && id < (int)parameter_class_.size());
+  assert(parameter_class_[id].is_const());
+  if (parameter_class_[id] == ParamClass::concrete_const) {
+    std::ostringstream out;
+    out.precision(precision);
+    out << parameter_values_[id];
+    return out.str();
+  } else if (parameter_class_[id] == ParamClass::arithmetic_int) {
+    return std::to_string((long long)parameter_values_[id]);
+  }
+  assert(parameter_class_[id] == ParamClass::symbolic_constexpr);
+  auto op = parameter_wires_[id]->input_gates[0]->gate->tp;
+  int current_precedence = -1;
+  if (op == GateType::add) {
+    current_precedence = 1;
+  } else if (op == GateType::mult || op == GateType::pi ||
+             op == GateType::neg) {
+    current_precedence = 2;
+  } else {
+    assert(false);
+  }
+  std::vector<std::string> child_str;
+  child_str.reserve(parameter_wires_[id]->input_gates[0]->input_wires.size());
+  for (auto &input_wire : parameter_wires_[id]->input_gates[0]->input_wires) {
+    child_str.emplace_back(ParamInfo::get_param_symbolic_string(
+        input_wire->index, precision, current_precedence));
+  }
+  std::string result;
+  if (op == GateType::add) {
+    result = child_str[0] + "+" + child_str[1];
+  } else if (op == GateType::mult) {
+    result = child_str[0] + "*" + child_str[1];
+  } else if (op == GateType::pi) {
+    result = "pi/" + child_str[0];
+  } else if (op == GateType::neg) {
+    result = "-" + child_str[0];
+  }
+  if (current_precedence < operator_precedence) {
+    result = "(" + result + ")";
+  }
+  return result;
+}
+
 void ParamInfo::set_param_value(int id, const ParamType &param) {
   assert(id >= 0 && id < (int)parameter_class_.size());
   assert(parameter_class_[id] == ParamClass::concrete_const ||

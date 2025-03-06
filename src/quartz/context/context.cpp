@@ -205,6 +205,18 @@ ParamType Context::get_param_value(int id) const {
   return param_info_->get_param_value(id);
 }
 
+std::string Context::get_param_symbolic_string(int id, int precision,
+                                               bool is_param_halved) const {
+  if (is_param_halved) {
+    return "2*" +
+           param_info_->get_param_symbolic_string(id, precision,
+                                                  /*operator_precedence=*/2);
+  } else {
+    return param_info_->get_param_symbolic_string(id, precision,
+                                                  /*operator_precedence=*/0);
+  }
+}
+
 void Context::set_param_value(int id, const ParamType &param) {
   return param_info_->set_param_value(id, param);
 }

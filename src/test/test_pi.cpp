@@ -11,7 +11,7 @@ int main() {
   Context ctx({GateType::rx, GateType::pi}, 1, &param_info);
 
   auto p0 = ctx.get_new_param_id(PI / 2);
-  auto p1 = ctx.get_new_param_id(2.0);
+  auto p1 = ctx.get_new_arithmetic_param_id(2);
   auto p2 = ctx.get_new_param_expression_id({p1}, ctx.get_gate(GateType::pi));
 
   CircuitSeq dag1(1);
@@ -33,6 +33,10 @@ int main() {
       }
     }
   }
+  std::cout << dag1.to_string(/*line_number=*/true, &ctx) << std::endl;
+  std::cout << dag1.to_qasm_style_string(&ctx) << std::endl;
+  std::cout << dag2.to_string(/*line_number=*/true, &ctx) << std::endl;
+  std::cout << dag2.to_qasm_style_string(&ctx) << std::endl;
 
   // Working directory is cmake-build-debug/ here.
   system("python ../src/test/test_pi.py");

@@ -13,7 +13,6 @@ import os
 import sys
 
 import z3
-from gates import kConstantEquations  # for constant square roots
 from gates import add, compute, get_matrix, neg  # for searching phase factors
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -326,6 +325,7 @@ def search_phase_factor_to_check_equivalence(
             z3.simplify(z3.Not(z3.And(eq_vector(output_vec1, output_vec2_shifted))))
         )
         solver.set("timeout", timeout)  # timeout in milliseconds
+        # print(solver.assertions())
         result = solver.check()
         if result != z3.unsat:
             print(

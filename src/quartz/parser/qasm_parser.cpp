@@ -510,4 +510,6 @@ int QubitParser::finalize() {
   return num_qubits;
 }
 
+bool QubitParser::is_finalized() { return finalized_; }
+
 }  // namespace quartz

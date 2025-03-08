@@ -250,6 +250,11 @@ class QubitParser {
    */
   int finalize();
 
+  /**
+   * @return If finalize() has been called.
+   */
+  [[nodiscard]] bool is_finalized();
+
  private:
   /**
    * Implementation details for parse_qasm2_decl and parse_qasm3_decl. This
@@ -485,6 +490,12 @@ bool QASMParser::load_qasm_stream(
       std::cerr << "Unknown gate: " << command << std::endl;
       assert(false);
     }
+  }
+
+  if (!qubit_parser.is_finalized()) {
+    // A circuit with no gates.
+    int num_qubits = qubit_parser.finalize();
+    seq = new CircuitSeq(num_qubits);
   }
 
   // Successfully parsed file.

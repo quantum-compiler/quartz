@@ -11,28 +11,63 @@ meta_index_original_fingerprint = 3
 
 kCheckPhaseShiftOfPiOver4Index = 10000  # A copy of the value in utils.h
 
+
+# helper constants
+
+sqrt2 = z3.Real("sqrt2")
+sqrt3 = z3.Real("sqrt3")
+sqrt5 = z3.Real("sqrt5")
+sqrt_of_2_plus_sqrt2 = z3.Real("sqrt_of_2_plus_sqrt2")
+sqrt_of_2_minus_sqrt2 = z3.Real("sqrt_of_2_minus_sqrt2")
+sqrt_of_5_minus_sqrt5 = z3.Real("sqrt_of_5_minus_sqrt5")
+kConstantEquations = [
+    sqrt2 * sqrt2 == 2,
+    sqrt3 * sqrt3 == 3,
+    sqrt5 * sqrt5 == 5,
+    sqrt_of_2_plus_sqrt2 * sqrt_of_2_plus_sqrt2 == 2 + sqrt2,
+    sqrt_of_2_minus_sqrt2 * sqrt_of_2_minus_sqrt2 == 2 - sqrt2,
+    sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
+]
+
+
 kPhaseFactorCoeffs = [0, 1, -1, 2, -2]
-kPhaseFactorConstant = math.pi / 4.0
+kPhaseFactorConstant = math.pi / 8.0
 kPhaseFactorConstantCoeffMin = 0
-kPhaseFactorConstantCoeffMax = 7
+kPhaseFactorConstantCoeffMax = 15
 kPhaseFactorConstantCosTable = [
     1,
-    1.0 / z3.Sqrt(2),
+    sqrt_of_2_plus_sqrt2 / 2,
+    1.0 / sqrt2,
+    sqrt_of_2_minus_sqrt2 / 2,
     0,
-    -1.0 / z3.Sqrt(2),
+    -sqrt_of_2_minus_sqrt2 / 2,
+    -1.0 / sqrt2,
+    -sqrt_of_2_plus_sqrt2 / 2,
     -1,
-    -1.0 / z3.Sqrt(2),
+    -sqrt_of_2_plus_sqrt2 / 2,
+    -1.0 / sqrt2,
+    -sqrt_of_2_minus_sqrt2 / 2,
     0,
-    1.0 / z3.Sqrt(2),
+    sqrt_of_2_minus_sqrt2 / 2,
+    1.0 / sqrt2,
+    sqrt_of_2_plus_sqrt2 / 2,
 ]
 kPhaseFactorConstantSinTable = [
     0,
-    1.0 / z3.Sqrt(2),
+    sqrt_of_2_minus_sqrt2 / 2,
+    1.0 / sqrt2,
+    sqrt_of_2_plus_sqrt2 / 2,
     1,
-    1.0 / z3.Sqrt(2),
+    sqrt_of_2_plus_sqrt2 / 2,
+    1.0 / sqrt2,
+    sqrt_of_2_minus_sqrt2 / 2,
     0,
-    -1.0 / z3.Sqrt(2),
+    -sqrt_of_2_minus_sqrt2 / 2,
+    -1.0 / sqrt2,
+    -sqrt_of_2_plus_sqrt2 / 2,
     -1,
-    -1.0 / z3.Sqrt(2),
+    -sqrt_of_2_plus_sqrt2 / 2,
+    -1.0 / sqrt2,
+    -sqrt_of_2_minus_sqrt2 / 2,
 ]
 kPhaseFactorEpsilon = 1e-6

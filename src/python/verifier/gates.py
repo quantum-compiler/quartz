@@ -1,19 +1,24 @@
 import math
+import os
+import sys
 
 import z3
 
-# helper constants
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-sqrt2 = z3.Real("sqrt2")
-sqrt3 = z3.Real("sqrt3")
-sqrt5 = z3.Real("sqrt5")
-sqrt_of_5_minus_sqrt5 = z3.Real("sqrt_of_5_minus_sqrt5")
-kConstantEquations = [
-    sqrt2 * sqrt2 == 2,
-    sqrt3 * sqrt3 == 3,
-    sqrt5 * sqrt5 == 5,
-    sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
-]
+from utils.utils import (
+    sqrt2,
+    sqrt3,
+    sqrt5,
+    sqrt_of_2_minus_sqrt2,
+    sqrt_of_2_plus_sqrt2,
+    sqrt_of_5_minus_sqrt5,
+)
+
+# helper solver
+
+
 nonnegativity_solver = z3.Solver()
 nonnegativity_solver.add(
     1.414 < sqrt2,
@@ -22,6 +27,10 @@ nonnegativity_solver.add(
     sqrt3 < 1.733,
     2.236 < sqrt5,
     sqrt5 < 2.237,
+    1.847 < sqrt_of_2_plus_sqrt2,
+    sqrt_of_2_plus_sqrt2 < 1.848,
+    0.765 < sqrt_of_2_minus_sqrt2,
+    sqrt_of_2_minus_sqrt2 < 0.766,
     1.662 < sqrt_of_5_minus_sqrt5,
     sqrt_of_5_minus_sqrt5 < 1.663,
 )
@@ -140,6 +149,11 @@ def pi(n, use_z3=True):
             return sqrt2 / 2, sqrt2 / 2
         else:
             return math.sqrt(2) / 2, math.sqrt(2) / 2
+    elif n == 8:
+        if use_z3:
+            return sqrt_of_2_plus_sqrt2 / 2, sqrt_of_2_minus_sqrt2 / 2
+        else:
+            return math.sqrt(2 + math.sqrt(2)) / 2, math.sqrt(2 - math.sqrt(2)) / 2
     # Half-Angle Formula.
     elif n % 2 == 0:
         return half(pi(n // 2))

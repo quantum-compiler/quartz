@@ -403,6 +403,7 @@ bool Context::load_param_info_from_json(std::istream &fin) {
     } else {
       // concrete parameter
       bool is_float = false;
+      bool multiplied_by_pi = false;
       std::string s;  // record the number string
       while (ch != ',' && ch != ']') {
         s += ch;
@@ -411,12 +412,19 @@ bool Context::load_param_info_from_json(std::istream &fin) {
         }
         fin >> ch;
       }
+      if (s.substr(0, 3) == "pi*") {
+        s = s.substr(3);
+        multiplied_by_pi = true;
+      }
       fin.unget();  // put the ',' or ']' back
-      ParamType val = std::stod(s);
       int id;
       if (is_float) {
+        ParamType val = multiplied_by_pi ? string_to_param(s) * PI
+                                         : string_to_param_without_pi(s);
         id = get_new_param_id(val);
       } else {
+        assert(!multiplied_by_pi);
+        ParamType val = string_to_param(s);
         id = get_new_arithmetic_param_id(val);
       }
       assert(id == i);

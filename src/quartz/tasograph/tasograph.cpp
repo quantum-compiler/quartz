@@ -16,12 +16,24 @@ enum {
   GUID_PRESERVED = 16383
 };
 
-bool equal_to_2k_pi(double d) {
-  d = std::abs(d);
+bool param_equal(const ParamType &a, const ParamType &b) {
+#ifdef USE_RATIONAL
+  return a == b;
+#else
+  return std::abs(a - b) <= eps;
+#endif
+}
+
+bool equal_to_2k_pi(const ParamType &p) {
+#ifdef USE_RATIONAL
+  return p.is_even();
+#else
+  auto d = std::abs(p);
   int m = d / (2 * PI);
   if (std::abs(d - m * 2 * PI) > eps && std::abs(d - (m + 1) * 2 * PI) > eps)
     return false;
   return true;
+#endif
 }
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}
@@ -718,9 +730,14 @@ void Graph::constant_and_rotation_elimination() {
           }
           result = params[0] + params[1];
           // Normalize result to [0, 2pi)
-          result = std::fmod(result, 2 * PI);
-          if (result < 0)
-            result += 2 * PI;
+#ifdef USE_RATIONAL
+          result -= (ParamType)floor(result / ((ParamType)2 * PI)) *
+                    ((ParamType)2 * PI);
+#else
+          result = std::fmod(result, (ParamType)2 * PI);
+#endif
+          if (result < (ParamType)0)
+            result += (ParamType)2 * PI;
 
           Op merged_op(context->next_global_unique_id(),
                        context->get_gate(GateType::input_param));
@@ -738,9 +755,14 @@ void Graph::constant_and_rotation_elimination() {
           param = get_param_value(edge.srcOp);
           result = -param;
           // Normalize result to [0, 2pi)
-          result = std::fmod(result, 2 * PI);
-          if (result < 0)
-            result += 2 * PI;
+#ifdef USE_RATIONAL
+          result -= (ParamType)floor(result / ((ParamType)2 * PI)) *
+                    ((ParamType)2 * PI);
+#else
+          result = std::fmod(result, (ParamType)2 * PI);
+#endif
+          if (result < (ParamType)0)
+            result += (ParamType)2 * PI;
           param_idx[edge.srcOp] = context->get_new_param_id(result);
           // Find destination
           assert(outEdges[op].size() == 1);
@@ -1232,15 +1254,15 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
 
 std::string Graph::to_qasm(bool print_result, bool print_guid) const {
   std::ostringstream o;
-  std::map<float, std::string> constant_2_pi;
-  std::vector<float> multiples;
+  std::map<ParamType, std::string> constant_2_pi;
+  std::vector<ParamType> multiples;
   for (int i = 1; i <= 8; ++i) {
-    multiples.push_back(i * 0.25);
-    multiples.push_back(-i * 0.25);
+    multiples.push_back((ParamType)i / (ParamType)4);
+    multiples.push_back(-(ParamType)i / (ParamType)4);
   }
-  multiples.push_back(0);
-  for (auto f : multiples) {
-    constant_2_pi[f * PI] = "pi*" + std::to_string(f);
+  multiples.push_back((ParamType)0);
+  for (const auto &f : multiples) {
+    constant_2_pi[f * PI] = "pi*" + param_to_string(f);
   }
 
   o << "OPENQASM 2.0;" << std::endl;
@@ -1302,7 +1324,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
             iss << ',';
           bool found = false;
           for (auto it : constant_2_pi) {
-            if (std::abs(f - it.first) < eps) {
+            if (param_equal(f, it.first)) {
               iss << it.second;
               found = true;
             }
@@ -1431,7 +1453,7 @@ Graph::_from_qasm_stream(Context *ctx,
           // 0.123
           // pi/2
           // pi
-          ParamType p = 0.0;
+          ParamType p = 0;
           bool negative = token[0] == '-';
           if (negative)
             token = token.substr(1);
@@ -1443,10 +1465,10 @@ Graph::_from_qasm_stream(Context *ctx,
               auto d = token.substr(3, std::string::npos);
               if (token[2] == '*') {
                 // pi*0.123
-                p = std::stod(d) * PI;
+                p = string_to_param(d) * PI;
               } else if (token[2] == '/') {
                 // pi/2
-                p = PI / std::stod(d);
+                p = PI / string_to_param(d);
               } else {
                 std::cerr << "Unsupported parameter format: " << token
                           << std::endl;
@@ -1456,14 +1478,14 @@ Graph::_from_qasm_stream(Context *ctx,
           } else if (token.find("pi") != std::string::npos) {
             // 0.123*pi
             auto d = token.substr(0, token.find("*"));
-            p = std::stod(d) * PI;
+            p = string_to_param(d) * PI;
             if (token.find("/") != std::string::npos) {
               // 0.123*pi/2
-              p = p / std::stod(token.substr(token.find("/") + 1));
+              p = p / string_to_param(token.substr(token.find("/") + 1));
             }
           } else {
             // 0.123
-            p = std::stod(token);
+            p = string_to_param_without_pi(token);
           }
           if (negative)
             p = -p;
@@ -2677,7 +2699,6 @@ void Graph::topology_order_ops(std::vector<Op> &ops) const {
 // It construct a sequence of gates in topology order for each graph
 // Returns true if the two sequences are the same
 bool Graph::equal(const Graph &other) const {
-  double epsilon = 1e-6;
   std::vector<Op> ops1, ops2;
   topology_order_ops(ops1);
   other.topology_order_ops(ops2);
@@ -2709,7 +2730,7 @@ bool Graph::equal(const Graph &other) const {
         }
       }
       for (int j = 0; j < num_params; j++) {
-        if (std::abs(params1[j] - params2[j]) > epsilon) {
+        if (!param_equal(params1[j], params2[j])) {
           return false;
         }
       }

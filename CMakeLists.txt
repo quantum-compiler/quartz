@@ -3,6 +3,8 @@ project(Quartz)
 
 SET(CMAKE_BUILD_TYPE "Release")
 
+add_compile_definitions(USE_RATIONAL)
+
 # python
 set(Python_FIND_VIRTUALENV FIRST)
 if (MSVC)

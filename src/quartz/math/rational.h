@@ -1,5 +1,7 @@
 // Adapted from Mingkuan Xu's template for competitive programming.
 
+#pragma once
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -42,7 +44,11 @@ class FFT {
   explicit FFT(int logn);
   FFT(const FFT &b) = delete;
   FFT &operator=(const FFT &b) = delete;
-  ~FFT();
+  ~FFT() {
+    delete[] rev;
+    delete[] wu1;
+    delete[] wu2;
+  }
   void fft(Complex *x);
   void fft(Complex *x, Complex *y);  // real numbers
   void ifft(Complex *x);
@@ -150,11 +156,6 @@ class Unsigned {
   [[nodiscard]] double to_double() const;
   [[nodiscard]] long double to_ldouble() const;
 };
-std::vector<FFT *> Unsigned::ffts;
-const int Unsigned::NUM;
-const double Unsigned::FFT_MUL_COEFFICIENT = 4.4;
-const double Unsigned::NEWTON_DIVMOD_COEFFICIENT = 11;
-const double Unsigned::NEWTON_DIVMOD_POWER_2_RATIO = 0.4;
 
 class Int {
  private:
@@ -291,18 +292,29 @@ class Rational {
   friend Int trunc(const Rational &r) { return r.a / r.b; }
   friend Int floor(const Rational &r);
   friend Int ceil(const Rational &r);
+  friend Int round(const Rational &r);
   friend Rational pow(const Rational &a, const Int &b);
   friend Rational abs(const Rational &r);
 
   // helper functions
   [[nodiscard]] bool is_zero() const { return a.is_zero(); }
   [[nodiscard]] bool is_neg() const { return a.is_neg(); }
+  [[nodiscard]] bool is_odd() const { return a.is_odd() && b == Int(1); }
+  [[nodiscard]] bool is_even() const { return !a.is_odd() && b == Int(1); }
   [[nodiscard]] const Int &numerator() const { return a; }
   [[nodiscard]] const Int &denominator() const { return b; }
 
   // type conversion functions
   [[nodiscard]] double to_double() const;
   [[nodiscard]] long double to_ldouble() const;
+  explicit operator int() const;
 };
 
+struct RationalHash {
+ public:
+  std::size_t operator()(const Rational &x) const {
+    // Not the most efficient, but it works
+    return std::hash<std::string>()(x.to_string());
+  }
+};
 }  // namespace quartz

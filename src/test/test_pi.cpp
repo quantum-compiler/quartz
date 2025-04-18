@@ -10,8 +10,8 @@ int main() {
   ParamInfo param_info;
   Context ctx({GateType::rx, GateType::pi}, 1, &param_info);
 
-  auto p0 = ctx.get_new_param_id(PI / 2);
-  auto p1 = ctx.get_new_param_id(2.0);
+  auto p0 = ctx.get_new_param_id(PI / (ParamType)2);
+  auto p1 = ctx.get_new_param_id((ParamType)2);
   auto p2 = ctx.get_new_param_expression_id({p1}, ctx.get_gate(GateType::pi));
 
   CircuitSeq dag1(1);

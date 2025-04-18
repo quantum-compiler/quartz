@@ -2,8 +2,6 @@
 
 #include "rational.h"
 
-#include "quartz/utils/utils.h"  // for the constant PI
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -11,6 +9,8 @@
 using namespace std;
 
 namespace quartz {
+
+static const double RAW_PI = std::acos(-1.0);
 
 Complex &Complex::operator+=(const Complex &b) {
   re += b.re, im += b.im;
@@ -81,16 +81,12 @@ FFT::FFT(int logn) : n(1 << logn) {
   for (int i = 1; i < n; i++)
     rev[i] = (rev[i >> 1] >> 1) | ((i & 1) << logn);
   for (int i = 0; i < (n >> 1); i++)
-    wu1[i | (n >> 1)] = Complex(cos(PI * i / (n >> 1)), sin(PI * i / (n >> 1)));
+    wu1[i | (n >> 1)] =
+        Complex(cos(RAW_PI * i / (n >> 1)), sin(RAW_PI * i / (n >> 1)));
   for (int i = (n >> 1) - 1; i >= 0; i--)
     wu1[i] = wu1[i << 1];
   for (int i = 0; i < n; i++)
     wu2[i] = wu1[i].conj();
-}
-FFT::~FFT() {
-  delete[] rev;
-  delete[] wu1;
-  delete[] wu2;
 }
 void FFT::fft(Complex *x) { fft_core(x, wu1); }
 void FFT::fft(Complex *x, Complex *y) {
@@ -125,6 +121,11 @@ void FFT::ifft(Complex *x, Complex *y)  // result: real numbers
     x[i].im = 0;
   }
 }
+std::vector<FFT *> Unsigned::ffts;
+const int Unsigned::NUM;
+const double Unsigned::FFT_MUL_COEFFICIENT = 4.4;
+const double Unsigned::NEWTON_DIVMOD_COEFFICIENT = 11;
+const double Unsigned::NEWTON_DIVMOD_POWER_2_RATIO = 0.4;
 
 void Unsigned::update() {
   while (!a.back() && a.size() > 1)
@@ -489,7 +490,7 @@ Unsigned Unsigned::divmod(const Unsigned &b) {
   int tmp;
   if ((tmp = b.ctz()) > 0) {
     if (tmp / NUM_DIGIT + 1 == (int)b.a.size() &&
-        b.a.back() == round(std::pow(10.0, tmp % NUM_DIGIT))) {
+        b.a.back() == std::round(std::pow(10.0, tmp % NUM_DIGIT))) {
       Unsigned ret = shift10(-tmp);
       *this -= ret.shift10(tmp);
       return ret;
@@ -844,6 +845,11 @@ int Rational::cmp(const Rational &r) const {
   return (a * r.b).cmp(b * r.a);
 }
 void Rational::assign(const char *s, int len) {
+  if (!s) {
+    a.inputnum(0);
+    b.inputnum(1);
+    return;
+  }
   if (len == -1)
     len = strlen(s);
   int i = 0;
@@ -916,6 +922,11 @@ Int ceil(const Rational &r) {
     return (r.a - 1) / r.b + 1;
   return r.a / r.b;
 }
+Int round(const Rational &r) {
+  if (r.is_neg())
+    return (r.a - r.b / 2) / r.b;
+  return (r.a + r.b / 2) / r.b;
+}
 Rational pow(const Rational &a, const Int &b) {
   if (b.is_neg())
     return pow(a.reciprocal(), -b);
@@ -925,5 +936,9 @@ Rational abs(const Rational &r) { return Rational(abs(r.a), r.b); }
 double Rational::to_double() const { return a.to_double() / b.to_double(); }
 long double Rational::to_ldouble() const {
   return a.to_ldouble() / b.to_ldouble();
+}
+Rational::operator int() const {
+  assert(b == Int(1));
+  return a.to_int();
 }
 }  // namespace quartz

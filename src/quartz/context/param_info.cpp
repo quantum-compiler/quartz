@@ -25,11 +25,20 @@ void ParamInfo::gen_random_parameters(int num_params) {
   assert(num_params >= 0);
   if (random_parameters_.size() < num_params) {
     random_parameters_.reserve(num_params);
+#ifdef USE_RATIONAL
+    static const long long kDenominator = 1ll << 62;
+    static std::uniform_int_distribution<long long> dis_int(-kDenominator,
+                                                            kDenominator);
+    while (random_parameters_.size() < num_params) {
+      random_parameters_.emplace_back(dis_int(gen), kDenominator);
+    }
+#else
     static const ParamType pi = std::acos((ParamType)-1.0);
     static std::uniform_real_distribution<ParamType> dis_real(-pi, pi);
     while (random_parameters_.size() < num_params) {
       random_parameters_.emplace_back(dis_real(gen));
     }
+#endif
   }
 }
 

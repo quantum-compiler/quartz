@@ -154,14 +154,16 @@ class ParamParser {
   /**
    * Maps parameter values to constant identifiers in the context of ctx_.
    */
-  std::unordered_map<ParamType, int> number_params_;
+  std::unordered_map<ParamType, int, ParamHash> number_params_;
 
   /**
    * Maps a pair (n, m) to the identifier of a symbolic expression, in the
    * context of ctx_, which corresponds to n*pi/m.
    * @see symbolic_pi_
    */
-  std::unordered_map<ParamType, std::unordered_map<ParamType, int>> pi_params_;
+  std::unordered_map<ParamType, std::unordered_map<ParamType, int, ParamHash>,
+                     ParamHash>
+      pi_params_;
 
   /**
    * Maps a parameter array name and index to the identifier of a symbolic

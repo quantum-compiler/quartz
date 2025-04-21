@@ -81,7 +81,11 @@ int ParamInfo::get_new_param_id(const ParamType &param) {
 int ParamInfo::get_new_arithmetic_param_id(const ParamType &param) {
   int id = (int)parameter_class_.size();
   assert(id == (int)parameter_class_.size());
+#ifdef USE_RATIONAL
+  assert(param.denominator() == Int(1));
+#else
   assert((int)param == param);
+#endif
   parameter_class_.emplace_back(ParamClass::arithmetic_int);
   auto wire = std::make_unique<CircuitWire>();
   wire->type = CircuitWire::input_param;

@@ -60,7 +60,7 @@ class Unsigned {
   static std::vector<FFT *> ffts;
 
  private:
-  static const int NUM = 1000000000;                                 // 1e9
+  static const int NUM = 1000000000;  // 1e9
   static const int NUM_DIGIT = 9;
   static const unsigned long long MAXNUM = 17000000000000000000ull;  // 1.7e19
   static const double FFT_MUL_COEFFICIENT;  // see below
@@ -299,8 +299,6 @@ class Rational {
   // helper functions
   [[nodiscard]] bool is_zero() const { return a.is_zero(); }
   [[nodiscard]] bool is_neg() const { return a.is_neg(); }
-  [[nodiscard]] bool is_odd() const { return a.is_odd() && b == Int(1); }
-  [[nodiscard]] bool is_even() const { return !a.is_odd() && b == Int(1); }
   [[nodiscard]] const Int &numerator() const { return a; }
   [[nodiscard]] const Int &denominator() const { return b; }
 

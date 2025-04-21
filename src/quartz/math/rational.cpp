@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 
 using namespace std;
 
@@ -852,15 +853,51 @@ void Rational::assign(const char *s, int len) {
   }
   if (len == -1)
     len = strlen(s);
-  int i = 0;
-  for (; i < len; i++)
-    if (s[i] == '/')
+  int div_loc = -1;
+  int decimal_point_loc = -1;
+  int e_loc = -1;
+  for (int i = 0; i < len; i++) {
+    if (s[i] == '/') {
+      div_loc = i;
       break;
-  a.assign(s, i);
-  if (i == len)
-    b.inputnum(1);
-  else
-    b.assign(s + i + 1, len - i - 1);
+    }
+    if (s[i] == '.') {
+      decimal_point_loc = i;
+    }
+    if (s[i] == 'e' || s[i] == 'E') {
+      e_loc = i;
+    }
+  }
+  if (div_loc == -1) {
+    if (decimal_point_loc == -1) {
+      a.assign(s, len);
+      b.inputnum(1);
+    } else {
+      string s_without_point(s, decimal_point_loc);
+      int b_pow = len - decimal_point_loc - 1;
+      if (e_loc == -1) {
+        s_without_point +=
+            string(s + decimal_point_loc + 1, len - decimal_point_loc - 1);
+      } else {
+        // [s_without_point].[remaining]e[a_pow]
+        s_without_point +=
+            string(s + decimal_point_loc + 1, e_loc - decimal_point_loc - 1);
+        int a_pow = stoi(string(s + e_loc + 1, len - e_loc - 1));
+        if (b_pow >= a_pow) {
+          b_pow -= a_pow;
+        } else {
+          s_without_point += string(a_pow - b_pow, '0');
+          b_pow = 0;
+        }
+      }
+      a.assign(s_without_point);
+      b = pow(Int(10), b_pow);
+      update();
+    }
+  } else {
+    a.assign(s, div_loc);
+    b.assign(s + div_loc + 1, len - div_loc - 1);
+  }
 }
 std::string Rational::to_string() const {
   if (b == Int(1))
@@ -869,7 +906,27 @@ std::string Rational::to_string() const {
 }
 std::istream &operator>>(istream &cin, Rational &b) {
   std::string s;
-  cin >> s;
+  int ch;
+  while (cin) {
+    ch = cin.get();
+    if (!isspace(ch)) {
+      cin.unget();
+      break;
+    }
+  }
+  while (cin) {
+    ch = cin.get();
+    // Only supports the following formats:
+    // a, a/b, a.b, a.bec
+    // where a and c are integers, b is a positive integer
+    if (isdigit(ch) || ch == '.' || ch == '-' || ch == '/' || ch == 'e' ||
+        ch == 'E' || ch == '+') {
+      s += (char)ch;
+    } else {
+      cin.unget();
+      break;
+    }
+  }
   b.assign(s);
   return cin;
 }

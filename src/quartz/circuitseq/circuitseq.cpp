@@ -716,7 +716,8 @@ CircuitSeqHashType CircuitSeq::hash(Context *ctx) {
       generate_hash_values(ctx, shifted, i, all_parameters, &tmp,
                            &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i);
-      shifted = dot_product * (ComplexType{cos_param(param), -sin_param(param)});
+      shifted =
+          dot_product * (ComplexType{cos_param(param), -sin_param(param)});
       generate_hash_values(ctx, shifted, i + num_total_params, all_parameters,
                            &tmp, &other_hash_values_);
       other_hash_values_.emplace_back(tmp, i + num_total_params);
@@ -1440,11 +1441,12 @@ std::unique_ptr<CircuitSeq> CircuitSeq::get_rz_to_t(Context *ctx) const {
       auto val = ctx->get_param_value(gate->input_wires.back()->index);
       auto val_div_pi_4_float = val * (ParamType)4 / PI;
 #ifdef USE_RATIONAL
-      int val_div_pi_4 = round(val_div_pi_4_float).to_int();
+      int val_div_pi_4 = val_div_pi_4_float.numerator().to_int();
+      assert(val_div_pi_4_float.denominator() == Int(1));
 #else
       int val_div_pi_4 = (int)std::round(val_div_pi_4_float);
-#endif
       assert(std::abs(val_div_pi_4_float - val_div_pi_4) < 1e-6);
+#endif
       val_div_pi_4 %= 8;
       if (val_div_pi_4 > 4) {
         val_div_pi_4 -= 8;

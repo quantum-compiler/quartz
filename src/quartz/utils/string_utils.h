@@ -64,7 +64,9 @@ bool read_json_style_vector(S &ss, std::vector<T> &vec) {
     return false;
   }
   int vec_size;
-  ss >> vec_size;
+  if (!(ss >> vec_size)) {
+    return false;
+  }
   vec.reserve(vec_size);
   vec.clear();
   for (int i = 0; i < vec_size; i++) {

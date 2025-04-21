@@ -26,7 +26,7 @@ bool param_equal(const ParamType &a, const ParamType &b) {
 
 bool equal_to_2k_pi(const ParamType &p) {
 #ifdef USE_RATIONAL
-  return p.is_even();
+  return p.denominator() == Int(1) && !p.numerator().is_odd();
 #else
   auto d = std::abs(p);
   int m = d / (2 * PI);

@@ -41,14 +41,17 @@ int main(int argc, char **argv) {
     }
   }
 
-  auto graph = Graph::from_qasm_file(&ctx, input_fn);
-  assert(graph);
-
   // Get xfer from the equivalent set
   std::vector<GraphXfer *> xfers =
       GraphXfer::get_all_xfers_from_ecc(&ctx, eqset_fn);
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
-  graph->optimize(xfers, graph->gate_count() * 1.05, circuit_name, "", true);
+  auto graph = Graph::from_qasm_file(&ctx, input_fn);
+  assert(graph);
+
+  auto graph_optimized = graph->optimize(xfers, graph->gate_count() * 1.05,
+                                         circuit_name, "", true, nullptr, 10);
+  std::cout << "Optimized graph:" << std::endl;
+  std::cout << graph_optimized->to_qasm();
   return 0;
 }

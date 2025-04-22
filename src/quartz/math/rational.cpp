@@ -994,8 +994,8 @@ double Rational::to_double() const { return a.to_double() / b.to_double(); }
 long double Rational::to_ldouble() const {
   return a.to_ldouble() / b.to_ldouble();
 }
-Rational::operator int() const {
+Rational::operator long long() const {
   assert(b == Int(1));
-  return a.to_int();
+  return a.to_ll();
 }
 }  // namespace quartz

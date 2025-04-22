@@ -283,7 +283,7 @@ std::string ParamInfo::to_json() const {
     result += ", ";
     if (parameter_class_[i] == ParamClass::arithmetic_int) {
       // arithmetic int
-      result += std::to_string((int)parameter_values_[i]);
+      result += std::to_string((long long)parameter_values_[i]);
     } else if (parameter_class_[i].is_input()) {
       if (parameter_class_[i].is_symbolic()) {
         // input symbolic

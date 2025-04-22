@@ -299,15 +299,13 @@ class Rational {
   // helper functions
   [[nodiscard]] bool is_zero() const { return a.is_zero(); }
   [[nodiscard]] bool is_neg() const { return a.is_neg(); }
-  [[nodiscard]] bool is_odd() const { return a.is_odd() && b == Int(1); }
-  [[nodiscard]] bool is_even() const { return !a.is_odd() && b == Int(1); }
   [[nodiscard]] const Int &numerator() const { return a; }
   [[nodiscard]] const Int &denominator() const { return b; }
 
   // type conversion functions
   [[nodiscard]] double to_double() const;
   [[nodiscard]] long double to_ldouble() const;
-  explicit operator int() const;
+  explicit operator long long() const;
 };
 
 struct RationalHash {

@@ -33,6 +33,7 @@ bool equal_to_2k_pi(const ParamType &p) {
   if (std::abs(d - m * 2 * PI) > eps && std::abs(d - (m + 1) * 2 * PI) > eps)
     return false;
   return true;
+#endif
 }
 
 Op::Op(void) : guid(GUID_INVALID), ptr(NULL) {}

@@ -852,7 +852,7 @@ void Rational::assign(const char *s, int len) {
     return;
   }
   if (len == -1)
-    len = strlen(s);
+    len = (int)strlen(s);
   int div_loc = -1;
   int decimal_point_loc = -1;
   int e_loc = -1;

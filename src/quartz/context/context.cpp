@@ -407,13 +407,24 @@ bool Context::load_param_info_from_json(std::istream &fin) {
       int id = get_new_param_expression_id(input_params, gate);
       assert(id == i);
     } else if (ch == '\"') {
-      // symbolic parameter
       fin >> ch;
-      assert(ch == '\"');  // ""
-      int id = get_new_param_id();
-      assert(id == i);
+      if (ch == '\"') {
+        // symbolic parameter ""
+        int id = get_new_param_id();
+        assert(id == i);
+      } else {
+        // concrete rational parameter "1/4"
+        std::string s;  // record the number string
+        while (ch != '\"') {
+          s += ch;
+          fin >> ch;
+        }
+        ParamType val = string_to_param(s);
+        int id = get_new_arithmetic_param_id(val);
+        assert(id == i);
+      }
     } else {
-      // concrete parameter
+      // concrete parameter 0.123
       bool is_float = false;
       bool multiplied_by_pi = false;
       std::string s;  // record the number string

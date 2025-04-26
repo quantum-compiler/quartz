@@ -14,6 +14,10 @@ std::string to_string_with_precision(const T &val, int precision = 6) {
   return out.str();
 }
 
+class Rational;
+template <>
+std::string to_string_with_precision(const Rational &val, int precision);
+
 template <typename T>
 std::string to_json_style_string(const std::vector<T> &vec) {
   std::string result = "[";

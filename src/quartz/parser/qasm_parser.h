@@ -327,7 +327,7 @@ bool QASMParser::load_qasm_stream(
   // Generalized control data.
   bool in_general_controlled_gate_block = false;
   std::vector<bool> general_control_flipped_qubits;
-  int num_flipped_qubits;
+  int num_flipped_qubits = 0;
 
   // Parse each line of the file.
   std::string line;

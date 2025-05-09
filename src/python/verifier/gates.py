@@ -21,18 +21,18 @@ from utils.utils import (
 
 nonnegativity_solver = z3.Solver()
 nonnegativity_solver.add(
-    1.414 < sqrt2,
-    sqrt2 < 1.415,
-    1.732 < sqrt3,
-    sqrt3 < 1.733,
-    2.236 < sqrt5,
-    sqrt5 < 2.237,
-    1.847 < sqrt_of_2_plus_sqrt2,
-    sqrt_of_2_plus_sqrt2 < 1.848,
-    0.765 < sqrt_of_2_minus_sqrt2,
-    sqrt_of_2_minus_sqrt2 < 0.766,
-    1.662 < sqrt_of_5_minus_sqrt5,
-    sqrt_of_5_minus_sqrt5 < 1.663,
+    # 1.414 < sqrt2,
+    # sqrt2 < 1.415,
+    # 1.732 < sqrt3,
+    # sqrt3 < 1.733,
+    # 2.236 < sqrt5,
+    # sqrt5 < 2.237,
+    # 1.847 < sqrt_of_2_plus_sqrt2,
+    # sqrt_of_2_plus_sqrt2 < 1.848,
+    # 0.765 < sqrt_of_2_minus_sqrt2,
+    # sqrt_of_2_minus_sqrt2 < 0.766,
+    # 1.662 < sqrt_of_5_minus_sqrt5,
+    # sqrt_of_5_minus_sqrt5 < 1.663,
 )
 nonnegativity_solver.set("timeout", 10)  # timeout in milliseconds
 

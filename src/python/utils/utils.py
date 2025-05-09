@@ -1,5 +1,6 @@
 import math
 
+import sympy
 import z3
 
 meta_index_num_qubits = 0
@@ -20,13 +21,16 @@ sqrt5 = z3.Real("sqrt5")
 sqrt_of_2_plus_sqrt2 = z3.Real("sqrt_of_2_plus_sqrt2")
 sqrt_of_2_minus_sqrt2 = z3.Real("sqrt_of_2_minus_sqrt2")
 sqrt_of_5_minus_sqrt5 = z3.Real("sqrt_of_5_minus_sqrt5")
+sqrt2 = sympy.sqrt(2)
+sqrt3 = sympy.sqrt(3)
+sqrt5 = sympy.sqrt(5)
 kConstantEquations = [
-    sqrt2 * sqrt2 == 2,
-    sqrt3 * sqrt3 == 3,
-    sqrt5 * sqrt5 == 5,
-    sqrt_of_2_plus_sqrt2 * sqrt_of_2_plus_sqrt2 == 2 + sqrt2,
-    sqrt_of_2_minus_sqrt2 * sqrt_of_2_minus_sqrt2 == 2 - sqrt2,
-    sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
+    # sqrt2 * sqrt2 == 2,
+    # sqrt3 * sqrt3 == 3,
+    # sqrt5 * sqrt5 == 5,
+    # sqrt_of_2_plus_sqrt2 * sqrt_of_2_plus_sqrt2 == 2 + sqrt2,
+    # sqrt_of_2_minus_sqrt2 * sqrt_of_2_minus_sqrt2 == 2 - sqrt2,
+    # sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
 ]
 
 

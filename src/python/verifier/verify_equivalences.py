@@ -1,9 +1,16 @@
 import ast
+import os
 import sys
 
-from verifier import *
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
 
-sys.path.append("..")
+from utils.utils import use_sympy
+
+if use_sympy:
+    from verifier_sympy import *
+else:
+    from verifier import *
 
 
 if __name__ == "__main__":

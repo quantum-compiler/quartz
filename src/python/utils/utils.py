@@ -1,6 +1,9 @@
 import math
 
+import sympy
 import z3
+
+use_sympy = True
 
 meta_index_num_qubits = 0
 meta_index_num_gates = 1
@@ -28,6 +31,13 @@ kConstantEquations = [
     sqrt_of_2_minus_sqrt2 * sqrt_of_2_minus_sqrt2 == 2 - sqrt2,
     sqrt_of_5_minus_sqrt5 * sqrt_of_5_minus_sqrt5 == 5 - sqrt5,
 ]
+if use_sympy:
+    sqrt2 = sympy.sqrt(2)
+    sqrt3 = sympy.sqrt(3)
+    sqrt5 = sympy.sqrt(5)
+    sqrt_of_2_plus_sqrt2 = sympy.sqrt(2 + sqrt2)
+    sqrt_of_2_minus_sqrt2 = sympy.sqrt(2 - sqrt2)
+    sqrt_of_5_minus_sqrt5 = sympy.sqrt(5 - sqrt5)
 
 
 kPhaseFactorCoeffs = [0, 1, -1, 2, -2]

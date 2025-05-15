@@ -1,7 +1,12 @@
 import ast
 import sys
 
-from verifier_sympy import *
+from utils.utils import use_sympy
+
+if use_sympy:
+    from verifier_sympy import *
+else:
+    from verifier import *
 
 sys.path.append("..")
 

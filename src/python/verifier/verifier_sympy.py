@@ -195,6 +195,9 @@ def phase_shift_by_id(vec, dag, phase_shift_id, all_parameters):
     return phase_shift(vec, phase_shift_lambda)
 
 
+tmp = 100
+
+
 def search_phase_factor_to_check_equivalence(
     dag1,
     dag2,
@@ -255,6 +258,14 @@ def search_phase_factor_to_check_equivalence(
         # Found a possible phase factor
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
+        global tmp
+        if len(str(output_vec1[0][0]) + str(output_vec2_shifted[0][0])) > tmp:
+            tmp = len(str(output_vec1[0][0]) + str(output_vec2_shifted[0][0]))
+            print('t', tmp)
+            print('a', output_vec1[0][0])
+            print('b', output_vec2_shifted[0][0])
+            print('c', output_vec1[0][1])
+            print('d', output_vec2_shifted[0][1])
         diff = any(
             sympy.simplify(v1[0] - v2[0]) != 0 or sympy.simplify(v1[1] - v2[1]) != 0
             for (v1, v2) in zip(output_vec1, output_vec2_shifted)

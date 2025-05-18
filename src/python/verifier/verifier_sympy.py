@@ -150,6 +150,7 @@ def evaluate(dag, input_dis, params, use_z3=True):
             output_dis = apply_matrix(
                 output_dis, get_matrix(gate[0], *parameter_values), qubit_indices
             )
+            output_dis = [(sympy.simplify(d[0]), sympy.simplify(d[1])) for d in output_dis]
         else:
             output_dis = apply_matrix(
                 output_dis,

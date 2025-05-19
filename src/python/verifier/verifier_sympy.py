@@ -13,7 +13,14 @@ import os
 import sys
 
 import sympy
-from gates import add, compute, get_matrix, neg  # for searching phase factors
+from gates import (  # for searching phase factors; for rational parameters times pi
+    add,
+    compute,
+    get_matrix,
+    mult,
+    neg,
+    pi,
+)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -510,6 +517,13 @@ def compute_params(param_info):
             params.append(param_info[i])
         elif isinstance(param_info[i], float):  # concrete parameter to be directly used
             params.append((math.cos(param_info[i]), math.sin(param_info[i])))
+        elif isinstance(param_info[i], str):  # concrete rational parameter times pi
+            p = param_info[i].split('/')
+            numerator = int(p[0])
+            denominator = 1
+            if len(p) == 2:
+                denominator = int(p[1])
+            params.append(mult(numerator, pi(denominator)))
         else:  # expression
             op = param_info[i][0]
             current_inputs = []
@@ -537,6 +551,8 @@ def find_equivalences(
     param_info = input_file_data[0][0][1:]
     # parameters generated for random testing
     parameters_for_fingerprint = input_file_data[0][1][1:]
+    # evaluate rationals
+    parameters_for_fingerprint = [eval(p) for p in parameters_for_fingerprint]
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0

@@ -13,15 +13,16 @@ class U1Gate : public Gate {
     assert(params.size() == 1);
     const ParamType &lambda = params[0];
     if (cached_matrices.find(lambda) == cached_matrices.end()) {
-      auto mat = std::make_unique<Matrix<2>>(
-          Matrix<2>({{1, 0}, {0, cos_param(lambda) + 1.0i * sin_param(lambda)}}));
+      auto mat = std::make_unique<Matrix<2>>(Matrix<2>(
+          {{1, 0}, {0, cos_param(lambda) + 1.0i * sin_param(lambda)}}));
       cached_matrices[lambda] = std::move(mat);
     }
     return cached_matrices[lambda].get();
   }
   bool is_sparse() const override { return true; }
   bool is_diagonal() const override { return true; }
-  std::unordered_map<ParamType, std::unique_ptr<Matrix<2>>, ParamHash> cached_matrices;
+  std::unordered_map<ParamType, std::unique_ptr<Matrix<2>>, ParamHash>
+      cached_matrices;
 };
 
 }  // namespace quartz

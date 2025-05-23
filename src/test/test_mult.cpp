@@ -10,9 +10,9 @@ int main() {
   ParamInfo param_info;
   Context ctx({GateType::rx, GateType::mult}, 1, &param_info);
 
-  auto p0 = ctx.get_new_param_id(2.0);
-  auto p1 = ctx.get_new_param_id(3.0);
-  auto p2 = ctx.get_new_param_id(6.0);
+  auto p0 = ctx.get_new_param_id((ParamType)2);
+  auto p1 = ctx.get_new_param_id((ParamType)3);
+  auto p2 = ctx.get_new_param_id((ParamType)6);
   auto p3 =
       ctx.get_new_param_expression_id({p0, p1}, ctx.get_gate(GateType::mult));
 

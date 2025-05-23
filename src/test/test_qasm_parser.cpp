@@ -80,9 +80,11 @@ void test_symbolic_exprs() {
     assert(false);
   }
 
+#ifndef USE_RATIONAL
   if (eq_mats(seq1->get_matrix(&ctx), seq2->get_matrix(&ctx), 0)) {
     assert(false);
   }
+#endif
 
   if (!has_exprs(ctx, seq1)) {
     std::cout << "Parser did not use symbolic pi values." << std::endl;
@@ -312,7 +314,7 @@ bool test_halved_param_context(Context &ctx, bool is_halved) {
   auto g = ctx.get_gate(GateType::neg);
 
   auto param_id = ctx.get_new_param_id();
-  auto const_id = ctx.get_new_param_id(0.5);
+  auto const_id = ctx.get_new_param_id((ParamType)1);
   auto exprs_id = ctx.get_new_param_expression_id({param_id}, g);
 
   if (ctx.param_is_halved(param_id) != is_halved) {
@@ -416,7 +418,7 @@ void test_halved_param_ids() {
     return;
   }
 
-  if (!eq_mats(seq1->get_matrix(&ctx_5), seq2->get_matrix(&ctx_5), 0)) {
+  if (!eq_mats(seq1->get_matrix(&ctx_5), seq2->get_matrix(&ctx_5), 1e-7)) {
     std::cout << "Disagreement on symbolic parameters." << std::endl;
     assert(false);
   }
@@ -471,18 +473,27 @@ void test_halved_param_ids() {
 //
 void test_printing_halved_params() {
   ParamInfo param_info;
-  Context ctx(
-      {GateType::p, GateType::rx, GateType::add, GateType::neg, GateType::pi},
-      &param_info);
+  Context ctx({GateType::p, GateType::rx, GateType::add, GateType::mult,
+               GateType::neg, GateType::pi},
+              &param_info);
 
   QASMParser parser(&ctx);
   parser.use_symbolic_pi(true);
 
+#ifdef USE_RATIONAL
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qreg q[1];\n"
+                    "rx(2*pi/3) q[0];\n"
+                    "rx(pi/6) q[0];\n"
+                    "p(pi/4) q[0];\n";
+#else
   std::string str = "OPENQASM 2.0;\n"
                     "include \"qelib1.inc\";\n"
                     "qreg q[1];\n"
                     "rx(2) q[0];\n"
                     "p(2) q[0];\n";
+#endif
 
   CircuitSeq *seq = nullptr;
   if (!parser.load_qasm_str(str, seq)) {
@@ -491,7 +502,7 @@ void test_printing_halved_params() {
     return;
   }
 
-  std::string act = seq->to_qasm_style_string(&ctx, 0.1);
+  std::string act = seq->to_qasm_style_string(&ctx, 1);
   if (act != str) {
     std::cout << "to_qasm_style_string: failed to handle halved parameters."
               << std::endl

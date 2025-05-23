@@ -274,6 +274,8 @@ int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
       if (token[pos - 1] == '*') {
         // Case: t*-e (negative sign), ignored here
         pos = token.find_last_of("+-", pos - 1);
+      } else {
+        break;
       }
     }
 

@@ -108,11 +108,13 @@ class ParamInfo {
    * 0: no need to add parentheses outside
    * 1: add
    * 2: mult, pi, neg  // expressions like PI/4*-3 are allowed
+   * @param is_param_halved
+   * If true, the result is the stored value multiplied by 2.
    * @return The string for the symbolic constant expression.
    */
   [[nodiscard]] std::string
   get_param_symbolic_string(int id, int precision,
-                            int operator_precedence) const;
+                            int operator_precedence, bool is_param_halved) const;
   /**
    * Set the value of a concrete parameter.
    */

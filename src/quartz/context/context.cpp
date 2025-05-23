@@ -207,14 +207,9 @@ ParamType Context::get_param_value(int id) const {
 
 std::string Context::get_param_symbolic_string(int id, int precision,
                                                bool is_param_halved) const {
-  if (is_param_halved) {
-    return "2*" +
-           param_info_->get_param_symbolic_string(id, precision,
-                                                  /*operator_precedence=*/2);
-  } else {
-    return param_info_->get_param_symbolic_string(id, precision,
-                                                  /*operator_precedence=*/0);
-  }
+  return param_info_->get_param_symbolic_string(id, precision,
+                                                /*operator_precedence=*/0,
+                                                is_param_halved);
 }
 
 void Context::set_param_value(int id, const ParamType &param) {
@@ -324,7 +319,6 @@ void Context::generate_parameter_expressions(
     int max_num_operators_per_expression) {
   assert(max_num_operators_per_expression == 1);
   int num_input_parameters = (int)param_info_->parameter_class_.size();
-  assert(num_input_parameters > 0);
   if (!param_info_->parameter_expressions_.empty()) {
     std::cerr << "Context::generate_parameter_expressions() called twice for a "
                  "single ParamInfo object. Please use different ParamInfo "

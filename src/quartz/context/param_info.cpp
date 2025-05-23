@@ -52,18 +52,19 @@ ParamType ParamInfo::get_param_value(int id) const {
   return parameter_values_[id];
 }
 
-std::string
-ParamInfo::get_param_symbolic_string(int id, int precision,
-                                     int operator_precedence) const {
+std::string ParamInfo::get_param_symbolic_string(int id, int precision,
+                                                 int operator_precedence,
+                                                 bool is_param_halved) const {
   assert(id >= 0 && id < (int)parameter_class_.size());
   assert(parameter_class_[id].is_const());
   if (parameter_class_[id] == ParamClass::concrete_const) {
     std::ostringstream out;
     out.precision(precision);
-    out << parameter_values_[id];
+    out << parameter_values_[id] * (ParamType)(is_param_halved ? 2 : 1);
     return out.str();
   } else if (parameter_class_[id] == ParamClass::arithmetic_int) {
-    return std::to_string((long long)parameter_values_[id]);
+    return std::to_string((long long)parameter_values_[id] *
+                          (is_param_halved ? 2 : 1));
   }
   assert(parameter_class_[id] == ParamClass::symbolic_constexpr);
   auto op = parameter_wires_[id]->input_gates[0]->gate->tp;
@@ -79,8 +80,15 @@ ParamInfo::get_param_symbolic_string(int id, int precision,
   std::vector<std::string> child_str;
   child_str.reserve(parameter_wires_[id]->input_gates[0]->input_wires.size());
   for (auto &input_wire : parameter_wires_[id]->input_gates[0]->input_wires) {
+    // Only pass the flag |is_param_halved| if the operator is +, -, or * only
+    // for RHS
+    // 2*(a+b) ==> 2*a + 2*b
+    // 2*(-a) ==> -2*a
+    // 2*(a*b) ==> a * (2*b)
     child_str.emplace_back(ParamInfo::get_param_symbolic_string(
-        input_wire->index, precision, current_precedence));
+        input_wire->index, precision, current_precedence,
+        is_param_halved && (op == GateType::add || op == GateType::neg ||
+                            (op == GateType::mult && child_str.size() == 1))));
   }
   std::string result;
   if (op == GateType::add) {
@@ -88,7 +96,30 @@ ParamInfo::get_param_symbolic_string(int id, int precision,
   } else if (op == GateType::mult) {
     result = child_str[0] + "*" + child_str[1];
   } else if (op == GateType::pi) {
-    result = "pi/" + child_str[0];
+    if (is_param_halved) {
+      if (parameter_class_[parameter_wires_[id]
+                               ->input_gates[0]
+                               ->input_wires[0]
+                               ->index] == ParamClass::arithmetic_int &&
+          (long long)parameter_values_[parameter_wires_[id]
+                                           ->input_gates[0]
+                                           ->input_wires[0]
+                                           ->index] %
+                  2 ==
+              0) {
+        // 2*pi/6 ==> pi/3
+        return "pi/" +
+               std::to_string((long long)parameter_values_[parameter_wires_[id]
+                                                               ->input_gates[0]
+                                                               ->input_wires[0]
+                                                               ->index] /
+                              2);
+      } else {
+        result = "2*pi/" + child_str[0];
+      }
+    } else {
+      result = "pi/" + child_str[0];
+    }
   } else if (op == GateType::neg) {
     result = "-" + child_str[0];
   }
@@ -240,7 +271,8 @@ ParamInfo::compute_parameters(const std::vector<ParamType> &input_parameters) {
   result.resize(parameter_class_.size());
   // Populates constant parameters.
   for (int i = 0; i < result.size(); ++i) {
-    if (parameter_class_[i].is_const()) {
+    if (parameter_class_[i].is_const() &&
+        parameter_class_[i] != ParamClass::symbolic_constexpr) {
       result[i] = parameter_values_[i];
     }
   }

@@ -69,7 +69,29 @@ void test_ccz() {
   }
 }
 
+void test_benchmark_result(const std::string &circuit) {
+  ParamInfo param_info;
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                   GateType::add, GateType::input_qubit, GateType::input_param},
+                  &param_info);
+  Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
+               GateType::h, GateType::rz, GateType::x, GateType::pi,
+               GateType::mult, GateType::add},
+              &param_info);
+  Context union_ctx = union_contexts(&src_ctx, &ctx);
+  Verifier verifier;
+  bool verified = verifier.verify_transformation_steps(
+      &union_ctx, (kQuartzRootPath / "benchmark-logs" / circuit).string() + "_",
+      /*verbose=*/true);
+  if (verified) {
+    std::cout << "All transformations are verified." << std::endl;
+  } else {
+    std::cout << "Some transformation is not verified." << std::endl;
+  }
+}
+
 int main() {
   test_ccz();
+  test_benchmark_result("gf2^32_mult");
   return 0;
 }

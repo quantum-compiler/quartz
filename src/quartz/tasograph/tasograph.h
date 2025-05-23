@@ -21,7 +21,8 @@ namespace quartz {
 
 #define eps 1e-6
 
-bool equal_to_2k_pi(double d);
+bool param_equal(const ParamType &a, const ParamType &b);
+bool equal_to_2k_pi(const ParamType &d);
 
 class Op {
  public:

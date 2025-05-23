@@ -3,7 +3,15 @@
 #include <complex>
 #include <filesystem>
 
+#ifdef USE_RATIONAL
+#include "quartz/math/rational.h"
+using ParamType = quartz::Rational;
+using ParamHash = quartz::RationalHash;
+#else
 using ParamType = double;
+using ParamHash = std::hash<double>;
+#endif
+
 #ifdef USE_ARBLIB
 #include "arb_complex.h"
 using ComplexType = ArbComplex;
@@ -18,7 +26,16 @@ using InputParamMaskType = unsigned long long;
 using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 
 namespace quartz {
+#ifdef USE_RATIONAL
+const ParamType PI(1);  // All parameters are rational multiples of PI
+#else
 const ParamType PI = std::acos((ParamType)-1);
+#endif
+ParamType string_to_param(const std::string &s);
+ParamType string_to_param_without_pi(const std::string &s);
+std::string param_to_string(const ParamType &p);
+double cos_param(const ParamType &p);
+double sin_param(const ParamType &p);
 
 // Constants for CircuitSeq::hash()
 constexpr double kCircuitSeqHashMaxError = 1e-15;

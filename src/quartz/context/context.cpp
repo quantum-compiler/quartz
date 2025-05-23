@@ -207,14 +207,9 @@ ParamType Context::get_param_value(int id) const {
 
 std::string Context::get_param_symbolic_string(int id, int precision,
                                                bool is_param_halved) const {
-  if (is_param_halved) {
-    return "2*" +
-           param_info_->get_param_symbolic_string(id, precision,
-                                                  /*operator_precedence=*/2);
-  } else {
-    return param_info_->get_param_symbolic_string(id, precision,
-                                                  /*operator_precedence=*/0);
-  }
+  return param_info_->get_param_symbolic_string(id, precision,
+                                                /*operator_precedence=*/0,
+                                                is_param_halved);
 }
 
 void Context::set_param_value(int id, const ParamType &param) {
@@ -324,7 +319,6 @@ void Context::generate_parameter_expressions(
     int max_num_operators_per_expression) {
   assert(max_num_operators_per_expression == 1);
   int num_input_parameters = (int)param_info_->parameter_class_.size();
-  assert(num_input_parameters > 0);
   if (!param_info_->parameter_expressions_.empty()) {
     std::cerr << "Context::generate_parameter_expressions() called twice for a "
                  "single ParamInfo object. Please use different ParamInfo "
@@ -407,14 +401,26 @@ bool Context::load_param_info_from_json(std::istream &fin) {
       int id = get_new_param_expression_id(input_params, gate);
       assert(id == i);
     } else if (ch == '\"') {
-      // symbolic parameter
       fin >> ch;
-      assert(ch == '\"');  // ""
-      int id = get_new_param_id();
-      assert(id == i);
+      if (ch == '\"') {
+        // symbolic parameter ""
+        int id = get_new_param_id();
+        assert(id == i);
+      } else {
+        // concrete rational parameter "1/4"
+        std::string s;  // record the number string
+        while (ch != '\"') {
+          s += ch;
+          fin >> ch;
+        }
+        ParamType val = string_to_param(s);
+        int id = get_new_arithmetic_param_id(val);
+        assert(id == i);
+      }
     } else {
-      // concrete parameter
+      // concrete parameter 0.123
       bool is_float = false;
+      bool multiplied_by_pi = false;
       std::string s;  // record the number string
       while (ch != ',' && ch != ']') {
         s += ch;
@@ -423,12 +429,19 @@ bool Context::load_param_info_from_json(std::istream &fin) {
         }
         fin >> ch;
       }
+      if (s.substr(0, 3) == "pi*") {
+        s = s.substr(3);
+        multiplied_by_pi = true;
+      }
       fin.unget();  // put the ',' or ']' back
-      ParamType val = std::stod(s);
       int id;
       if (is_float) {
+        ParamType val = multiplied_by_pi ? string_to_param(s) * PI
+                                         : string_to_param_without_pi(s);
         id = get_new_param_id(val);
       } else {
+        assert(!multiplied_by_pi);
+        ParamType val = string_to_param(s);
         id = get_new_arithmetic_param_id(val);
       }
       assert(id == i);

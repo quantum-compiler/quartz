@@ -42,14 +42,14 @@ class Command {
       } else {
         auto pi_pos = input.find("pi");
         if (pi_pos == input.npos) {
-          constant_params[param_idx.size()] = std::stod(input);
+          constant_params[param_idx.size()] = string_to_param_without_pi(input);
         } else if (pi_pos == 0) {
           constant_params[param_idx.size()] = PI;
         } else if (pi_pos == 1 && input[0] == '-') {
           constant_params[param_idx.size()] = -PI;
         } else {
           constant_params[param_idx.size()] =
-              PI * std::stod(input.substr(0, pi_pos));
+              PI * string_to_param(input.substr(0, pi_pos));
         }
         param_idx.push_back(-1);
       }

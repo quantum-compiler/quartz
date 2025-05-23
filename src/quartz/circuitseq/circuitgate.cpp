@@ -165,7 +165,7 @@ std::string CircuitGate::to_string(Context *ctx) const {
             input_wires[j]->index, /*precision=*/6, /*is_param_halved=*/false);
       } else {
         param_value =
-            std::to_string(ctx->get_param_value(input_wires[j]->index));
+            param_to_string(ctx->get_param_value(input_wires[j]->index));
       }
       result += "[" + param_value + "]";
     }
@@ -293,8 +293,14 @@ std::string CircuitGate::to_qasm_style_string(Context *ctx,
             // optimization: if a parameter is 0, do not output that many digits
             out << "0";
           } else if (gate->is_param_halved(curr_param_index)) {
-            out << std::fixed << 2 * param_value;
+#ifdef USE_RATIONAL
+            out << "pi*";
+#endif
+            out << std::fixed << (ParamType)2 * param_value;
           } else {
+#ifdef USE_RATIONAL
+            out << "pi*";
+#endif
             out << std::fixed << param_value;
           }
           result += std::move(out).str();

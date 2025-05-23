@@ -13,7 +13,14 @@ import os
 import sys
 
 import sympy
-from gates import add, compute, get_matrix, neg  # for searching phase factors
+from gates import (  # for searching phase factors; for rational parameters times pi
+    add,
+    compute,
+    get_matrix,
+    mult,
+    neg,
+    pi,
+)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -89,8 +96,8 @@ def apply_matrix(vec, mat, qubit_indices):
 
 def input_distribution(num_qubits):
     vec_size = 1 << num_qubits
-    real_part = sympy.symbols(f'r_0:{vec_size}')
-    imag_part = sympy.symbols(f'i_0:{vec_size}')
+    real_part = sympy.symbols(f"r_0:{vec_size}")
+    imag_part = sympy.symbols(f"i_0:{vec_size}")
     return list(zip(real_part, imag_part))
 
 
@@ -112,7 +119,7 @@ def angle(c, s):
 
 
 def create_parameters(num_parameters, equation_list):
-    params = sympy.symbols(f'p_0:{num_parameters}')
+    params = sympy.symbols(f"p_0:{num_parameters}")
     param_cos = [sympy.cos(p) for p in params]
     param_sin = [sympy.sin(p) for p in params]
     return list(zip(param_cos, param_sin))
@@ -258,8 +265,11 @@ def search_phase_factor_to_check_equivalence(
         # Found a possible phase factor
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
+        # verify v1[0] == v2[0] and v1[1] == v2[1]
+        x = sympy.symbols("x")
         diff = any(
-            sympy.simplify(v1[0] - v2[0]) != 0 or sympy.simplify(v1[1] - v2[1]) != 0
+            sympy.minimal_polynomial(v1[0] - v2[0], x) != x
+            or sympy.minimal_polynomial(v1[1] - v2[1], x) != x
             for (v1, v2) in zip(output_vec1, output_vec2_shifted)
         )
         if diff:
@@ -510,6 +520,13 @@ def compute_params(param_info):
             params.append(param_info[i])
         elif isinstance(param_info[i], float):  # concrete parameter to be directly used
             params.append((math.cos(param_info[i]), math.sin(param_info[i])))
+        elif isinstance(param_info[i], str):  # concrete rational parameter times pi
+            p = param_info[i].split("/")
+            numerator = int(p[0])
+            denominator = 1
+            if len(p) == 2:
+                denominator = int(p[1])
+            params.append(mult(numerator, pi(denominator)))
         else:  # expression
             op = param_info[i][0]
             current_inputs = []
@@ -537,6 +554,8 @@ def find_equivalences(
     param_info = input_file_data[0][0][1:]
     # parameters generated for random testing
     parameters_for_fingerprint = input_file_data[0][1][1:]
+    # evaluate rationals
+    parameters_for_fingerprint = [eval(p) for p in parameters_for_fingerprint]
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0

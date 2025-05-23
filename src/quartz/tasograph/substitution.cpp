@@ -730,7 +730,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
           // Check if the constant input parameter is the same
           auto xfer_param_value = paramValues.find(in.idx)->second;
           auto graph_param_value = graph->get_param_value(mappedOp);
-          if (std::abs(xfer_param_value - graph_param_value) > eps)
+          if (!param_equal(xfer_param_value, graph_param_value))
             return false;
         }
       } else {
@@ -745,7 +745,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
             // Check if the constant input parameter is the same
             auto xfer_param_value = paramValues.find(in.idx)->second;
             auto graph_param_value = graph->get_param_value(mappedOp);
-            if (std::abs(xfer_param_value - graph_param_value) > eps)
+            if (!param_equal(xfer_param_value, graph_param_value))
               return false;
           }
         } else {
@@ -758,7 +758,7 @@ bool GraphXfer::can_match(OpX *srcOp, Op op, const Graph *graph) const {
                 // Check if the constant input parameter is the same
                 auto xfer_param_value = paramValues.find(in.idx)->second;
                 auto graph_param_value = graph->get_param_value(e.srcOp);
-                if (std::abs(xfer_param_value - graph_param_value) > eps)
+                if (!param_equal(xfer_param_value, graph_param_value))
                   return false;
               }
               newMapInputs.insert(

@@ -1625,7 +1625,7 @@ bool Schedule::compute_kernel_schedule_simple_repeat(
       for (auto qubit : gates[gate_location]->get_qubit_indices()) {
         // |qubit| gets 1, |qubit - 1| gets 0.5, |qubit +- 2| gets 0.25, ...
         for (int j = 0; j < num_qubits; j++) {
-          recent_qubit_weight[j] += pow(0.5, abs(qubit - j));
+          recent_qubit_weight[j] += std::pow(0.5, std::abs(qubit - j));
         }
       }
       return gate_location;

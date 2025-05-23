@@ -113,8 +113,8 @@ class ParamInfo {
    * @return The string for the symbolic constant expression.
    */
   [[nodiscard]] std::string
-  get_param_symbolic_string(int id, int precision,
-                            int operator_precedence, bool is_param_halved) const;
+  get_param_symbolic_string(int id, int precision, int operator_precedence,
+                            bool is_param_halved) const;
   /**
    * Set the value of a concrete parameter.
    */

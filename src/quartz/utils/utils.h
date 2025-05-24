@@ -1,9 +1,9 @@
 #pragma once
 
+#include "quartz/math/bitset.h"
+
 #include <complex>
 #include <filesystem>
-
-#include "quartz/math/bitset.h"
 
 #ifdef USE_RATIONAL
 #include "quartz/math/rational.h"

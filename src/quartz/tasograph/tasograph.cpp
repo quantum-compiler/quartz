@@ -1,5 +1,6 @@
 #include "tasograph.h"
 
+#include "quartz/math/bitset.h"
 #include "substitution.h"
 
 #include <cassert>
@@ -994,7 +995,7 @@ void Graph::rotation_merging(GateType target_rotation) {
     assert(false);
   }
   // Step 1: calculate the bitmask of each operator
-  std::unordered_map<Pos, uint64_t, PosHash> bitmasks;
+  std::unordered_map<Pos, QubitMaskType, PosHash> bitmasks;
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
   std::queue<Op> todos;
 
@@ -1003,7 +1004,10 @@ void Graph::rotation_merging(GateType target_rotation) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
       int qubit_idx = input_qubit_op_2_qubit_idx[it.first];
-      bitmasks[Pos(it.first, 0)] = 1 << qubit_idx;
+      if (bitmasks.count(Pos(it.first, 0)) == 0) {
+        bitmasks[Pos(it.first, 0)] = Bitset(get_num_qubits());
+      }
+      bitmasks[Pos(it.first, 0)][qubit_idx] = true;
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
     } else if (it.first.ptr->tp == GateType::input_param) {
       todos.push(it.first);
@@ -1106,7 +1110,8 @@ void Graph::rotation_merging(GateType target_rotation) {
 
     // Step 4: merge rotations with the same bitmasks on the same qubit
     std::unordered_map<
-        int, std::unordered_map<uint64_t, std::unordered_set<Pos, PosHash>>>
+        int, std::unordered_map<QubitMaskType, std::unordered_set<Pos, PosHash>,
+                                QubitMaskHash>>
         qubit_2_bm_2_pos;
     for (const auto &pos : covered) {
       if (pos.op.ptr->tp == GateType::cx) {

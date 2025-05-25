@@ -1,5 +1,7 @@
 #pragma once
 
+#include "quartz/math/bitset.h"
+
 #include <complex>
 #include <filesystem>
 
@@ -22,6 +24,8 @@ using CircuitSeqHashType = unsigned long long;
 using PhaseShiftIdType = int;
 using EquivalenceHashType = std::pair<unsigned long long, int>;
 using InputParamMaskType = unsigned long long;
+using QubitMaskType = quartz::Bitset;  // for rotation merging
+using QubitMaskHash = quartz::BitsetHash;
 
 using namespace std::complex_literals;  // so that we can write stuff like 1.0i
 

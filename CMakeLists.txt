@@ -28,7 +28,7 @@ message(STATUS "Python library directories: ${Python_LIBRARY_DIRS}")
 link_directories(${Python_LIBRARY_DIRS})
 
 # pybind11
-execute_process(COMMAND ${Python_EXECUTABLE} -m pybind11 --cmake
+execute_process(COMMAND ${Python_EXECUTABLE} -m pybind11 --cmakedir
         OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 find_package(pybind11 CONFIG REQUIRED)
 include_directories(${pybind11_INCLUDE_DIR})

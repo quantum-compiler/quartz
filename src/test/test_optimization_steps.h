@@ -29,11 +29,11 @@ void test_optimization(
   std::cout << graph->total_cost() << " gates in circuit before optimizing."
             << std::endl;
 
-  // Context shift, these constructs cannot be inside the if-block
+  // Context shift
   std::shared_ptr<Graph> graph_before_search;
-  Context union_ctx = union_contexts(ctx, dst_ctx);
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(ctx, dst_ctx, &union_ctx);
   if (dst_ctx != nullptr) {
+    Context union_ctx = union_contexts(ctx, dst_ctx);
+    auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(ctx, dst_ctx, &union_ctx);
     auto start = std::chrono::steady_clock::now();
     // Greedy toffoli flip
     graph_before_search = graph->toffoli_flip_greedy(
@@ -42,6 +42,24 @@ void test_optimization(
     //   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
     auto end = std::chrono::steady_clock::now();
     graph.swap(graph_before_search);
+  } else {
+    // Rotation merging
+    if (!store_all_steps_file_prefix.empty()) {
+      graph->to_qasm(store_all_steps_file_prefix + "0.qasm",
+                     /*print_result=*/false,
+                     /*print_guid=*/false);
+    }
+    graph->rotation_merging(GateType::rz);
+    if (!store_all_steps_file_prefix.empty()) {
+      graph->to_qasm(store_all_steps_file_prefix + "1.qasm",
+                     /*print_result=*/false,
+                     /*print_guid=*/false);
+      // Store the number of steps (1).
+      std::ofstream fout(store_all_steps_file_prefix + ".txt");
+      assert(fout.is_open());
+      fout << 1 << std::endl;
+      fout.close();
+    }
   }
 
   bool continue_storing_all_steps = !store_all_steps_file_prefix.empty();

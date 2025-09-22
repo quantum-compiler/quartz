@@ -8,7 +8,7 @@
 
 using namespace quartz;
 
-void test_preprocessed() {
+void test_clifford_t() {
   ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::t, GateType::tdg, GateType::x,
@@ -29,6 +29,34 @@ void test_preprocessed() {
   Verifier verifier;
   bool verified = verifier.verify_transformation_steps(
       &ctx, (kQuartzRootPath / "logs/barenco_tof_3_").string(),
+      /*verbose=*/true);
+  if (verified) {
+    std::cout << "All transformations are verified." << std::endl;
+  } else {
+    std::cout << "Some transformation is not verified." << std::endl;
+  }
+}
+
+void test_preprocessed() {
+  ParamInfo param_info;
+  Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
+               GateType::h, GateType::rz, GateType::x, GateType::add},
+              &param_info);
+  if (!std::filesystem::exists(kQuartzRootPath / "logs")) {
+    std::filesystem::create_directory(kQuartzRootPath / "logs");
+  }
+  auto xfers = GraphXfer::get_all_xfers_from_ecc(
+      &ctx,
+      (kQuartzRootPath / "eccset/Nam_6_3_complete_ECC_set.json").string());
+
+  test_optimization(&ctx, nullptr,
+                    (kQuartzRootPath / "circuit/barenco_tof_4.qasm").string(),
+                    xfers,
+                    /*timeout=*/3600 * 12,
+                    (kQuartzRootPath / "logs/barenco_tof_4_").string());
+  Verifier verifier;
+  bool verified = verifier.verify_transformation_steps(
+      &ctx, (kQuartzRootPath / "logs/barenco_tof_4_").string(),
       /*verbose=*/true);
   if (verified) {
     std::cout << "All transformations are verified." << std::endl;
@@ -91,7 +119,7 @@ void test_benchmark_result(const std::string &circuit) {
 }
 
 int main() {
-  test_ccz();
-  test_benchmark_result("gf2^32_mult");
+  test_preprocessed();
+  //  test_benchmark_result("gf2^32_mult");
   return 0;
 }

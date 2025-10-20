@@ -1319,6 +1319,10 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
             assert(param_has_value(edge.srcOp));
             param_values[edge.dstIdx - num_qubits] =
                 get_param_value(edge.srcOp);
+            if (op.ptr->is_param_halved(edge.dstIdx - num_qubits)) {
+              param_values[edge.dstIdx - num_qubits] =
+                  param_values[edge.dstIdx - num_qubits] * (ParamType)2;
+            }
           }
         }
         bool first = true;

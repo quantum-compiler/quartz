@@ -31,6 +31,7 @@ void test_optimization(
 
   // Context shift
   std::shared_ptr<Graph> graph_before_search;
+  constexpr bool kRotationMergingIfNoContextShift = true;
   if (dst_ctx != nullptr) {
     Context union_ctx = union_contexts(ctx, dst_ctx);
     auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(ctx, dst_ctx, &union_ctx);
@@ -42,7 +43,7 @@ void test_optimization(
     //   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
     auto end = std::chrono::steady_clock::now();
     graph.swap(graph_before_search);
-  } else {
+  } else if (kRotationMergingIfNoContextShift) {
     // Rotation merging
     if (!store_all_steps_file_prefix.empty()) {
       graph->to_qasm(store_all_steps_file_prefix + "0.qasm",
@@ -62,7 +63,8 @@ void test_optimization(
     }
   }
 
-  bool continue_storing_all_steps = !store_all_steps_file_prefix.empty();
+  bool continue_storing_all_steps =
+      !store_all_steps_file_prefix.empty() || kRotationMergingIfNoContextShift;
   auto start = std::chrono::steady_clock::now();
   auto new_graph =
       graph->optimize(xfers, graph->total_cost() * 1.05, file_name,

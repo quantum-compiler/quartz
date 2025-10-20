@@ -27,7 +27,7 @@ bool Verifier::verify_transformation_steps(Context *ctx,
       std::cout << "circuit " << i << std::endl;
       std::cout << circuits[i]->to_string(/*line_number=*/true) << std::endl;
     }
-    if (i > 0) {
+    if (i > 506) {
       if (verbose) {
         std::cout << "Verifying circuit " << i - 1 << " -> circuit " << i
                   << std::endl;
@@ -252,6 +252,8 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
     std::cout << "Checking Verifier::equivalent() on:" << std::endl;
     std::cout << c1->to_string(/*line_number=*/true, ctx) << std::endl;
     std::cout << c2->to_string(/*line_number=*/true, ctx) << std::endl;
+    c1->to_qasm_file(ctx, kQuartzRootPath.string() + "/c1.qasm");
+    c2->to_qasm_file(ctx, kQuartzRootPath.string() + "/c2.qasm");
   }
 
   Dataset dataset;

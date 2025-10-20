@@ -207,7 +207,7 @@ class Graph {
   /**
    * Greedily apply transformations towards lower cost.
    * @param ctx The context variable.
-   * @param equiv_file_name The ECC set file name.
+   * @param eqs The ECC set.
    * @param print_message To output the log to the screen or not.
    * @param cost_function The cost function.
    * @param store_all_steps_file_prefix If not empty, store each circuit
@@ -215,7 +215,7 @@ class Graph {
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph> greedy_optimize(
-      Context *ctx, const std::string &equiv_file_name, bool print_message,
+      Context *ctx, const EquivalenceSet &eqs, bool print_message,
       std::function<float(Graph *)> cost_function = nullptr,
       const std::string &store_all_steps_file_prefix = std::string());
   std::shared_ptr<Graph>
@@ -229,7 +229,7 @@ class Graph {
   /**
    * Optimize this circuit with a greedy phase at the beginning.
    * @param ctx The context variable.
-   * @param equiv_file_name The ECC set file name.
+   * @param eqs The ECC set.
    * @param circuit_name The circuit name shown in the log.
    * @param print_message To output the log or not. The log will be outputted
    * to a file with name combined by the ECC set file name and the circuit
@@ -242,7 +242,7 @@ class Graph {
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
-  optimize(Context *ctx, const std::string &equiv_file_name,
+  optimize(Context *ctx, const EquivalenceSet &eqs,
            const std::string &circuit_name, bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
            double cost_upper_bound = -1 /*default = current cost * 1.05*/,

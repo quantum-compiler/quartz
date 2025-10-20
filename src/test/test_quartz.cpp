@@ -52,6 +52,13 @@ int main(int argc, char **argv) {
                    GateType::cx, GateType::input_qubit, GateType::input_param},
                   &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(&dst_ctx, eqset_fn, /*from_verifier=*/false)) {
+    std::cout << "Failed to load equivalence file \"" << eqset_fn << "\"."
+              << std::endl;
+    assert(false);
+  }
 
   // Construct GraphXfers for toffoli flip
   // Use this for voqc gate set(h, rz, x, cx)
@@ -81,9 +88,9 @@ int main(int argc, char **argv) {
   graph_before_search->to_qasm(input_fn + ".toffoli_flip", false, false);
 
   // Optimization
-  auto graph_after_search = graph_before_search->optimize(
-      &dst_ctx, eqset_fn, input_fn, /*print_message=*/
-      true);
+  auto graph_after_search =
+      graph_before_search->optimize(&dst_ctx, eqs, input_fn, /*print_message=*/
+                                    true);
   std::cout << "gate count after optimization: "
             << graph_after_search->total_cost() << std::endl;
   graph_after_search->to_qasm(output_fn, false, false);

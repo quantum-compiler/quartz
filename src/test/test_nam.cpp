@@ -46,6 +46,13 @@ int main(int argc, char **argv) {
                    GateType::cx, GateType::input_qubit, GateType::input_param},
                   &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(&dst_ctx, eqset_fn, /*from_verifier=*/false)) {
+    std::cout << "Failed to load equivalence file \"" << eqset_fn << "\"."
+              << std::endl;
+    assert(false);
+  }
 
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
@@ -81,7 +88,7 @@ int main(int argc, char **argv) {
 
   // Optimization
   auto graph_after_search =
-      graph_before_search->optimize(&dst_ctx, eqset_fn, fn, /*print_message=*/
+      graph_before_search->optimize(&dst_ctx, eqs, fn, /*print_message=*/
                                     true);
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn

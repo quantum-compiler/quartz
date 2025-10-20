@@ -364,6 +364,16 @@ std::string Context::param_info_to_json() const {
 }
 
 bool Context::load_param_info_from_json(std::istream &fin) {
+  if (!param_info_->parameter_class_.empty() ||
+      !param_info_->parameter_wires_.empty() ||
+      !param_info_->parameter_values_.empty() ||
+      !param_info_->parameter_expressions_.empty()) {
+    std::cerr << "The ParamInfo object is not empty. "
+                 "Loading parameter information from Json files like ECC sets "
+                 "would overwrite previous parameter information."
+              << std::endl;
+    return false;
+  }
   fin.ignore(std::numeric_limits<std::streamsize>::max(), '[');
   if (fin.eof()) {
     return false;

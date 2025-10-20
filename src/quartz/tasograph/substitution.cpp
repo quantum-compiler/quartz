@@ -550,16 +550,7 @@ GraphXfer::ccz_cx_t_xfer(Context *src_ctx, Context *dst_ctx,
 }
 
 std::vector<GraphXfer *>
-GraphXfer::get_all_xfers_from_ecc(Context *ctx,
-                                  const std::string &equiv_file_name) {
-  EquivalenceSet eqs;
-  // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
-    std::cout << "Failed to load equivalence file \"" << equiv_file_name
-              << "\"." << std::endl;
-    assert(false);
-  }
-
+GraphXfer::get_all_xfers_from_eqs(Context *ctx, const EquivalenceSet &eqs) {
   auto eccs = eqs.get_all_equivalence_sets();
   std::vector<GraphXfer *> xfers;
   for (const auto &ecc : eccs) {
@@ -587,6 +578,19 @@ GraphXfer::get_all_xfers_from_ecc(Context *ctx,
     }
   }
   return xfers;
+}
+
+std::vector<GraphXfer *>
+GraphXfer::get_all_xfers_from_ecc(Context *ctx,
+                                  const std::string &equiv_file_name) {
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
+    std::cout << "Failed to load equivalence file \"" << equiv_file_name
+              << "\"." << std::endl;
+    assert(false);
+  }
+  return get_all_xfers_from_eqs(ctx, eqs);
 }
 
 GraphXfer::GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,

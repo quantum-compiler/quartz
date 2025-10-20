@@ -28,6 +28,13 @@ void benchmark_nam(const std::string &circuit_name) {
                    GateType::cx, GateType::input_qubit, GateType::input_param},
                   &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+  EquivalenceSet eqs;
+  // Load equivalent dags from file
+  if (!eqs.load_json(&dst_ctx, ecc_set_name, /*from_verifier=*/false)) {
+    std::cout << "Failed to load equivalence file \"" << ecc_set_name << "\"."
+              << std::endl;
+    assert(false);
+  }
 
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
@@ -63,10 +70,10 @@ void benchmark_nam(const std::string &circuit_name) {
   start = std::chrono::steady_clock::now();
   // Optimization
   auto graph_after_search = graph_before_search->optimize(
-      &dst_ctx, ecc_set_name, circuit_name, /*print_message=*/
-      true,                                 /*cost_function=*/
-      nullptr,                              /*cost_upper_bound=*/
-      -1,                                   /*timeout=*/
+      &dst_ctx, eqs, circuit_name, /*print_message=*/
+      true,                        /*cost_function=*/
+      nullptr,                     /*cost_upper_bound=*/
+      -1,                          /*timeout=*/
       10);
   end = std::chrono::steady_clock::now();
 

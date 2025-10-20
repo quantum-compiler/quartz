@@ -1576,20 +1576,12 @@ void Graph::draw_circuit(const std::string &src_file_name,
 }
 
 std::shared_ptr<Graph>
-Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
+Graph::greedy_optimize(Context *ctx, const EquivalenceSet &eqs,
                        bool print_message,
                        std::function<float(Graph *)> cost_function,
                        const std::string &store_all_steps_file_prefix) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
-  }
-
-  EquivalenceSet eqs;
-  // Load equivalent dags from file
-  if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
-    std::cout << "Failed to load equivalence file \"" << equiv_file_name
-              << "\"." << std::endl;
-    assert(false);
   }
 
   auto original_cost = cost_function(this);
@@ -1940,7 +1932,7 @@ std::shared_ptr<Graph> Graph::optimize_legacy(
 }
 
 std::shared_ptr<Graph>
-Graph::optimize(Context *ctx, const std::string &equiv_file_name,
+Graph::optimize(Context *ctx, const EquivalenceSet &eqs,
                 const std::string &circuit_name, bool print_message,
                 std::function<float(Graph *)> cost_function,
                 double cost_upper_bound, double timeout,
@@ -1949,17 +1941,15 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
   // Get xfer from the equivalent set
-  std::vector<GraphXfer *> xfers =
-      GraphXfer::get_all_xfers_from_ecc(ctx, equiv_file_name);
+  std::vector<GraphXfer *> xfers = GraphXfer::get_all_xfers_from_eqs(ctx, eqs);
   if (print_message) {
     std::cout << "Number of xfers: " << xfers.size() << std::endl;
   }
   if (cost_upper_bound == -1) {
     cost_upper_bound = total_cost() * 1.05;
   }
-  auto preprocessed_graph =
-      greedy_optimize(ctx, equiv_file_name, print_message, cost_function,
-                      store_all_steps_file_prefix);
+  auto preprocessed_graph = greedy_optimize(
+      ctx, eqs, print_message, cost_function, store_all_steps_file_prefix);
   return preprocessed_graph->optimize(
       xfers, cost_upper_bound, circuit_name, /*log_file_name=*/"",
       print_message, cost_function, timeout, store_all_steps_file_prefix,
@@ -2915,9 +2905,11 @@ ParamType Graph::get_param_value(const Op &op) const {
 bool Graph::param_has_value(const Op &op) const {
   auto idx = param_idx.find(op);
   if (idx == param_idx.end()) {
+    std::cout << "param_idx not found" << std::endl;
     return false;  // not a parameter
   }
   if (!context->param_is_const(idx->second)) {
+    std::cout << context << " " << idx->second << " not const" << std::endl;
     return false;  // not constant
   }
   return true;

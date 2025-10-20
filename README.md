@@ -183,7 +183,7 @@ You can use the API:
 
 ```cpp
 std::shared_ptr<Graph> optimize(Context *ctx,
-                                const std::string &equiv_file_name,
+                                const EquivalenceSet &eqs,
                                 const std::string &circuit_name,
                                 bool print_message,
                                 std::function<float(Graph *)> cost_function = nullptr,
@@ -195,7 +195,7 @@ std::shared_ptr<Graph> optimize(Context *ctx,
 Explanation for the parameters:
 
 - `ctx`: The context object.
-- `equiv_file_name`: The file name of the ECC set.
+- `eqs`: The ECC set object, should be loaded before the circuit is loaded.
 - `circuit_name`: The name of the circuit, which will be printed with the
   intermediate result.
 - `print_message`: Print debug message to the console.
@@ -208,8 +208,37 @@ Explanation for the parameters:
 Usage example:
 
 ```c++
-auto graph_optimized = graph->optimize(&context,
-                                       equiv_file_name,
+// Construct contexts
+ParamInfo param_info;
+Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                 GateType::input_qubit, GateType::input_param},
+                &param_info);
+Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
+                 GateType::cx, GateType::input_qubit, GateType::input_param},
+                &param_info);
+auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+EquivalenceSet eqs;
+// Load equivalent dags from file
+if (!eqs.load_json(&dst_ctx, eqset_fn, /*from_verifier=*/false)) {
+  std::cout << "Failed to load equivalence file \"" << eqset_fn << "\"."
+            << std::endl;
+  assert(false);
+}
+auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
+// Load qasm file
+QASMParser qasm_parser(&src_ctx);
+CircuitSeq *dag = nullptr;
+if (!qasm_parser.load_qasm(input_fn, dag)) {
+  std::cout << "Parser failed" << std::endl;
+  assert(false);
+}
+Graph graph_input(&src_ctx, dag);
+// Greedy toffoli flip
+auto graph = graph_input.toffoli_flip_greedy(
+    GateType::rz, xfer_pair.first, xfer_pair.second);
+// Optimize
+auto graph_optimized = graph->optimize(&dst_ctx,
+                                       eqs,
                                        circuit_name,
                                        /*print_message=*/true,
                                        [] (Graph *graph) { return graph->total_cost(); },

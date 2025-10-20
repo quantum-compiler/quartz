@@ -42,8 +42,7 @@ int main(int argc, char **argv) {
   }
 
   // Get xfer from the equivalent set
-  std::vector<GraphXfer *> xfers =
-      GraphXfer::get_all_xfers_from_ecc(&ctx, eqset_fn);
+  std::vector<GraphXfer *> xfers = GraphXfer::get_all_xfers_from_eqs(&ctx, eqs);
   std::cout << "number of xfers: " << xfers.size() << std::endl;
 
   auto graph = Graph::from_qasm_file(&ctx, input_fn);

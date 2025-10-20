@@ -266,12 +266,24 @@ def search_phase_factor_to_check_equivalence(
         # print(f'Checking phase factor {current_phase_factor_for_fingerprint}')
         output_vec2_shifted = phase_shift(output_vec2, current_phase_factor_symbolic)
         # verify v1[0] == v2[0] and v1[1] == v2[1]
-        x = sympy.symbols("x")
         diff = any(
-            sympy.minimal_polynomial(v1[0] - v2[0], x) != x
-            or sympy.minimal_polynomial(v1[1] - v2[1], x) != x
+            v1[0] != v2[0] or v1[1] != v2[1]
             for (v1, v2) in zip(output_vec1, output_vec2_shifted)
         )
+        if diff:  # simple v1[0] == v2[0] and v1[1] == v2[1] check doesn't work
+            try:
+                x = sympy.symbols("x")
+                diff = any(
+                    sympy.minimal_polynomial(v1[0] - v2[0], x) != x
+                    or sympy.minimal_polynomial(v1[1] - v2[1], x) != x
+                    for (v1, v2) in zip(output_vec1, output_vec2_shifted)
+                )
+            except sympy.polys.polyerrors.NotAlgebraic:
+                diff = any(
+                    sympy.simplify(v1[0] - v2[0]) != 0
+                    or sympy.simplify(v1[1] - v2[1]) != 0
+                    for (v1, v2) in zip(output_vec1, output_vec2_shifted)
+                )
         if diff:
             print(
                 f"sympy returns {[(sympy.simplify(v1[0] - v2[0]), sympy.simplify(v1[1] - v2[1])) for (v1, v2) in zip(output_vec1, output_vec2_shifted)]} for the following equivalence which passed random testing:"

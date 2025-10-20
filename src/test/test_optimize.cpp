@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  ParamInfo param_info(/*num_input_symbolic_params=*/2, false);
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::cx,
                GateType::h, GateType::rz, GateType::x, GateType::add},
               /*num_qubits=*/3, &param_info);

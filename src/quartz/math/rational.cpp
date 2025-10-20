@@ -909,7 +909,7 @@ std::istream &operator>>(istream &cin, Rational &b) {
   int ch;
   while (cin) {
     ch = cin.get();
-    if (!isspace(ch)) {
+    if (!isspace(ch) || ch == '"') {  // filter out whitespace and '"'
       cin.unget();
       break;
     }
@@ -922,6 +922,8 @@ std::istream &operator>>(istream &cin, Rational &b) {
     if (isdigit(ch) || ch == '.' || ch == '-' || ch == '/' || ch == 'e' ||
         ch == 'E' || ch == '+') {
       s += (char)ch;
+    } else if (ch == '"') {
+      // filter out '"'
     } else {
       cin.unget();
       break;

@@ -21,7 +21,7 @@ See [instructions](INSTALL.md) to install Quartz from source code.
 
 Quartz targets the logical optimization stage in quantum circuit compilation and
 can be used to optimize quantum circuits for arbitrary gate sets (e.g., IBM or
-Regetti quantum processors). Quartz works in two steps. First, for a given gate
+Rigetti quantum processors). Quartz works in two steps. First, for a given gate
 set, the Quartz circuit generator and circuit equivalence verifier can
 automatically generate and verify possible circuit transformations, represented
 as an equivalent circuit class (ECC) set. Second, Quartz's circuit optimizer
@@ -284,7 +284,7 @@ make verify_openqasm
 ```
 
 If `[timeout]` is given, then the value (in milliseconds) will be used as a
-timeout for all Z3 queries (otherwise a default value of 30 seconds is used,
+timeout for all Z3 (or SymPy) queries (otherwise a default value of 30 seconds is used,
 which should be enough for most Z3 queries). If `[tmpdir]` is given, the
 temporary files during verification will be put into this directory.
 

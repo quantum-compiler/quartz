@@ -105,4 +105,15 @@ bool read_json_style_vector(S &ss, std::vector<T> &vec) {
   return true;
 }
 
+/**
+ * Specialization: also handle the case "a/b" when reading a floating-point
+ * value from std::istream.
+ * @param ss The istream with a json array at the beginning,
+ * created by to_json_style_string(vec) above but potentially in Rational
+ * instead of double.
+ * @param vec The returned vector. The original content is deleted.
+ * @return True iff the read is successful.
+ */
+bool read_json_style_vector(std::istream &ss, std::vector<double> &vec);
+
 }  // namespace quartz

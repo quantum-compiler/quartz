@@ -44,9 +44,9 @@ struct TensorXCompare {
 
 class TensorXHash {
  public:
-  size_t operator()(const TensorX &a) const {
-    std::hash<size_t> hash_fn;
-    return hash_fn(a.idx) * 17 + hash_fn((size_t)(a.op));
+  std::size_t operator()(const TensorX &a) const {
+    std::hash<std::size_t> hash_fn;
+    return hash_fn(a.idx) * 17 + hash_fn((std::size_t)(a.op));
   }
 };
 
@@ -99,7 +99,7 @@ class GraphXfer {
   void unmatch(OpX *srcOp, Op op, const Graph *graph);
   void run(int depth, Graph *graph,
            std::vector<std::shared_ptr<Graph>> &new_candidates,
-           std::set<size_t> &, float threshold, int maxNumOps,
+           std::set<std::size_t> &, float threshold, int maxNumOps,
            bool enable_early_stop, bool &stop_search);
   std::shared_ptr<Graph> run_1_time(int depth, Graph *graph);
   std::shared_ptr<Graph> create_new_graph(const Graph *graph) const;

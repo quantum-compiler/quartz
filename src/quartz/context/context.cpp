@@ -44,7 +44,7 @@ Context::Context(const std::vector<GateType> &supported_gates, int num_qubits,
   generate_parameter_expressions();
 }
 
-size_t Context::next_global_unique_id(void) {
+std::size_t Context::next_global_unique_id(void) {
   static std::mutex lock;
   std::lock_guard<std::mutex> lg(lock);
   return global_unique_id++;

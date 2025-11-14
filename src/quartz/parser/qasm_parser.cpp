@@ -4,7 +4,7 @@ namespace quartz {
 
 void find_and_replace_all(std::string &data, const std::string &tofind,
                           const std::string &toreplace) {
-  size_t pos = data.find(tofind);
+  std::size_t pos = data.find(tofind);
   while (pos != std::string::npos) {
     data.replace(pos, tofind.size(), toreplace);
     pos = data.find(tofind, pos + toreplace.size());
@@ -13,7 +13,7 @@ void find_and_replace_all(std::string &data, const std::string &tofind,
 
 void find_and_replace_first(std::string &data, const std::string &tofind,
                             const std::string &toreplace) {
-  size_t pos = data.find(tofind);
+  std::size_t pos = data.find(tofind);
   if (pos != std::string::npos) {
     data.replace(pos, tofind.size(), toreplace);
   }
@@ -21,7 +21,7 @@ void find_and_replace_first(std::string &data, const std::string &tofind,
 
 void find_and_replace_last(std::string &data, const std::string &tofind,
                            const std::string &toreplace) {
-  size_t pos = data.rfind(tofind);
+  std::size_t pos = data.rfind(tofind);
   if (pos != std::string::npos) {
     data.replace(pos, tofind.size(), toreplace);
   }
@@ -29,7 +29,7 @@ void find_and_replace_last(std::string &data, const std::string &tofind,
 
 int string_to_number(const std::string &input) {
   int ret = -1;
-  for (size_t i = 0; i < input.length(); i++) {
+  for (std::size_t i = 0; i < input.length(); i++) {
     if (input[i] >= '0' && input[i] <= '9') {
       if (ret == -1) {
         ret = 0;
@@ -269,7 +269,7 @@ int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
   while (token != "") {
     // Determines where the expression splits into terms, when applicable.
     // The right-most (last) deliminator will identify the next term to parse.
-    size_t pos = token.find_last_of("+-");
+    std::size_t pos = token.find_last_of("+-");
     while (pos != std::string::npos && pos > 0) {
       if (token[pos - 1] == '*') {
         // Case: t*-e (negative sign), ignored here

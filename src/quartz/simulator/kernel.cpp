@@ -186,8 +186,8 @@ bool Kernel::verify(const std::function<bool(int)> &is_local_qubit) const {
   return true;
 }
 
-size_t KernelInDP::get_hash() const {
-  size_t result = 5381 + (int)tp;
+std::size_t KernelInDP::get_hash() const {
+  std::size_t result = 5381 + (int)tp;
   for (const auto &i : active_qubits) {
     result = result * 33 + i;
   }

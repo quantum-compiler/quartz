@@ -198,27 +198,27 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   }
   for (auto e : src_dag->get_param_expr_ops(_context)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       src_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->srcOps.push_back(op);
   }
-  for (size_t i = 0; i < src_dag->gates.size(); i++) {
+  for (std::size_t i = 0; i < src_dag->gates.size(); i++) {
     CircuitGate *e = src_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       //   if (e->output_wires[j]->is_qubit()) {
       //     TensorX output(op, j);
       //     op->add_output(output);
@@ -232,25 +232,25 @@ GraphXfer *GraphXfer::create_GraphXfer(Context *_context,
   }
   for (auto e : dst_dag->get_param_expr_ops(_context)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       dst_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->dstOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_dag->gates.size(); i++) {
+  for (std::size_t i = 0; i < dst_dag->gates.size(); i++) {
     CircuitGate *e = dst_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       //   if (e->output_wires[j]->is_qubit()) {
       TensorX output(op, j);
       op->add_output(output);
@@ -346,27 +346,27 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
   }
   for (auto e : src_dag->get_param_expr_ops(_context)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       src_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->srcOps.push_back(op);
   }
-  for (size_t i = 0; i < src_dag->gates.size(); i++) {
+  for (std::size_t i = 0; i < src_dag->gates.size(); i++) {
     CircuitGate *e = src_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       src_to_tx[e->output_wires[j]] = output;
@@ -375,25 +375,25 @@ GraphXfer *GraphXfer::create_GraphXfer_from_qasm_str(
   }
   for (auto e : dst_dag->get_param_expr_ops(_context)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       dst_to_tx[e->output_wires[j]] = output;
     }
     graphXfer->dstOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_dag->gates.size(); i++) {
+  for (std::size_t i = 0; i < dst_dag->gates.size(); i++) {
     CircuitGate *e = dst_dag->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       dst_to_tx[e->output_wires[j]] = output;
@@ -455,7 +455,7 @@ GraphXfer::create_single_gate_GraphXfer(Context *src_ctx, Context *dst_ctx,
   for (auto cmd : dst_cmds) {
     OpX *op = new OpX(cmd.get_gate_type());
     auto num_qubit = cmd.qubit_idx.size();
-    for (size_t i = 0; i < num_qubit; ++i) {
+    for (std::size_t i = 0; i < num_qubit; ++i) {
       assert(dst_qubits_2_tensorx.find(cmd.qubit_idx[i]) !=
              dst_qubits_2_tensorx.end());
       op->add_input(dst_qubits_2_tensorx[cmd.qubit_idx[i]]);
@@ -465,7 +465,7 @@ GraphXfer::create_single_gate_GraphXfer(Context *src_ctx, Context *dst_ctx,
       dst_qubits_2_tensorx[cmd.qubit_idx[i]] = tensor;
     }
     auto num_params = cmd.param_idx.size();
-    for (size_t i = 0; i < num_params; ++i) {
+    for (std::size_t i = 0; i < num_params; ++i) {
       // Non-constant parameters
       if (cmd.param_idx[i] != -1) {
         assert(dst_params_2_tensorx.find(cmd.param_idx[i]) !=
@@ -619,27 +619,27 @@ GraphXfer::GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
   }
   for (auto e : src_graph->get_param_expr_ops(src_ctx_)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       src_to_tx[e->output_wires[j]] = output;
     }
     srcOps.push_back(op);
   }
-  for (size_t i = 0; i < src_graph->gates.size(); i++) {
+  for (std::size_t i = 0; i < src_graph->gates.size(); i++) {
     CircuitGate *e = src_graph->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       assert(src_to_tx.find(e->input_wires[j]) != src_to_tx.end());
       TensorX input = src_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       //   if (e->output_wires[j]->is_qubit()) {
       //     TensorX output(op, j);
       //     op->add_output(output);
@@ -653,25 +653,25 @@ GraphXfer::GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
   }
   for (auto e : dst_graph->get_param_expr_ops(dst_ctx_)) {
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       TensorX output(op, j);
       op->add_output(output);
       dst_to_tx[e->output_wires[j]] = output;
     }
     dstOps.push_back(op);
   }
-  for (size_t i = 0; i < dst_graph->gates.size(); i++) {
+  for (std::size_t i = 0; i < dst_graph->gates.size(); i++) {
     CircuitGate *e = dst_graph->gates[i].get();
     OpX *op = new OpX(e->gate->tp);
-    for (size_t j = 0; j < e->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->input_wires.size(); j++) {
       TensorX input = dst_to_tx[e->input_wires[j]];
       op->add_input(input);
     }
-    for (size_t j = 0; j < e->output_wires.size(); j++) {
+    for (std::size_t j = 0; j < e->output_wires.size(); j++) {
       //   if (e->output_wires[j]->is_qubit()) {
       TensorX output(op, j);
       op->add_output(output);

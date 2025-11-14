@@ -52,7 +52,7 @@ int main() {
       std::shared_ptr<Graph>, std::vector<std::shared_ptr<Graph>>,
       std::function<bool(std::shared_ptr<Graph>, std::shared_ptr<Graph>)>>
       candidate_q(graph_cmp);
-  std::set<size_t> hash_mp;
+  std::set<std::size_t> hash_mp;
   candidate_q.push(graph);
   std::shared_ptr<Graph> best_graph = graph;
   hash_mp.insert(graph->hash());
@@ -62,9 +62,9 @@ int main() {
     candidate_q.pop();
     std::vector<Op> all_ops;
     top_graph->topology_order_ops(all_ops);
-    assert(all_ops.size() == (size_t)top_graph->gate_count());
+    assert(all_ops.size() == (std::size_t)top_graph->gate_count());
     for (auto op : all_ops) {
-      for (size_t i = 0; i < xfers.size(); ++i) {
+      for (std::size_t i = 0; i < xfers.size(); ++i) {
         auto xfer = xfers[i];
         //   for (auto xfer : xfers) {
         if (top_graph->xfer_appliable(xfer, op)) {

@@ -27,7 +27,7 @@ bool equal_to_2k_pi(const ParamType &d);
 class Op {
  public:
   Op();
-  Op(size_t _guid, Gate *_ptr) : guid(_guid), ptr(_ptr) {}
+  Op(std::size_t _guid, Gate *_ptr) : guid(_guid), ptr(_ptr) {}
   inline bool operator==(const Op &b) const {
     if (guid != b.guid)
       return false;
@@ -64,7 +64,7 @@ class Op {
   static const Op INVALID_OP;
 
  public:
-  size_t guid;
+  std::size_t guid;
   Gate *ptr;
 };
 
@@ -79,9 +79,9 @@ class OpCompare {
 
 class OpHash {
  public:
-  size_t operator()(const Op &a) const {
-    std::hash<size_t> hash_fn;
-    return hash_fn(a.guid) * 17 + hash_fn((size_t)(a.ptr));
+  std::size_t operator()(const Op &a) const {
+    std::hash<std::size_t> hash_fn;
+    return hash_fn(a.guid) * 17 + hash_fn((std::size_t)(a.ptr));
   }
 };
 
@@ -129,8 +129,8 @@ inline bool operator!=(const Pos &a, const Pos &b) {
 
 class PosHash {
  public:
-  size_t operator()(const Pos &a) const {
-    std::hash<size_t> hash_fn;
+  std::size_t operator()(const Pos &a) const {
+    std::hash<std::size_t> hash_fn;
     OpHash op_hash;
     return op_hash(a.op) * 17 + hash_fn(a.idx);
   }
@@ -191,16 +191,16 @@ class Graph {
   Op add_parameter_by_id(int param_index);
   Op new_gate(GateType gt);
   [[nodiscard]] bool has_loop() const;
-  size_t hash();
+  std::size_t hash();
   [[nodiscard]] bool equal(const Graph &other) const;
   bool check_correctness();
   [[nodiscard]] int specific_gate_count(GateType gate_type) const;
   [[nodiscard]] float total_cost() const;
   [[nodiscard]] int gate_count() const;
   [[nodiscard]] int circuit_depth() const;
-  size_t get_next_special_op_guid();
-  size_t get_special_op_guid();
-  void set_special_op_guid(size_t _special_op_guid);
+  std::size_t get_next_special_op_guid();
+  std::size_t get_special_op_guid();
+  void set_special_op_guid(std::size_t _special_op_guid);
   std::shared_ptr<Graph> context_shift(Context *src_ctx, Context *dst_ctx,
                                        Context *union_ctx,
                                        RuleParser *rule_parser,
@@ -291,7 +291,7 @@ class Graph {
                                               const std::string &qasm_str);
   void draw_circuit(const std::string &qasm_str,
                     const std::string &save_filename);
-  [[nodiscard]] size_t get_num_qubits() const;
+  [[nodiscard]] std::size_t get_num_qubits() const;
   void print_qubit_ops();
   std::shared_ptr<Graph> toffoli_flip_greedy(
       GateType target_rotation, GraphXfer *xfer, GraphXfer *inverse_xfer,
@@ -303,9 +303,9 @@ class Graph {
   toffoli_flip_by_instruction(GateType target_rotation, GraphXfer *xfer,
                               GraphXfer *inverse_xfer,
                               std::vector<int> instruction);
-  [[nodiscard]] std::vector<size_t>
+  [[nodiscard]] std::vector<std::size_t>
   appliable_xfers(Op op, const std::vector<GraphXfer *> &) const;
-  [[nodiscard]] std::vector<size_t>
+  [[nodiscard]] std::vector<std::size_t>
   appliable_xfers_parallel(Op op, const std::vector<GraphXfer *> &) const;
   bool xfer_appliable(GraphXfer *xfer, Op op) const;
   std::shared_ptr<Graph> apply_xfer(GraphXfer *xfer, Op op,

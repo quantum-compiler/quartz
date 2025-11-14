@@ -58,13 +58,13 @@ int test() {
 
     // std::vector<Op> all_ops;
     // test_graph->topology_order_ops(all_ops);
-    // assert(all_ops.size() == (size_t)test_graph->gate_count());
+    // assert(all_ops.size() == (std::size_t)test_graph->gate_count());
     // bool stop_loop = false;
     // // (0, 1945)
-    // for (size_t i_op = 0; i_op < all_ops.size() && !stop_loop; i_op++) {
+    // for (std::size_t i_op = 0; i_op < all_ops.size() && !stop_loop; i_op++) {
     //   auto op = all_ops[i_op];
     // // for (auto op : all_ops) {
-    //   for (size_t i_x = 0; i_x < xfers.size(); ++i_x) {
+    //   for (std::size_t i_x = 0; i_x < xfers.size(); ++i_x) {
     //     auto xfer = xfers[i_x];
     //     if (test_graph->xfer_appliable(xfer, op)) {
     //       auto new_graph = test_graph->apply_xfer(xfer, op);

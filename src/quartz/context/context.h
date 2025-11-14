@@ -51,7 +51,7 @@ class Context {
   [[nodiscard]] const Vector &get_generated_hashing_dis(int num_qubits) const;
   [[nodiscard]] const Vector &get_and_gen_hashing_dis(int num_qubits);
   [[nodiscard]] std::vector<ParamType> get_all_generated_parameters() const;
-  size_t next_global_unique_id();
+  std::size_t next_global_unique_id();
 
   [[nodiscard]] bool has_parameterized_gate() const;
 
@@ -181,7 +181,7 @@ class Context {
  private:
   bool insert_gate(GateType tp);
 
-  size_t global_unique_id;
+  std::size_t global_unique_id;
   bool may_use_halved_params_;
   std::unordered_map<GateType, std::unique_ptr<Gate>> gates_;
   std::unordered_map<

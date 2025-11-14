@@ -809,10 +809,10 @@ bool CircuitSeq::remove_unused_qubits(std::vector<int> unused_qubits) {
 }
 
 void CircuitSeq::print(Context *ctx) const {
-  for (size_t i = 0; i < gates.size(); i++) {
+  for (std::size_t i = 0; i < gates.size(); i++) {
     CircuitGate *circuit_gate = gates[i].get();
     printf("gate[%zu] type(%d)\n", i, circuit_gate->gate->tp);
-    for (size_t j = 0; j < circuit_gate->input_wires.size(); j++) {
+    for (std::size_t j = 0; j < circuit_gate->input_wires.size(); j++) {
       CircuitWire *wire = circuit_gate->input_wires[j];
       if (wire->is_qubit()) {
         printf("    inputs[%zu]: qubit(%d)\n", j, wire->index);

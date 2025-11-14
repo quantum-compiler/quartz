@@ -93,7 +93,7 @@ int main() {
     std::cout << "dur1 = " << dur1 << "  dur2 = " << dur2 << std::endl
               << std::endl;
 
-    for (size_t i = 0; i < ans_ref.size(); i++) {
+    for (std::size_t i = 0; i < ans_ref.size(); i++) {
       if (i >= ans_para.size()) {
         std::cerr << i << " >= ans_para.size()  "
                   << "ans_ref.size(): " << ans_ref.size()

@@ -31,7 +31,7 @@ Schedule::Schedule(std::unique_ptr<CircuitSeq> &&sequence, int num_local_qubits,
   }
 }
 
-size_t Schedule::num_down_sets() {
+std::size_t Schedule::num_down_sets() {
   const int num_qubits = sequence_->get_num_qubits();
   const int num_gates = sequence_->get_num_gates();
   // Each std::vector<bool> object stores a mask of which gates are in the
@@ -310,8 +310,8 @@ bool Schedule::compute_kernel_schedule(
   // A state for dynamic programming.
   struct Status {
    public:
-    static size_t get_hash(const std::vector<int> &s) {
-      size_t result = 5381;
+    static std::size_t get_hash(const std::vector<int> &s) {
+      std::size_t result = 5381;
       for (const auto &i : s) {
         result = result * 33 + i;
       }
@@ -468,11 +468,11 @@ bool Schedule::compute_kernel_schedule(
     // this is a fusion kernel or the gate execution cost if this is a
     // shared-memory kernel.
     std::vector<KernelInDP> absorbing_kernels;
-    size_t hash;
+    std::size_t hash;
   };
   class StatusHash {
    public:
-    size_t operator()(const Status &s) const { return s.hash; }
+    std::size_t operator()(const Status &s) const { return s.hash; }
   };
   struct LocalSchedule {
    public:

@@ -147,7 +147,7 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
 
   for (auto &node : seq->wires) {
     assert(node->type != CircuitWire::input_param);
-    size_t srcIdx = -1;  // Assumption: a node can have at most 1 input
+    std::size_t srcIdx = -1;  // Assumption: a node can have at most 1 input
     Op srcOp;
     if (node->type == CircuitWire::input_qubit) {
       srcOp = input_qubits_op[node->index];
@@ -171,7 +171,7 @@ Graph::Graph(Context *ctx, const CircuitSeq *seq)
     assert(srcOp != Op::INVALID_OP);
 
     for (auto output_edge : node->output_gates) {
-      size_t dstIdx;
+      std::size_t dstIdx;
       bool found = false;
       for (dstIdx = 0; dstIdx < output_edge->input_wires.size(); ++dstIdx) {
         if (node.get() == output_edge->input_wires[dstIdx]) {
@@ -257,7 +257,7 @@ std::unique_ptr<CircuitSeq> Graph::to_circuit_sequence() const {
   return seq;
 }
 
-size_t Graph::get_next_special_op_guid() {
+std::size_t Graph::get_next_special_op_guid() {
   if (special_op_guid >= GUID_PRESERVED) {
     std::cerr << "Run out of special guid." << std::endl;
     assert(false);
@@ -265,9 +265,9 @@ size_t Graph::get_next_special_op_guid() {
   return special_op_guid++;
 }
 
-size_t Graph::get_special_op_guid() { return special_op_guid; }
+std::size_t Graph::get_special_op_guid() { return special_op_guid; }
 
-void Graph::set_special_op_guid(size_t _special_op_guid) {
+void Graph::set_special_op_guid(std::size_t _special_op_guid) {
   special_op_guid = _special_op_guid;
 }
 
@@ -394,16 +394,16 @@ bool Graph::check_correctness(void) {
 }
 
 // TODO: add constant parameters
-size_t Graph::hash(void) {
-  size_t total = 0;
+std::size_t Graph::hash(void) {
+  std::size_t total = 0;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare>::const_iterator it;
-  std::unordered_map<size_t, size_t> hash_values;
+  std::unordered_map<std::size_t, std::size_t> hash_values;
   std::queue<Op> op_queue;
   // Compute the hash value for input ops
   for (it = outEdges.begin(); it != outEdges.end(); it++) {
     if (it->first.ptr->tp == GateType::input_qubit ||
         it->first.ptr->tp == GateType::input_param) {
-      size_t my_hash = 17 * 13 + (size_t)it->first.ptr->tp;
+      std::size_t my_hash = 17 * 13 + (std::size_t)it->first.ptr->tp;
       hash_values[it->first.guid] = my_hash;
       total += my_hash;
       op_queue.push(it->first);
@@ -411,7 +411,7 @@ size_t Graph::hash(void) {
   }
 
   // Construct in-degree map
-  std::map<Op, size_t> op_in_edges_cnt;
+  std::map<Op, std::size_t> op_in_edges_cnt;
   for (it = inEdges.begin(); it != inEdges.end(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }
@@ -422,7 +422,7 @@ size_t Graph::hash(void) {
     if (hash_values.find(op.guid) == hash_values.end()) {
       std::set<Edge, EdgeCompare> list = inEdges[op];
       std::set<Edge, EdgeCompare>::const_iterator it2;
-      size_t my_hash = 17 * 13 + (size_t)op.ptr->tp;
+      std::size_t my_hash = 17 * 13 + (std::size_t)op.ptr->tp;
       for (it2 = list.begin(); it2 != list.end(); it2++) {
         Edge e = *it2;
         assert(hash_values.find(e.srcOp.guid) != hash_values.end());
@@ -486,7 +486,7 @@ std::shared_ptr<Graph> Graph::context_shift(Context *src_ctx, Context *dst_ctx,
 float Graph::total_cost(void) const {
   // Uncomment to use circuit depth as the cost
   // return circuit_depth();
-  size_t cnt = 0;
+  std::size_t cnt = 0;
   for (const auto &it : inEdges) {
     if (it.first.ptr->is_quantum_gate())
       cnt++;
@@ -696,7 +696,7 @@ void Graph::constant_and_rotation_elimination() {
   }
 
   // Construct in-degree map
-  std::unordered_map<Op, size_t, OpHash> op_in_edges_cnt;
+  std::unordered_map<Op, std::size_t, OpHash> op_in_edges_cnt;
   for (auto it = inEdges.cbegin(); it != inEdges.cend(); ++it) {
     op_in_edges_cnt[it->first] = it->second.size();
   }

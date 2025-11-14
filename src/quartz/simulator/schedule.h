@@ -22,7 +22,7 @@ class Schedule {
            int num_shared_memory_cacheline_qubits, Context *ctx);
 
   // Compute the number of down sets for the circuit sequence.
-  [[nodiscard]] size_t num_down_sets();
+  [[nodiscard]] std::size_t num_down_sets();
 
   [[nodiscard]] bool is_local_qubit(int index) const;
 

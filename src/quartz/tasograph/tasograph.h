@@ -276,9 +276,9 @@ class Graph {
            bool continue_storing_all_steps = false);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
-  [[nodiscard]] std::string
-  to_qasm(bool print_result = false, bool print_guid = false,
-          int param_precision = 6) const;
+  [[nodiscard]] std::string to_qasm(bool print_result = false,
+                                    bool print_guid = false,
+                                    int param_precision = 6) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_guid) const;
   template <class _CharT, class _Traits>

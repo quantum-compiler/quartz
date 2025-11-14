@@ -67,18 +67,18 @@ void Graph::_construct_pos_2_logical_qubit() {
       pos_2_logical_qubit[Pos(op, 0)] = input_qubit_op_2_qubit_idx[op];
     }
     if (outEdges.find(op) != outEdges.end()) {
-      auto op_out_edges = outEdges.find(op)->second;
-      for (auto e_it = op_out_edges.cbegin(); e_it != op_out_edges.cend();
-           ++e_it) {
-        if (pos_2_logical_qubit.find(Pos(e_it->srcOp, e_it->srcIdx)) !=
+      const auto &op_out_edges = outEdges.find(op)->second;
+      for (const auto &op_out_edge : op_out_edges) {
+        if (pos_2_logical_qubit.find(
+                Pos(op_out_edge.srcOp, op_out_edge.srcIdx)) !=
             pos_2_logical_qubit.end()) {
-          pos_2_logical_qubit[Pos(e_it->dstOp, e_it->dstIdx)] =
-              pos_2_logical_qubit[Pos(e_it->srcOp, e_it->srcIdx)];
+          pos_2_logical_qubit[Pos(op_out_edge.dstOp, op_out_edge.dstIdx)] =
+              pos_2_logical_qubit[Pos(op_out_edge.srcOp, op_out_edge.srcIdx)];
         }
-        assert(op_in_degree[e_it->dstOp] > 0);
-        op_in_degree[e_it->dstOp]--;
-        if (op_in_degree[e_it->dstOp] == 0) {
-          op_q.push(e_it->dstOp);
+        assert(op_in_degree[op_out_edge.dstOp] > 0);
+        op_in_degree[op_out_edge.dstOp]--;
+        if (op_in_degree[op_out_edge.dstOp] == 0) {
+          op_q.push(op_out_edge.dstOp);
         }
       }
     }
@@ -305,6 +305,14 @@ Op Graph::add_parameter(const ParamType &p) {
   auto guid = context->next_global_unique_id();
   Op op(guid, gate);
   param_idx[op] = context->get_new_param_id(p);
+  return op;
+}
+
+Op Graph::add_parameter_by_id(int param_index) {
+  Gate *gate = context->get_gate(GateType::input_param);
+  auto guid = context->next_global_unique_id();
+  Op op(guid, gate);
+  param_idx[op] = param_index;
   return op;
 }
 
@@ -1257,8 +1265,10 @@ void Graph::to_qasm(const std::string &save_filename, bool print_result,
   ofs << to_qasm(print_result, print_guid);
 }
 
-std::string Graph::to_qasm(bool print_result, bool print_guid) const {
+std::string Graph::to_qasm(bool print_result, bool print_guid,
+                           int param_precision) const {
   std::ostringstream o;
+#ifndef USE_RATIONAL
   std::map<ParamType, std::string> constant_2_pi;
   std::vector<ParamType> multiples;
   for (int i = 1; i <= 8; ++i) {
@@ -1269,6 +1279,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
   for (const auto &f : multiples) {
     constant_2_pi[f * PI] = "pi*" + param_to_string(f);
   }
+#endif
 
   o << "OPENQASM 2.0;" << std::endl;
   o << "include \"qelib1.inc\";" << std::endl;
@@ -1310,37 +1321,59 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
         iss << '(';
         assert(inEdges.find(op) != inEdges.end());
         int num_params = op.ptr->get_num_parameters();
-        std::vector<ParamType> param_values(num_params);
+        std::vector<std::string> param_value_strs(num_params);
         for (auto edge : in_edges) {
           // Print parameters
           if (edge.dstIdx >= num_qubits) {
             // Parameter inputs
             // All parameters should be constant
             assert(param_has_value(edge.srcOp));
-            param_values[edge.dstIdx - num_qubits] =
-                get_param_value(edge.srcOp);
-            if (op.ptr->is_param_halved(edge.dstIdx - num_qubits)) {
-              param_values[edge.dstIdx - num_qubits] =
-                  param_values[edge.dstIdx - num_qubits] * (ParamType)2;
+            auto param_index_it = param_idx.find(edge.srcOp);
+            assert(param_index_it != param_idx.end());
+            if (context->param_is_symbolic(param_index_it->second)) {
+              param_value_strs[edge.dstIdx - num_qubits] =
+                  context->get_param_symbolic_string(
+                      param_index_it->second, param_precision,
+                      op.ptr->is_param_halved(edge.dstIdx - num_qubits));
+            } else {
+              auto param_value = get_param_value(edge.srcOp);
+              if (op.ptr->is_param_halved(edge.dstIdx - num_qubits)) {
+                param_value = param_value * (ParamType)2;
+              }
+              std::ostringstream out;
+              bool found = false;
+#ifndef USE_RATIONAL
+              for (const auto &it : constant_2_pi) {
+                if (param_equal(param_value, it.first)) {
+                  out << it.second;
+                  found = true;
+                }
+              }
+#endif
+              if (!found) {
+                out.precision(param_precision);
+                if (param_value == 0) {
+                  // optimization: if a parameter is 0, do not output that many
+                  // digits
+                  out << "0";
+                } else {
+#ifdef USE_RATIONAL
+                  out << "pi*";
+#endif
+                  out << std::fixed << param_value;
+                }
+              }
+              param_value_strs[edge.dstIdx - num_qubits] = std::move(out).str();
             }
           }
         }
         bool first = true;
-        for (auto f : param_values) {
+        for (const auto &f : param_value_strs) {
           if (first) {
             first = false;
           } else
             iss << ',';
-          bool found = false;
-          for (auto it : constant_2_pi) {
-            if (param_equal(f, it.first)) {
-              iss << it.second;
-              found = true;
-            }
-          }
-          if (!found) {
-            iss << "pi*" << f / PI;
-          }
+          iss << f;
         }
         iss << ')';
       }
@@ -1390,7 +1423,7 @@ std::string Graph::to_qasm(bool print_result, bool print_guid) const {
 
 template <class _CharT, class _Traits>
 std::shared_ptr<Graph>
-Graph::_from_qasm_stream(Context *ctx,
+Graph::_from_qasm_stream(Context *ctx, ParamParser *param_parser,
                          std::basic_istream<_CharT, _Traits> &qasm_stream) {
   std::shared_ptr<Graph> graph(new Graph(ctx));
   std::string line;
@@ -1399,11 +1432,35 @@ Graph::_from_qasm_stream(Context *ctx,
   std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
   size_t total_num_qubits = 0;
   while (std::getline(qasm_stream, line, ';')) {
-    // repleace comma with space
+    // Unlike CircuitSeq which treats the following general controlled gate
+    // block as one gate, Graph treats them as three gates.
+    // //ctrl
+    // x q[0];
+    // cx q[0], q[1];
+    // x q[0];
+
+    // Remove comments
+    auto comment_position = line.find("//");
+    while (comment_position != std::string::npos) {
+      auto newline_position = line.find('\n', comment_position + 2 /*"//"*/);
+      if (newline_position == std::string::npos) {
+        // remove until the end
+        line.resize(comment_position);
+        break;
+      }
+      line.replace(comment_position, newline_position - comment_position, "");
+      comment_position = line.find("//", comment_position);
+    }
+    // Adds spaces before square brackets to support OpenQASM 3 declarations.
+    // The spaces should not apply to the parameters passed to rotation gates.
+    find_and_replace_all(line, "array[", "array [");
+    find_and_replace_all(line, "qubit[", "qubit [");
+    // Replace comma with space
     find_and_replace_all(line, ",", " ");
+    // Replace parentheses for parameterized gate with space
     find_and_replace_all(line, "(", " ");
     find_and_replace_all(line, ")", " ");
-    // ignore end of line
+    // Ignore end of line
     find_and_replace_all(line, "\n", "");
     while (!line.empty() && line.front() == ' ') {
       line.erase(0, 1);
@@ -1411,9 +1468,13 @@ Graph::_from_qasm_stream(Context *ctx,
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
-    if (command == "//") {
-      continue;  // comment, ignore this line
-    } else if (command == "") {
+    // Strip the command to avoid potential '\r'
+    command = strip(command);
+    // XXX: "u" is an alias of "u3".
+    if (command == std::string("u")) {
+      command = std::string("u3");
+    }
+    if (command.empty()) {
       continue;  // empty line, ignore this line
     } else if (command == "OPENQASM" || command == "OpenQASM") {
       continue;  // header, ignore this line
@@ -1426,13 +1487,15 @@ Graph::_from_qasm_stream(Context *ctx,
     } else if (command == "creg") {
       continue;  // ignore this line
     } else if (command == "qreg") {
+      // QASM 2
       std::string token;
       getline(ss, token, ' ');
       std::string qreg_name = token.substr(0, token.find('['));
       qreg_name_2_start_idx[qreg_name] = total_num_qubits;
       size_t num_qubits = string_to_number(token);
       pos_on_qubits.resize(total_num_qubits + num_qubits);
-      for (int i = total_num_qubits; i < total_num_qubits + num_qubits; ++i) {
+      for (int i = (int)total_num_qubits; i < total_num_qubits + num_qubits;
+           ++i) {
         auto op = graph->add_qubit(i);
         pos_on_qubits[i] = Pos(op, 0);
         // Construct input_qubit_op_2_qubit_idx
@@ -1440,108 +1503,73 @@ Graph::_from_qasm_stream(Context *ctx,
       }
       total_num_qubits += num_qubits;
       assert(!ss.good());
+    } else if (command == "qubit") {
+      // QASM 3
+      std::string token;
+      getline(ss, token, ']');
+      std::string qreg_name;
+      getline(ss, qreg_name);
+      qreg_name_2_start_idx[qreg_name] = total_num_qubits;
+      size_t num_qubits = string_to_number(token);
+      pos_on_qubits.resize(total_num_qubits + num_qubits);
+      for (int i = (int)total_num_qubits; i < total_num_qubits + num_qubits;
+           ++i) {
+        auto op = graph->add_qubit(i);
+        pos_on_qubits[i] = Pos(op, 0);
+        // Construct input_qubit_op_2_qubit_idx
+        graph->input_qubit_op_2_qubit_idx[op] = i;
+      }
+      total_num_qubits += num_qubits;
+      assert(!ss.good());
+    } else if (command == "input") {
+      std::cerr << "Parameter arrays are unsupported when loading QASM directly"
+                   " to Graph. Please load the QASM to CircuitSeq and then"
+                   " convert it to Graph."
+                << std::endl;
+      return nullptr;
     } else if (is_gate_string(command, gate_type)) {
+      // Gate parsing.
       Gate *gate = graph->context->get_gate(gate_type);
       if (!gate) {
         std::cerr << "Unsupported gate in current context: " << command
                   << std::endl;
         return nullptr;
       }
-      if (gate->is_parametrized_gate()) {
-        auto op = graph->new_gate(gate_type);
-        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
-        auto num_params = graph->context->get_gate(gate_type)->num_parameters;
-        for (int i = 0; i < num_params; ++i) {
-          assert(ss.good());
-          std::string token;
-          ss >> token;
-          // Currently only support the format of
-          // pi*0.123,
-          // 0.123*pi,
-          // 0.123*pi/2,
-          // 0.123
-          // pi/2
-          // pi
-          ParamType p = 0;
-          bool negative = token[0] == '-';
-          if (negative)
-            token = token.substr(1);
-          if (token.find("pi") == 0) {
-            if (token == "pi") {
-              // pi
-              p = PI;
-            } else {
-              auto d = token.substr(3, std::string::npos);
-              if (token[2] == '*') {
-                // pi*0.123
-                p = string_to_param(d) * PI;
-              } else if (token[2] == '/') {
-                // pi/2
-                p = PI / string_to_param(d);
-              } else {
-                std::cerr << "Unsupported parameter format: " << token
-                          << std::endl;
-                assert(false);
-              }
-            }
-          } else if (token.find("pi") != std::string::npos) {
-            // 0.123*pi
-            auto d = token.substr(0, token.find("*"));
-            p = string_to_param(d) * PI;
-            if (token.find("/") != std::string::npos) {
-              // 0.123*pi/2
-              p = p / string_to_param(token.substr(token.find("/") + 1));
-            }
-          } else {
-            // 0.123
-            p = string_to_param_without_pi(token);
-          }
-          if (negative)
-            p = -p;
-          auto src_op = graph->add_parameter(p);
-          int src_idx = 0;
+      int num_qubits = graph->context->get_gate(gate_type)->num_qubits;
+      int num_params = graph->context->get_gate(gate_type)->num_parameters;
+      auto op = graph->new_gate(gate_type);
+      for (int i = 0; i < num_params; ++i) {
+        assert(ss.good());
+        bool is_halved =
+            graph->context->get_gate(gate_type)->is_param_halved(i);
+        int index = param_parser->parse_expr(ss, is_halved);
+        if (index == -1) {
+          std::cerr << "Unknown parameter." << std::endl;
+          return nullptr;
+        }
+        auto src_op = graph->add_parameter_by_id(index);
+        int src_idx = 0;
+        auto dst_op = op;
+        auto dst_idx = num_qubits + i;
+        graph->add_edge(src_op, dst_op, src_idx, dst_idx);
+      }
+      for (int i = 0; i < num_qubits; ++i) {
+        assert(ss.good());
+        std::string token;
+        ss >> token;
+        std::string qreg_name = token.substr(0, token.find('['));
+        size_t qubit_idx_in_qreg = string_to_number(token);
+        size_t qubit_idx = qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
+        if (qubit_idx != -1) {
+          auto src_op = pos_on_qubits[qubit_idx].op;
+          auto src_idx = pos_on_qubits[qubit_idx].idx;
           auto dst_op = op;
-          auto dst_idx = num_qubits + i;
+          auto dst_idx = i;
           graph->add_edge(src_op, dst_op, src_idx, dst_idx);
-        }
-        for (int i = 0; i < num_qubits; ++i) {
-          assert(ss.good());
-          std::string token;
-          ss >> token;
-          std::string qreg_name = token.substr(0, token.find('['));
-          size_t qubit_idx_in_qreg = string_to_number(token);
-          size_t qubit_idx =
-              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
-          if (qubit_idx != -1) {
-            auto src_op = pos_on_qubits[qubit_idx].op;
-            auto src_idx = pos_on_qubits[qubit_idx].idx;
-            auto dst_op = op;
-            auto dst_idx = i;
-            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
-            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
-          } else
-            return nullptr;
-        }
-      } else if (gate->is_quantum_gate()) {
-        auto op = graph->new_gate(gate_type);
-        auto num_qubits = graph->context->get_gate(gate_type)->num_qubits;
-        for (int i = 0; i < num_qubits; ++i) {
-          assert(ss.good());
-          std::string token;
-          ss >> token;
-          std::string qreg_name = token.substr(0, token.find('['));
-          size_t qubit_idx_in_qreg = string_to_number(token);
-          size_t qubit_idx =
-              qubit_idx_in_qreg + qreg_name_2_start_idx[qreg_name];
-          if (qubit_idx != -1) {
-            auto src_op = pos_on_qubits[qubit_idx].op;
-            auto src_idx = pos_on_qubits[qubit_idx].idx;
-            auto dst_op = op;
-            auto dst_idx = i;
-            graph->add_edge(src_op, dst_op, src_idx, dst_idx);
-            pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
-          } else
-            return nullptr;
+          pos_on_qubits[qubit_idx] = Pos(dst_op, dst_idx);
+        } else {
+          std::cerr << "Unknown qubit." << std::endl;
+          return nullptr;
         }
       }
     } else {
@@ -1562,7 +1590,10 @@ std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
     std::cerr << "Failed to open " << filename << std::endl;
     return nullptr;
   }
-  auto graph = _from_qasm_stream(ctx, fin);
+  ParamParser param_parser(ctx);
+  // use_symbolic_pi is set to false in case the input includes floating-point
+  // numbers.
+  auto graph = _from_qasm_stream(ctx, &param_parser, fin);
   fin.close();
   return graph;
 }
@@ -1570,7 +1601,10 @@ std::shared_ptr<Graph> Graph::from_qasm_file(Context *ctx,
 std::shared_ptr<Graph> Graph::from_qasm_str(Context *ctx,
                                             const std::string &qasm_str) {
   std::stringstream sstream(qasm_str);
-  return _from_qasm_stream(ctx, sstream);
+  ParamParser param_parser(ctx);
+  // use_symbolic_pi is set to false in case the input includes floating-point
+  // numbers.
+  return _from_qasm_stream(ctx, &param_parser, sstream);
 }
 
 void Graph::draw_circuit(const std::string &src_file_name,

@@ -188,6 +188,7 @@ class Graph {
                               int dstIdx) const;
   Op add_qubit(int qubit_idx);
   Op add_parameter(const ParamType &p);
+  Op add_parameter_by_id(int param_index);
   Op new_gate(GateType gt);
   [[nodiscard]] bool has_loop() const;
   size_t hash();
@@ -276,12 +277,13 @@ class Graph {
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   [[nodiscard]] std::string to_qasm(bool print_result = false,
-                                    bool print_guid = false) const;
+                                    bool print_guid = false,
+                                    int param_precision = 6) const;
   void to_qasm(const std::string &save_filename, bool print_result,
                bool print_guid) const;
   template <class _CharT, class _Traits>
   static std::shared_ptr<Graph>
-  _from_qasm_stream(Context *ctx,
+  _from_qasm_stream(Context *ctx, ParamParser *param_parser,
                     std::basic_istream<_CharT, _Traits> &qasm_stream);
   static std::shared_ptr<Graph> from_qasm_file(Context *ctx,
                                                const std::string &filename);

@@ -17,7 +17,9 @@ static double geomean_gate_count = 1;
 static std::stringstream summary_result;
 
 void benchmark_nam(const std::string &circuit_name) {
-  std::string circuit_path = "circuit/nam-benchmarks/" + circuit_name + ".qasm";
+  std::string circuit_path = kQuartzRootPath.string() +
+                             "/circuit/nam-benchmarks/" + circuit_name +
+                             ".qasm";
   // Construct contexts
   ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,

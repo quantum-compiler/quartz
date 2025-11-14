@@ -1,6 +1,7 @@
 #include "quartz/context/context.h"
 #include "quartz/gate/gate.h"
 #include "quartz/parser/qasm_parser.h"
+#include "quartz/tasograph/tasograph.h"
 
 #include <cassert>
 
@@ -491,8 +492,8 @@ void test_printing_halved_params() {
   std::string str = "OPENQASM 2.0;\n"
                     "include \"qelib1.inc\";\n"
                     "qreg q[1];\n"
-                    "rx(2) q[0];\n"
-                    "p(2) q[0];\n";
+                    "rx(2.0) q[0];\n"
+                    "p(1.5) q[0];\n";
 #endif
 
   CircuitSeq *seq = nullptr;
@@ -506,6 +507,30 @@ void test_printing_halved_params() {
   if (act != str) {
     std::cout << "to_qasm_style_string: failed to handle halved parameters."
               << std::endl
+              << act << std::endl;
+    assert(false);
+  }
+}
+
+void test_loading_to_graph() {
+  ParamInfo param_info;
+  Context ctx({GateType::rz, GateType::input_qubit, GateType::input_param,
+               GateType::mult, GateType::pi},
+              1, &param_info);
+
+  std::string str = "OPENQASM 2.0;\n"
+                    "include \"qelib1.inc\";\n"
+                    "qreg q[1];\n"
+#ifdef USE_RATIONAL
+                    "rz(pi*1/2) q[0];\n";
+#else
+                    "rz(pi*0.500000) q[0];\n";
+#endif
+  auto graph = Graph::from_qasm_str(&ctx, str);
+
+  std::string act = graph->to_qasm();
+  if (act != str) {
+    std::cout << "to_qasm: failed to handle halved parameters." << std::endl
               << act << std::endl;
     assert(false);
   }
@@ -526,4 +551,7 @@ int main() {
   test_halved_param_ids();
   std::cout << "[Printing Halved Constant Parameters]" << std::endl;
   test_printing_halved_params();
+  std::cout << "[Graph Parsing Tests]" << std::endl;
+  test_loading_to_graph();
+  return 0;
 }

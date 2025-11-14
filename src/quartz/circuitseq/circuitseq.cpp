@@ -976,6 +976,8 @@ std::unique_ptr<CircuitSeq> CircuitSeq::read_json(Context *ctx,
 std::unique_ptr<CircuitSeq>
 CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
   QASMParser parser(ctx);
+  // use_symbolic_pi is set to false in case the input includes floating-point
+  // numbers.
   CircuitSeq *seq = nullptr;
   parser.load_qasm(filename, seq);
   std::unique_ptr<CircuitSeq> ret;
@@ -986,6 +988,8 @@ CircuitSeq::from_qasm_file(Context *ctx, const std::string &filename) {
 std::unique_ptr<CircuitSeq>
 CircuitSeq::from_qasm_style_string(Context *ctx, const std::string &str) {
   QASMParser parser(ctx);
+  // use_symbolic_pi is set to false in case the input includes floating-point
+  // numbers.
   CircuitSeq *seq = nullptr;
   parser.load_qasm_str(str, seq);
   std::unique_ptr<CircuitSeq> ret;

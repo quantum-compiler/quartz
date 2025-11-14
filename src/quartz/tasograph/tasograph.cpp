@@ -1432,8 +1432,8 @@ Graph::_from_qasm_stream(Context *ctx, ParamParser *param_parser,
   std::unordered_map<std::string, size_t> qreg_name_2_start_idx;
   size_t total_num_qubits = 0;
   while (std::getline(qasm_stream, line, ';')) {
-    // Unlike CircuitSeq which treats the following general control gate block
-    // as one gate, Graph treats them as three gates.
+    // Unlike CircuitSeq which treats the following general controlled gate
+    // block as one gate, Graph treats them as three gates.
     // //ctrl
     // x q[0];
     // cx q[0], q[1];

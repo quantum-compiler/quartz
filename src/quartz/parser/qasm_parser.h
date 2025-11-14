@@ -334,7 +334,7 @@ bool QASMParser::load_qasm_stream(
   GateType gate_type;
   while (std::getline(qasm_stream, line, ';')) {
     if (line.find("//ctrl") != std::string::npos) {
-      // Quartz's specific comment to enter a general control gate block
+      // Quartz's specific comment to enter a general controlled gate block
       assert(!in_general_controlled_gate_block);
       in_general_controlled_gate_block = true;
       general_control_flipped_qubits.clear();

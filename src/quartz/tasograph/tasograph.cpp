@@ -1437,7 +1437,8 @@ Graph::_from_qasm_stream(Context *ctx, ParamParser *param_parser,
     // //ctrl
     // x q[0];
     // cx q[0], q[1];
-    // x q[0]
+    // x q[0];
+
     // Remove comments
     auto comment_position = line.find("//");
     while (comment_position != std::string::npos) {

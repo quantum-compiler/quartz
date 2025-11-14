@@ -159,9 +159,13 @@ int ParamInfo::get_new_arithmetic_param_id(const ParamType &param) {
   int id = (int)parameter_class_.size();
   assert(id == (int)parameter_class_.size());
 #ifdef USE_RATIONAL
-  assert(param.denominator() == Int(1));
+  assert(param.denominator() == Int(1) &&
+         "Did you set use_symbolic_pi to true but used floating-point "
+         "expressions like pi*0.5?");
 #else
-  assert((int)param == param);
+  assert((int)param == param &&
+         "Did you set use_symbolic_pi to true but used floating-point "
+         "expressions like pi*0.5?");
 #endif
   parameter_class_.emplace_back(ParamClass::arithmetic_int);
   auto wire = std::make_unique<CircuitWire>();

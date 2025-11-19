@@ -1,6 +1,7 @@
 #include "verifier.h"
 
 #include "quartz/dataset/dataset.h"
+#include "quartz/tasograph/tasograph.h"
 #include "quartz/utils/utils.h"
 
 #include <algorithm>
@@ -45,6 +46,97 @@ bool Verifier::verify_transformation_steps(Context *ctx,
 
 bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
                           const CircuitSeq *circuit2, bool verbose) {
+  const int num_qubits = circuit1->get_num_qubits();
+  std::unique_ptr<CircuitSeq> c1, c2;
+  if (!extract_difference(ctx, circuit1, circuit2, c1, c2, verbose)) {
+    // Already printed out the reason there when verbose is true
+    return false;
+  }
+  if (c1->get_num_gates() == 0 && c2->get_num_gates() == 0) {
+    // The two circuits are equivalent.
+    if (verbose) {
+      std::cout << "Equivalent: same circuit." << std::endl;
+    }
+    return true;
+  }
+  // Remove qubits with no gates to avoid creating 2^num_qubits variables in the
+  // verifier.
+  std::vector<int> qubit_permutation(num_qubits, -1);
+  int remaining_qubits = 0;
+  for (int i = 0; i < num_qubits; i++) {
+    if (c1->outputs[i] != c1->wires[i].get() ||
+        c2->outputs[i] != c2->wires[i].get()) {
+      // qubit used in at least one of the two circuits
+      qubit_permutation[i] = remaining_qubits++;
+    }
+  }
+  if (remaining_qubits < num_qubits) {
+    if (verbose) {
+      std::cout << "Reducing the number of qubits from " << num_qubits << " to "
+                << remaining_qubits << std::endl;
+    }
+    c1 = c1->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
+    c2 = c2->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
+  }
+
+  if (verbose) {
+    std::cout << "Checking Verifier::equivalent() on:" << std::endl;
+    std::cout << c1->to_string(/*line_number=*/true, ctx) << std::endl;
+    std::cout << c2->to_string(/*line_number=*/true, ctx) << std::endl;
+    c1->to_qasm_file(ctx, kQuartzRootPath.string() + "/c1.qasm");
+    c2->to_qasm_file(ctx, kQuartzRootPath.string() + "/c2.qasm");
+  }
+
+  Dataset dataset;
+  bool ret = dataset.insert(ctx, std::move(c1));
+  assert(ret);
+  ret = dataset.insert_to_nearby_set_if_exists(ctx, std::move(c2));
+  if (ret) {
+    // no nearby set
+    if (verbose) {
+      std::cout << "Not equivalent: different hash values." << std::endl;
+    }
+    return false;  // hash value not equal or adjacent
+  }
+  ret = dataset.save_json(ctx,
+                          kQuartzRootPath.string() + "/tmp_before_verify.json");
+  assert(ret);
+  std::string command_string =
+      std::string("python ") + kQuartzRootPath.string() +
+      "/src/python/verifier/verify_equivalences.py " +
+      kQuartzRootPath.string() + "/tmp_before_verify.json " +
+      kQuartzRootPath.string() + "/tmp_after_verify.json" +
+      (verbose ? " True True" : "");
+  system(command_string.c_str());
+  EquivalenceSet equiv_set;
+  ret = equiv_set.load_json(ctx,
+                            kQuartzRootPath.string() + "/tmp_after_verify.json",
+                            /*from_verifier=*/true, nullptr);
+  assert(ret);
+  if (equiv_set.num_equivalence_classes() == 1) {
+    return true;  // equivalent
+  } else {
+    if (verbose) {
+      std::cout << "Not equivalent: Z3 cannot prove they are equivalent."
+                << std::endl;
+    }
+    return false;  // not equivalent
+  }
+}
+
+bool Verifier::extract_difference(Context *ctx, const CircuitSeq *circuit1,
+                                  const CircuitSeq *circuit2,
+                                  std::unique_ptr<CircuitSeq> &output_circuit1,
+                                  std::unique_ptr<CircuitSeq> &output_circuit2,
+                                  bool verbose) {
+  if (output_circuit1 || output_circuit2) {
+    if (verbose) {
+      std::cout << "Error: output_circuit1 and output_circuit2 should be both "
+                   "set to nullptr when calling extract_difference()."
+                << std::endl;
+    }
+    return false;
+  }
   if (circuit1->get_num_qubits() != circuit2->get_num_qubits()) {
     if (verbose) {
       std::cout << "Not equivalent: different numbers of qubits." << std::endl;
@@ -140,12 +232,13 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
     }
   }
 
-  auto c1 = circuit1->get_suffix_seq(frontier1, ctx);
-  auto c2 = circuit2->get_suffix_seq(frontier2, ctx);
+  output_circuit1 = circuit1->get_suffix_seq(frontier1, ctx);
+  output_circuit2 = circuit2->get_suffix_seq(frontier2, ctx);
   if (verbose) {
-    std::cout << "Removed " << circuit1->get_num_gates() - c1->get_num_gates()
+    std::cout << "Removed "
+              << circuit1->get_num_gates() - output_circuit1->get_num_gates()
               << " prefix gates from circuit1 and "
-              << circuit2->get_num_gates() - c2->get_num_gates()
+              << circuit2->get_num_gates() - output_circuit2->get_num_gates()
               << " prefix gates from circuit2." << std::endl;
     std::cout << "Frontier of circuit1:" << std::endl;
     for (auto &wire : frontier1) {
@@ -170,31 +263,23 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
   assert(circuit1->get_num_gates() - c1->get_num_gates() ==
          circuit2->get_num_gates() - c2->get_num_gates());
 
-  if (c1->get_num_gates() == 0 && c2->get_num_gates() == 0) {
-    // The two circuits are equivalent.
-    if (verbose) {
-      std::cout << "Equivalent: same circuit." << std::endl;
-    }
-    return true;
-  }
-
   // Remove common last gates
   while (true) {
     bool removed_anything = false;
     for (int i = 0; i < num_qubits; i++) {
-      if (c1->outputs[i]->input_gates.empty() ||
-          c2->outputs[i]->input_gates.empty()) {
+      if (output_circuit1->outputs[i]->input_gates.empty() ||
+          output_circuit2->outputs[i]->input_gates.empty()) {
         // At least of the two circuits does not have a gate at qubit i
         continue;
       }
       assert(c1->outputs[i]->input_gates.size() == 1);
       assert(c2->outputs[i]->input_gates.size() == 1);
-      auto gate1 = c1->outputs[i]->input_gates[0];
-      auto gate2 = c2->outputs[i]->input_gates[0];
+      auto gate1 = output_circuit1->outputs[i]->input_gates[0];
+      auto gate2 = output_circuit2->outputs[i]->input_gates[0];
       if (gate1->gate != gate2->gate ||
           gate1->input_wires.size() != gate2->input_wires.size() ||
-          !c1->is_one_of_last_gates(gate1) ||
-          !c2->is_one_of_last_gates(gate2)) {
+          !output_circuit1->is_one_of_last_gates(gate1) ||
+          !output_circuit2->is_one_of_last_gates(gate2)) {
         continue;
       }
       bool matched = true;
@@ -218,8 +303,8 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
         }
       }
       if (matched) {
-        c1->remove_gate_near_end(gate1);
-        c2->remove_gate_near_end(gate2);
+        output_circuit1->remove_gate_near_end(gate1);
+        output_circuit2->remove_gate_near_end(gate2);
         removed_anything = true;
       }
     }
@@ -227,70 +312,52 @@ bool Verifier::equivalent(Context *ctx, const CircuitSeq *circuit1,
       break;
     }
   }
+  return true;
+}
 
-  // Remove qubits with no gates to avoid creating 2^num_qubits variables in the
-  // verifier.
-  std::vector<int> qubit_permutation(num_qubits, -1);
-  int remaining_qubits = 0;
-  for (int i = 0; i < num_qubits; i++) {
-    if (c1->outputs[i] != c1->wires[i].get() ||
-        c2->outputs[i] != c2->wires[i].get()) {
-      // qubit used in at least one of the two circuits
-      qubit_permutation[i] = remaining_qubits++;
-    }
+std::string Verifier::difference_str(Context *ctx, const CircuitSeq *circuit1,
+                                     const CircuitSeq *circuit2,
+                                     int columns_before_midline,
+                                     int param_precision) {
+  std::unique_ptr<CircuitSeq> c1, c2;
+  if (!extract_difference(ctx, circuit1, circuit2, c1, c2, /*verbose=*/false)) {
+    return "(Error during extract_difference().)";
   }
-  if (remaining_qubits < num_qubits) {
-    if (verbose) {
-      std::cout << "Reducing the number of qubits from " << num_qubits << " to "
-                << remaining_qubits << std::endl;
-    }
-    c1 = c1->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
-    c2 = c2->get_permuted_seq(qubit_permutation, {}, ctx, remaining_qubits);
+  std::string result;
+  int num_gates = std::max(c1->get_num_gates(), c2->get_num_gates());
+  if (num_gates == 0) {
+    return "(same)";
   }
+  for (int i = 0; i < num_gates; i++) {
+    std::string line;
+    if (i < c1->get_num_gates()) {
+      line = c1->gates[i]->to_qasm_style_string(ctx, param_precision);
+      line.pop_back();  // remove '\n'
+    }
+    if (line.size() < columns_before_midline) {
+      line.append(columns_before_midline - line.size(), ' ');
+    }
+    line += "| ";
+    if (i < c2->get_num_gates()) {
+      line += c2->gates[i]->to_qasm_style_string(ctx, param_precision);
+      line.pop_back();  // remove '\n'
+    }
+    result += line + '\n';
+  }
+  return result;
+}
 
-  if (verbose) {
-    std::cout << "Checking Verifier::equivalent() on:" << std::endl;
-    std::cout << c1->to_string(/*line_number=*/true, ctx) << std::endl;
-    std::cout << c2->to_string(/*line_number=*/true, ctx) << std::endl;
-    c1->to_qasm_file(ctx, kQuartzRootPath.string() + "/c1.qasm");
-    c2->to_qasm_file(ctx, kQuartzRootPath.string() + "/c2.qasm");
+std::string Verifier::difference_str(const Graph *circuit1,
+                                     const Graph *circuit2,
+                                     int columns_before_midline,
+                                     int param_precision) {
+  if (circuit1->context != circuit2->context) {
+    return "(Error: different context.)";
   }
-
-  Dataset dataset;
-  bool ret = dataset.insert(ctx, std::move(c1));
-  assert(ret);
-  ret = dataset.insert_to_nearby_set_if_exists(ctx, std::move(c2));
-  if (ret) {
-    // no nearby set
-    if (verbose) {
-      std::cout << "Not equivalent: different hash values." << std::endl;
-    }
-    return false;  // hash value not equal or adjacent
-  }
-  ret = dataset.save_json(ctx,
-                          kQuartzRootPath.string() + "/tmp_before_verify.json");
-  assert(ret);
-  std::string command_string =
-      std::string("python ") + kQuartzRootPath.string() +
-      "/src/python/verifier/verify_equivalences.py " +
-      kQuartzRootPath.string() + "/tmp_before_verify.json " +
-      kQuartzRootPath.string() + "/tmp_after_verify.json" +
-      (verbose ? " True True" : "");
-  system(command_string.c_str());
-  EquivalenceSet equiv_set;
-  ret = equiv_set.load_json(ctx,
-                            kQuartzRootPath.string() + "/tmp_after_verify.json",
-                            /*from_verifier=*/true, nullptr);
-  assert(ret);
-  if (equiv_set.num_equivalence_classes() == 1) {
-    return true;  // equivalent
-  } else {
-    if (verbose) {
-      std::cout << "Not equivalent: Z3 cannot prove they are equivalent."
-                << std::endl;
-    }
-    return false;  // not equivalent
-  }
+  auto c1 = circuit1->to_circuit_sequence();
+  auto c2 = circuit2->to_circuit_sequence();
+  return difference_str(circuit1->context, c1.get(), c2.get(),
+                        columns_before_midline, param_precision);
 }
 
 bool Verifier::equivalent_on_the_fly(Context *ctx, CircuitSeq *circuit1,

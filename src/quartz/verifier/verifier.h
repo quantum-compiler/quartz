@@ -1,8 +1,8 @@
 #pragma once
 
+#include "quartz/circuitseq/circuitseq.h"
 #include "quartz/context/context.h"
 #include "quartz/dataset/equivalence_set.h"
-#include "quartz/circuitseq/circuitseq.h"
 
 namespace quartz {
 class Graph;
@@ -59,14 +59,14 @@ class Verifier {
    * @param param_precision The parameter precision for the output.
    * @return A string side-by-side for the difference.
    */
-  static std::string difference_str(Context *ctx, const CircuitSeq *circuit1,
-                                    const CircuitSeq *circuit2,
-                                    int columns_before_midline = 40,
-                                    int param_precision = kDefaultQASMParamPrecision);
-  static std::string difference_str(const Graph *circuit1,
-                                    const Graph *circuit2,
-                                    int columns_before_midline = 40,
-                                    int param_precision = kDefaultQASMParamPrecision);
+  static std::string
+  difference_str(Context *ctx, const CircuitSeq *circuit1,
+                 const CircuitSeq *circuit2, int columns_before_midline = 40,
+                 int param_precision = kDefaultQASMParamPrecision);
+  static std::string
+  difference_str(const Graph *circuit1, const Graph *circuit2,
+                 int columns_before_midline = 40,
+                 int param_precision = kDefaultQASMParamPrecision);
   // On-the-fly equivalence checking while generating circuits
   static bool equivalent_on_the_fly(Context *ctx, CircuitSeq *circuit1,
                                     CircuitSeq *circuit2);

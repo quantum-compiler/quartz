@@ -16,5 +16,5 @@ int main() {
   //                GateType::rxx3});
   auto graph =
       Graph::from_qasm_file(&ctx, "../experiment/nam_rm_circs/gf2^6_mult.qasm");
-  graph->to_qasm("test.qasm", false, false);
+  graph->to_qasm(std::string("test.qasm"), false, false);
 }

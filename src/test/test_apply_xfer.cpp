@@ -93,5 +93,5 @@ int main() {
     }
   }
 
-  best_graph->to_qasm("test.qasm", false, false);
+  best_graph->to_qasm(std::string("test.qasm"), false, false);
 }

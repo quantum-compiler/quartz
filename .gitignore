@@ -64,3 +64,4 @@ build/*
 
 # others
 .DS_Store
+.cache/

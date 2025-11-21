@@ -17,6 +17,6 @@ int main() {
   }
 
   Graph graph(&ctx, dag);
-  graph.to_qasm("temp.qasm", /*print_result=*/true, true);
+  graph.to_qasm(std::string("temp.qasm"), /*print_result=*/true, true);
   graph.draw_circuit("temp.qasm", "temp.png");
 }

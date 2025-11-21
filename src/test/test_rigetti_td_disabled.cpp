@@ -83,7 +83,8 @@ int main(int argc, char **argv) {
       &union_ctx_0, eqs_h_cz, fn, /*print_message=*/
       true);
   graph_after_h_cz_merge->to_qasm(
-      "circuit/voqc-benchmarks/after_h_cz_merge.qasm", false, false);
+      std::string("circuit/voqc-benchmarks/after_h_cz_merge.qasm"), false,
+      false);
 
   // Shift the context to Rigetti Agave
   RuleParser rules({"h q0 = rx q0 pi; rz q0 0.5pi; rx q0 0.5pi; rz q0 -0.5pi;",

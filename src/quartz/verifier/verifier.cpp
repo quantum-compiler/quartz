@@ -260,8 +260,8 @@ bool Verifier::extract_difference(Context *ctx, const CircuitSeq *circuit1,
     }
   }
   // We should have removed the same number of gates
-  assert(circuit1->get_num_gates() - c1->get_num_gates() ==
-         circuit2->get_num_gates() - c2->get_num_gates());
+  assert(circuit1->get_num_gates() - output_circuit1->get_num_gates() ==
+         circuit2->get_num_gates() - output_circuit2->get_num_gates());
 
   // Remove common last gates
   while (true) {
@@ -272,8 +272,8 @@ bool Verifier::extract_difference(Context *ctx, const CircuitSeq *circuit1,
         // At least of the two circuits does not have a gate at qubit i
         continue;
       }
-      assert(c1->outputs[i]->input_gates.size() == 1);
-      assert(c2->outputs[i]->input_gates.size() == 1);
+      assert(output_circuit1->outputs[i]->input_gates.size() == 1);
+      assert(output_circuit2->outputs[i]->input_gates.size() == 1);
       auto gate1 = output_circuit1->outputs[i]->input_gates[0];
       auto gate2 = output_circuit2->outputs[i]->input_gates[0];
       if (gate1->gate != gate2->gate ||

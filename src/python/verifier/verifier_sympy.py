@@ -567,7 +567,7 @@ def find_equivalences(
     # parameters generated for random testing
     parameters_for_fingerprint = input_file_data[0][1][1:]
     # evaluate rationals
-    parameters_for_fingerprint = [eval(p) for p in parameters_for_fingerprint]
+    parameters_for_fingerprint = [p if isinstance(p, float) else eval(p) for p in parameters_for_fingerprint]
     output_dict = {}
     equivalent_called = 0
     total_equivalence_found = 0

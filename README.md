@@ -295,7 +295,7 @@ organization of the Quartz code base.
 
 ## Issues
 
-Please file an issue or contact mingkuan@cmu.edu if you encounter any problems.
+Please file an issue or contact mingkuax@alumni.cmu.edu if you encounter any problems.
 
 ## Contributing
 

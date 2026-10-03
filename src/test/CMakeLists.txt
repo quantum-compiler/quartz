@@ -79,3 +79,6 @@ add_executable(verify_openqasm ${VERIFY_OPENQASM} )
 if(USE_ARBLIB)
     add_executable(test_arb ${TEST_ARB} )
 endif()
+
+add_executable(test_packed_graph test_packed_graph.cpp)
+add_executable(benchmark_compressed_search benchmark_compressed_search.cpp)

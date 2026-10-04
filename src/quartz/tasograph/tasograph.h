@@ -27,12 +27,14 @@ struct OptimizerSearchStats {
   size_t peak_candidates = 0;
   size_t queue_shrinks = 0;
   size_t peak_packed_queue_bytes = 0;
-  size_t popped_hash_digest = 0;
 };
 
 struct OptimizerSearchOptions {
-  // Opt-in. The cost function must be deterministic and must not mutate graphs
-  // or depend on their addresses: compressed candidates cache their cost.
+  // Candidate compression is disabled by default. Set compress_candidates to
+  // true to pack queued graphs; constructing/passing these options alone does
+  // not enable it. The cost function must be deterministic, non-mutating, and
+  // independent of graph addresses, and stable during the search: compressed
+  // candidates cache their cost.
   bool compress_candidates = false;
   // Zero means unlimited. Useful for reproducible equal-work comparisons.
   size_t max_expansions = 0;

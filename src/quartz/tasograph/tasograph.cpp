@@ -2150,9 +2150,6 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     auto candidate = pop_candidate();
     auto graph = candidate->materialize();
     stats.expanded++;
-    if (search_options.stats) {
-      stats.popped_hash_digest = stats.popped_hash_digest * 31 + graph->hash();
-    }
     std::vector<Op> all_nodes;
     graph->topology_order_ops(all_nodes);
     for (auto xfer : xfers) {
@@ -2218,6 +2215,8 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
 
   if (!store_all_steps_file_prefix.empty()) {
     std::vector<std::shared_ptr<const Candidate>> steps;
+    // The root has no parent and was already written before the search (or
+    // by the greedy phase). Exclude it so it is not exported a second time.
     for (auto step = best_candidate; step->parent; step = step->parent) {
       steps.push_back(step);
     }

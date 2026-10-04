@@ -1,5 +1,5 @@
-#include "quartz/tasograph/packed_graph.h"
 #include "quartz/tasograph/substitution.h"
+#include "quartz/tasograph/tasograph.h"
 
 #include <chrono>
 #include <iostream>
@@ -21,7 +21,17 @@ struct DeleteTestXfer {
   }
 };
 
-// Run each mode in a fresh process, e.g. /usr/bin/time -v <command>.
+// Run from the repository root, once per mode in a fresh process:
+//   ./build/benchmark_compressed_search reference|compressed
+//       circuit/nam_circs/barenco_tof_4.qasm
+//       eccset/Nam_5_3_complete_ECC_set.json 300
+// The final arguments are an expansion budget (0 means unlimited), an optional
+// timeout in seconds, and an optional step-file prefix. Compare equal budgets
+// for equal work, or use budget 0 for equal-time measurements. Repeat runs and
+// alternate mode order; use an external tool (e.g. /usr/bin/time -v on Linux)
+// for peak process memory. peak_packed_queue_bytes counts only snapshot
+// storage, not allocator/queue overhead, retained history, or other process
+// memory.
 int main(int argc, char **argv) {
   try {
     if (argc < 5) {
@@ -69,7 +79,6 @@ int main(int argc, char **argv) {
               << " peak_candidates=" << stats.peak_candidates
               << " shrinks=" << stats.queue_shrinks
               << " peak_packed_queue_bytes=" << stats.peak_packed_queue_bytes
-              << " popped_hash_digest=" << stats.popped_hash_digest
               << " best_cost=" << optimized->total_cost()
               << " result_hash=" << optimized->hash() << " seconds=" << seconds
               << '\n';

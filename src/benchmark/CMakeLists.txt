@@ -15,3 +15,6 @@ file(GLOB_RECURSE ILP_NUM_STAGES "ilp_num_stages.cpp")
 add_executable(benchmark_ilp_num_stages ${ILP_NUM_STAGES})
 file(GLOB_RECURSE DP "dp.cpp")
 add_executable(benchmark_dp ${DP})
+
+file(GLOB_RECURSE COMPRESSED_SEARCH "benchmark_compressed_search.cpp")
+add_executable(benchmark_compressed_search ${COMPRESSED_SEARCH})

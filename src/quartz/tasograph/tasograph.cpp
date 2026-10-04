@@ -898,8 +898,7 @@ bool Graph::move_forward(Pos &pos, bool left) {
 }
 
 bool Graph::moveable(GateType tp) {
-  if (tp == GateType::cx || tp == GateType::x || tp == GateType::rz ||
-      tp == GateType::u1)
+  if (tp == GateType::cx || tp == GateType::rz || tp == GateType::u1)
     return true;
   return false;
 }

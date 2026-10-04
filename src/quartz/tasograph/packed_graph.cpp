@@ -9,22 +9,22 @@ PackedGraph::PackedGraph(const Graph &graph)
     : context_(graph.context), special_op_guid_(graph.special_op_guid) {
   std::map<Op, Node, OpCompare> nodes;
   for (const auto &entry : graph.inEdges) {
-    nodes[entry.first].has_in_edges = true;
+    nodes.try_emplace(entry.first).first->second.has_in_edges = true;
   }
   size_t num_connections = 0;
   for (const auto &entry : graph.outEdges) {
-    nodes[entry.first].has_out_edges = true;
+    nodes.try_emplace(entry.first).first->second.has_out_edges = true;
     num_connections += entry.second.size();
     for (const auto &edge : entry.second) {
-      nodes[edge.srcOp];
-      nodes[edge.dstOp];
+      nodes.try_emplace(edge.srcOp);
+      nodes.try_emplace(edge.dstOp);
     }
   }
   for (const auto &entry : graph.input_qubit_op_2_qubit_idx) {
-    nodes[entry.first].qubit_index = entry.second;
+    nodes.try_emplace(entry.first).first->second.qubit_index = entry.second;
   }
   for (const auto &entry : graph.param_idx) {
-    nodes[entry.first].parameter_index = entry.second;
+    nodes.try_emplace(entry.first).first->second.parameter_index = entry.second;
   }
   if (nodes.size() > std::numeric_limits<uint32_t>::max()) {
     throw std::length_error("Too many operations to pack a search graph");
@@ -51,10 +51,10 @@ std::shared_ptr<Graph> PackedGraph::unpack() const {
   for (const auto &node : nodes_) {
     // Preserve empty map entries as well as isolated input qubits.
     if (node.has_in_edges) {
-      graph->inEdges[node.op];
+      graph->inEdges.try_emplace(node.op);
     }
     if (node.has_out_edges) {
-      graph->outEdges[node.op];
+      graph->outEdges.try_emplace(node.op);
     }
     if (node.qubit_index >= 0) {
       graph->input_qubit_op_2_qubit_idx.emplace(node.op, node.qubit_index);

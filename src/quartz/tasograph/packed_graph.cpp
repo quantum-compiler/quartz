@@ -9,11 +9,11 @@ PackedGraph::PackedGraph(const Graph &graph)
     : context_(graph.context), special_op_guid_(graph.special_op_guid) {
   std::map<Op, Node, OpCompare> nodes;
   for (const auto &entry : graph.inEdges) {
-    nodes.try_emplace(entry.first).first->second.has_in_edges = true;
+    nodes[entry.first].has_in_edges = true;
   }
   size_t num_connections = 0;
   for (const auto &entry : graph.outEdges) {
-    nodes.try_emplace(entry.first).first->second.has_out_edges = true;
+    nodes[entry.first].has_out_edges = true;
     num_connections += entry.second.size();
     for (const auto &edge : entry.second) {
       nodes.try_emplace(edge.srcOp);

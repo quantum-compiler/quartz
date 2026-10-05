@@ -1007,13 +1007,16 @@ void Graph::rotation_merging(GateType target_rotation) {
   std::unordered_map<Pos, int, PosHash> pos_to_qubits;
   std::queue<Op> todos;
 
+  const int num_qubits = (int)get_num_qubits();
+  const int sign_bit = num_qubits;
+
   // For all input_qubits, initialize its bitmap, and assign it a idx
   for (const auto &it : outEdges) {
     if (it.first.ptr->tp == GateType::input_qubit) {
       todos.push(it.first);
       int qubit_idx = input_qubit_op_2_qubit_idx[it.first];
       if (bitmasks.count(Pos(it.first, 0)) == 0) {
-        bitmasks[Pos(it.first, 0)] = Bitset(get_num_qubits());
+        bitmasks[Pos(it.first, 0)] = Bitset(num_qubits + 1);
       }
       bitmasks[Pos(it.first, 0)][qubit_idx] = true;
       pos_to_qubits[Pos(it.first, 0)] = qubit_idx;
@@ -1050,17 +1053,29 @@ void Graph::rotation_merging(GateType target_rotation) {
       //               pos_to_qubits[pos_list[0]]);
       pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_list[0]];
       pos_to_qubits[Pos(op, 1)] = pos_to_qubits[pos_list[1]];
+    } else if (op.ptr->tp == GateType::x) {
+      auto in_edge_list = inEdges[op];
+      Pos pos_in;
+      for (const auto &edge : in_edge_list) {
+        if (edge.dstIdx == 0) {
+          pos_in = Pos(edge.srcOp, edge.srcIdx);
+          break;
+        }
+      }
+      bitmasks[Pos(op, 0)] = bitmasks[pos_in];
+      bitmasks[Pos(op, 0)].flip(sign_bit);
+      pos_to_qubits[Pos(op, 0)] = pos_to_qubits[pos_in];
     } else if (op.ptr->tp != GateType::input_qubit &&
                op.ptr->tp != GateType::input_param) {
       auto in_edge_list = inEdges[op];
-      int num_qubits = op.ptr->get_num_qubits();
-      std::vector<Pos> pos_list(num_qubits);
+      int num_qubits_in_op = op.ptr->get_num_qubits();
+      std::vector<Pos> pos_list(num_qubits_in_op);
       for (const auto &edge : in_edge_list) {
-        if (edge.dstIdx < num_qubits) {
+        if (edge.dstIdx < num_qubits_in_op) {
           pos_list[edge.dstIdx] = Pos(edge.srcOp, edge.srcIdx);
         }
       }
-      for (int i = 0; i < num_qubits; ++i) {
+      for (int i = 0; i < num_qubits_in_op; ++i) {
         bitmasks[Pos(op, i)] = bitmasks[pos_list[i]];
         pos_to_qubits[Pos(op, i)] = pos_to_qubits[pos_list[i]];
       }

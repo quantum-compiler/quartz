@@ -2,6 +2,7 @@
 
 #include "quartz/utils/string_utils.h"
 
+#include <algorithm>
 #include <cassert>
 
 namespace quartz {

@@ -21,10 +21,10 @@ PackedGraph::PackedGraph(const Graph &graph)
     }
   }
   for (const auto &entry : graph.input_qubit_op_2_qubit_idx) {
-    nodes.try_emplace(entry.first).first->second.qubit_index = entry.second;
+    nodes[entry.first].qubit_index = entry.second;
   }
   for (const auto &entry : graph.param_idx) {
-    nodes.try_emplace(entry.first).first->second.parameter_index = entry.second;
+    nodes[entry.first].parameter_index = entry.second;
   }
   if (nodes.size() > std::numeric_limits<uint32_t>::max()) {
     throw std::length_error("Too many operations to pack a search graph");

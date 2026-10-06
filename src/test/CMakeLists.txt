@@ -79,3 +79,6 @@ add_executable(verify_openqasm ${VERIFY_OPENQASM} )
 if(USE_ARBLIB)
     add_executable(test_arb ${TEST_ARB} )
 endif()
+
+file(GLOB_RECURSE TEST_PACKED_GRAPH "test_packed_graph.cpp")
+add_executable(test_packed_graph ${TEST_PACKED_GRAPH})

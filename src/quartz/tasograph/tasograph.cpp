@@ -1,5 +1,6 @@
 #include "tasograph.h"
 
+#include "packed_graph.h"
 #include "quartz/math/bitset.h"
 #include "substitution.h"
 
@@ -1974,7 +1975,8 @@ Graph::optimize(Context *ctx, const EquivalenceSet &eqs,
                 const std::string &circuit_name, bool print_message,
                 std::function<float(Graph *)> cost_function,
                 double cost_upper_bound, double timeout,
-                const std::string &store_all_steps_file_prefix) {
+                const std::string &store_all_steps_file_prefix,
+                const OptimizerSearchOptions &search_options) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1991,7 +1993,7 @@ Graph::optimize(Context *ctx, const EquivalenceSet &eqs,
   return preprocessed_graph->optimize(
       xfers, cost_upper_bound, circuit_name, /*log_file_name=*/"",
       print_message, cost_function, timeout, store_all_steps_file_prefix,
-      /*continue_storing_all_steps=*/true);
+      /*continue_storing_all_steps=*/true, search_options);
 }
 
 std::shared_ptr<Graph>
@@ -2000,19 +2002,76 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                 const std::string &log_file_name, bool print_message,
                 std::function<float(Graph *)> cost_function, double timeout,
                 const std::string &store_all_steps_file_prefix,
-                bool continue_storing_all_steps) {
+                bool continue_storing_all_steps,
+                const OptimizerSearchOptions &search_options) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
   auto start = std::chrono::steady_clock::now();
-  std::priority_queue<std::shared_ptr<Graph>,
-                      std::vector<std::shared_ptr<Graph>>, GraphCompare>
-      candidates((GraphCompare(cost_function)));
+  // Only the current and best graphs remain materialized in compressed mode.
+  // History shares packed snapshots with the queue and releases pruned
+  // branches.
+  struct Candidate {
+    std::shared_ptr<Graph> graph;
+    std::shared_ptr<const PackedGraph> packed;
+    float cost;
+    std::shared_ptr<const Candidate> parent;
+
+    std::shared_ptr<Graph> materialize() const {
+      return packed ? packed->unpack() : graph;
+    }
+    size_t packed_bytes() const { return packed ? packed->storage_bytes() : 0; }
+  };
+  std::function<bool(const std::shared_ptr<const Candidate> &,
+                     const std::shared_ptr<const Candidate> &)>
+      compare = [&](const std::shared_ptr<const Candidate> &lhs,
+                    const std::shared_ptr<const Candidate> &rhs) {
+        return search_options.compress_candidates
+                   ? lhs->cost > rhs->cost
+                   : cost_function(lhs->graph.get()) >
+                         cost_function(rhs->graph.get());
+      };
+  using CandidateQueue =
+      std::priority_queue<std::shared_ptr<const Candidate>,
+                          std::vector<std::shared_ptr<const Candidate>>,
+                          decltype(compare)>;
+  CandidateQueue candidates(compare);
+  const bool record_history = !store_all_steps_file_prefix.empty();
+  auto make_candidate = [&](const std::shared_ptr<Graph> &graph, float cost,
+                            std::shared_ptr<const Candidate> parent) {
+    auto candidate = std::make_shared<Candidate>();
+    candidate->cost = cost;
+    if (search_options.compress_candidates) {
+      candidate->packed = std::make_shared<PackedGraph>(*graph);
+    } else {
+      candidate->graph = graph;
+    }
+    if (record_history) {
+      candidate->parent = std::move(parent);
+    }
+    return candidate;
+  };
+  OptimizerSearchStats stats;
+  size_t packed_queue_bytes = 0;
+  auto push_candidate = [&](std::shared_ptr<const Candidate> candidate) {
+    packed_queue_bytes += candidate->packed_bytes();
+    candidates.push(std::move(candidate));
+    stats.peak_candidates = std::max(stats.peak_candidates, candidates.size());
+    stats.peak_packed_queue_bytes =
+        std::max(stats.peak_packed_queue_bytes, packed_queue_bytes);
+  };
+  auto pop_candidate = [&]() {
+    auto candidate = candidates.top();
+    packed_queue_bytes -= candidate->packed_bytes();
+    candidates.pop();
+    return candidate;
+  };
   std::set<size_t> hashmap;
   std::shared_ptr<Graph> best_graph(new Graph(*this));
   auto best_cost = cost_function(this);
-
-  candidates.push(best_graph);
+  std::shared_ptr<const Candidate> best_candidate =
+      make_candidate(best_graph, best_cost, nullptr);
+  push_candidate(best_candidate);
   hashmap.insert(hash());
 
   int invoke_cnt = 0;
@@ -2028,7 +2087,6 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   }
 
   // Information necessary to store each step
-  std::unordered_map<Graph *, std::shared_ptr<Graph>> previous_graph;
   int step_count = 0;
   if (!store_all_steps_file_prefix.empty()) {
     if (continue_storing_all_steps) {
@@ -2052,24 +2110,22 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
               circuit_name.c_str(), (int)candidates.size());
     }
     auto shrink_start = std::chrono::steady_clock::now();
-    std::priority_queue<std::shared_ptr<Graph>,
-                        std::vector<std::shared_ptr<Graph>>, GraphCompare>
-        new_candidates((GraphCompare(cost_function)));
+    CandidateQueue new_candidates(compare);
     std::map<float, int> cost_count;
+    size_t kept_packed_bytes = 0;
     while (!candidates.empty()) {
-      auto candidate = candidates.top();
-      cost_count[cost_function(candidate.get())]++;
+      auto candidate = pop_candidate();
+      cost_count[search_options.compress_candidates
+                     ? candidate->cost
+                     : cost_function(candidate->graph.get())]++;
       if (new_candidates.size() < kShrinkToNumCandidates) {
-        new_candidates.push(candidate);
-      } else {
-        if (!store_all_steps_file_prefix.empty()) {
-          // no need to record history of removed graphs
-          previous_graph.erase(candidate.get());
-        }
+        kept_packed_bytes += candidate->packed_bytes();
+        new_candidates.push(std::move(candidate));
       }
-      candidates.pop();
     }
-    std::swap(candidates, new_candidates);
+    candidates.swap(new_candidates);
+    packed_queue_bytes = kept_packed_bytes;
+    stats.queue_shrinks++;
     auto shrink_end = std::chrono::steady_clock::now();
     if (print_message) {
       fprintf(
@@ -2088,9 +2144,12 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   };
 
   bool hit_timeout = false;
-  while (!candidates.empty()) {
-    auto graph = candidates.top();
-    candidates.pop();
+  while (!candidates.empty() &&
+         (search_options.max_expansions == 0 ||
+          stats.expanded < search_options.max_expansions)) {
+    auto candidate = pop_candidate();
+    auto graph = candidate->materialize();
+    stats.expanded++;
     std::vector<Op> all_nodes;
     graph->topology_order_ops(all_nodes);
     for (auto xfer : xfers) {
@@ -2120,17 +2179,16 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
           continue;
         }
         hashmap.insert(new_hash);
-        candidates.push(new_graph);
-        if (!store_all_steps_file_prefix.empty()) {
-          // record history
-          previous_graph[new_graph.get()] = graph;
-        }
+        auto new_candidate = make_candidate(new_graph, new_cost, candidate);
+        push_candidate(new_candidate);
+        stats.accepted++;
         if (candidates.size() > kMaxNumCandidates) {
           shrink_candidates();
         }
         if (new_cost < best_cost) {
           best_cost = new_cost;
           best_graph = new_graph;
+          best_candidate = new_candidate;
         }
       }
       if (hit_timeout) {
@@ -2156,18 +2214,18 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   }
 
   if (!store_all_steps_file_prefix.empty()) {
-    std::vector<Graph *> steps(1, best_graph.get());
-    while (previous_graph.count(steps.back()) > 0) {
-      // there is a previous graph
-      steps.push_back(previous_graph[steps.back()].get());
+    std::vector<std::shared_ptr<const Candidate>> steps;
+    // The root has no parent and was already written before the search (or
+    // by the greedy phase). Exclude it so it is not exported a second time.
+    for (auto step = best_candidate; step->parent; step = step->parent) {
+      steps.push_back(step);
     }
-    // no need to save the initial graph again
-    for (int i = (int)steps.size() - 2; i >= 0; i--) {
+    for (auto it = steps.rbegin(); it != steps.rend(); ++it) {
       step_count++;
-      steps[i]->to_qasm(store_all_steps_file_prefix +
-                            std::to_string(step_count) + ".qasm",
-                        /*print_result=*/false,
-                        /*print_guid=*/false);
+      (*it)->materialize()->to_qasm(store_all_steps_file_prefix +
+                                        std::to_string(step_count) + ".qasm",
+                                    /*print_result=*/false,
+                                    /*print_guid=*/false);
     }
 
     // Store the number of steps.
@@ -2176,6 +2234,12 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     fout_step.close();
   }
 
+  if (search_options.stats) {
+    *search_options.stats = stats;
+  }
+  if (fout && fout != stdout) {
+    fclose(fout);
+  }
   return best_graph;
 }
 

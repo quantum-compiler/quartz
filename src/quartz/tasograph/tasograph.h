@@ -19,6 +19,28 @@
 
 namespace quartz {
 
+// Optional per-search diagnostics, reset on each call. Packed bytes count only
+// queued snapshot storage, excluding history, queue overhead, and context data.
+struct OptimizerSearchStats {
+  size_t expanded = 0;
+  size_t accepted = 0;
+  size_t peak_candidates = 0;
+  size_t queue_shrinks = 0;
+  size_t peak_packed_queue_bytes = 0;
+};
+
+struct OptimizerSearchOptions {
+  // Candidate compression is disabled by default. Set compress_candidates to
+  // true to pack queued graphs; constructing/passing these options alone does
+  // not enable it. The cost function must be deterministic, non-mutating, and
+  // independent of graph addresses, and stable during the search: compressed
+  // candidates cache their cost.
+  bool compress_candidates = false;
+  // Zero means unlimited. Useful for reproducible equal-work comparisons.
+  size_t max_expansions = 0;
+  OptimizerSearchStats *stats = nullptr;
+};
+
 #define eps 1e-6
 
 bool param_equal(const ParamType &a, const ParamType &b);
@@ -240,6 +262,8 @@ class Graph {
    * @param timeout Timeout in seconds, for the search phase.
    * @param store_all_steps_file_prefix If not empty, store each circuit
    * transformation step in a file with the corresponding file prefix.
+   * @param search_options Optional candidate compression, work limit, and
+   * stats.
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
@@ -248,7 +272,8 @@ class Graph {
            std::function<float(Graph *)> cost_function = nullptr,
            double cost_upper_bound = -1 /*default = current cost * 1.05*/,
            double timeout = 3600 /*1 hour*/,
-           const std::string &store_all_steps_file_prefix = std::string());
+           const std::string &store_all_steps_file_prefix = std::string(),
+           const OptimizerSearchOptions &search_options = {});
   /**
    * Optimize this circuit without a greedy phase.
    * @param xfers The circuit transformations.
@@ -264,6 +289,8 @@ class Graph {
    * @param continue_storing_all_steps If true, there was a greedy phase
    * before calling this function with the same |store_all_steps_file_prefix|.
    * We should continue the numbering in this case.
+   * @param search_options Optional candidate compression, work limit, and
+   * stats.
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
@@ -273,7 +300,8 @@ class Graph {
            std::function<float(Graph *)> cost_function = nullptr,
            double timeout = 3600 /*1 hour*/,
            const std::string &store_all_steps_file_prefix = std::string(),
-           bool continue_storing_all_steps = false);
+           bool continue_storing_all_steps = false,
+           const OptimizerSearchOptions &search_options = {});
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   [[nodiscard]] std::string to_qasm(bool print_result = false,

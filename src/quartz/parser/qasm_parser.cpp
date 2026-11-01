@@ -1,5 +1,7 @@
 #include "qasm_parser.h"
 
+#include <cctype>
+
 namespace quartz {
 
 void find_and_replace_all(std::string &data, const std::string &tofind,
@@ -273,6 +275,11 @@ int ParamParser::parse_expr(std::stringstream &ss, bool is_halved) {
     while (pos != std::string::npos && pos > 0) {
       if (token[pos - 1] == '*') {
         // Case: t*-e (negative sign), ignored here
+        pos = token.find_last_of("+-", pos - 1);
+      } else if ((token[pos - 1] == 'e' || token[pos - 1] == 'E') && pos > 1 &&
+                 (std::isdigit((unsigned char)token[pos - 2]) ||
+                  token[pos - 2] == '.')) {
+        // Case: 1.5e-05 (sign of an exponent), ignored here
         pos = token.find_last_of("+-", pos - 1);
       } else {
         break;

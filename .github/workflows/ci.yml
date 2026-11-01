@@ -13,8 +13,10 @@ jobs:
         shell: bash -l {0}
     steps:
       - uses: actions/checkout@v3
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
+          # the runner image no longer provides a conda installation
+          miniforge-version: latest
           activate-environment: quartz
           environment-file: env.yml
       - name: Install Dependencies

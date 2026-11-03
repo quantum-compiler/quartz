@@ -19,14 +19,14 @@ void init_python_interpreter() {
   std::string new_python_path;
   if (current_python_path) {
     new_python_path = current_python_path;
-#ifdef WIN32
+#if defined(_WIN32) || defined(WIN32)
     new_python_path += ";";
 #else
     new_python_path += ":";
 #endif
   }
   new_python_path += python_module_path.string();
-#ifdef WIN32
+#if defined(_WIN32) || defined(WIN32)
   system("python -c \"import sys;"
          "print(sys.prefix)\" > tmp.txt");
   std::ifstream fin("tmp.txt");

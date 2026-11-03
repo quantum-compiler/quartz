@@ -158,14 +158,14 @@ class RuleParser {
 
  public:
   static RuleParser ccz_cx_rz_rules() {
-    return RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
-                       "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "
-                       "q0 q2; cx q0 q1; rz q1 -0.25pi; cx q0 q1; rz q0 "
-                       "0.25pi; rz q1 0.25pi; rz q2 0.25pi;",
-                       "ccz q0 q1 q2 = cx q1 q2; rz q2 0.25pi; cx q0 q2; rz "
-                       "q2 -0.25pi; cx q1 q2; rz q2 0.25pi; cx "
-                       "q0 q2; cx q0 q1; rz q1 0.25pi; cx q0 q1; rz q0 "
-                       "-0.25pi; rz q1 -0.25pi; rz q2 -0.25pi;"});
+    return RuleParser({"ccz q0 q1 q2 = cx q1 q2; rz q2 -0.125pi; cx q0 q2; rz "
+                       "q2 0.125pi; cx q1 q2; rz q2 -0.125pi; cx "
+                       "q0 q2; cx q0 q1; rz q1 -0.125pi; cx q0 q1; rz q0 "
+                       "0.125pi; rz q1 0.125pi; rz q2 0.125pi;",
+                       "ccz q0 q1 q2 = cx q1 q2; rz q2 0.125pi; cx q0 q2; rz "
+                       "q2 -0.125pi; cx q1 q2; rz q2 0.125pi; cx "
+                       "q0 q2; cx q0 q1; rz q1 0.125pi; cx q0 q1; rz q0 "
+                       "-0.125pi; rz q1 -0.125pi; rz q2 -0.125pi;"});
   }
 
   static RuleParser ccz_cx_u1_rules() {

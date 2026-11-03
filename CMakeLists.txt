@@ -30,6 +30,7 @@ link_directories(${Python_LIBRARY_DIRS})
 # pybind11
 execute_process(COMMAND ${Python_EXECUTABLE} -m pybind11 --cmakedir
         OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REPLACE "\"" "" pybind11_DIR "${pybind11_DIR}")
 find_package(pybind11 CONFIG REQUIRED)
 include_directories(${pybind11_INCLUDE_DIR})
 
@@ -111,16 +112,17 @@ target_link_libraries(quartz_runtime PUBLIC ${QUARTZ_LINK_LIBS})
 target_include_directories(quartz_runtime
         PUBLIC ${PROJECT_SOURCE_DIR}/src)
 
-execute_process(COMMAND cat /proc/version RESULT_VARIABLE NOT_LINUX)
-# TODO: check different OS in a better way here
-if (NOT_LINUX)
+if (WIN32)
+    message("build on Windows")
     if (NOT MSVC)
-        message("build on macOS, link openmp lib with compiler clang")
-        include_directories(/usr/local/include)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
-        find_library(OPENMP_LIB libomp.dylib PATHS /usr/local/lib /usr/local/opt/libomp/lib /opt/homebrew/opt/libomp/lib)
-        target_link_libraries(quartz_runtime LINK_PUBLIC ${OPENMP_LIB})
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
     endif()
+elseif (APPLE)
+    message("build on macOS, link openmp lib with compiler clang")
+    include_directories(/usr/local/include)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
+    find_library(OPENMP_LIB libomp.dylib PATHS /usr/local/lib /usr/local/opt/libomp/lib /opt/homebrew/opt/libomp/lib)
+    target_link_libraries(quartz_runtime LINK_PUBLIC ${OPENMP_LIB})
 else()
     message("build on Linux")
     if (DEFINED ENV{CC} AND DEFINED ENV{CXX})

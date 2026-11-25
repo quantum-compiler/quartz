@@ -532,8 +532,8 @@ Unsigned &Unsigned::shift10_eq(int x) {
       a.push_back(0);
       for (int i = 0; i < (int)a.size() - 1; i++)
         a[i] = a[i + 1] % tmp * (NUM / tmp) + a[i] / tmp;
-      update();
     }
+    update();
     return *this;
   }
 }
